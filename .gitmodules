@@ -8,5 +8,5 @@
 	path = externalPackages/netcdf-c
 	url = https://github.com/Unidata/netcdf-c.git
 [submodule "externalPackages/netcfd-fortran"]
-	path = externalPackages/netcfd-fortran
+	path = externalPackages/netcdf-fortran
 	url = https://github.com/Unidata/netcdf-fortran.git
