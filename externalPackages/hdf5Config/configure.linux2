@@ -1,0 +1,1 @@
+./configure --with-zlib=${FUNWAVE_PREFIX} --enable-shared  --enable-parallell --enable-fortran --prefix=${FUNWAVE_PREFIX}

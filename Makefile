@@ -15,8 +15,11 @@ export
 all: testGlobalConfig installExternalPackages
 
 testGlobalConfig:
-		@test -f platformsConfig/platform.${FUNWAVE_ARCH}|| { echo "Global config file does not exist for current platform: '"${FUNWAVE_ARCH}"'. Exiting..." ; exit 1; }
+		@test -f versionsConfig/version.${FUNWAVE_ARCH}|| { echo "Global config file does not exist for current version: '"${FUNWAVE_ARCH}"'. Exiting..." ; exit 1; }
 
 
 installExternalPackages:
 	cd externalPackages; make all
+
+clean_externalPackages: 
+	cd externalPackages && make -k distclean
