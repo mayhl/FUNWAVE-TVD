@@ -1,1 +1,1 @@
-./configure --with-zlib=${FUNWAVE_PREFIX} --enable-shared  --enable-parallell --enable-fortran --prefix=${FUNWAVE_PREFIX}
+ ./configure --prefix=${FUNWAVE_PREFIX} --with-zlib=${FUNWAVE_PREFIX} --enable-shared --enable-parallel --enable-fortran  LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib"

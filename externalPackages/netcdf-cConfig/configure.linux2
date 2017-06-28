@@ -1,1 +1,7 @@
-./configure --shared --prefix=${FUNWAVE_PREFIX}
+CC=mpicc ./configure --prefix=${FUNWAVE_PREFIX} \
+--enable-netcdf-4 --enable-parallel \
+--enable-shared --enable-static \
+CPPFLAGS="-I=${FUNWAVE_PREFIX}/include" \
+LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib"
+
+#--with-hdf5=${FUNWAVE_PREFIX} --with-zlib=${FUNWAVE_PREFIX} 
