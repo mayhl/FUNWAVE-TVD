@@ -1,1 +1,1 @@
- ./configure --prefix=${FUNWAVE_PREFIX} --with-zlib=${FUNWAVE_PREFIX} --enable-shared --enable-parallel --enable-fortran  LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib"
+CC=mpicc ./configure --prefix=${FUNWAVE_PREFIX} --with-zlib=${FUNWAVE_PREFIX} --enable-shared  --enable-static --enable-parallel --enable-fortran  LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib"
