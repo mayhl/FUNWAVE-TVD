@@ -21,7 +21,7 @@ testGlobalConfig:
 		@test -f versionsConfig/version.${FUNWAVE_ARCH}|| { echo "Global config file does not exist for current version: '"${FUNWAVE_ARCH}"'. Exiting..." ; exit 1; }
 
 installExternalPackages:
-	cd externalPackage && make all
+	cd externalPackages; make all
 
 clean_externalPackages: 
 	cd externalPackages && make -k distclean

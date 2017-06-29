@@ -1,7 +1,7 @@
 
 include ../versionsConfig/version.${FUNWAVE_ARCH}
 
-all:	install_netcdf_c
+all:	install_zlib install_hdf5 install_netcdf_c
 
 check_all: check_zlib check_hdf5 check_netcdf_c
 
@@ -28,7 +28,7 @@ check_zlib:
 install_zlib:	config_zlib build_zlib
 	@echo "Installing zlib"
 	@cd ${ZLIB_VERSION} && make install > ../install_zlib_progress 2>&1
-	@cat config_zlib_progress build_zlib_progress check_zlib_progress install_zlib_progress > install_zlib
+	@cat config_zlib_progress build_zlib_progress install_zlib_progress > install_zlib
 
 #hdf5
 
@@ -55,6 +55,7 @@ install_hdf5: config_hdf5 build_hdf5
 
 config_netcdf_c:
 	@echo "Configuring netCDF-c"
+	@cd ${NETCDF_C_VERSION} && autoreconf -ivf > ../autoreconf_netcdf_c_progress 2>&1
 	@cd ${NETCDF_C_VERSION} && ../netcdf-cConfig/configure.${FUNWAVE_ARCH} > ../config_netcdf_c_progress 2>&1
 
 build_netcdf_c:
@@ -68,7 +69,7 @@ check_netcdf_c:
 install_netcdf_c: config_netcdf_c build_netcdf_c
 	@echo "Installing netCDF-c"
 	@cd ${NETCDF_C_VERSION} && make install > ../install_netcdf_c_progress 2>&1
-	@cat config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
+	@cat autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
 
 
 #netCDF-fortran
