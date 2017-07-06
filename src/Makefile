@@ -51,7 +51,8 @@
 #            LIBS  = $(PV3LIB) $(CLIB)  $(PARLIB) $(IOLIBS) $(MPILIB) $(GOTMLIB)
 #            INCS  = $(IOINCS) $(GOTMINCS)
 
-
+	     LIBS = -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff
+	     INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include 
 #--------------------------------------------------------------------------
 #  Preprocessing and Compilation Directives
 #--------------------------------------------------------------------------

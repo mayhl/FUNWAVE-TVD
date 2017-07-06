@@ -161,7 +161,6 @@ SUBROUTINE PutFileBinary(FILE_NAME,PHI)
      IMPLICIT NONE
      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
      REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
-     REAL(SP),DIMENSION(Mloc,Nloc) :: PHITEST
 
      INTEGER ::  file_handler, ierr , istatus  , mem_type_loc , file_type_glob
      INTEGER(8) :: offset
@@ -218,4 +217,18 @@ SUBROUTINE PutFileBinary(FILE_NAME,PHI)
 
 END SUBROUTINE PutfileBinary
 
+SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
+
+
+      USE netcdf
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
+      REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
+
+      INTEGER :: mode_flag, ncid, test
+
+      test =  nf90_create(FILE_NAME,  NF90_MPIIO, ncid, &
+                       comm = MPI_COMM_WORLD, info = MPI_INFO_NULL)
+
+END SUBROUTINE PutFileNetCDF
 END MODULE PARALLEL_FIELD_IO

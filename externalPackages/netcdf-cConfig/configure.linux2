@@ -1,2 +1,2 @@
-CC=mpicc ./configure --prefix=${FUNWAVE_PREFIX} --enable-netcdf-4 --enable-parallel-tests --enable-shared --enable-static CPPFLAGS="-I=${FUNWAVE_PREFIX}/include" LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib"
+CC=mpicc ./configure --prefix=${FUNWAVE_PREFIX} --enable-netcdf-4 --disable-dap --enable-parallel-tests --enable-shared --enable-static CPPFLAGS="-I=${FUNWAVE_PREFIX}/include" LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib"
 
