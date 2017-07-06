@@ -3723,9 +3723,9 @@ SUBROUTINE PutFile(FILE_NAME,PHI)
      CHARACTER(LEN=80)::TMP_NAME=' '
 
      SELECT CASE (TRIM(FIELD_IO_TYPE))
-      CASE ('ASCII')
+      CASE ('ASCII' , 'ascii')
          CALL PutFileASCII(FILE_NAME,PHI)
-      CASE ('BINARY')
+      CASE ('BINARY' , 'binary' )
          Call PutFileBinary(FILE_NAME,PHI)
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input

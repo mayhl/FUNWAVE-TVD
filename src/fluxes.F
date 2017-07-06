@@ -411,6 +411,7 @@ END SUBROUTINE WAVE_SPEED
 !    05/06/2010 Fengyan Shi
 !    08/06/2015 Young-Kwang Choi, added DelxU4 and DelxU4 terms
 !    09/07/2015 Young-Kwang Choi, added MASK9u and MAST9v
+!    06/29/2017 Young-Kwang Choi, fix a bug in dimension of DelxU4 ..
 !
 !-------------------------------------------------------------------------------------
 SUBROUTINE CONSTRUCTION
@@ -418,8 +419,8 @@ SUBROUTINE CONSTRUCTION
      IMPLICIT NONE
 # if defined (CARTESIAN)
 ! ykchoi (15. 08. 06.)
-     REAL(SP),DIMENSION(Mloc1,Nloc) :: DelxU4, DelxV4
-     REAL(SP),DIMENSION(Mloc,Nloc1) :: DelyV4, DelyU4
+     REAL(SP),DIMENSION(Mloc,Nloc) :: DelxU4, DelxV4
+     REAL(SP),DIMENSION(Mloc,Nloc) :: DelyV4, DelyU4
 # endif
 
 ![ykchoi	(09.07.2015)

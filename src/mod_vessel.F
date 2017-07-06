@@ -97,7 +97,7 @@ CONTAINS
 ! READ VESSEL
 
 SUBROUTINE VESSEL_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL
                     
   USE INPUT_READ
   IMPLICIT NONE
@@ -200,14 +200,16 @@ SUBROUTINE VESSEL_INITIAL
   DO Kves = 1, NumVessel
 
 !  file name
-    itmp1=mod(Kves/1000,10)
-    itmp2=mod(Kves/100,10)
-    itmp3=mod(Kves/10,10)
-    itmp4=mod(Kves,10)
+    itmp1=mod(Kves/10000,10)
+    itmp2=mod(Kves/1000,10)
+    itmp3=mod(Kves/100,10)
+    itmp4=mod(Kves/10,10)
+    itmp5=mod(Kves,10)
     write(FILE_VESSEL(1:1),'(I1)')itmp1
     write(FILE_VESSEL(2:2),'(I1)')itmp2
     write(FILE_VESSEL(3:3),'(I1)')itmp3
     write(FILE_VESSEL(4:4),'(I1)')itmp4
+    write(FILE_VESSEL(5:5),'(I1)')itmp5
 
     TMP_NAME = TRIM(VESSEL_FOLDER)//'vessel_'//TRIM(FILE_VESSEL)
 

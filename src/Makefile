@@ -18,8 +18,17 @@
 #             FLAG_9 = -DZALPHA
 #             FLAG_10 = -DMANNING
 #             FLAG_11 = -DSPHERICAL_IJ_STATION
+<<<<<<< HEAD
+              FLAG_12 = -DVESSEL
+#              FLAG_13 = -DVIS_KENNEDY
+#              FLAG_14 = -DVESSEL_PANEL_SOURCE
+#              FLAG_15 = -DREALISTIC_VESSEL_BODY
+#              FLAG_16 = -DMETEO
+#              FLAG_17 = -DWIND
+=======
 #             FLAG_12 = -DVESSEL
 
+>>>>>>> 209b857ae70bc1cf36512bdccd29f5ef0380cecb
 #--------------------------------------------------------------------------
 #  mpi defs 
 #--------------------------------------------------------------------------
