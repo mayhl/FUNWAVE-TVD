@@ -1,0 +1,2 @@
+CC=mpicc FC=mpif90 F77=mpif77 ./configure --prefix=${FUNWAVE_PREFIX}  --enable-parallel-tests --enable-shared --enable-static CPPFLAGS="-I=${FUNWAVE_PREFIX}/include" LIBS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib  -lnetcdf -lhdf5hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz"
+

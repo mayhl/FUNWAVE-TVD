@@ -2,7 +2,7 @@
 include ../versionsConfig/version.${FUNWAVE_ARCH}
 
 
-all:	install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran
+all:	 install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran  
 
 # Note checks may take a while, in particular hdf5 check
 check_all:	check_zlib check_hdf5 check_netcdf_c check_netcdf_fortran
@@ -34,7 +34,7 @@ check_zlib:
 	@cd ${ZLIB_VERSION} && make test > ../check_zlib_progress 2>&1
 
 
-install_zlib:	config_zlib build_zlib check_zlib
+install_zlib:	config_zlib build_zlib
 	@echo "Installing zlib"
 	@cd ${ZLIB_VERSION} && make install > ../install_zlib_progress 2>&1
 	@cat config_zlib_progress build_zlib_progress install_zlib_progress > install_zlib
@@ -69,12 +69,16 @@ install_hdf5: config_hdf5 build_hdf5
 #--------
 
 # autoreconf used to genereate configure, makefiles, etc
-# flags used correctly call libtoolize, aclocal, autoconf, and automake
+# flags used correctly call, aclocal, autoconf, and automake
 # from autotools
+# Note: libtoolize not call with autoreconf -ivf on some platforms
 
 config_netcdf_c:
-	@echo "Configuring netCDF-c"
+	@echo "Libtoolize netCDF-c"
+	@cd ${NETCDF_C_VERSION} && libtoolize > ../libtoolize_netcdf_c_progress 2>&1
+	@echo "Autoreconf netCDF-c"
 	@cd ${NETCDF_C_VERSION} && autoreconf -ivf > ../autoreconf_netcdf_c_progress 2>&1
+	@echo "Configuring netCDF-c"
 	@cd ${NETCDF_C_VERSION} && ../netcdf-cConfig/configure.${FUNWAVE_ARCH} > ../config_netcdf_c_progress 2>&1
 
 
@@ -86,10 +90,10 @@ check_netcdf_c:
 	@echo "Checking netCDF-c"
 	@cd ${NETCDF_C_VERSION} && make check > ../check_netcdf_c_progress 2>&1
 
-install_netcdf_c: config_netcdf_c build_netcdf_c check_netcdf_c
+install_netcdf_c: config_netcdf_c build_netcdf_c
 	@echo "Installing netCDF-c"
 	@cd ${NETCDF_C_VERSION} && make install > ../install_netcdf_c_progress 2>&1
-	@cat autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
+	@cat libtoolize_netcdf_c_progress autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
 
 
 #--------------
@@ -99,6 +103,9 @@ install_netcdf_c: config_netcdf_c build_netcdf_c check_netcdf_c
 # autoreconf used to genereate configure, makefiles, etc
 # see previous note
 config_netcdf_fortran:
+	@echo "Libtoolize netCDF-fortran"
+	@cd ${NETCDF_F_VERSION} && libtoolize > ../libtoolize_netcdf_fortran_progress 2>&1
+	@echo "Autoreconf netCDF-fortran"
 	@cd ${NETCDF_F_VERSION} && autoreconf -ivf > ../autoreconf_netcdf_fortran_progress 2>&1
 	@echo "Configuring netCDF-fortran"
 	@cd ${NETCDF_F_VERSION} && ../netcdf-fortranConfig/configure.${FUNWAVE_ARCH} > ../config_netcdf_fortran_progress 2>&1
@@ -115,4 +122,4 @@ check_netcdf_fortran:
 install_netcdf_fortran: config_netcdf_fortran build_netcdf_fortran
 	@echo "Installing netCDF-fortran"
 	@cd ${NETCDF_F_VERSION} && make install > ../install_netcdf_fortran_progress 2>&1
-	@cat autoreconf_netcdf_fortran_progress config_netcdf_fortran_progress build_netcdf_fortran_progress  install_netcdf_fortran_progress > install_netcdf_fortran
+	@cat libtoolize_netcdf_fortran_progress autoreconf_netcdf_fortran_progress config_netcdf_fortran_progress build_netcdf_fortran_progress install_netcdf_fortran_progress > install_netcdf_fortran
