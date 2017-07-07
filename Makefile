@@ -1,6 +1,6 @@
 #setting environment variables from shell if they are not set
 FUNWAVE ?= $(shell pwd)
-FUNWAVE_ARCH ?= $(shell python -c "import sys; print sys.platform")
+FUNWAVE_ARCH ?= $(shell python -c "import sys; print (sys.platform)")
 FUNWAVE_PREFIX ?= ${FUNWAVE}/${FUNWAVE_ARCH}
 FUNWAVE_PYTHON ?= ${FUNWAVE_PREFIX}/bin/python
 ifeq ($(FUNWAVE_ARCH), darwin)

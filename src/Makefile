@@ -18,17 +18,13 @@
 #             FLAG_9 = -DZALPHA
 #             FLAG_10 = -DMANNING
 #             FLAG_11 = -DSPHERICAL_IJ_STATION
-<<<<<<< HEAD
               FLAG_12 = -DVESSEL
 #              FLAG_13 = -DVIS_KENNEDY
 #              FLAG_14 = -DVESSEL_PANEL_SOURCE
 #              FLAG_15 = -DREALISTIC_VESSEL_BODY
 #              FLAG_16 = -DMETEO
 #              FLAG_17 = -DWIND
-=======
-#             FLAG_12 = -DVESSEL
 
->>>>>>> 209b857ae70bc1cf36512bdccd29f5ef0380cecb
 #--------------------------------------------------------------------------
 #  mpi defs 
 #--------------------------------------------------------------------------
@@ -60,8 +56,14 @@
 #            LIBS  = $(PV3LIB) $(CLIB)  $(PARLIB) $(IOLIBS) $(MPILIB) $(GOTMLIB)
 #            INCS  = $(IOINCS) $(GOTMINCS)
 
-	     LIBS = -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff
-	     INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include 
+	  #   LIBS = -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff
+	 #    INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include
+	     LIBS =  -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff -lnetcdf -L/home/michaellam/FUNWAVE-TVD/linux/lib -Wl,-rpath=/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdf -lhdf5hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz
+
+
+
+	     INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include
+
 #--------------------------------------------------------------------------
 #  Preprocessing and Compilation Directives
 #--------------------------------------------------------------------------

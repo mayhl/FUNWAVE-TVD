@@ -3722,16 +3722,40 @@ SUBROUTINE PutFile(FILE_NAME,PHI)
 
      CHARACTER(LEN=80)::TMP_NAME=' '
 
+      REAL(SP) :: start_time , end_time, elapsed_time
+      REAL(SP) :: max_time, min_time, mean_time
+      INTEGER :: ierr
+      
+      start_time = MPI_Wtime()
+      
      SELECT CASE (TRIM(FIELD_IO_TYPE))
       CASE ('ASCII' , 'ascii')
          CALL PutFileASCII(FILE_NAME,PHI)
       CASE ('BINARY' , 'binary' )
          Call PutFileBinary(FILE_NAME,PHI)
+      CASE ( 'NETCDF' , 'netcdf' )
+         Call PutFileNetCDF(FILE_NAME,PHI)
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input
          CALL PutFileASCII(FILE_NAME,PHI)
      END SELECT
 
+         
+      end_time = MPI_Wtime()
+
+      elapsed_time = end_time - start_time
+
+     CALL MPI_Reduce( elapsed_time ,  max_time , 1 , mpi_sp , MPI_MAX , 0 , MPI_COMM_WORLD, ierr)
+     CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
+      CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
+
+      IF ( myid.EQ.0 ) THEN
+        mean_time = mean_time/(PY*PX)
+        WRITE(*,*) 'Mean Time: ' , mean_time
+         WRITE(*,*) 'Max Time: ' , mean_time
+         WRITE(*,*) 'Min Time: ' , min_time
+      END IF
+      
 END SUBROUTINE Putfile
 
 # else

@@ -225,10 +225,50 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
       CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
       REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
 
-      INTEGER :: mode_flag, ncid, test
+      REAL(SP) , DIMENSION(Mloc- 2*Nghost  , Nloc - 2*Nghost) :: TEST_DATA
+      INTEGER :: mode_flag, ncid, x_dimid , y_dimid, varid
 
-      test =  nf90_create(FILE_NAME,  NF90_MPIIO, ncid, &
-                       comm = MPI_COMM_WORLD, info = MPI_INFO_NULL)
+      INTEGER, DIMENSION(ndims) :: start, count, dimids, chunk_size
 
+      mode_flag = IOR(NF90_NETCDF4, NF90_MPIIO)
+      
+      CALL CheckNetCDF(nf90_create(FILE_NAME, mode_flag , ncid, &
+                       comm = MPI_COMM_WORLD, info = MPI_INFO_NULL))
+
+      CALL CheckNetCDF(nf90_def_dim(ncid, "x", Mglob , x_dimid))
+      CALL CheckNetCDF(nf90_def_dim(ncid, "y", Nglob , y_dimid))
+
+      dimids = (/ x_dimid, y_dimid /)
+
+      chunk_size = (/ Mloc- 2*Nghost  , Nloc - 2*Nghost  /)
+      
+      CALL CheckNetCDF(nf90_def_var(ncid, "data", NF90_DOUBLE, dimids, varid, chunksizes=chunk_size))
+      CALL CheckNetCDF(nf90_enddef(ncid))
+      
+      start = (/ iista , jjsta /)
+      count = chunk_size
+      !call CheckNetCDF(nf90_var_par_access(ncid, varid, nf90_collective))  
+      CALL CheckNetCDF(nf90_put_var(ncid, varid, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost) ) , start = start, &
+       count = count))
+
+
+      
+      CALL CheckNetCDF( nf90_close(ncid) )
+
+      
 END SUBROUTINE PutFileNetCDF
+
+
+SUBROUTINE CheckNetCDF(status)
+
+      USE netcdf
+      IMPLICIT NONE
+      INTEGER, INTENT (IN) :: status
+      
+      IF(status /=  nf90_noerr) THEN
+         WRITE (*,*) "NetCDF Error:" ,  trim(nf90_strerror(status))
+         STOP 2
+      END IF
+END SUBROUTINE CheckNetCDF
+      
 END MODULE PARALLEL_FIELD_IO

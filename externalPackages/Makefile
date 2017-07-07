@@ -2,7 +2,7 @@
 include ../versionsConfig/version.${FUNWAVE_ARCH}
 
 
-all:	 install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran  
+all:	 install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran 
 
 # Note checks may take a while, in particular hdf5 check
 check_all:	check_zlib check_hdf5 check_netcdf_c check_netcdf_fortran
