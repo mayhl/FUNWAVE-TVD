@@ -1,34 +1,49 @@
+% Clearing Matlab workspace
 clear all
+
+% -----------------------
+% ----- User Input ------
+% -----------------------
+
 fdir='../input_files/output/';
 fdir='C:\Users\Michael Lam\Desktop\simple_cases_input\beach_2D\';
 
 % Time series to plot
 nfile=[1,2];
 
-% Time values for series
+% Time values for series in minutes
 times = {'200','400'};
+
+% Plot resolution for vector field (sk=1 for full resolution) 
+sk=8;
+
+% -----------------------
+% -- End of user input --
+% -----------------------
 
 if (length(nfile) ~= length(times) )
     error('Number of files to load does not equal number of time series values.')
 end
 
-% Plot resolution for vector field (sk=1 for full resolution) 
-sk=8;
-
 % Getting domain dimensions
 eta=load([fdir 'eta_00001']);
 [n,m]=size(eta);
+
+% Setting up partition
 dx=2.0;
 dy=2.0;
 x=[0:m-1]*dx;
 y=[0:n-1]*dy;
 
+% Sponge layer location
 x_sponge=[0 100 100 0 0];
 y_sponge=[0 0 y(end) y(end) 0];
+
+% Wavemaker location
 x_wavemaker=[150 160 160 150 150];
 y_wavemaker=[0 0 y(end) y(end) 0];
 
-% Plot window dimensions
+% Dimensions of plot window 
 wid=4;
 len=5;
 set(gcf,'units','inches','paperunits','inches','papersize', [wid len],'position',[1 1 wid len],'paperposition',[0 0 wid len]);
@@ -36,14 +51,18 @@ clf
 
 
 for num=1:length(nfile)
-    
+
+% Padding integer number with zereo to
+% be 5 characters long e.g. 1 -> 00001
 fnum=sprintf('%.5d',nfile(num));
+
+% Loading data from files
 u=load([fdir 'umean_' fnum]);
 v=load([fdir 'vmean_' fnum]);
 ht=load([fdir 'Hsig_' fnum]);
 mask=load([fdir 'mask_' fnum]);
 
-% 
+% Removing masked points from plot
 u(mask==0)=NaN;
 v(mask==0)=NaN;
 ht(mask==0)=NaN;

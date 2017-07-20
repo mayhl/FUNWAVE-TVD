@@ -1,3 +1,4 @@
+% Clearing Matlab workspace
 clear all
 
 % -----------------------
@@ -31,6 +32,7 @@ len=4;
 set(gcf,'units','inches','paperunits','inches','papersize', [wid len],'position',[1 1 wid len],'paperposition',[0 0 wid len]);
 clf
 
+% Plotting depth
 pcolor(x,y,-dep),shading interp
 
 % Using demcmap if Mapping Toolbox is installed
@@ -42,6 +44,7 @@ end
 ylabel(' Lat (deg) ')
 xlabel(' Lon (deg) ')
 
+% Ploting color bars if toggled
 if ( plot_color_bars )
 cbar=colorbar;
 set(get(cbar,'ylabel'),'String','-depth (m) ') 
