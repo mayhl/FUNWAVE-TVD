@@ -6,7 +6,6 @@ clear all
 % -----------------------
 
 fdir='../input_files/output/';
-fdir='C:\Users\Michael Lam\Desktop\simple_cases_input\beach_2D\';
 
 % Time series to plot
 nfile=[1,2];

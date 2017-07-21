@@ -69,17 +69,3 @@ vessel(:,3)=yship+n/2*dy;;
 
 save -ASCII depth.txt dep
 save -ASCII vessel_0001 vessel
-
-
-
-
-
-
-
-
-    
-    
-    
-    
-    
-      
