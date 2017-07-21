@@ -38,10 +38,10 @@ TITLE = inlet_shoal_beach
    ! ----------------- TIME---------------------------------- 
    ! time: total computational time/ plot time / screen interval  
    ! all in seconds 
- TOTAL_TIME = 1200.0 
- PLOT_INTV = 30.0 
+ TOTAL_TIME = 7200.0 
+ PLOT_INTV = 300.0 
  PLOT_INTV_STATION = 0.5 
- SCREEN_INTV = 10.0 
+ SCREEN_INTV = 300.0 
 
    ! -----------------GRID---------------------------------- 
    ! if use spherical grid, in decimal degrees 
@@ -71,13 +71,14 @@ Xc_WK = 250.0
 Yc_WK = 0.0
 Ywidth_WK = 20000.0
   ! Wei and Kirby irregular wave
-FreqPeak = 0.0893
+FreqPeak = 0.1
 FreqMin = 0.03
 FreqMax = 0.3
 Hmo = 1.00
 GammaTMA = 3.3
 ThetaPeak = 30.0
 Sigma_Theta = 10.0
+EqualEnergy = T
   ! ---------------- PERIODIC BOUNDARY CONDITION --------- 
   ! South-North periodic boundary condition 
   ! 
@@ -129,13 +130,13 @@ Cbrk2 = 0.35
   ! ----------------- WAVE AVERAGE ------------------------ 
   ! if use smagorinsky mixing, have to set -DMIXING in Makefile 
   ! and set averaging time interval, T_INTV_mean, default: 20s 
-T_INTV_mean = 240.0 
-STEADY_TIME=480.0 
+T_INTV_mean = 1200.0 
+STEADY_TIME=1200.0 
 
   ! -----------------OUTPUT----------------------------- 
   ! stations  
   ! if NumberStations>0, need input i,j in STATION_FILE 
-NumberStations = 2
+NumberStations = 3
 STATIONS_FILE = gauges.txt 
   ! output variables, T=.TRUE, F = .FALSE. 
 DEPTH_OUT = T 

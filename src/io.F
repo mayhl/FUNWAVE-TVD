@@ -2868,7 +2868,7 @@ SUBROUTINE READ_INPUT
 
       IF(ierr.EQ.1) FIELD_IO_TYPE = 'ASCII'
       
-      IF (myid.EQ.0) WRITE(3,*) 'FIELD_TYPE_IO = ' , FIELD_IO_TYPE
+      IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
 # endif
 ! mayhl]
  

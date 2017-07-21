@@ -8,7 +8,7 @@ TITLE = levee_solitary
    !    PX,PY - processor numbers in X and Y 
    !    NOTE: make sure consistency with mpirun -np n (px*py) 
    !     
- PX = 2
+ PX = 4
  PY = 1
    ! --------------------DEPTH------------------------------------- 
    ! Depth types, DEPTH_TYPE=DATA: from depth file 
@@ -95,7 +95,7 @@ Cd = 0.01
   ! construction: HLLC 
   ! cfl condition: CFL 
   ! froude number cap: FroudeCap 
-! HIGH_ORDER = THIRD 
+HIGH_ORDER = THIRD 
   ! CFL 
 CFL = 0.1 
   ! Froude Number Cap (to avoid jumping drop, set 1.5) 
