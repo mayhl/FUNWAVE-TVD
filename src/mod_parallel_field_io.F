@@ -230,10 +230,13 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
       INTEGER, DIMENSION(ndims) :: start, count, dimids, chunk_size
 
-      mode_flag = IOR(NF90_NETCDF4, NF90_MPIIO)
       
-      CALL CheckNetCDF(nf90_create(FILE_NAME, mode_flag , ncid, &
-                       comm = MPI_COMM_WORLD, info = MPI_INFO_NULL))
+      mode_flag = IOR(NF90_MPIIO, NF90_CLOBBER)
+      mode_flag = IOR(mode_flag, NF90_NETCDF4)
+         
+
+      CALL CheckNetCDF(nf90_create_par(FILE_NAME, mode_flag , &
+                         MPI_COMM_WORLD,  MPI_INFO_NULL, ncid)) 
 
       CALL CheckNetCDF(nf90_def_dim(ncid, "x", Mglob , x_dimid))
       CALL CheckNetCDF(nf90_def_dim(ncid, "y", Nglob , y_dimid))
@@ -242,17 +245,29 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
       chunk_size = (/ Mloc- 2*Nghost  , Nloc - 2*Nghost  /)
       
-      CALL CheckNetCDF(nf90_def_var(ncid, "data", NF90_DOUBLE, dimids, varid, chunksizes=chunk_size))
-      CALL CheckNetCDF(nf90_enddef(ncid))
+      CALL CheckNetCDF(nf90_def_var( &
+      ncid, &
+      "fff", &
+      NF90_DOUBLE, &
+      dimids, &
+      varid))!, &
+     ! chunksizes=chunk_size))
       
+    !  WRITE(*,*) "Ending Def")
+      CALL CheckNetCDF(nf90_enddef(ncid))
+       
       start = (/ iista , jjsta /)
       count = chunk_size
-      !call CheckNetCDF(nf90_var_par_access(ncid, varid, nf90_collective))  
-      CALL CheckNetCDF(nf90_put_var(ncid, varid, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost) ) , start = start, &
-       count = count))
+      CALL CheckNetCDF(nf90_var_par_access(ncid, varid, nf90_collective))
+       
+     ! CALL CheckNetCDF(nf90_put_var(ncid, varid, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost) ) , start = start, &
+    !   count = count))
 
-
-      
+      CALL CheckNetCDF(nf90_put_var(ncid, varid, &
+      PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost) ) , & 
+      start = start, &
+      count = count)) 
+ 
       CALL CheckNetCDF( nf90_close(ncid) )
 
       
