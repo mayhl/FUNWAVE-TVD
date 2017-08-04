@@ -10,7 +10,18 @@ endif
 # exporting variables to submakes
 export
 
+
 .PHONY: all clean cleaner help
+
+
+test:
+	@echo 
+	@cd scripts && ./menu.sh ${BUILD} || exit 1
+	@echo ""
+	@echo "-----------------------------------------"
+	@echo "Building" $$(cat scripts/version.current) "Configuration"  
+	@echo "-----------------------------------------"
+# Note: Double $ is to pass out correctly between shells
 
 all: testGlobalConfig installExternalPackages
 
@@ -25,3 +36,5 @@ installExternalPackages:
 
 clean_externalPackages: 
 	cd externalPackages && make -k distclean
+%:
+    @: 
