@@ -18,6 +18,8 @@ EXIT_CODE=${#BUILDS[@]}
 
 OPTION_COUNT=$((EXIT_CODE-1))
 
+# Importing external functions
+. ./printTitle.sh --source-only
 
 parseInput ()
 {
@@ -49,13 +51,23 @@ parseInput ()
 
 	    # Testing if input value is exit code
 	    if [[ ${BUILD_SELECTED} == ${EXIT_CODE} ]] ; then
+		echo ""
 		echo "${ERROR_TYPE}: Exit code selected, exiting script!!!" 
 		exit 1
 	    else
 		# Export build to text file to be read by Makefile
 		# Note: Can not export varibles from child shell (current script)
 		#       to parent shell (Makefile recipe).
-		echo ${BUILDS[${BUILD_SELECTED}]} > version.current
+		BUILD=${BUILDS[${BUILD_SELECTED}]}
+
+		TITLE="Building ${BUILD} Version"
+		printTitle   
+#
+#		echo ${BUILD} > version.current.string
+#		BUILD=${BUILD// /.} 
+#		echo ${BUILD} > version.current.signature
+
+		
 		exit 0
 	    fi
 	fi
@@ -91,11 +103,9 @@ fi
 
 # Listing available builds
 
-echo ""
-echo "------"
-echo "Builds"
-echo "------"
-
+TITLE="BUILD"
+printTitle
+ 
 COUNTER=0
 while [ ${COUNTER} -lt ${EXIT_CODE} ]; do
 
@@ -107,8 +117,9 @@ done
 # List exit option
 echo "[${EXIT_CODE}] Exit" 	 
 
-ATTEMPTS=0
 
+# Attempt to read user input
+ATTEMPTS=0
 while [ ${ATTEMPTS} -lt ${MAX_ATTEMPTS} ]; do
 
     echo ""
@@ -123,10 +134,12 @@ done
 
 # Returning error if value build has not been
 # selected after loop has been completed
-echo "ERROR: Max attempt reached. Exiting Script"
+echo ""
+echo "ERROR: Max attempts reached. Exiting script!!!"
+echo ""
 exit 1 
 
-#BUILD=${BUILD// /_} 
+
 
 
 
