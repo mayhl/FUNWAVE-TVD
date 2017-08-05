@@ -1,12 +1,31 @@
+# exporting variables to submakes and scripts
+# Note: Required for bash scripts
+export
+
+#Note: ?= assignment operator evaulates expression on right hand side
+FUNWAVE_ARCH ?= ${shell cat ../scripts/version.current.signature}
+
+EXTERN_PACK_DIR=externalPackages/
 
 include ../versionsConfig/version.${FUNWAVE_ARCH}
 
+.PHONY: all clean cleaner help
+
+
+
+test:
+	@echo ${FUNWAVE_ARCH}
 
 all:	 install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran 
 
 # Note checks may take a while, in particular hdf5 check
 check_all:	check_zlib check_hdf5 check_netcdf_c check_netcdf_fortran
 
+
+verify_all_config_files: verify_zlib_config_file \
+			 verify_hdf5_config_file \
+			 verify_netcdf_c_config_file \
+			 verify_netcdf_fortran_config_file
 
 # Restores local submodules repos to original state and
 # cleans current version builds of submodules
@@ -20,6 +39,12 @@ distclean:
 #----
 #zlib
 #----
+
+verify_zlib_config_file:
+	${eval DIRECTORY=${EXTERN_PACK_DIR}zlibConfig/}
+	${eval NAME=zLib}
+	${eval SUB_NAME=configure}
+	@cd ../scripts && ./verifyConfigFile.sh  
 
 config_zlib:
 	@echo "Configuring zlib"
@@ -43,6 +68,13 @@ install_zlib:	config_zlib build_zlib
 #----
 #hdf5
 #----
+
+
+verify_hdf5_config_file:
+	${eval DIRECTORY=${EXTERN_PACK_DIR}hdf5Config/}
+	${eval NAME=HDF5}
+	${eval SUB_NAME=configure}
+	@cd ../scripts && ./verifyConfigFile.sh  
 
 config_hdf5:
 	@echo "Configuring hdf5"
@@ -68,11 +100,16 @@ install_hdf5: config_hdf5 build_hdf5
 #netCDF-c
 #--------
 
+verify_netcdf_c_config_file:
+	${eval DIRECTORY=${EXTERN_PACK_DIR}/netcdf-cConfig}
+	${eval NAME=NetCDF-C}
+	${eval SUB_NAME=configure}
+	@cd ../scripts && ./verifyConfigFile.sh
+
 # autoreconf used to genereate configure, makefiles, etc
 # flags used correctly call, aclocal, autoconf, and automake
 # from autotools
 # Note: libtoolize not call with autoreconf -ivf on some platforms
-
 config_netcdf_c:
 	@echo "Libtoolize netCDF-c"
 	@cd ${NETCDF_C_VERSION} && libtoolize > ../libtoolize_netcdf_c_progress 2>&1
@@ -99,6 +136,13 @@ install_netcdf_c: config_netcdf_c build_netcdf_c
 #--------------
 #netCDF-fortran
 #--------------
+
+
+verify_netcdf_fortran_config_file:
+	${eval DIRECTORY=${EXTERN_PACK_DIR}netcdf-fortranConfig/}
+	${eval NAME=NetCDF-Fortran}
+	${eval SUB_NAME=configure}
+	@cd ../scripts && ./verifyConfigFile.sh
 
 # autoreconf used to genereate configure, makefiles, etc
 # see previous note

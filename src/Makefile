@@ -58,11 +58,11 @@
 
 	  #   LIBS = -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff
 	 #    INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include
-	     LIBS =  -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff -lnetcdf -L/home/michaellam/FUNWAVE-TVD/linux/lib -Wl,-rpath=/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdf -lhdf5hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz
+	     LIBS =  -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff -lnetcdf -L/home/mayhl/Code/FUNWAVE-TVD/linux2/lib -Wl,-rpath=/home/mayhl/Code/FUNWAVE-TVD/linux2/lib -lnetcdf -lhdf5hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz
 
 
 
-	     INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include
+	     INCS = -I/home/mayhl/Code/FUNWAVE-TVD/linux2/include  
 
 #--------------------------------------------------------------------------
 #  Preprocessing and Compilation Directives
