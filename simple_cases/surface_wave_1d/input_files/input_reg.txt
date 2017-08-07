@@ -2,13 +2,13 @@
   ! NOTE: all input parameter are capital sensitive 
   ! --------------------TITLE------------------------------------- 
   ! title only for log file 
-TITLE = inlet_shoal_beach
+TITLE = regular_1D
   ! -------------------PARALLEL INFO----------------------------- 
    !  
    !    PX,PY - processor numbers in X and Y 
    !    NOTE: make sure consistency with mpirun -np n (px*py) 
    !     
- PX = 2
+ PX = 4
  PY = 1
    ! --------------------DEPTH------------------------------------- 
    ! Depth types, DEPTH_TYPE=DATA: from depth file 

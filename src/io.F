@@ -2868,7 +2868,7 @@ SUBROUTINE READ_INPUT
 
       IF(ierr.EQ.1) FIELD_IO_TYPE = 'ASCII'
       
-      IF (myid.EQ.0) WRITE(3,*) 'FIELD_TYPE_IO = ' , FIELD_IO_TYPE
+      IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
 # endif
 ! mayhl]
  
@@ -3490,6 +3490,11 @@ SUBROUTINE PREVIEW
         call PutFile(TMP_NAME,WindU2D)
         TMP_NAME = TRIM(FDIR)//'Vstorm_'//TRIM(FILE_NAME)
         call PutFile(TMP_NAME,WindV2D)
+    ENDIF
+
+    IF(MeteoGausian)THEN
+        TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
+        call PutFile(TMP_NAME,StormPressureTotal)
     ENDIF
 
     IF(SlideModel)THEN

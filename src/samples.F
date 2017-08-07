@@ -42,7 +42,7 @@
 !    either expressed or implied, of the FreeBSD Project.
 !  
 !-------------------------------------------------------------------------------------
-# if defined(SAMPLES)
+
 !-------------------------------------------------------------------------------------
 !
 !    SOLITARY_WAVE_LEFT_BOUNDARY is subroutine to provide 
@@ -75,10 +75,8 @@ SUBROUTINE SOLITARY_WAVE_LEFT_BOUNDARY
        enddo   
      
 END SUBROUTINE SOLITARY_WAVE_LEFT_BOUNDARY
-# endif
 
 
-# if defined(SAMPLES)
 !-------------------------------------------------------------------------------------
 !
 !    INITIAL_WAVE is subroutine to provide initial wave condition
@@ -154,9 +152,8 @@ SUBROUTINE INITIAL_WAVE
 213  continue
 
 END SUBROUTINE INITIAL_WAVE
-# endif
 
-# if defined(SAMPLES)
+
 !-------------------------------------------------------------------------------------
 !
 !    INITIAL_RECTANGULAR is subroutine to provide initial rectangular hump 
@@ -227,10 +224,8 @@ SUBROUTINE INITIAL_RECTANGULAR(M,N,Nghost,Dphi,Dtheta,Lon_West,Lat_South, &
 # endif
  
 END SUBROUTINE INITIAL_RECTANGULAR
-# endif
 
 
-# if defined(SAMPLES)
 !-------------------------------------------------------------------------------------
 !
 !    INITIAL_GAUSIAN is subroutine to provide initial gausian hump 
@@ -309,9 +304,8 @@ SUBROUTINE INITIAL_GAUSIAN(M,N,Nghost,Dphi,Dtheta,Lon_West,Lat_South, &
 # endif
  
 END SUBROUTINE INITIAL_GAUSIAN
-# endif
 
-# if defined(SAMPLES)
+
 !-------------------------------------------------------------------------------------
 !
 !    INITIAL_DIPOLE is subroutine to provide initial dipole 
@@ -394,9 +388,8 @@ SUBROUTINE INITIAL_DIPOLE(M,N,Nghost,Dphi,Dtheta,Lon_West,Lat_South, &
 # endif
  
 END SUBROUTINE INITIAL_DIPOLE
-# endif
 
-# if defined (SAMPLES)
+
 !-------------------------------------------------------------------------------------
 !
 !    INITIAL_N_WAVE is subroutine to provide initial N wave solution 
@@ -460,9 +453,8 @@ SUBROUTINE INITIAL_N_WAVE(M,N,DX,x1,x2,Ha,gamma_s,dep,U,V,Eta)
 
 
 END SUBROUTINE INITIAL_N_WAVE
-# endif
 
-# if defined(SAMPLES)
+
 !-------------------------------------------------------------------------------------
 !
 !    INITIAL_SOLITARY_WAVE is subroutine to provide initial solitary wave solution 
@@ -521,9 +513,8 @@ SUBROUTINE INITIAL_SOLITARY_WAVE(M,N,DX,Xwavemaker,&
 
 
 END SUBROUTINE INITIAL_SOLITARY_WAVE
-# endif
 
-# if defined(SAMPLES)
+
 !-------------------------------------------------------------------------------------
 !
 !    SUB_SLTRY is subroutine to provide solitary wave solution of Nogu equations
@@ -585,4 +576,3 @@ SUBROUTINE SUB_SLTRY(a0, h1, alp, r1, bue, ae1, ae2, au, C_ph)
          zr  = bue*rx*cph
 
 END SUBROUTINE SUB_SLTRY
-# endif

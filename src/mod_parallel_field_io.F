@@ -50,6 +50,8 @@
 !      12/06/2017 Michael-Angelo Y.-H. Lam
 !-------------------------------------------------------------------------------------
 
+# if defined (PARALLEL)
+
 MODULE PARALLEL_FIELD_IO
 USE GLOBAL
 
@@ -279,3 +281,6 @@ SUBROUTINE CheckNetCDF(status)
 END SUBROUTINE CheckNetCDF
       
 END MODULE PARALLEL_FIELD_IO
+
+# endif
+ ! end parallel

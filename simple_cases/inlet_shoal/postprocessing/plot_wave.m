@@ -1,5 +1,5 @@
 clear all
-fdir='/Users/fengyanshi15/FUNWAVE_GITHUB/BENCHMARKS_test/simple_inlet_case/saved_results/irr_30deg_brkwater_abs/';
+fdir='/Users/fengyanshi15/tmp1/';
 
 dep=load('../bathy/dep_shoal_inlet.txt');
 
@@ -15,8 +15,8 @@ x_wavemaker=[240 260 260 240 240];
 y_wavemaker=[0 0 y(end) y(end) 0];
 
 
-nfile=[5 30];
-min={'150' '900'};
+nfile=[5 7];
+min={'200' '300'};
 
 wid=8;
 len=5;

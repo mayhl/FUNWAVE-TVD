@@ -50,7 +50,8 @@ ETA_FILE = ../external_files/ETA_30min.txt
 U_FILE = ../external_files/U_30min.txt
 V_FILE = ../external_files/V_30min.txt
   ! ---------------- SPONGE LAYER ------------------------
-SPONGE_ON = T
+DIRECT_SPONGE = T
+FRICTION_SPONGE = T
 Sponge_west_width =  100000.0  ! in meters
 Sponge_east_width =  100000.0
 Sponge_south_width = 100000.0

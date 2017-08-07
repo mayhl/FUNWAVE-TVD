@@ -1,7 +1,7 @@
 #-----------BEGIN MAKEFILE-------------------------------------------------
             SHELL         = /bin/sh
             DEF_FLAGS     = -P -traditional 
-            EXEC          = funwave_gnu
+            EXEC          = funwave_vessel
 #==========================================================================
 #--------------------------------------------------------------------------
 #        PRECISION          DEFAULT PRECISION: SINGLE                     
@@ -10,21 +10,20 @@
 
             FLAG_1 = -DDOUBLE_PRECISION 
             FLAG_2 = -DPARALLEL
-            FLAG_3 = -DSAMPLES
+#            FLAG_3 = -DSAMPLES
             FLAG_4 = -DCARTESIAN
 #              FLAG_6 = -DINTEL
 #             FLAG_7 = -DMIXING
-#             FLAG_8 = -DCOUPLING
+              FLAG_8 = -DCOUPLING
 #             FLAG_9 = -DZALPHA
 #             FLAG_10 = -DMANNING
 #             FLAG_11 = -DSPHERICAL_IJ_STATION
-              FLAG_12 = -DVESSEL
+#               FLAG_12 = -DVESSEL
 #              FLAG_13 = -DVIS_KENNEDY
 #              FLAG_14 = -DVESSEL_PANEL_SOURCE
 #              FLAG_15 = -DREALISTIC_VESSEL_BODY
 #              FLAG_16 = -DMETEO
 #              FLAG_17 = -DWIND
-
 #--------------------------------------------------------------------------
 #  mpi defs 
 #--------------------------------------------------------------------------
@@ -95,7 +94,7 @@ OBJS = $(SRCS:.F=.o)
 
 $(EXEC):	$(OBJS)
 		$(FC) $(FFLAGS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
-		mv $(EXEC) ../bin/
+#		mv $(EXEC) ../bin/
 #--------------------------------------------------------------------------
 
 #--------------------------------------------------------------------------

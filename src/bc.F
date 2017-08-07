@@ -619,6 +619,8 @@ SUBROUTINE PHI_COLL(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,Nghost,PHI,VTYPE)
 # if defined (PARALLEL)
 # if defined (COUPLING)
     USE GLOBAL, ONLY : n_east,n_west,n_suth,n_nrth,&
+                     comm2d, ier,myid,PX,PY,&
+                       NumberProcessor,ProcessorID, &
         IN_DOMAIN_WEST,IN_DOMAIN_EAST,IN_DOMAIN_SOUTH,IN_DOMAIN_NORTH
 # else
     USE GLOBAL, ONLY : n_east,n_west,n_suth,n_nrth, &

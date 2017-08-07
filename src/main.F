@@ -192,11 +192,9 @@ Program FUNWAVE_TVD
    DO WHILE (TIME<TOTAL_TIME)
 
 
-# if defined (SAMPLES)
      IF(WaveMaker(1:7)=='LEF_SOL')THEN
        CALL SOLITARY_WAVE_LEFT_BOUNDARY
-     ENDIF  
-# endif 
+     ENDIF   
 
 ! update three variables
      Eta0=Eta

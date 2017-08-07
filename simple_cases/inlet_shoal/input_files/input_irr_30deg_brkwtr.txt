@@ -8,8 +8,8 @@ TITLE = inlet_shoal_beach
    !    PX,PY - processor numbers in X and Y 
    !    NOTE: make sure consistency with mpirun -np n (px*py) 
    !     
- PX = 8
- PY = 16
+ PX = 4
+ PY = 4
    ! --------------------DEPTH------------------------------------- 
    ! Depth types, DEPTH_TYPE=DATA: from depth file 
    !              DEPTH_TYPE=FLAT: idealized flat, need depth_flat 

@@ -65,6 +65,7 @@ MODULE METEO_MODULE
   IMPLICIT NONE
   SAVE
 
+       LOGICAL :: MeteoGausian = .FALSE.
        LOGICAL :: SlideModel = .FALSE.
        LOGICAL :: WindConstantField = .FALSE.
        LOGICAL :: WindForce = .FALSE.
@@ -84,6 +85,11 @@ MODULE METEO_MODULE
                 Pn_storm1, Pc_storm1,A_storm1,B_storm1, &
                 Pn_storm2, Pc_storm2,A_storm2,B_storm2, &
                 TimeStorm1,TimeStorm2,ThetaStorm
+
+!   Gausian
+    REAL(SP) :: DP_storm2,SigmaX2, SigmaY2, Theta2, &
+                DP_storm1,SigmaX1, SigmaY1, Theta1
+
     REAL(SP),DIMENSION(:,:),ALLOCATABLE :: StormPressureTotal, &
                                            StormPressureX,StormPressureY
     REAL(SP),DIMENSION(:),ALLOCATABLE ::  Xco,Yco
@@ -168,6 +174,21 @@ SUBROUTINE METEO_INITIAL
 # endif
        ENDIF
 
+  ! meteo gausian 2D
+      CALL READ_LOGICAL(MeteoGausian,FILE_NAME,'MeteoGausian',ierr)
+      IF(ierr==1)THEN
+        MeteoGausian = .FALSE.
+# if defined (PARALLEL)
+      if (myid.eq.0) THEN
+         WRITE(*,'(A40)')'not use MeteoGausian'
+         WRITE(3,'(A40)')'not use MeteoGausian'
+      endif
+# else
+         WRITE(*,'(A40)')'not use MeteoGausian'
+         WRITE(3,'(A40)')'not use MeteoGausian'
+# endif
+       ENDIF
+
   ! slide model
       CALL READ_LOGICAL(SlideModel,FILE_NAME,'SlideModel',ierr)
       IF(ierr==1)THEN
@@ -182,6 +203,11 @@ SUBROUTINE METEO_INITIAL
          WRITE(3,'(A40)')'not SlideModel'
 # endif
        ENDIF
+
+! ------------------ meteo gausian
+  IF(MeteoGausian)THEN
+         AirPressure = .TRUE.
+  ENDIF
 
 ! -------------------wind and pressure---------------
   IF(WindHollandModel.OR.WindConstantField)THEN
@@ -302,6 +328,13 @@ SUBROUTINE METEO_INITIAL
 
   ENDIF ! end holland model
 
+  IF(MeteoGausian) THEN
+
+     CALL MeteoGausian_Setup
+
+  ENDIF ! end meteogausian
+
+
   IF (WindConstantField) THEN
 
      CALL Contant_Wind_Field_Setup
@@ -327,6 +360,12 @@ SUBROUTINE METEO_FORCING
     CALL Holland_Model_Forcing
 
   ENDIF ! end holland model
+
+  IF (MeteoGausian) THEN
+
+    CALL MeteoGausian_Forcing
+
+  ENDIF ! end meteogausian
 
   IF(WindConstantField)THEN
 
@@ -886,6 +925,223 @@ SUBROUTINE Slide_Model_Forcing
     ENDDO
 
 END SUBROUTINE Slide_Model_Forcing
+
+SUBROUTINE MeteoGausian_Setup
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE
+  USE INPUT_READ
+  IMPLICIT NONE
+  CHARACTER(LEN=80)::FILE_NAME=' '
+  CHARACTER(LEN=80)::STORM_FILE =' '
+  CHARACTER(LEN=80)::TMP_NAME=' '
+  INTEGER :: Ifile,ierr
+  CHARACTER(LEN=80):: StormName
+
+! read storm from input.txt
+      FILE_NAME='input.txt'
+
+! storm file
+      CALL READ_STRING(STORM_FILE,FILE_NAME,'METEO_GAUSIAN_FILE',ierr)
+# if defined (PARALLEL)
+      if (myid.eq.0) WRITE(3,'(A15,A50)')'STORM_FILE:', STORM_FILE
+# else
+      WRITE(3,'(A15,A50)')'STORM_FILE:', STORM_FILE
+# endif
+
+
+      ALLOCATE (Xco(Mloc),Yco(Nloc))
+
+      
+! Xco, and Yco
+
+# if defined (PARALLEL)
+     Xco(Ibeg) = npx*(Mloc-2*Nghost)*DX
+# else
+     Xco(Ibeg) = ZERO
+# endif
+     DO I = Ibeg+1,Mloc
+       Xco(I) = Xco(I-1)+DX
+     ENDDO
+     DO I = Ibeg-1,Ibeg-Nghost,-1
+       Xco(I) = Xco(I+1)-DX
+     ENDDO
+
+# if defined (PARALLEL)
+     Yco(Jbeg) = npy*(Nloc-2*Nghost)*DY
+# else
+     Yco(Jbeg) = ZERO
+# endif
+     DO J = Jbeg+1,Nloc
+       Yco(J) = Yco(J-1)+DY
+     ENDDO
+     DO J = Jbeg-1,Jbeg-Nghost,-1
+       Yco(J) = Yco(J+1)-DY
+     ENDDO
+
+    TMP_NAME = TRIM(STORM_FILE)
+
+! check existing
+
+ INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
+  IF(.NOT.FILE_EXIST)THEN
+# if defined (PARALLEL)
+   IF(MYID==0)  &
+   WRITE(*,*) TRIM(TMP_NAME), 'CANNOT BE FOUND. STOP'
+   CALL MPI_FINALIZE (ier)
+   STOP
+# else
+    WRITE(*,*) TRIM(TMP_NAME), 'CANNOT BE FOUND. STOP'
+    STOP
+# endif
+  ENDIF
+
+! open file
+  Ifile=300
+  OPEN(Ifile,FILE=TRIM(TMP_NAME))
+
+! read file
+         READ(Ifile,*)  ! title
+         READ(Ifile,*)  StormName  !  name
+         READ(Ifile,*)  ! t,x,y, Pn, Pc, A and B
+         READ(Ifile,*)  TimeStorm2,Xstorm2,Ystorm2,  &
+                        DP_storm2,SigmaX2, SigmaY2, Theta2
+
+         TimeStorm1 = TimeStorm2
+         Xstorm1 = Xstorm2
+         Ystorm1 = Ystorm2
+         DP_storm1 = DP_storm2
+         SigmaX1 = SigmaX2
+         SigmaY1 = SigmaY2
+         Theta1 = Theta2
+
+# if defined (PARALLEL)
+   IF(MYID==0)THEN
+   WRITE(3,*) 'Storm Name: ',  TRIM(StormName)
+   WRITE(3,*) 'Initial Time, X, Y', TimeStorm2,Xstorm2,Ystorm2
+   WRITE(3,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+   ENDIF
+# else
+   WRITE(*,*) 'Storm Name: ',  TRIM(StormName)
+   WRITE(*,*) 'Initial Time, X, Y', TimeStorm2,Xstorm2,Ystorm2
+   WRITE(*,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+   WRITE(3,*) 'Storm Name: ',  TRIM(StormName)
+   WRITE(3,*) 'Initial Time, X, Y', TimeStorm2,Xstorm2,Ystorm2
+   WRITE(3,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+# endif
+
+END SUBROUTINE MeteoGausian_Setup
+
+SUBROUTINE MeteoGausian_Forcing
+  USE GLOBAL,ONLY : Mloc,Nloc,tmp1,tmp2,SMALL,TIME,ZERO
+  USE INPUT_READ
+  IMPLICIT NONE
+  INTEGER :: Ifile,ierr,I,J
+  REAL(SP) :: DP_storm,SigmaX, SigmaY, Theta
+  REAL(SP) :: Xstorm, Ystorm
+  REAL(SP) :: a,b,c
+
+    StormPressureTotal = ZERO
+
+    IF(TIME>TimeStorm1.AND.TIME>TimeStorm2) THEN
+
+         TimeStorm1=TimeStorm2
+         Xstorm1 = Xstorm2
+         Ystorm1 = Ystorm2
+
+    Ifile = 300
+
+    READ(Ifile,*,END=120)  TimeStorm2,Xstorm2,Ystorm2,  &
+                        DP_storm2,SigmaX2, SigmaY2, Theta2
+
+# if defined (PARALLEL)
+   IF(MYID==0)THEN
+     WRITE(3,*)'T,X,Y = ', TimeStorm2,Xstorm2,Ystorm2
+     WRITE(*,*)'T,X,Y = ', TimeStorm2,Xstorm2,Ystorm2
+   WRITE(3,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+   WRITE(*,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+   ENDIF
+# else
+   WRITE(*,*)'T,X,Y = ', TimeStorm2,Xstorm2,Ystorm2
+   WRITE(*,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+   WRITE(3,*)'T,X,Y = ', TimeStorm2,Xstorm2,Ystorm2
+   WRITE(3,*) 'dP,SigmaX,SigmaY, Theta: ', DP_storm2,SigmaX2, SigmaY2, Theta2
+# endif
+
+    ENDIF ! end time > timestorm2
+
+! calculate force
+    tmp2=ZERO
+    tmp1=ZERO
+
+    IF(TIME>TimeStorm1)THEN
+      IF(TimeStorm1.EQ.TimeStorm2)THEN
+        ! no more data
+        tmp2=ZERO
+        tmp1=ZERO
+      ELSE
+      tmp2=(TimeStorm2-TIME) &
+            /MAX(SMALL, ABS(TimeStorm2-TimeStorm1))
+      tmp1=1.0_SP - tmp2;
+      ENDIF  ! no more data?
+    ENDIF ! time>time_1
+
+    Xstorm = Xstorm2*tmp1 +Xstorm1*tmp2
+    Ystorm = Ystorm2*tmp1 +Ystorm1*tmp2
+    dP_storm = Dp_storm2*tmp1 + dP_storm1*tmp2
+    SigmaX = SigmaX2*tmp1 + SigmaX1*tmp2 
+    SigmaY= SigmaY2*tmp1 + SigmaY1*tmp2
+    Theta = (Theta2*tmp1 + Theta1*tmp2)*PI/180.0_SP
+
+120 CONTINUE  ! no more data for vessel Kves
+
+! sourceX and sourceY
+
+    IF(SigmaX .eq. ZERO .OR. SigmaY .eq. ZERO)THEN
+# if defined (PARALLEL)
+      if (myid.eq.0) THEN
+         WRITE(*,'(A40,A40)')'SigmaX or SigmaY:', 'ZERO, STOP'
+         WRITE(3,'(A40,A40)')'SigmaX or SigmaY:', 'ZERO, STOP'
+      endif
+       call MPI_FINALIZE ( ier )
+# else
+         WRITE(*,'(A40,A40)')'SigmaX or SigmaY:', 'ZERO, STOP'
+         WRITE(3,'(A40,A40)')'SigmaX or SigmaY:', 'ZERO, STOP'
+# endif
+        STOP
+     
+    ENDIF
+
+    a = (COS(Theta))**2/2.0_SP/SigmaX**2  &
+              + (SIN(Theta))**2/2.0_SP/SigmaY**2
+    b =-SIN(2.0_SP*Theta)/4.0_SP/SigmaX**2   &
+              + SIN(2.0_SP*Theta)/4.0_SP/SigmaY**2
+    c = (SIN(Theta))**2/2.0_SP/SigmaX**2  &
+              + (COS(Theta))**2/2.0_SP/SigmaY**2
+
+    DO J=1,Nloc
+    DO I=1,Mloc
+
+       StormPressureTotal(I,J)=dP_Storm*EXP(-(a*(Xco(I)-Xstorm)**2 &
+                         +2.0_SP*b*(Xco(I)-Xstorm)*(Yco(J)-Ystorm)  &
+                         +c*(Yco(J)-Ystorm)**2))/100.0_SP
+
+       !   /100.0_SP  ! convert from cm to meter
+
+
+    ENDDO
+    ENDDO
+
+    DO J=Jbeg,Jend
+    DO I=Ibeg,Iend
+       StormPressureX(I,J) = -Grav*H(I,J)*  &
+               (StormPressureTotal(I+1,J)-StormPressureTotal(I-1,J))/2.0_SP  &
+               /DX
+       StormPressureY(I,J) = -Grav*H(I,J)*  &
+               (StormPressureTotal(I,J+1)-StormPressureTotal(I,J-1))/2.0_SP  &
+               /DY
+    ENDDO
+    ENDDO
+
+END SUBROUTINE MeteoGausian_Forcing
 
 
 END MODULE METEO_MODULE

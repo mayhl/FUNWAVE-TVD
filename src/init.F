@@ -725,23 +725,23 @@ SUBROUTINE INITIALIZATION
      IF(INI_UVZ) THEN
         CALL INITIAL_UVZ
      ENDIF 
-# if defined(SAMPLES)
+
 ! initial solitary wave
      IF(WaveMaker(1:7)=='INI_SOL') THEN
        CALL INITIAL_SOLITARY_WAVE(Mloc,Nloc, DX,Xwavemaker,& 
           AMP_SOLI,Dep_Soli,Beta_ref,U,V,Eta)
      ENDIF
-# endif
 
-# if defined(SAMPLES)
+
+
 ! initial N wave
      IF(WaveMaker(1:6)=='N_WAVE') THEN
        CALL INITIAL_N_WAVE(Mloc,Nloc, DX,x1_Nwave,& 
           x2_Nwave,a0_Nwave,gamma_Nwave,dep_Nwave,U,V,Eta)
      ENDIF
-# endif
 
-# if defined(SAMPLES)
+
+
 ! initial rectangular hump
      IF(WaveMaker(1:7)=='INI_REC') THEN
 # if defined (CARTESIAN)
@@ -752,9 +752,8 @@ SUBROUTINE INITIALIZATION
              Xc,Yc,WID,AMP_SOLI,Eta)
 # endif
      ENDIF
-# endif
 
-# if defined(SAMPLES)
+
 ! initial gausian hump
      IF(WaveMaker(1:7)=='INI_GAU') THEN
 # if defined (CARTESIAN)
@@ -775,14 +774,14 @@ SUBROUTINE INITIALIZATION
              Xc,Yc,AMP_SOLI,WID,Eta)
 # endif
      ENDIF
-# endif
 
-# if defined(SAMPLES)
+
+
 ! initial wave surface
      IF(WaveMaker(1:7)=='INI_OTH') THEN
        CALL INITIAL_WAVE
      ENDIF
-# endif
+
 
      CALL WAVEMAKER_INITIALIZATION
    
