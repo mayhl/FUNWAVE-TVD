@@ -1,0 +1,11 @@
+
+CCP_VERSION		= /usr/bin/cpp 
+MPICC_VERSION		= icc
+MPIFC_VERSION		= ifort
+
+MPILIB_VERSION		= -lmpi
+
+ZLIB_VERSION		= zlib
+HDF5_VERSION	  	= hdf5
+NETCDF_C_VERSION  	= netcdf-c
+NETCDF_F_VERSION  	= netcdf-fortran

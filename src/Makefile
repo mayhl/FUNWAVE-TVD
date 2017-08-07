@@ -2,6 +2,10 @@
             SHELL         = /bin/sh
             DEF_FLAGS     = -P -traditional 
             EXEC          = funwave_vessel
+
+	   FUNWAVE_ARCH   ?= ${shell cat ../currentVersion/signature}
+include ../versionsConfig/version.${FUNWAVE_ARCH} 
+
 #==========================================================================
 #--------------------------------------------------------------------------
 #        PRECISION          DEFAULT PRECISION: SINGLE                     
@@ -27,9 +31,9 @@
 #--------------------------------------------------------------------------
 #  mpi defs 
 #--------------------------------------------------------------------------
-         CPP      = /usr/bin/cpp 
+         CPP      = ${CCP_VERSION} 
          CPPFLAGS = $(DEF_FLAGS)
-         FC       = mpif90
+         FC       = ${MPIFC_VERSION}
          DEBFLGS  = 
          OPT      = 
          CLIB     = 
@@ -38,6 +42,7 @@
          FFLAGS = $(DEBFLGS) $(OPT) 
          MDEPFLAGS = --cpp --fext=f90 --file=-
          RANLIB = ranlib
+	 MPILIB = ${MPILIB_VERSION}
 #--------------------------------------------------------------------------
 #  CAT Preprocessing Flags
 #--------------------------------------------------------------------------
@@ -55,13 +60,8 @@
 #            LIBS  = $(PV3LIB) $(CLIB)  $(PARLIB) $(IOLIBS) $(MPILIB) $(GOTMLIB)
 #            INCS  = $(IOINCS) $(GOTMINCS)
 
-	  #   LIBS = -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff
-	 #    INCS = -I/home/michaellam/FUNWAVE-TVD/linux/include
-	     LIBS =  -L/home/michaellam/FUNWAVE-TVD/linux/lib -lnetcdff -lnetcdf -L/home/mayhl/Code/FUNWAVE-TVD/linux2/lib -Wl,-rpath=/home/mayhl/Code/FUNWAVE-TVD/linux2/lib -lnetcdf -lhdf5hl_fortran -lhdf5_fortran -lhdf5_hl -lhdf5 -lz
-
-
-
-	     INCS = -I/home/mayhl/Code/FUNWAVE-TVD/linux2/include  
+	     LIBS ?= -L${shell cat ../currentVersion/flibs} 
+	     INCS ?= -I${shell cat ../currentVersion/include}
 
 #--------------------------------------------------------------------------
 #  Preprocessing and Compilation Directives
