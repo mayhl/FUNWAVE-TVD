@@ -1,7 +1,9 @@
 
-CC_VERSION		= /usr/bin/cpp 
+CCP_VERSION		= /usr/bin/cpp 
 MPICC_VERSION		= mpicc
 MPIFC_VERSION		= mpif90
+
+MPILIB_VERSION		=
 
 ZLIB_VERSION		= zlib
 HDF5_VERSION	  	= hdf5
