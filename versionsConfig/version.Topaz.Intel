@@ -1,7 +1,7 @@
 
-CCP_VERSION		= /usr/bin/cpp 
+CCP_VERSION		= cpp
 MPICC_VERSION		= mpiicc
-MPIFC_VERSION		= mpiifort
+MPIFC_VERSION		= mpiifort -fpp
 
 MPILIB_VERSION		=
 
@@ -9,3 +9,15 @@ ZLIB_VERSION		= zlib
 HDF5_VERSION	  	= hdf5
 NETCDF_C_VERSION  	= netcdf-c
 NETCDF_F_VERSION  	= netcdf-fortran
+
+
+#CC=mpiicc
+#CXX=mpiicpc
+#CFLAGS='-O3 -xHost -ip -no-prec-div -static-intel'
+#CXXFLAGS='-O3 -xHost -ip -no-prec-div -static-intel'
+#F77=mpiifort
+#FC=mpiifort
+#F90=mpiifort
+#FFLAGS='-O3 -xHost -ip -no-prec-div -static-intel'
+#CPP=icc
+#CXXCPP=icpc

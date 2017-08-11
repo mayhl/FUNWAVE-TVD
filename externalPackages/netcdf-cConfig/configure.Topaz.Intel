@@ -1,0 +1,17 @@
+CC=mpiicc \
+CXX=mpiicpc \
+F77=mpiifort \
+FC=mpiifort \
+F90=mpiifort \
+CPP='mpiicc -E' \
+CXXCPP='mpiicpc -E' \
+./configure \
+--prefix=${FUNWAVE_PREFIX} \
+--enable-netcdf-4 \
+--disable-dap \
+--enable-parallel-tests \
+CPPFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
+CXXFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
+CFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
+FFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
+LDFLAGS="-L${FUNWAVE_PREFIX}/lib" 

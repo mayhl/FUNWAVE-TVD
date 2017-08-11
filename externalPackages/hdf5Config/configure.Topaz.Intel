@@ -1,0 +1,9 @@
+CC=mpiicc \
+F9X=mpiifort \
+CXX=mpiicpc \
+./configure \
+--prefix=${FUNWAVE_PREFIX} \
+--with-zlib=${FUNWAVE_PREFIX} \
+--enable-fortran \
+--enable-parallel \
+LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib" 
