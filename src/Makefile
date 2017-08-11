@@ -16,9 +16,9 @@ include ../versionsConfig/version.${FUNWAVE_ARCH}
             FLAG_2 = -DPARALLEL
 #            FLAG_3 = -DSAMPLES
             FLAG_4 = -DCARTESIAN
-#              FLAG_6 = -DINTEL
+              FLAG_6 = -DINTEL
 #             FLAG_7 = -DMIXING
-              FLAG_8 = -DCOUPLING
+#              FLAG_8 = -DCOUPLING
 #             FLAG_9 = -DZALPHA
 #             FLAG_10 = -DMANNING
 #             FLAG_11 = -DSPHERICAL_IJ_STATION
@@ -94,7 +94,7 @@ OBJS = $(SRCS:.F=.o)
 
 $(EXEC):	$(OBJS)
 		$(FC) $(FFLAGS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
-#		mv $(EXEC) ../bin/
+		mv $(EXEC) ../bin/
 #--------------------------------------------------------------------------
 
 #--------------------------------------------------------------------------

@@ -16,42 +16,37 @@ export
 
 .PHONY: all clean cleaner help
 
-test3: 
-	@cd scripts && \
-	${eval DIRECTORY=versionsConfig/} \
-	${eval NAME=Global}\
-	${eval SUB_NAME=version} \
-	./configFileCheck.sh
 
 
-test2:
-	cd externalPackages && make test
 
-test:
-	@cd scripts && ./menu.sh BUILD_SELECTED=${BUILD_SELECTED} || exit 1
-	${eval FUNWAVE_ARCH = ${shell cat scripts/version.current.string}}
-#	${eval TEST = ${shell printf "%-30s" "*"}}
-#	echo ${TEST// /-} 
-#	echo ${TEST}
-#	@echo ${TEST}
-#	${eval TEST2 = "${TEST// /-}"}
-#	@echo ${TEST2}
-#	@echo ""
-#	@echo "-----------------------------------------"${TEST}
-#	@echo "Building" ${FUNWAVE_ARCH} "Configuration"  
-#	@echo "-----------------------------------------"
-# Note: Double $ is to pass out correctly between shells
+all:	version_select verify_config_files install_external_packages 
 
-all: testGlobalConfig installExternalPackages
+
+verify_config_files:
+	${eval TITLE=Verifying configure files }
+	@cd scripts && ./printTitleCmd.sh
+	${eval DIRECTORY=versionsConfig/} 
+	${eval NAME=Global}
+	${eval SUB_NAME=version} 
+	@cd scripts && ./verifyConfigFile.sh
+	@cd externalPackages && $(MAKE) -s verify_all_config_files
+
+version_select:
+	@cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
 
 check_all:
 	cd externalPackages && make check_all
 
-testGlobalConfig:
-		@test -f versionsConfig/version.${FUNWAVE_ARCH}|| { echo "Global config file does not exist for current version: '"${FUNWAVE_ARCH}"'. Exiting..." ; exit 1; }
+#testGlobalConfig:
+#		@test -f versionsConfig/version.${FUNWAVE_ARCH}|| { echo "Global config file does not exist for current version: '"${FUNWAVE_ARCH}"'. Exiting..." ; exit 1; }
 
-installExternalPackages:
-	cd externalPackages; make all
+install_FUNWAVE:
+	${eval TITLE=Building FUNWAVE-TVD}
+	@cd scripts && ./printTitleCmd.sh
+	@cd src && make
+
+install_external_packages:
+	@cd externalPackages; $(MAKE) -s all
 
 clean_externalPackages: 
 	cd externalPackages && make -k distclean

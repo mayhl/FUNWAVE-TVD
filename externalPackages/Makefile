@@ -3,7 +3,10 @@
 export
 
 #Note: ?= assignment operator evaulates expression on right hand side
-FUNWAVE_ARCH ?= ${shell cat ../scripts/version.current.signature}
+
+FUNWAVE ?= $(shell cd .. ; pwd)
+FUNWAVE_ARCH ?= ${shell cat ../currentVersion/signature}
+FUNWAVE_PREFIX ?= ${FUNWAVE}/${FUNWAVE_ARCH}
 
 EXTERN_PACK_DIR=externalPackages/
 
@@ -11,21 +14,32 @@ include ../versionsConfig/version.${FUNWAVE_ARCH}
 
 .PHONY: all clean cleaner help
 
-
-
 test:
-	@echo ${FUNWAVE_ARCH}
+	@echo ${FUNWAVE_PREFIX}
 
-all:	 install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran 
+
+all:	title install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran save_libary_dependencies
+
+title:
+	${eval TITLE=Building Libary Dependencies}
+	@cd ../scripts && ./printTitleCmd.sh
+
+
+# Saving linking options for building FUNWAVE with NetCDF libary
+save_libary_dependencies:
+	@cd ${FUNWAVE_PREFIX}/bin && ./nf-config --includedir > ../../currentVersion/include 2>&1
+	@cd ${FUNWAVE_PREFIX}/bin && ./nf-config --flibs > ../../currentVersion/flibs 2>&1
+
 
 # Note checks may take a while, in particular hdf5 check
 check_all:	check_zlib check_hdf5 check_netcdf_c check_netcdf_fortran
 
 
+# Verify existence of configure files for current build
 verify_all_config_files: verify_zlib_config_file \
 			 verify_hdf5_config_file \
 			 verify_netcdf_c_config_file \
-			 verify_netcdf_fortran_config_file
+			 verify_netcdf_fortran_config_file 
 
 # Restores local submodules repos to original state and
 # cleans current version builds of submodules
@@ -77,6 +91,10 @@ verify_hdf5_config_file:
 	@cd ../scripts && ./verifyConfigFile.sh  
 
 config_hdf5:
+	@echo "Libtoolize hdf5"
+	@cd ${HDF5_VERSION} && libtoolize > ../libtoolize_hdf5_progress 2>&1
+	@echo "Autoreconf hdf5"
+	@cd ${HDF5_VERSION} && autoreconf -ivf > ../autoreconf_hdf5_progress 2>&1
 	@echo "Configuring hdf5"
 	@cd ${HDF5_VERSION} && ../hdf5Config/configure.${FUNWAVE_ARCH} > ../config_hdf5_progress 2>&1
 
@@ -101,7 +119,7 @@ install_hdf5: config_hdf5 build_hdf5
 #--------
 
 verify_netcdf_c_config_file:
-	${eval DIRECTORY=${EXTERN_PACK_DIR}/netcdf-cConfig}
+	${eval DIRECTORY=${EXTERN_PACK_DIR}/netcdf-cConfig/}
 	${eval NAME=NetCDF-C}
 	${eval SUB_NAME=configure}
 	@cd ../scripts && ./verifyConfigFile.sh
@@ -116,6 +134,7 @@ config_netcdf_c:
 	@echo "Autoreconf netCDF-c"
 	@cd ${NETCDF_C_VERSION} && autoreconf -ivf > ../autoreconf_netcdf_c_progress 2>&1
 	@echo "Configuring netCDF-c"
+	${eval LDFLAGS=-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib}
 	@cd ${NETCDF_C_VERSION} && ../netcdf-cConfig/configure.${FUNWAVE_ARCH} > ../config_netcdf_c_progress 2>&1
 
 
@@ -136,7 +155,6 @@ install_netcdf_c: config_netcdf_c build_netcdf_c
 #--------------
 #netCDF-fortran
 #--------------
-
 
 verify_netcdf_fortran_config_file:
 	${eval DIRECTORY=${EXTERN_PACK_DIR}netcdf-fortranConfig/}
