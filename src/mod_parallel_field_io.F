@@ -223,13 +223,14 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
 
       USE netcdf
+      USE global
       IMPLICIT NONE
       CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
       REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
 
       REAL(SP) , DIMENSION(Mloc- 2*Nghost  , Nloc - 2*Nghost) :: TEST_DATA
       INTEGER :: mode_flag, ncid, x_dimid , y_dimid, varid
-
+      INTEGER :: dummy_id
       INTEGER, DIMENSION(ndims) :: start, count, dimids, chunk_size
 
       
@@ -250,15 +251,29 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
       NF90_DOUBLE, &
       dimids, &
       varid))
+
+      
+# if defined (CARTESIAN)
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DX", DX))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DY", DY))
+# else
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lon_West", Lon_West))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lat_South", Lat_South))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dphi", Dphi))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dtheta", Dtheta))
+# endif
+      
+     
       
       CALL CheckNetCDF(nf90_enddef(ncid))
        
       start = (/ iista , jjsta /)
-      count = chunk_size
+      count = (/ Mloc-2*Nghost , Nloc-2*Nghost /) ! chunk_size
       CALL CheckNetCDF(nf90_var_par_access(ncid, varid, nf90_collective))
        
       CALL CheckNetCDF(nf90_put_var(ncid, varid, &
       PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost) ) , & 
+    !  TEST_DATA , & 
       start = start, &
       count = count)) 
  
