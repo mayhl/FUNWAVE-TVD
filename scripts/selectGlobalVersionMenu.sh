@@ -63,10 +63,9 @@ parseInput ()
 		TITLE="Building ${BUILD} Version"
 		printTitle   
 #
-#		echo ${BUILD} > version.current.string
-#		BUILD=${BUILD// /.} 
-#		echo ${BUILD} > version.current.signature
-
+		echo ${BUILD} > ../currentVersion/string
+		BUILD=${BUILD// /.} 
+		echo ${BUILD} > ../currentVersion/signature
 		
 		exit 0
 	    fi

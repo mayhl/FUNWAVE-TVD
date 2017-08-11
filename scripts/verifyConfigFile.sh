@@ -2,22 +2,20 @@
 
 MAX_ATTEMPTS=5
 
-FUNWAVE_ARCH=$(<version.current.signature)
+FUNWAVE_ARCH=$(<../currentVersion/signature)
 
 FILE_DIR=../${DIRECTORY}${SUB_NAME}"."${FUNWAVE_ARCH}
 
-echo ${FILE_DIR}
-
 # Importing external functions
-. ./printTitle.sh --source-only
-
+#. ./printTitle.sh --source-only
+source printTitle.sh
 if [ -e ${FILE_DIR} ]
 then
-    echo "ok"
+    echo "${NAME} ${SUB_NAME} file found"
 else
 
     
-    CURRENT_VERSION=$(<version.current.string)
+    CURRENT_VERSION=$(<../currentVersion/string)
 
     echo ""
     echo "${NAME} ${SUB_NAME} file not found for ${CURRENT_VERSION}."
