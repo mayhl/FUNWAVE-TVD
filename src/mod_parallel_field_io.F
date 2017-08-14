@@ -226,7 +226,7 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
 
       USE netcdf
-      USE global, ONLY : TIME, DX,DY
+      
       IMPLICIT NONE
       CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
       REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
@@ -306,10 +306,118 @@ SUBROUTINE CheckNetCDF(status)
          WRITE (*,*) "NetCDF Error:" ,  trim(nf90_strerror(status))
          STOP 2
       END IF
+
+      
 END SUBROUTINE CheckNetCDF
+
+
+SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
+
+      USE HDF5
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
+      REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
+      CHARACTER(LEN=80) :: dsetname
+      INTEGER :: error, error_n
+
+      INTEGER :: mpi_info
+
+
+      INTEGER(HID_T) :: file_id       ! File identifier 
+      INTEGER(HID_T) :: dset_id       ! Dataset identifier 
+      INTEGER(HID_T) :: filespace     ! Dataspace identifier in file 
+      INTEGER(HID_T) :: memspace      ! Dataspace identifier in memory
+      INTEGER(HID_T) :: plist_id      ! Property list identifier 
+
+      INTEGER(HSIZE_T), DIMENSION(ndims) :: dimsf , chunk_dims
+
+      INTEGER(HSIZE_T),  DIMENSION(ndims) :: count  
+      INTEGER(HSSIZE_T), DIMENSION(ndims) :: offset 
+      INTEGER(HSIZE_T),  DIMENSION(ndims) :: stride
+      INTEGER(HSIZE_T),  DIMENSION(ndims) :: block
+      
+      dsetname = "test"
+      dimsf = (/Mglob,Nglob/) 
+      chunk_dims = (/Mloc-2*Nghost,Nloc-2*Nghost/) 
+      ! Initialize HDF5 library and Fortran interfaces.
+      CALL h5open_f(error)
+
+      ! Setup file access property list with parallel I/O access.
+      mpi_info = MPI_INFO_NULL 
+      CALL h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
+      CALL h5pset_fapl_mpio_f(plist_id, MPI_COMM_WORLD , mpi_info , error)
+
+      ! Create the file collectively.
+      CALL h5fcreate_f(FILE_NAME, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
+      CALL h5pclose_f(plist_id, error)
+
+      ! Create the data space for the  dataset. 
+      CALL h5screate_simple_f(ndims, dimsf, filespace, error)
+      CALL h5screate_simple_f(ndims, chunk_dims, memspace, error)
+
+     ! Create chunked dataset.
+     !
+      CALL h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
+      CALL h5pset_chunk_f(plist_id, ndims, chunk_dims, error)
+# if defined (DOUBLE_PRECISION)
+      CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_DOUBLE, filespace, &
+      dset_id, error, plist_id)
+# else
+      CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_FLOAT , filespace, &
+      dset_id, error, plist_id)
+# endif       
+      CALL h5sclose_f(filespace, error)
+
+      stride(1) = 1 
+      stride(2) = 1 
+      count(1) =  1 
+      count(2) =  1 
+      block(1) = chunk_dims(1)
+      block(2) = chunk_dims(2)
+      offset(1) = iista - 1 ! 0 start index even in Fortran 
+      offset(2) = jjsta - 1     ! 0 start index even in Fortran
+
+      ! Select hyperslab in the file.
+      CALL h5dget_space_f(dset_id, filespace, error)
+      CALL h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error, &
+                                 stride, block)
+      ! Create property list for collective dataset write
+      CALL h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) 
+      CALL h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+
+      
+      ! Write the dataset collectively. 
+# if defined (DOUBLE_PRECISION)
+      CALL h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
+                     file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
+# else
+      CALL h5dwrite_f(dset_id, H5T_NATIVE_FLOAT, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
+                     file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
 # endif
+                     
+      ! Close dataspaces.
+      CALL h5sclose_f(filespace, error)
+      CALL h5sclose_f(memspace, error)
+      
+      ! Close the dataset.
+      CALL h5dclose_f(dset_id, error)
+
+      
+      ! Close the property list.
+      CALL h5pclose_f(plist_id, error)
+      
+      ! Close the file.
+      CALL h5fclose_f(file_id, error)
+
+      ! Close FORTRAN interfaces and HDF5 library.
+      CALL h5close_f(error)
+      
+END SUBROUTINE PutFileXDMF
+      
+# endif
+! end external packages
          
-END MODULE PARALLEL_FIELD_IO
+END MODULE PARALLEL_FIELD_IO 
 
 
 # endif

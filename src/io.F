@@ -3714,7 +3714,7 @@ END SUBROUTINE Getfile
 !
 !    HISTORY:
 !      05/01/2010  Fengyan Shi
-!      05/06/2017  Young-Kwang Choi 
+ !      05/06/2017  Young-Kwang Choi 
 !-------------------------------------------------------------------------------------
 
 SUBROUTINE PutFile(FILE_NAME,PHI)
@@ -3740,7 +3740,9 @@ SUBROUTINE PutFile(FILE_NAME,PHI)
          Call PutFileBinary(FILE_NAME,PHI)
 # if defined (EXTERNAL_PACKAGES)  
       CASE ( 'NETCDF' , 'netcdf' )
-         Call PutFileNetCDF(FILE_NAME,PHI)  
+         Call PutFileNetCDF(FILE_NAME,PHI)
+      CASE ( 'XDMF' , 'xdmf' )
+         Call PutFileXDMF(FILE_NAME,PHI)
 # endif
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input
