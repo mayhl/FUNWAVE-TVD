@@ -3738,8 +3738,10 @@ SUBROUTINE PutFile(FILE_NAME,PHI)
          CALL PutFileASCII(FILE_NAME,PHI)
       CASE ('BINARY' , 'binary' )
          Call PutFileBinary(FILE_NAME,PHI)
+# if defined (EXTERNAL_PACKAGES)  
       CASE ( 'NETCDF' , 'netcdf' )
-         Call PutFileNetCDF(FILE_NAME,PHI)
+         Call PutFileNetCDF(FILE_NAME,PHI)  
+# endif
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input
          CALL PutFileASCII(FILE_NAME,PHI)

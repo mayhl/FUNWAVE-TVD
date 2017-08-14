@@ -219,15 +219,18 @@ SUBROUTINE PutFileBinary(FILE_NAME,PHI)
 
 END SUBROUTINE PutfileBinary
 
+
+# if defined (EXTERNAL_PACKAGES)  
+
 SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
 
       USE netcdf
-      USE global
+      USE global, ONLY : TIME, DX,DY
       IMPLICIT NONE
       CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
       REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
-
+      REAL(SP):: dummy_val
       REAL(SP) , DIMENSION(Mloc- 2*Nghost  , Nloc - 2*Nghost) :: TEST_DATA
       INTEGER :: mode_flag, ncid, x_dimid , y_dimid, varid
       INTEGER :: dummy_id
@@ -252,15 +255,25 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
       dimids, &
       varid))
 
+
+      dummy_val=TIME
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "TIME", dummy_val))
       
 # if defined (CARTESIAN)
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DX", DX))
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DY", DY))
+      dummy_val=DX
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DX", dummy_val))
+      dummy_val=DY
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DY", dummy_val))
 # else
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lon_West", Lon_West))
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lat_South", Lat_South))
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dphi", Dphi))
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dtheta", Dtheta))
+      
+      dummy_val=Lon_West
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lon_West", dummy_val))
+      dummy_val=Lat_South
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lat_South", dummy_val))
+      dummy_val=Dphi
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dphi", dummy_val))
+      dummy_val=Dtheta
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dtheta", dummy_val))
 # endif
       
      
@@ -294,8 +307,10 @@ SUBROUTINE CheckNetCDF(status)
          STOP 2
       END IF
 END SUBROUTINE CheckNetCDF
-      
+# endif
+         
 END MODULE PARALLEL_FIELD_IO
+
 
 # endif
  ! end parallel
