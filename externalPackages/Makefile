@@ -25,11 +25,7 @@ EXTERN_PACK_DIR=externalPackages/
 include ../versionsConfig/version.${FUNWAVE_ARCH}
 
 
-.PHONY: all clean cleaner help
-
-test:
-	@echo ${FUNWAVE_PREFIX}
-
+.PHONY: all clean cleaner help 
 
 all:	title install_autoconf_tools install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran save_libary_dependencies
 
@@ -59,30 +55,33 @@ verify_all_config_files: verify_zlib_config_file \
 distclean:
 	git submodule foreach git clean -f
 	rm -rf ${FUNWAVE_PREFIX}/*
-	rm -f *_progress 
-	rm -f install_*
 
-#--------------
-#autoconf tools
-#-------------
+#------------------
+#  autoconf tools
+#------------------
 install_autoconf_tools:
+
+ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_zlib),)
+	@echo "autoconf tools appears to be installed, skipping installation" 
+else
 	@echo "Installing autoconf tools"
 	@cd autoconf_tools && bash preinstall_autoconf_tools.sh > ${FUNWAVE_PREFIX}/install_autoconf_tools_progress 2>&1
+	@mv ${FUNWAVE_PREFIX}/install_autoconf_tools_progress ${FUNWAVE_PREFIX}/install_autoconf_tools
+endif
 
-
-#----
-#zlib
-#----
+#--------
+#  zlib
+#--------
 
 verify_zlib_config_file:
 	${eval DIRECTORY=${EXTERN_PACK_DIR}zlibConfig/}
 	${eval NAME=zLib}
-	${eval SUB_NAME=configure
+	${eval SUB_NAME=configure}
 	@cd ../scripts && ./verifyConfigFile.sh  
 
 config_zlib:
 	@echo "Configuring zlib"
-	@cd ${ZLIB_VERSION} && ../zlibConfig/configure.${FUNWAVE_ARCH} > ${FUNWAVE_ARCH}/config_zlib_progress 2>&1
+	@cd ${ZLIB_VERSION} && ../zlibConfig/configure.${FUNWAVE_ARCH} > ${FUNWAVE_PREFIX}/config_zlib_progress 2>&1
 
 build_zlib:
 	@echo "Building zlib"
@@ -95,7 +94,7 @@ check_zlib:
 
 install_zlib:
 ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_zlib),)
-	@echo "zlib appears to be installed, skipping installation." 
+	@echo "zlib appears to be installed, skipping installation" 
 else
 	@make -s config_zlib build_zlib 
 	@echo "Installing zlib"
@@ -104,9 +103,9 @@ else
 	@cd ${FUNWAVE_PREFIX} && rm config_zlib_progress build_zlib_progress install_zlib_progress
 endif
 
-#----
-#hdf5
-#----
+#--------
+#  hdf5
+#--------
 
 
 verify_hdf5_config_file:
@@ -135,7 +134,7 @@ check_hdf5:
 
 install_hdf5: 
 ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_hdf5),)
-	@echo "HDF5 appears to be installed, skipping installation." 
+	@echo "HDF5 appears to be installed, skipping installation" 
 else
 	@make -s config_hdf5 build_hdf5
 	@echo "Installing HDF5"
@@ -144,9 +143,9 @@ else
 	@cd ${FUNWAVE_PREFIX} && rm libtoolize_hdf5_progress autoreconf_hdf5_progress config_hdf5_progress build_hdf5_progress install_hdf5_progress
 endif
 
-#--------
-#netCDF-c
-#--------
+#------------
+#  netCDF-c
+#------------
 
 verify_netcdf_c_config_file:
 	${eval DIRECTORY=${EXTERN_PACK_DIR}/netcdf-cConfig/}
@@ -178,7 +177,7 @@ check_netcdf_c:
 
 install_netcdf_c:
 ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_netcdf_c),)
-	@echo "netCDF-c appears to be installed, skipping installation." 
+	@echo "netCDF-c appears to be installed, skipping installation" 
 else
 	@make -s config_netcdf_c build_netcdf_c
 	@echo "Installing netCDF-c"
@@ -186,9 +185,10 @@ else
 	@cd ${FUNWAVE_PREFIX} && cat libtoolize_netcdf_c_progress autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
 	@cd ${FUNWAVE_PREFIX} && rm libtoolize_netcdf_c_progress autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress
 endif
-#--------------
-#netCDF-fortran
-#--------------
+
+#------------------
+#  netCDF-fortran
+#------------------
 
 verify_netcdf_fortran_config_file:
 	${eval DIRECTORY=${EXTERN_PACK_DIR}netcdf-fortranConfig/}
@@ -218,7 +218,7 @@ check_netcdf_fortran:
 install_netcdf_fortran: 
 
 ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_netcdf_fortran),)
-	@echo "netCDF-fortran appears to be installed, skipping installation." 
+	@echo "netCDF-fortran appears to be installed, skipping installation" 
 else
 	@make -s config_netcdf_fortran build_netcdf_fortran
 	@echo "Installing netCDF-fortran"

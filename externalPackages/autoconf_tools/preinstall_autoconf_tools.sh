@@ -11,7 +11,11 @@ LIBTOOL_VERS=libtool-2.4.6
 #
 # Should not need to modify any lines below
 #
-INSTALL_DIR=$(FUNWAVE_PREFIX)
+INSTALL_DIR=${FUNWAVE_PREFIX}
+echo "-----------------"
+echo "Install Directory"
+echo "-----------------"
+echo ${INSTALL_DIR}
 export PATH="${INSTALL_DIR}/util/bin:${PATH}"
 
 wget http://ftp.gnu.org/gnu/autoconf/$AUTOCONF_VERS.tar.gz
