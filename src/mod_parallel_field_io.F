@@ -248,22 +248,33 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
       dimids = (/ x_dimid, y_dimid /)
 
+# if defined (DOUBLE_PRECISION)
       CALL CheckNetCDF(nf90_def_var( &
       ncid, &
       "fff", &
       NF90_DOUBLE, &
       dimids, &
       varid))
+# else
+       CALL CheckNetCDF(nf90_def_var( &
+      ncid, &
+      "fff", &
+      NF90_FLOAT, &
+      dimids, &
+      varid))
+# endif  
+      
+
 
 
       dummy_val=TIME
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "TIME", dummy_val))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "TIME", TIME))
       
 # if defined (CARTESIAN)
       dummy_val=DX
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DX", dummy_val))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DX", DX))
       dummy_val=DY
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DY", dummy_val))
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DY", DY))
 # else
       
       dummy_val=Lon_West
@@ -277,7 +288,6 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 # endif
       
      
-      
       CALL CheckNetCDF(nf90_enddef(ncid))
        
       start = (/ iista , jjsta /)
@@ -301,10 +311,12 @@ SUBROUTINE CheckNetCDF(status)
       USE netcdf
       IMPLICIT NONE
       INTEGER, INTENT (IN) :: status
+      INTEGER :: errorcode, ierr
       
       IF(status /=  nf90_noerr) THEN
-         WRITE (*,*) "NetCDF Error:" ,  trim(nf90_strerror(status))
-         STOP 2
+         WRITE (*,*) "Error " ,  trim(nf90_strerror(status))
+         CALL MPI_ABORT (MPI_COMM_WORLD, errorcode , ierr) 
+         
       END IF
 
       
@@ -363,7 +375,7 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_DOUBLE, filespace, &
       dset_id, error, plist_id)
 # else
-      CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_FLOAT , filespace, &
+      CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_REAL , filespace, &
       dset_id, error, plist_id)
 # endif       
       CALL h5sclose_f(filespace, error)
@@ -391,7 +403,7 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       CALL h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
                      file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
 # else
-      CALL h5dwrite_f(dset_id, H5T_NATIVE_FLOAT, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
+      CALL h5dwrite_f(dset_id, H5T_NATIVE_REAL , PHI( (Nghost+1):(Mloc-Nghost),(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
                      file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
 # endif
                      
