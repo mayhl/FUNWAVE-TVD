@@ -4,6 +4,8 @@ export
 
 #Note: ?= assignment operator evaulates expression on right hand side
 
+
+
 FUNWAVE ?= $(shell cd .. ; pwd)
 FUNWAVE_ARCH ?= ${shell cat ../currentVersion/signature}
 FUNWAVE_PREFIX ?= ${FUNWAVE}/${FUNWAVE_ARCH}
@@ -64,7 +66,8 @@ distclean:
 #autoconf tools
 #-------------
 install_autoconf_tools:
-	@cd autoconf_tools && bash preinstall_autoconf_tools.sh > ../install_autoconf_tools_progress 2>&1
+	@echo "Installing autoconf tools"
+	@cd autoconf_tools && bash preinstall_autoconf_tools.sh > ${FUNWAVE_PREFIX}/install_autoconf_tools_progress 2>&1
 
 
 #----
@@ -79,22 +82,27 @@ verify_zlib_config_file:
 
 config_zlib:
 	@echo "Configuring zlib"
-	@cd ${ZLIB_VERSION} && ../zlibConfig/configure.${FUNWAVE_ARCH} > ../config_zlib_progress 2>&1
+	@cd ${ZLIB_VERSION} && ../zlibConfig/configure.${FUNWAVE_ARCH} > ${FUNWAVE_ARCH}/config_zlib_progress 2>&1
 
 build_zlib:
 	@echo "Building zlib"
-	@cd ${ZLIB_VERSION} && make > ../build_zlib_progress 2>&1
+	@cd ${ZLIB_VERSION} && make > ${FUNWAVE_PREFIX}/build_zlib_progress 2>&1
 
 check_zlib:
 	@echo "Checking zlib"
-	@cd ${ZLIB_VERSION} && make test > ../check_zlib_progress 2>&1
+	@cd ${ZLIB_VERSION} && make test > ${FUNWAVE_PREFIX}/check_zlib_progress 2>&1
 
 
-install_zlib:	config_zlib build_zlib
+install_zlib:
+ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_zlib),)
+	@echo "zlib appears to be installed, skipping installation." 
+else
+	@make -s config_zlib build_zlib 
 	@echo "Installing zlib"
-	@cd ${ZLIB_VERSION} && make install > ../install_zlib_progress 2>&1
-	@cat config_zlib_progress build_zlib_progress install_zlib_progress > install_zlib
-
+	@cd ${ZLIB_VERSION} && make install > ${FUNWAVE_PREFIX}/install_zlib_progress 2>&1
+	@cd ${FUNWAVE_PREFIX} && cat config_zlib_progress build_zlib_progress install_zlib_progress > install_zlib
+	@cd ${FUNWAVE_PREFIX} && rm config_zlib_progress build_zlib_progress install_zlib_progress
+endif
 
 #----
 #hdf5
@@ -108,28 +116,33 @@ verify_hdf5_config_file:
 	@cd ../scripts && ./verifyConfigFile.sh  
 
 config_hdf5:
-	@echo "Libtoolize hdf5"
-	@cd ${HDF5_VERSION} && libtoolize > ../libtoolize_hdf5_progress 2>&1
-	@echo "Autoreconf hdf5"
-	@cd ${HDF5_VERSION} && autoreconf -ivf > ../autoreconf_hdf5_progress 2>&1
-	@echo "Configuring hdf5"
-	@cd ${HDF5_VERSION} && ../hdf5Config/configure.${FUNWAVE_ARCH} > ../config_hdf5_progress 2>&1
+	@echo "Libtoolize HDF5"
+	@cd ${HDF5_VERSION} && libtoolize > ${FUNWAVE_PREFIX}/libtoolize_hdf5_progress 2>&1
+	@echo "Autoreconf HDF5"
+	@cd ${HDF5_VERSION} && autoreconf -ivf > ${FUNWAVE_PREFIX}/autoreconf_hdf5_progress 2>&1
+	@echo "Configuring HDF5"
+	@cd ${HDF5_VERSION} && ../hdf5Config/configure.${FUNWAVE_ARCH} > ${FUNWAVE_PREFIX}/config_hdf5_progress 2>&1
 
 build_hdf5: 
-	@echo "Building hdf5"
-	@cd ${HDF5_VERSION} && make > ../build_hdf5_progress 2>&1
+	@echo "Building HDF5"
+	@cd ${HDF5_VERSION} && make > ${FUNWAVE_PREFIX}/build_hdf5_progress 2>&1
 
 # Note: Using -i flag in make check to skip failed test in cache_api.
 #       All other test should pass.
 check_hdf5: 
-	@echo "Checking hdf5"
-	@cd ${HDF5_VERSION} && make -i check > ../check_hdf5_progress 2>&1
+	@echo "Checking HDF5"
+	@cd ${HDF5_VERSION} && make -i check > ${FUNWAVE_PREFIX}/check_hdf5_progress 2>&1
 
-install_hdf5: config_hdf5 build_hdf5
-	@echo "Installing hdf5"
-	@cd ${HDF5_VERSION} && make install > ../install_hdf5_progress 2>&1
-	@cat config_hdf5_progress build_hdf5_progress install_hdf5_progress > install_hdf5
-
+install_hdf5: 
+ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_hdf5),)
+	@echo "HDF5 appears to be installed, skipping installation." 
+else
+	@make -s config_hdf5 build_hdf5
+	@echo "Installing HDF5"
+	@cd ${HDF5_VERSION} && make install > ${FUNWAVE_PREFIX}/install_hdf5_progress 2>&1
+	@cd ${FUNWAVE_PREFIX} && cat libtoolize_hdf5_progress autoreconf_hdf5_progress config_hdf5_progress build_hdf5_progress install_hdf5_progress > install_hdf5
+	@cd ${FUNWAVE_PREFIX} && rm libtoolize_hdf5_progress autoreconf_hdf5_progress config_hdf5_progress build_hdf5_progress install_hdf5_progress
+endif
 
 #--------
 #netCDF-c
@@ -147,28 +160,32 @@ verify_netcdf_c_config_file:
 # Note: libtoolize not call with autoreconf -ivf on some platforms
 config_netcdf_c:
 	@echo "Libtoolize netCDF-c"
-	@cd ${NETCDF_C_VERSION} && libtoolize > ../libtoolize_netcdf_c_progress 2>&1
+	@cd ${NETCDF_C_VERSION} && libtoolize > ${FUNWAVE_PREFIX}/libtoolize_netcdf_c_progress 2>&1
 	@echo "Autoreconf netCDF-c"
-	@cd ${NETCDF_C_VERSION} && autoreconf -ivf > ../autoreconf_netcdf_c_progress 2>&1
+	@cd ${NETCDF_C_VERSION} && autoreconf -ivf > ${FUNWAVE_PREFIX}/autoreconf_netcdf_c_progress 2>&1
 	@echo "Configuring netCDF-c"
 	${eval LDFLAGS=-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib}
-	@cd ${NETCDF_C_VERSION} && ../netcdf-cConfig/configure.${FUNWAVE_ARCH} > ../config_netcdf_c_progress 2>&1
+	@cd ${NETCDF_C_VERSION} && ../netcdf-cConfig/configure.${FUNWAVE_ARCH} > ${FUNWAVE_PREFIX}/config_netcdf_c_progress 2>&1
 
 
 build_netcdf_c:
 	@echo "Building netCDF-c"
-	@cd ${NETCDF_C_VERSION} && make > ../build_netcdf_c_progress 2>&1
+	@cd ${NETCDF_C_VERSION} && make > ${FUNWAVE_PREFIX}/build_netcdf_c_progress 2>&1
 
 check_netcdf_c: 
 	@echo "Checking netCDF-c"
-	@cd ${NETCDF_C_VERSION} && make check > ../check_netcdf_c_progress 2>&1
+	@cd ${NETCDF_C_VERSION} && make check > ${FUNWAVE_PREFIX}/check_netcdf_c_progress 2>&1
 
-install_netcdf_c: config_netcdf_c build_netcdf_c
+install_netcdf_c:
+ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_netcdf_c),)
+	@echo "netCDF-c appears to be installed, skipping installation." 
+else
+	@make -s config_netcdf_c build_netcdf_c
 	@echo "Installing netCDF-c"
-	@cd ${NETCDF_C_VERSION} && make install > ../install_netcdf_c_progress 2>&1
-	@cat libtoolize_netcdf_c_progress autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
-
-
+	@cd ${NETCDF_C_VERSION} && make install > ${FUNWAVE_PREFIX}/install_netcdf_c_progress 2>&1
+	@cd ${FUNWAVE_PREFIX} && cat libtoolize_netcdf_c_progress autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress > install_netcdf_c
+	@cd ${FUNWAVE_PREFIX} && rm libtoolize_netcdf_c_progress autoreconf_netcdf_c_progress config_netcdf_c_progress build_netcdf_c_progress install_netcdf_c_progress
+endif
 #--------------
 #netCDF-fortran
 #--------------
@@ -183,22 +200,29 @@ verify_netcdf_fortran_config_file:
 # see previous note
 config_netcdf_fortran:
 	@echo "Libtoolize netCDF-fortran"
-	@cd ${NETCDF_F_VERSION} && libtoolize > ../libtoolize_netcdf_fortran_progress 2>&1
+	@cd ${NETCDF_F_VERSION} && libtoolize > ${FUNWAVE_PREFIX}/libtoolize_netcdf_fortran_progress 2>&1
 	@echo "Autoreconf netCDF-fortran"
-	@cd ${NETCDF_F_VERSION} && autoreconf -ivf > ../autoreconf_netcdf_fortran_progress 2>&1
+	@cd ${NETCDF_F_VERSION} && autoreconf -ivf > ${FUNWAVE_PREFIX}/autoreconf_netcdf_fortran_progress 2>&1
 	@echo "Configuring netCDF-fortran"
-	@cd ${NETCDF_F_VERSION} && ../netcdf-fortranConfig/configure.${FUNWAVE_ARCH} > ../config_netcdf_fortran_progress 2>&1
+	@cd ${NETCDF_F_VERSION} && ../netcdf-fortranConfig/configure.${FUNWAVE_ARCH} > ${FUNWAVE_PREFIX}/config_netcdf_fortran_progress 2>&1
 
 
 build_netcdf_fortran:
 	@echo "Building netCDF-fortran"
-	@cd ${NETCDF_F_VERSION} && make > ../build_netcdf_fortran_progress 2>&1
+	@cd ${NETCDF_F_VERSION} && make > ${FUNWAVE_PREFIX}/build_netcdf_fortran_progress 2>&1
 
 check_netcdf_fortran: 
 	@echo "Checking netCDF-fortran"
-	@cd ${NETCDF_F_VERSION} && make check > ../check_netcdf_fortran_progress 2>&1
+	@cd ${NETCDF_F_VERSION} && make check > ${FUNWAVE_PREFIX}/check_netcdf_fortran_progress 2>&1
 
-install_netcdf_fortran: config_netcdf_fortran build_netcdf_fortran
+install_netcdf_fortran: 
+
+ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_netcdf_fortran),)
+	@echo "netCDF-fortran appears to be installed, skipping installation." 
+else
+	@make -s config_netcdf_fortran build_netcdf_fortran
 	@echo "Installing netCDF-fortran"
-	@cd ${NETCDF_F_VERSION} && make install > ../install_netcdf_fortran_progress 2>&1
-	@cat libtoolize_netcdf_fortran_progress autoreconf_netcdf_fortran_progress config_netcdf_fortran_progress build_netcdf_fortran_progress install_netcdf_fortran_progress > install_netcdf_fortran
+	@cd ${NETCDF_F_VERSION} && make install > ${FUNWAVE_PREFIX}/install_netcdf_fortran_progress 2>&1
+	@cd ${FUNWAVE_PREFIX} && cat libtoolize_netcdf_fortran_progress autoreconf_netcdf_fortran_progress config_netcdf_fortran_progress build_netcdf_fortran_progress install_netcdf_fortran_progress > install_netcdf_fortran
+	@cd ${FUNWAVE_PREFIX} && rm libtoolize_netcdf_fortran_progress autoreconf_netcdf_fortran_progress config_netcdf_fortran_progress build_netcdf_fortran_progress install_netcdf_fortran_progress
+endif
