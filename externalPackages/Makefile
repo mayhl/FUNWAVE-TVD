@@ -8,9 +8,20 @@ FUNWAVE ?= $(shell cd .. ; pwd)
 FUNWAVE_ARCH ?= ${shell cat ../currentVersion/signature}
 FUNWAVE_PREFIX ?= ${FUNWAVE}/${FUNWAVE_ARCH}
 
+# for autoconf_tools
+export PATH:=${FUNWAVE_PREFIX}/util/bin:${PATH}
+
 EXTERN_PACK_DIR=externalPackages/
 
+# quick hack for Topaz                                                                                   
+# ifeq (${FUNWAVE_ARCH}, Topaz.Intel)
+#	AUTORECONF = '/app/unsupported/COST/autoconf/2.69/intel/bin/autoreconf'
+# else
+#	AUTORECONF = autoreconf
+# endif
+
 include ../versionsConfig/version.${FUNWAVE_ARCH}
+
 
 .PHONY: all clean cleaner help
 
@@ -18,7 +29,7 @@ test:
 	@echo ${FUNWAVE_PREFIX}
 
 
-all:	title install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran save_libary_dependencies
+all:	title install_autoconf_tools install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran save_libary_dependencies
 
 title:
 	${eval TITLE=Building Libary Dependencies}
@@ -49,6 +60,12 @@ distclean:
 	rm -f *_progress 
 	rm -f install_*
 
+#--------------
+#autoconf tools
+#-------------
+install_autoconf_tools:
+	@cd autoconf_tools && bash preinstall_autoconf_tools.sh > ../install_autoconf_tools_progress 2>&1
+
 
 #----
 #zlib
@@ -57,7 +74,7 @@ distclean:
 verify_zlib_config_file:
 	${eval DIRECTORY=${EXTERN_PACK_DIR}zlibConfig/}
 	${eval NAME=zLib}
-	${eval SUB_NAME=configure}
+	${eval SUB_NAME=configure
 	@cd ../scripts && ./verifyConfigFile.sh  
 
 config_zlib:

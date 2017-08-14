@@ -1,10 +1,10 @@
 #-----------BEGIN MAKEFILE-------------------------------------------------
             SHELL         = /bin/sh
             DEF_FLAGS     = -P -traditional 
-            EXEC          = funwave_vessel
 
 	   FUNWAVE_ARCH   ?= ${shell cat ../currentVersion/signature}
-include ../versionsConfig/version.${FUNWAVE_ARCH} 
+	   include ../versionsConfig/version.${FUNWAVE_ARCH} 
+           EXEC          = funwave_${FUNWAVE_ARCH}
 
 #==========================================================================
 #--------------------------------------------------------------------------
