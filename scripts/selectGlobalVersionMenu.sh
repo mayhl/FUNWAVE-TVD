@@ -40,7 +40,7 @@ parseInput ()
 	    MESSAGE="${ERROR_TYPE}: Invalid build number selected. Please enter a number between 0 and ${OPTION_COUNT}"
 
 	    if [[ ${INPUT_ARG_ENTERED} -eq 0 ]]; then
-		MESSAGE="${MESSAGE}, or enter ${OPTION_COUNT} to exit."
+		MESSAGE="${MESSAGE}, or enter ${EXIT_CODE} to exit."
 	    else
 		MESSAGE="${MESSAGE}."
 	    fi
@@ -73,7 +73,7 @@ parseInput ()
 	
     else
    
-      echo "${ERROR_TYPE}: Non-integer value entered. Please enter a interger value."
+      echo "${ERROR_TYPE}: Non-integer value entered. Please enter a integer value."
       
     fi
 } 

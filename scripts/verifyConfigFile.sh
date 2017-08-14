@@ -106,7 +106,7 @@ else
 		fi
 		
 	    else
-		echo "WARNING: Non-integer value entered. Please enter a interger value."
+		echo "WARNING: Non-integer value entered. Please enter a integer value."
 	    fi
 	    
 
