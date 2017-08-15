@@ -20,7 +20,7 @@ all:	version_select verify_config_files install_externalPackages install_funwave
 
 
 verify_config_files:
-	${eval TITLE=Verifying configure files }
+	${eval TITLE=Verifying configure files}
 	@cd scripts && ./printTitleCmd.sh
 	${eval DIRECTORY=versionsConfig/} 
 	${eval NAME=Global}
@@ -29,7 +29,14 @@ verify_config_files:
 	@cd externalPackages && $(MAKE) -s verify_all_config_files
 
 version_select:
+	@mkdir -p currentVersion
+	@rm -f currentVersion/*
 	@cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
+	${eval FUNWAVE_ARCH = $${shell cat currentVersion/signature}}
+	@mkdir -p ${FUNWAVE_ARCH}
+
+
+
 
 check_all:
 	cd externalPackages && make check_all
@@ -42,7 +49,13 @@ install_funwave:
 	@cd src && make
 
 install_externalPackages:
+	@cd scripts && ./selectExternalPackages.sh
+ifeq ($(wildcard  currentVersion/externalPackages),)
 	@cd externalPackages; $(MAKE) -s all
+else
+	@echo "Not installing external packages."
+endif
+
 
 
 # cleans

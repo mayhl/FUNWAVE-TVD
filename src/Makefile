@@ -16,7 +16,7 @@
             FLAG_2 = -DPARALLEL
 #            FLAG_3 = -DSAMPLES
             FLAG_4 = -DCARTESIAN
-              FLAG_6 = -DINTEL
+
 #             FLAG_7 = -DMIXING
 #              FLAG_8 = -DCOUPLING
 #             FLAG_9 = -DZALPHA
@@ -28,10 +28,19 @@
 #              FLAG_15 = -DREALISTIC_VESSEL_BODY
 #              FLAG_16 = -DMETEO
 #              FLAG_17 = -DWIND
+
+ifdef INTEL_FLAG
+        FLAG_6 = -DINTEL
+endif
+
+ifneq ($(wildcard  ../currentVersion/externalPackages),)
+	FLAG_18 = -DEXTERNAL_PACKAGES
+endif
+
 #--------------------------------------------------------------------------
 #  mpi defs 
 #--------------------------------------------------------------------------
-         CPP      = ${CCP_VERSION} 
+         CPP      = ${CCP_VERSION}
          CPPFLAGS = $(DEF_FLAGS)
          FC       = ${MPIFC_VERSION}
          DEBFLGS  = 
@@ -60,8 +69,12 @@
 #            LIBS  = $(PV3LIB) $(CLIB)  $(PARLIB) $(IOLIBS) $(MPILIB) $(GOTMLIB)
 #            INCS  = $(IOINCS) $(GOTMINCS)
 
+
+# Adding links to external packages if flag is defined
+ifneq (,$(findstring DEXTERNAL_PACKAGES,$(CPPARGS)))
 	     LIBS ?= -L${shell cat ../currentVersion/flibs} 
 	     INCS ?= -I${shell cat ../currentVersion/include}
+endif
 
 #--------------------------------------------------------------------------
 #  Preprocessing and Compilation Directives
@@ -113,3 +126,8 @@ clean:
 
 clobber:	clean
 		/bin/rm -f *.f90 *.o $(EXEC)
+
+test:
+	@echo ${INTEL_FLAG}
+	${eval TEST123=Y}
+	@echo ${TEST123}

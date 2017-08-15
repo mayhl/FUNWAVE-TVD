@@ -13,6 +13,9 @@ FUNWAVE_PREFIX ?= ${FUNWAVE}/${FUNWAVE_ARCH}
 # for autoconf_tools
 export PATH:=${FUNWAVE_PREFIX}/util/bin:${PATH}
 
+
+export PATH:=${LD_LIBRARY_PATH}:${PATH}
+
 EXTERN_PACK_DIR=externalPackages/
 
 # quick hack for Topaz                                                                                   

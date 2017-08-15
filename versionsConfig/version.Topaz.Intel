@@ -5,6 +5,9 @@ MPIFC_VERSION		= mpiifort -fpp
 
 MPILIB_VERSION		=
 
+# Can be set to anything, remove to not set Intel flag in FUNWAVE Makefile
+INTEL_FLAG 		= Y
+
 ZLIB_VERSION		= zlib
 HDF5_VERSION	  	= hdf5
 NETCDF_C_VERSION  	= netcdf-c

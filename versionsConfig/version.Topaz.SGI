@@ -1,9 +1,12 @@
 
-CCP_VERSION		= /usr/bin/cpp 
+CCP_VERSION		= cpp
 MPICC_VERSION		= icc
 MPIFC_VERSION		= ifort
 
 MPILIB_VERSION		= -lmpi
+
+# Can be set to anything, remove to not set Intel flag in FUNWAVE Makefile
+INTEL_FLAG 		= Y
 
 ZLIB_VERSION		= zlib
 HDF5_VERSION	  	= hdf5
