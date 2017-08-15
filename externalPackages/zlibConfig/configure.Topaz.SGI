@@ -1,3 +1,3 @@
 CC=icc \
-CFLAGS='-O3 -xHost -ip' \
+CFLAGS='-lmpi -O3 -xHost -ip' \
 ./configure --prefix=${FUNWAVE_PREFIX}

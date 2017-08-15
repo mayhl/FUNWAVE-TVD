@@ -1,13 +1,17 @@
-CC=mpiicc \
-F9X=mpiifort \
-CXX=mpiicpc \
+CC=icc \
+CXX=icpc \
+F77=ifort \
+FC=ifort \
+F90=ifort \
+CPP='icc -E' \
+CXXCPP='icpc -E' \
 ./configure \
 --prefix=${FUNWAVE_PREFIX} \
---with-zlib=${FUNWAVE_PREFIX} \
---enable-fortran \
---enable-parallel \
-LDFLAGS="-L${FUNWAVE_PREFIX}/lib -Wl,-rpath=${FUNWAVE_PREFIX}/lib" \
+--enable-netcdf-4 \
+--disable-dap \
+--enable-parallel-tests \
 CPPFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
 CXXFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
 CFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
-FFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" 
+FFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
+LDFLAGS="-L${FUNWAVE_PREFIX}/lib -" 
