@@ -50,7 +50,7 @@ install_funwave:
 
 install_externalPackages:
 	@cd scripts && ./selectExternalPackages.sh
-ifeq ($(wildcard  currentVersion/externalPackages),)
+ifneq ($(wildcard  currentVersion/externalPackages),)
 	@cd externalPackages; $(MAKE) -s all
 else
 	@echo "Not installing external packages."
