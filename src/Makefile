@@ -4,7 +4,7 @@
 
 	   FUNWAVE_ARCH   ?= ${shell cat ../currentVersion/signature}
 	   include ../versionsConfig/version.${FUNWAVE_ARCH} 
-           EXEC          = funwave_${FUNWAVE_ARCH}
+           EXEC          = funwave
 
 #==========================================================================
 #--------------------------------------------------------------------------
@@ -107,7 +107,7 @@ OBJS = $(SRCS:.F=.o)
 
 $(EXEC):	$(OBJS)
 		$(FC) $(FFLAGS) $(LDFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
-		mv $(EXEC) ../bin/
+		mv $(EXEC) ../${FUNWAVE_ARCH}/bin/
 #--------------------------------------------------------------------------
 
 #--------------------------------------------------------------------------
