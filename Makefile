@@ -29,7 +29,7 @@ verify_config_files:
 	@cd externalPackages && $(MAKE) -s verify_all_config_files
 
 version_select:
-	@mkdir -p currentVersion
+	@mkdir -p "currentVersion"
 	@rm -f currentVersion/*
 	@cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
 	${eval FUNWAVE_ARCH = $${shell cat currentVersion/signature}}
