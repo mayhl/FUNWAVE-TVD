@@ -50,19 +50,27 @@
 !      12/06/2017 Michael-Angelo Y.-H. Lam
 !-------------------------------------------------------------------------------------
 
-# if defined (PARALLEL)
+
 
 MODULE PARALLEL_FIELD_IO
+
+# if defined (PARALLEL)
+      
 USE GLOBAL
 
+  
 CONTAINS
 
-SUBROUTINE PutFileASCII(FILE,PHI)
+SUBROUTINE PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
     
      IMPLICIT NONE
-     CHARACTER(LEN=80), INTENT(IN) :: FILE
+     CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
+     CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
+      
+     CHARACTER(LEN=80) :: FILE
 
+      
 ![-------ykchoi (06/May/2017)
       !INTEGER :: l
       ! could be max. procs
@@ -80,7 +88,15 @@ SUBROUTINE PutFileASCII(FILE,PHI)
 !-------ykchoi (06/May/2017)]
      LOGICAL :: FirstCallPutFile = .TRUE.
      SAVE  FirstCallPutFile
-     
+
+      ! Filter off file number for depth and breakwater 
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      ELSE
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+      ENDIF
+
+      
 ! first time call 
      IF(FirstCallPutFile)THEN
         FirstCallPutFile = .FALSE.
@@ -158,17 +174,28 @@ END SUBROUTINE PutfileASCII
 
 ! Code derived from William D. Gropp lecture slides 33 
 ! http://wgropp.cs.illinois.edu/courses/cs598-s16/lectures/lecture33.pdf
-SUBROUTINE PutFileBinary(FILE_NAME,PHI)
+SUBROUTINE PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
     
      IMPLICIT NONE
-     CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
+     CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
+     CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
      REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
 
+     CHARACTER(LEN=80) :: FILE
+      
      INTEGER ::  file_handler, ierr , istatus  , mem_type_loc , file_type_glob
      INTEGER(8) :: offset
      INTEGER , DIMENSION(ndims) ::  sizes_loc , subsizes_loc , start_index_loc
      INTEGER , DIMENSION(ndims) ::  sizes_glob , subsizes_glob , start_index_glob
 
+
+      ! Filter off file number for depth and breakwater 
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      ELSE
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+      ENDIF
+      
      offset = 0
 
 
@@ -205,7 +232,7 @@ SUBROUTINE PutFileBinary(FILE_NAME,PHI)
      CALL MPI_TYPE_COMMIT(file_type_glob, ierr)
 
 
-     CALL MPI_FILE_OPEN(MPI_COMM_WORLD, FILE_NAME , & 
+     CALL MPI_FILE_OPEN(MPI_COMM_WORLD, FILE , & 
                            MPI_MODE_WRONLY + MPI_MODE_CREATE, & 
                            MPI_INFO_NULL, file_handler , ierr) 
 
@@ -224,7 +251,7 @@ END SUBROUTINE PutfileBinary
 
 SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
 
-
+      
       USE netcdf
       
       IMPLICIT NONE
@@ -243,9 +270,16 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
       CALL CheckNetCDF(nf90_create_par(FILE_NAME, mode_flag , &
                          MPI_COMM_WORLD,  MPI_INFO_NULL, ncid)) 
 
+
+# if defined (CARTESIAN)
       CALL CheckNetCDF(nf90_def_dim(ncid, "x", Mglob , x_dimid))
       CALL CheckNetCDF(nf90_def_dim(ncid, "y", Nglob , y_dimid))
+# else
+      CALL CheckNetCDF(nf90_def_dim(ncid, "Dphi", Mglob , x_dimid))
+      CALL CheckNetCDF(nf90_def_dim(ncid, "Dtheta", Nglob , y_dimid))
+# endif
 
+      
       dimids = (/ x_dimid, y_dimid /)
 
 # if defined (DOUBLE_PRECISION)
@@ -428,9 +462,11 @@ END SUBROUTINE PutFileXDMF
       
 # endif
 ! end external packages
-         
+      
+# endif
+! end parallel
+      
 END MODULE PARALLEL_FIELD_IO 
 
 
-# endif
- ! end parallel
+

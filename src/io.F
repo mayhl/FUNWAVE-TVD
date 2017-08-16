@@ -3337,9 +3337,12 @@ END SUBROUTINE STATIONS
 !    05/01/2010  Fengyan Shi
 !    06/01/2015  Young-Kwang Choi, change file number to 5 digits, 
 !                        such as eta_00001
+!    15/08/2017  Michael-Angelo Y.-H. Lam - Move file path handling to PutFile
 !
 !-------------------------------------------------------------------------------------
 SUBROUTINE PREVIEW
+
+      
      USE GLOBAL
 # if defined (VESSEL)
      USE VESSEL_MODULE
@@ -3348,11 +3351,24 @@ SUBROUTINE PREVIEW
      USE METEO_MODULE
 # endif
 
+! Check PutFile call for new signature
+     ! INTERFACE 
+      !   SUBROUTINE PutFile(VAR_NAME,PHI)
+      !   USE GLOBAL
+      !   USE PARALLEL_FIELD_IO
+      !   IMPLICIT NONE
+
+       !  CHARACTER(LEN=80) ,INTENT(IN) :: VAR_NAME!, OUTPUT_NUM
+       !  REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
+       !  END SUBROUTINE PutFile
+     ! END INTERFACE
+
      IMPLICIT NONE
 
      CHARACTER(LEN=80)::FILE_NAME=' '
      CHARACTER(LEN=80)::FILE_NAME_MEAN=' '
-     CHARACTER(LEN=80)::TMP_NAME=' '
+!     CHARACTER(LEN=80)::TMP_NAME=' '
+     CHARACTER(LEN=80)::VAR_NAME
      CHARACTER(LEN=80)::FDIR=' '
 
      FDIR=TRIM(RESULT_FOLDER)
@@ -3370,6 +3386,22 @@ SUBROUTINE PREVIEW
 
 102     FORMAT(A20,I6,A14,F12.3,A2,F12.3)
 
+
+
+     
+     IF(ICOUNT==1)THEN
+     IF(OUT_DEPTH.OR.BREAKWATER)THEN
+        FILE_NAME=''
+!     TMP_NAME = TRIM(FDIR)//'dep.out'
+        FILE_NAME=''
+        VAR_NAME='dep.out'
+        call PutFile(VAR_NAME,FILE_NAME,DEPTH)
+!TMP_NAME = TRIM(FDIR)//'cd_breakwater.out'
+        VAR_NAME='cd_breakwater.out'
+        call PutFile(VAR_NAME,FILE_NAME,CD_breakwater) 
+     ENDIF
+     ENDIF
+
         !ykchoi
 	  !itmp1=mod(icount/1000,10)
         !itmp2=mod(icount/100,10)
@@ -3386,95 +3418,103 @@ SUBROUTINE PREVIEW
         write(file_name(3:3),'(I1)')itmp3
         write(file_name(4:4),'(I1)')itmp4
     	  write(file_name(5:5),'(I1)')itmp5   !ykchoi
-
-     IF(ICOUNT==1)THEN
-     IF(OUT_DEPTH.OR.BREAKWATER)THEN
-        TMP_NAME = TRIM(FDIR)//'dep.out'
-        call PutFile(TMP_NAME,DEPTH)
-        TMP_NAME = TRIM(FDIR)//'cd_breakwater.out'
-        call PutFile(TMP_NAME,CD_breakwater)
-     ENDIF
-     ENDIF
+        
 ![ykchoi
      write(10000,*)time, dt
 !ykchoi]
 
+   
+        
      IF(OUT_ETA)THEN
-        TMP_NAME = TRIM(FDIR)//'eta_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,Eta)
+!TMP_NAME = TRIM(FDIR)//'eta_'//TRIM(FILE_NAME)
+        VAR_NAME='eta'
+        call PutFile(VAR_NAME,FILE_NAME,Eta)
      ENDIF
 
      IF(OUT_Hmax)THEN
-        TMP_NAME = TRIM(FDIR)//'hmax_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,HeightMax)
+!TMP_NAME = TRIM(FDIR)//'hmax_'//TRIM(FILE_NAME)
+        VAR_NAME = 'hmax'
+        call PutFile(VAR_NAME,FILE_NAME,HeightMax)
      ENDIF
 
      IF(OUT_Hmin)THEN
-        TMP_NAME = TRIM(FDIR)//'hmin_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,HeightMin)
+!TMP_NAME = TRIM(FDIR)//'hmin_'//TRIM(FILE_NAME)
+        VAR_NAME='hmin'
+        call PutFile(VAR_NAME,FILE_NAME,HeightMin)
      ENDIF
 
      IF(OUT_Umax)THEN
-        TMP_NAME = TRIM(FDIR)//'umax_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,VelocityMax)
+!TMP_NAME = TRIM(FDIR)//'umax_'//TRIM(FILE_NAME)
+        VAR_NAME='umax'
+        call PutFile(VAR_NAME,FILE_NAME,VelocityMax)
      ENDIF
      
      IF(OUT_MFmax)THEN                                                                                            
-        TMP_NAME = TRIM(FDIR)//'MFmax_'//TRIM(FILE_NAME)                                                          
-        call PutFile(TMP_NAME,MomentumFluxMax)                                                                              
+!TMP_NAME = TRIM(FDIR)//'MFmax_'//TRIM(FILE_NAME)
+        VAR_NAME='MFmax'
+        call PutFile(VAR_NAME,FILE_NAME,MomentumFluxMax)                                                                             
      ENDIF      
      
-     IF(OUT_VORmax)THEN                                                                                            
-        TMP_NAME = TRIM(FDIR)//'VORmax_'//TRIM(FILE_NAME)                                                          
-        call PutFile(TMP_NAME,VorticityMax)                                                                              
+     IF(OUT_VORmax)THEN                                                                                         
+!TMP_NAME = TRIM(FDIR)//'VORmax_'//TRIM(FILE_NAME)
+        VAR_NAME='VORmax'
+        call PutFile(VAR_NAME,FILE_NAME,VorticityMax)                                                                              
      ENDIF            
      
      IF(OUT_U)THEN
-        TMP_NAME = TRIM(FDIR)//'u_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,U)
+!TMP_NAME = TRIM(FDIR)//'u_'//TRIM(FILE_NAME)
+        VAR_NAME='u'
+        call PutFile(VAR_NAME,FILE_NAME,U)
      ENDIF
 
      IF(OUT_V)THEN
-        TMP_NAME = TRIM(FDIR)//'v_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,V)
+!TMP_NAME = TRIM(FDIR)//'v_'//TRIM(FILE_NAME)
+        VAR_NAME='v'
+        call PutFile(VAR_NAME,FILE_NAME,V)
      ENDIF
 
      IF(OUT_MASK)THEN
-        TMP_NAME = TRIM(FDIR)//'mask_'//TRIM(FILE_NAME)
+        !TMP_NAME = TRIM(FDIR)//'mask_'//TRIM(FILE_NAME)
         Int2Flo=MASK
-        call PutFile(TMP_NAME,Int2Flo)
+        VAR_NAME='mask'
+        call PutFile(VAR_NAME,FILE_NAME,Int2Flo)
      ENDIF
 
      IF(OUT_MASK9)THEN
-        TMP_NAME = TRIM(FDIR)//'mask9_'//TRIM(FILE_NAME)
+! TMP_NAME = TRIM(FDIR)//'mask9_'//TRIM(FILE_NAME)
+        VAR_NAME='mask9'
         Int2Flo=MASK9
-        call PutFile(TMP_NAME,Int2Flo)
+        call PutFile(VAR_NAME,FILE_NAME,Int2Flo) 
      ENDIF
 
 210   FORMAT(5000I3)
 
      IF(OUT_P)THEN
-        TMP_NAME = TRIM(FDIR)//'p_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,P(1:Mloc,1:Nloc))
+!TMP_NAME = TRIM(FDIR)//'p_'//TRIM(FILE_NAME)
+        VAR_NAME='p'
+        call PutFile(VAR_NAME,FILE_NAME,P(1:Mloc,1:Nloc))
      ENDIF
 
      IF(OUT_Q)THEN
-        TMP_NAME = TRIM(FDIR)//'q_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,Q(1:Mloc,1:Nloc))
+! TMP_NAME = TRIM(FDIR)//'q_'//TRIM(FILE_NAME)
+        VAR_NAME='q'
+        call PutFile(VAR_NAME,FILE_NAME,Q(1:Mloc,1:Nloc))
      ENDIF
 
 
      IF(OUT_AGE)THEN
       IF(SHOW_BREAKING)THEN
-        TMP_NAME = TRIM(FDIR)//'age_'//TRIM(FILE_NAME)
-         call PutFile(TMP_NAME,AGE_BREAKING)
+!TMP_NAME = TRIM(FDIR)//'age_'//TRIM(FILE_NAME)
+         VAR_NAME='age'
+         call PutFile(VAR_NAME,FILE_NAME,AGE_BREAKING)
       ENDIF
      ENDIF
 
       IF(VISCOSITY_BREAKING)THEN
        IF(OUT_NU)THEN
-        TMP_NAME = TRIM(FDIR)//'nubrk_'//TRIM(FILE_NAME)
-         call PutFile(TMP_NAME,nu_break)
+! TMP_NAME = TRIM(FDIR)//'nubrk_'//TRIM(FILE_NAME)
+         VAR_NAME='nubrk'
+         call PutFile(VAR_NAME,FILE_NAME,nu_break)
        ENDIF
 !        TMP_NAME = TRIM(FDIR)//'etat_'//TRIM(FILE_NAME)
 !         call PutFile(TMP_NAME,etat) 
@@ -3484,22 +3524,27 @@ SUBROUTINE PREVIEW
    IF(OUT_METEO)THEN
 
     IF(WindHollandModel)THEN
-        TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,StormPressureTotal)
-        TMP_NAME = TRIM(FDIR)//'Ustorm_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,WindU2D)
-        TMP_NAME = TRIM(FDIR)//'Vstorm_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,WindV2D)
+!TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
+        VAR_NAME='Pstorm'
+        call PutFile(VAR_NAME,FILE_NAME,StormPressureTotal)
+!TMP_NAME = TRIM(FDIR)//'Ustorm_'//TRIM(FILE_NAME)
+        VAR_NAME='Ustorm'
+        call PutFile(VAR_NAME,FILE_NAME,WindU2D)
+!TMP_NAME = TRIM(FDIR)//'Vstorm_'//TRIM(FILE_NAME)
+        VAR_NAME='VStorm'
+        call PutFile(VAR_NAME,FILE_NAME,WindV2D)
     ENDIF
 
     IF(MeteoGausian)THEN
-        TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,StormPressureTotal)
+!TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
+        VAR_NAME='Pstorm'
+        call PutFile(VAR_NAME,FILE_NAME,StormPressureTotal)
     ENDIF
 
     IF(SlideModel)THEN
-        TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,StormPressureTotal)      
+!TMP_NAME = TRIM(FDIR)//'Pstorm_'//TRIM(FILE_NAME)
+        VAR_NAME='Pstorm'
+        call PutFile(VAR_NAME,FILE_NAME,StormPressureTotal)      
     ENDIF
 
   ENDIF
@@ -3508,20 +3553,23 @@ SUBROUTINE PREVIEW
 # if defined (VESSEL)
      IF(OUT_VESSEL)THEN
 # if defined (VESSEL_PANEL_SOURCE)
-        TMP_NAME = TRIM(FDIR)//'Fves_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,VesselFluxGradient)
+!TMP_NAME = TRIM(FDIR)//'Fves_'//TRIM(FILE_NAME)
+        VAR_NAME='Fves'
+        call PutFile(VAR_NAME,FILE_NAME,VesselFluxGradient)
 # else
-        TMP_NAME = TRIM(FDIR)//'Pves_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,VesselPressureTotal)
+!TMP_NAME = TRIM(FDIR)//'Pves_'//TRIM(FILE_NAME)
+        VAR_NAME='Pves'
+        call PutFile(VAR_NAME,FILE_NAME,VesselPressureTotal)
 # endif
    ! end panel source
-
+ 
      ENDIF
 # endif
 
      IF(OUT_TMP)THEN
-        TMP_NAME = TRIM(FDIR)//'tmp_'//TRIM(FILE_NAME)
-        call PutFile(TMP_NAME,tmp4preview)
+!TMP_NAME = TRIM(FDIR)//'tmp_'//TRIM(FILE_NAME)
+        VAR_NAME='tmp'
+        call PutFile(VAR_NAME,FILE_NAME,tmp4preview)
      ENDIF
 
 101   continue
@@ -3533,7 +3581,8 @@ END SUBROUTINE PREVIEW
 !    PREVIEW_MEAN is subroutine for print-out of mean field data
 !
 !  HISTORY:
-!    03/22/2016  Fengyan Shi
+!     03/22/2016  Fengyan Shi
+!     15/08/2017  Michael-Angelo Y.-H. Lam - Move file path handling to PutFile
 !-------------------------------------------------------------------------------------
 SUBROUTINE PREVIEW_MEAN
      USE GLOBAL
@@ -3541,8 +3590,8 @@ SUBROUTINE PREVIEW_MEAN
 
      CHARACTER(LEN=80)::FILE_NAME=' '
      CHARACTER(LEN=80)::FDIR=' '
-     CHARACTER(LEN=80)::TMP_NAME=' '
-
+!     CHARACTER(LEN=80)::TMP_NAME=' '
+     CHARACTER(LEN=80)::VAR_NAME
      FDIR=TRIM(RESULT_FOLDER)
 
      ICOUNT_MEAN=ICOUNT_MEAN+1
@@ -3570,25 +3619,33 @@ SUBROUTINE PREVIEW_MEAN
         write(file_name(4:4),'(I1)')itmp4
     	write(file_name(5:5),'(I1)')itmp5  
 
+
+        
         IF(OUT_Umean)THEN
-          TMP_NAME = TRIM(FDIR)//'umean_'//TRIM(FILE_NAME)
-          call PutFile(TMP_NAME,Umean)
+! TMP_NAME = TRIM(FDIR)//'umean_'//TRIM(FILE_NAME)
+          VAR_NAME='umean'
+          call PutFile(VAR_NAME,FILE_NAME,Umean)
         ENDIF
         IF(OUT_Vmean)THEN
-          TMP_NAME = TRIM(FDIR)//'vmean_'//TRIM(FILE_NAME)
-          call PutFile(TMP_NAME,Vmean)
+! TMP_NAME = TRIM(FDIR)//'vmean_'//TRIM(FILE_NAME)
+          VAR_NAME='vmean'
+          call PutFile(VAR_NAME,FILE_NAME,Vmean)
         ENDIF
         IF(OUT_ETAmean)THEN
-          TMP_NAME = TRIM(FDIR)//'etamean_'//TRIM(FILE_NAME)
-          call PutFile(TMP_NAME,ETAmean)
+!TMP_NAME = TRIM(FDIR)//'etamean_'//TRIM(FILE_NAME)
+          VAR_NAME='etamean'
+          call PutFile(VAR_NAME,FILE_NAME,ETAmean)
         ENDIF
-        IF(OUT_WaveHeight)THEN
-          TMP_NAME = TRIM(FDIR)//'Hrms_'//TRIM(FILE_NAME)
-          call PutFile(TMP_NAME,WaveHeightRMS)
-          TMP_NAME = TRIM(FDIR)//'Havg_'//TRIM(FILE_NAME)
-          call PutFile(TMP_NAME,WaveHeightAve)
-          TMP_NAME = TRIM(FDIR)//'Hsig_'//TRIM(FILE_NAME)
-          call PutFile(TMP_NAME,SigWaveHeight)
+         IF(OUT_WaveHeight)THEN
+!TMP_NAME = TRIM(FDIR)//'Hrms_'//TRIM(FILE_NAME)
+          VAR_NAME='Hrms'
+          call PutFile(VAR_NAME,FILE_NAME,WaveHeightRMS)
+!TMP_NAME = TRIM(FDIR)//'Havg_'//TRIM(FILE_NAME)
+          VAR_NAME='Havg'
+          call PutFile(VAR_NAME,FILE_NAME,WaveHeightAve)
+! TMP_NAME = TRIM(FDIR)//'Hsig_'//TRIM(FILE_NAME)
+          VAR_NAME='Hsig'
+          call PutFile(VAR_NAME,FILE_NAME,SigWaveHeight)
         ENDIF
                     
 
@@ -3645,7 +3702,7 @@ SUBROUTINE GetFile(FILE,PHI)
            ENDDO
            DO I=MGlob+Nghost+1,MGlob+2*Nghost
               PHIGLOB(I,J)=PHIGLOB(MGlob+Nghost,J)
-           ENDDO
+           ENDDO 
         ENDDO
      endif
 
@@ -3714,39 +3771,49 @@ END SUBROUTINE Getfile
 !
 !    HISTORY:
 !      05/01/2010  Fengyan Shi
- !      05/06/2017  Young-Kwang Choi 
+!     05/06/2017  Young-Kwang Choi
+!     15/08/2017  Michael-Angelo Y.-H. Lam - Changed signature.      
 !-------------------------------------------------------------------------------------
 
-SUBROUTINE PutFile(FILE_NAME,PHI)
+SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
      USE GLOBAL
      USE PARALLEL_FIELD_IO
      IMPLICIT NONE
 
-     CHARACTER(LEN=80) FILE_NAME
+     CHARACTER(LEN=80) ,INTENT(IN) :: VAR_NAME!, OUTPUT_NUM
+     CHARACTER(LEN=10) ,INTENT(IN) :: FILE_NUMBER
      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
 
-     CHARACTER(LEN=80)::TMP_NAME=''
+    ! CHARACTER(LEN=80)::TMP_NAME=''
 
    !   REAL(SP) :: start_time , end_time, elapsed_time
    !   REAL(SP) :: max_time, min_time, mean_time
       INTEGER :: ierr
       
  !     start_time = MPI_Wtime()
+!   
+
       
-     SELECT CASE (TRIM(FIELD_IO_TYPE))
+
+      
+ 
+
+  
+      
+      SELECT CASE (TRIM(FIELD_IO_TYPE))
       CASE ('ASCII' , 'ascii')
-         CALL PutFileASCII(FILE_NAME,PHI)
+         CALL PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
       CASE ('BINARY' , 'binary' )
-         Call PutFileBinary(FILE_NAME,PHI)
+         Call PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 # if defined (EXTERNAL_PACKAGES)  
       CASE ( 'NETCDF' , 'netcdf' )
-         Call PutFileNetCDF(FILE_NAME,PHI)
+         Call PutFileNetCDF(VAR_NAME,PHI)
       CASE ( 'XDMF' , 'xdmf' )
-         Call PutFileXDMF(FILE_NAME,PHI)
+         Call PutFileXDMF(VAR_NAME,PHI)
 # endif
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input
-         CALL PutFileASCII(FILE_NAME,PHI)
+         CALL PutFileASCII(VAR_NAME,FILE_NUMBER,PHI) 
      END SELECT
 
          
@@ -3774,17 +3841,34 @@ END SUBROUTINE Putfile
 !
 !    HISTORY:
 !      05/01/2010  Fengyan Shi
-!
+!      15/08/2017  Michael-Angelo Y.-H. Lam - Changed signature. 
+!                                             File path now handled here
+!                                             
 !-------------------------------------------------------------------------------------
-SUBROUTINE PutFile(FILE,PHI)
+SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
      USE PARAM
      USE GLOBAL
      IMPLICIT NONE
      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
-     CHARACTER(LEN=80) FILE
+     CHARACTER(LEN=80) ,INTENT(IN) :: VAR_NAME
+     CHARACTER(LEN=10) ,INTENT(IN) :: FILE_NUMBER
+      
+     CHARACTER(LEN=80) :: FILE
      LOGICAL :: FirstCallPutFile = .TRUE.
      SAVE  FirstCallPutFile
 
+
+      
+      
+      ! Filter off file number for depth and breakwater 
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      ELSE
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+      ENDIF
+
+      WRITE(*,*) "FILE: "//FILE
+      
 ! first time call 
      IF(FirstCallPutFile)THEN
         FirstCallPutFile = .FALSE.
