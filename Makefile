@@ -12,7 +12,7 @@ export
 #	PLATFORM_ENV = MACOSX_DEPLOYMENT_TARGET=$(shell sw_vers -productVersion | sed "s/\(10.[0-9]\).*/\1/")
 #endif
 
-MKDIR_P = make -p
+MKDIR_P = mkdir -p
 
 .PHONY: all clean cleaner help
 
