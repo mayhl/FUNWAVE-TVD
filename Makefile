@@ -16,6 +16,10 @@ export
 .PHONY: all clean cleaner help
 
 
+test_eval:
+	${eval TEST12 = $${shell cat asdad2}}
+	@echo 'Done'
+
 all:	version_select verify_config_files install_externalPackages install_funwave
 
 
@@ -28,15 +32,17 @@ verify_config_files:
 	@cd scripts && ./verifyConfigFile.sh
 	@cd externalPackages && $(MAKE) -s verify_all_config_files
 
+
 version_select:
-	@mkdir -p "currentVersion"
-	@rm -f currentVersion/*
-	@cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
+	rm -rf currentVersion/
+	mkdir -p "currentVersion"
+	cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
+	@make -s make_funwave_arch_dir
+
+# Note: Seperate recipe to ensure file exists before reading signature
+make_funwave_arch_dir:
 	${eval FUNWAVE_ARCH = $${shell cat currentVersion/signature}}
 	@mkdir -p ${FUNWAVE_ARCH}
-
-
-
 
 check_all:
 	cd externalPackages && make check_all
@@ -50,6 +56,9 @@ install_funwave:
 
 install_externalPackages:
 	@cd scripts && ./selectExternalPackages.sh
+	@make -s check_extneralPackages
+
+check_extneralPackages: 
 ifneq ($(wildcard  currentVersion/externalPackages),)
 	@cd externalPackages; $(MAKE) -s all
 else
