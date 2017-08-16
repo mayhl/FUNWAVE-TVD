@@ -28,7 +28,7 @@ EXTERN_PACK_DIR=externalPackages/
 include ../versionsConfig/version.${FUNWAVE_ARCH}
 
 
-.PHONY: all clean cleaner help 
+.PHONY: all clean distclean help 
 
 all:	title install_autoconf_tools install_zlib install_hdf5 install_netcdf_c install_netcdf_fortran save_libary_dependencies
 
@@ -54,10 +54,13 @@ verify_all_config_files: verify_zlib_config_file \
 			 verify_netcdf_fortran_config_file 
 
 # Restores local submodules repos to original state and
-# cleans current version builds of submodules
+# cleans current version builds of submodules, execute
+# from main FUNWAVE-TVD repo root directory and NOT
+# in externalPackages !!!
 distclean:
-	git submodule foreach git clean -f
 	rm -rf ${FUNWAVE_PREFIX}/*
+	cd ../ && git submodule foreach git clean -f
+
 
 #------------------
 #  autoconf tools
