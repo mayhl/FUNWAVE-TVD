@@ -12,13 +12,9 @@ export
 #	PLATFORM_ENV = MACOSX_DEPLOYMENT_TARGET=$(shell sw_vers -productVersion | sed "s/\(10.[0-9]\).*/\1/")
 #endif
 
+MKDIR_P = make -p
 
 .PHONY: all clean cleaner help
-
-
-test_eval:
-	${eval TEST12 = $${shell cat asdad2}}
-	@echo 'Done'
 
 all:	version_select verify_config_files install_externalPackages install_funwave
 
@@ -34,15 +30,15 @@ verify_config_files:
 
 
 version_select:
-	rm -rf currentVersion/
-	mkdir -p "currentVersion"
-	cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
+	@rm -rf currentVersion/
+	@${MKDIR_P} "currentVersion"
+	@cd scripts && ./selectGlobalVersionMenu.sh BUILD_SELECTED=${BUILD_SELECTED}
 	@make -s make_funwave_arch_dir
 
 # Note: Seperate recipe to ensure file exists before reading signature
 make_funwave_arch_dir:
 	${eval FUNWAVE_ARCH = $${shell cat currentVersion/signature}}
-	@mkdir -p ${FUNWAVE_ARCH}
+	@${MKDIR_P} ${FUNWAVE_ARCH}
 
 check_all:
 	cd externalPackages && make check_all

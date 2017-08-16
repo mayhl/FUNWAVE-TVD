@@ -64,7 +64,7 @@ distclean:
 #------------------
 install_autoconf_tools:
 
-ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_zlib),)
+ifneq ($(wildcard  ${FUNWAVE_PREFIX}/install_autoconf_tools),)
 	@echo "autoconf tools appears to be installed, skipping installation" 
 else
 	@echo "Installing autoconf tools"
