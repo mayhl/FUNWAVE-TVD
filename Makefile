@@ -14,7 +14,7 @@ export
 
 MKDIR_P = mkdir -p
 
-.PHONY: all clean cleaner help
+.PHONY: all clean distclean help
 
 all:	version_select verify_config_files install_externalPackages install_funwave
 
@@ -39,6 +39,7 @@ version_select:
 make_funwave_arch_dir:
 	${eval FUNWAVE_ARCH = $${shell cat currentVersion/signature}}
 	@${MKDIR_P} ${FUNWAVE_ARCH}
+
 
 check_all:
 	cd externalPackages && make check_all
@@ -72,5 +73,5 @@ clean_funwave:
 
 clean:	clean_funwave clean_externalPackages
 
-cleaner: 
+distclean: 
 	cd src && make clobber
