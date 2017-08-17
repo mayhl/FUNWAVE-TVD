@@ -13,5 +13,4 @@ CPPFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include"
 CXXFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
 CFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
 FFLAGS="-O3 -xHost -ip -no-prec-div -shared-intel -I${FUNWAVE_PREFIX}/include" \
-LDFLAGS="-L${FUNWAVE_PREFIX}/lib" \
-CPPFLAGS="-I${FUNWAVE_PREFIX}/include" 
+LDFLAGS="-L${FUNWAVE_PREFIX}/lib"  
