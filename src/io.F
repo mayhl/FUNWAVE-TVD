@@ -2869,6 +2869,16 @@ SUBROUTINE READ_INPUT
       IF(ierr.EQ.1) FIELD_IO_TYPE = 'ASCII'
       
       IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
+
+      CALL READ_LOGICAL(COMBINE_FIELD_IO,FILE_NAME,'COMBINE_FIELD_IO',ierr)
+
+      IF (myid.EQ.0) THEN
+         IF( COMBINE_FIELD_IO.EQV..TRUE.) THEN
+            WRITE(3,*) 'COMBINE_FIELD_IO = YES'
+         ELSE
+            WRITE(3,*) 'COMBINE_FIELD_IO = NO'
+         END IF
+      END IF 
 # endif
 ! mayhl]
  
@@ -3370,7 +3380,12 @@ SUBROUTINE PREVIEW
 !     CHARACTER(LEN=80)::TMP_NAME=' '
      CHARACTER(LEN=80)::VAR_NAME
      CHARACTER(LEN=80)::FDIR=' '
-
+     
+    !  REAL(SP) :: start_time , end_time, elapsed_time
+    !  REAL(SP) :: max_time, min_time, mean_time
+     !  INTEGER :: ierr
+     ! start_time = MPI_Wtime()
+      
      FDIR=TRIM(RESULT_FOLDER)
 
      ICOUNT=ICOUNT+1
@@ -3396,11 +3411,11 @@ SUBROUTINE PREVIEW
         FILE_NAME=''
         VAR_NAME='dep.out'
         call PutFile(VAR_NAME,FILE_NAME,DEPTH)
-        CALL ClosePutFile()
+        IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL ClosePutFile()
 !TMP_NAME = TRIM(FDIR)//'cd_breakwater.out'
         VAR_NAME='cd_breakwater.out'
         call PutFile(VAR_NAME,FILE_NAME,CD_breakwater) 
-        CALL ClosePutFile()
+        IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL ClosePutFile()
      ENDIF
      ENDIF
 
@@ -3424,8 +3439,8 @@ SUBROUTINE PREVIEW
 ![ykchoi
      write(10000,*)time, dt
 !ykchoi]
-     CALL SetSharedFileName('field_output')   
-     IF(OUT_ETA)THEN
+      IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL SetSharedFileName('field_output')   
+      IF(OUT_ETA)THEN
 !TMP_NAME = TRIM(FDIR)//'eta_'//TRIM(FILE_NAME)
         VAR_NAME='eta'
         call PutFile(VAR_NAME,FILE_NAME,Eta)
@@ -3572,7 +3587,26 @@ SUBROUTINE PREVIEW
         call PutFile(VAR_NAME,FILE_NAME,tmp4preview)
      ENDIF
 
-     CALL ClosePutFile()
+     IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL ClosePutFile()
+
+!     end_time = MPI_Wtime()
+
+ !     elapsed_time = end_time - start_time
+
+!     CALL MPI_Reduce( elapsed_time ,  max_time , 1 , mpi_sp , MPI_MAX , 0 , MPI_COMM_WORLD, ierr)
+!     CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
+!      CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
+
+  !    IF ( myid.EQ.0 ) THEN
+ !        mean_time = mean_time/(PY*PX)
+  !       WRITE(*,*) 'Mean Time: ' , mean_time
+   !      WRITE(*,*) 'Max Time: ' , mean_time
+   !      WRITE(*,*) 'Min Time: ' , min_time
+   !  END IF
+
+
+
+     
 101   continue
 
 END SUBROUTINE PREVIEW
@@ -3621,7 +3655,7 @@ SUBROUTINE PREVIEW_MEAN
     	write(file_name(5:5),'(I1)')itmp5  
 
 
-     CALL SetSharedFileName('averaged_field_output')
+      IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL SetSharedFileName('averaged_field_output')
         
         IF(OUT_Umean)THEN
 ! TMP_NAME = TRIM(FDIR)//'umean_'//TRIM(FILE_NAME)
@@ -3650,7 +3684,7 @@ SUBROUTINE PREVIEW_MEAN
           call PutFile(VAR_NAME,FILE_NAME,SigWaveHeight)
         ENDIF
         
-     CALL ClosePutFile()
+     IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL ClosePutFile()
         
 END SUBROUTINE PREVIEW_MEAN
 
@@ -3801,8 +3835,6 @@ SUBROUTINE ClosePutFile()
 
       END SELECT
       
-      FILE_CLOSED=.TRUE.
-      SHARED_FILE_NAME = ''
 # endif
       
 END SUBROUTINE ClosePutFile
@@ -3845,6 +3877,7 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
 # if defined (EXTERNAL_PACKAGES)  
       CASE ( 'NETCDF' , 'netcdf' )
          Call PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
+         IF (COMBINE_FIELD_IO.EQV..FALSE.) CALL ClosePutFileNetCDF()
       CASE ( 'XDMF' , 'xdmf' )
          Call PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 # endif

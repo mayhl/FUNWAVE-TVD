@@ -351,19 +351,18 @@ SUBROUTINE PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
       INTEGER :: mode_flag, x_dimid , y_dimid, varid
       INTEGER :: dummy_id
       INTEGER, DIMENSION(ndims) :: start, count, chunk_size
- 
-! Filter off file number for depth and breakwater
-      IF ( TRIM(SHARED_FILE_NAME) == '' ) THEN
-         IF (TRIM(FILE_NUMBER)=='') THEN
-            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      
+!     Filter off file number for depth and breakwater
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      ELSE
+         IF ( COMBINE_FIELD_IO.EQV..TRUE. ) THEN
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)
          ELSE
             FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
          END IF
-      ELSE
-         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)
       END IF
 
-      
       IF ( FILE_CLOSED.EQV..TRUE. ) THEN
          CALL CreateFileNetCDF(FILE_NAME)
          FILE_CLOSED = .FALSE.   
@@ -407,6 +406,9 @@ SUBROUTINE ClosePutFileNetCDF()
       USE netcdf
       IMPLICIT NONE
       CALL CheckNetCDF( nf90_close(ncid) )
+      
+      FILE_CLOSED=.TRUE.
+      SHARED_FILE_NAME = ''
 
 END SUBROUTINE ClosePutFileNetCDF
 
