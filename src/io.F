@@ -2870,6 +2870,21 @@ SUBROUTINE READ_INPUT
       
       IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
 
+      SELECT CASE (TRIM(FIELD_IO_TYPE))
+      CASE ('ASCII' , 'ascii')
+         FIELD_IO_TYPE_ID = ASCII_IO_ID
+      CASE ('BINARY' , 'binary' )
+         FIELD_IO_TYPE_ID = BINARY_IO_ID
+# if defined (EXTERNAL_PACKAGES)  
+      CASE ( 'NETCDF' , 'netcdf' )
+         FIELD_IO_TYPE_ID = NETCDF_IO_ID
+      CASE ( 'XDMF' , 'xdmf' )
+         FIELD_IO_TYPE_ID = XDMF_IO_ID
+# endif
+      CASE DEFAULT
+         FIELD_IO_TYPE_ID = ASCII_IO_ID 
+     END SELECT
+
       CALL READ_LOGICAL(COMBINE_FIELD_IO,FILE_NAME,'COMBINE_FIELD_IO',ierr)
 
       IF (myid.EQ.0) THEN
@@ -3381,10 +3396,10 @@ SUBROUTINE PREVIEW
      CHARACTER(LEN=80)::VAR_NAME
      CHARACTER(LEN=80)::FDIR=' '
      
-    !  REAL(SP) :: start_time , end_time, elapsed_time
-    !  REAL(SP) :: max_time, min_time, mean_time
-     !  INTEGER :: ierr
-     ! start_time = MPI_Wtime()
+      REAL(SP) :: start_time , end_time, elapsed_time
+      REAL(SP) :: max_time, min_time, mean_time
+       INTEGER :: ierr
+      start_time = MPI_Wtime()
       
      FDIR=TRIM(RESULT_FOLDER)
 
@@ -3589,20 +3604,20 @@ SUBROUTINE PREVIEW
 
      IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL ClosePutFile()
 
-!     end_time = MPI_Wtime()
+     end_time = MPI_Wtime()
 
- !     elapsed_time = end_time - start_time
+      elapsed_time = end_time - start_time
 
-!     CALL MPI_Reduce( elapsed_time ,  max_time , 1 , mpi_sp , MPI_MAX , 0 , MPI_COMM_WORLD, ierr)
-!     CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
-!      CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
+     CALL MPI_Reduce( elapsed_time ,  max_time , 1 , mpi_sp , MPI_MAX , 0 , MPI_COMM_WORLD, ierr)
+     CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
+      CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
 
-  !    IF ( myid.EQ.0 ) THEN
- !        mean_time = mean_time/(PY*PX)
-  !       WRITE(*,*) 'Mean Time: ' , mean_time
-   !      WRITE(*,*) 'Max Time: ' , mean_time
-   !      WRITE(*,*) 'Min Time: ' , min_time
-   !  END IF
+      IF ( myid.EQ.0 ) THEN
+         mean_time = mean_time/(PY*PX)
+         WRITE(*,*) 'Mean Time: ' , mean_time
+         WRITE(*,*) 'Max Time: ' , mean_time
+         WRITE(*,*) 'Min Time: ' , min_time
+     END IF
 
 
 
@@ -3827,10 +3842,10 @@ SUBROUTINE ClosePutFile()
       USE GLOBAL
       USE PARALLEL_FIELD_IO
       
-      SELECT CASE (TRIM(FIELD_IO_TYPE))
-      CASE ( 'NETCDF' , 'netcdf' )
+      SELECT CASE (FIELD_IO_TYPE_ID)
+      CASE ( NETCDF_IO_ID )
          Call ClosePutFileNetCDF()
-      !CASE ( 'XDMF' , 'xdmf' )
+      !CASE ( XDMF_IO_ID )
          !Call ClosePutFileXDMF()
 
       END SELECT
@@ -3862,23 +3877,23 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
 
     ! CHARACTER(LEN=80)::TMP_NAME=''
 
-   !   REAL(SP) :: start_time , end_time, elapsed_time
-   !   REAL(SP) :: max_time, min_time, mean_time
-      INTEGER :: ierr
+  !    REAL(SP) :: start_time , end_time, elapsed_time
+  !    REAL(SP) :: max_time, min_time, mean_time
+   !   INTEGER :: ierr
       
- !     start_time = MPI_Wtime()
+  !    start_time = MPI_Wtime()
 !   
 
-      SELECT CASE (TRIM(FIELD_IO_TYPE))
-      CASE ('ASCII' , 'ascii')
+      SELECT CASE (FIELD_IO_TYPE_ID)
+      CASE (ASCII_IO_ID)
          CALL PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
-      CASE ('BINARY' , 'binary' )
+      CASE (BINARY_IO_ID )
          Call PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 # if defined (EXTERNAL_PACKAGES)  
-      CASE ( 'NETCDF' , 'netcdf' )
+      CASE ( NETCDF_IO_ID )
          Call PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
          IF (COMBINE_FIELD_IO.EQV..FALSE.) CALL ClosePutFileNetCDF()
-      CASE ( 'XDMF' , 'xdmf' )
+      CASE ( XDMF_IO_ID )
          Call PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 # endif
       CASE DEFAULT
@@ -3899,8 +3914,8 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
 !        mean_time = mean_time/(PY*PX)
  !       WRITE(*,*) 'Mean Time: ' , mean_time
 !         WRITE(*,*) 'Max Time: ' , mean_time
-!         WRITE(*,*) 'Min Time: ' , min_time
-!     END IF
+ !        WRITE(*,*) 'Min Time: ' , min_time
+ !    END IF
       
 END SUBROUTINE Putfile
 

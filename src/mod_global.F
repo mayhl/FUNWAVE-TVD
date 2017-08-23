@@ -103,8 +103,19 @@ MODULE GLOBAL
        CHARACTER(LEN=80) Time_Scheme
        CHARACTER(LEN=80) CONSTR
        CHARACTER(LEN=80) HIGH_ORDER
+
+
+       ! Field IO Parameters 
        CHARACTER(LEN=80) FIELD_IO_TYPE !mayhl 17/06/12
        LOGICAL :: COMBINE_FIELD_IO !mayhl 17/08/23
+       
+       INTEGER ::  FIELD_IO_TYPE_ID
+       INTEGER, PARAMETER :: ASCII_IO_ID  = 0
+       INTEGER, PARAMETER :: BINARY_IO_ID = 1
+       INTEGER, PARAMETER :: NETCDF_IO_ID = 2
+       INTEGER, PARAMETER :: XDMF_IO_ID   = 3
+
+       
        ![ykchoi(14.12.24)
        REAL(SP) :: HotStartTime
        !ykchoi(14.12.24)]
