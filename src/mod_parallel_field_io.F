@@ -54,13 +54,24 @@
 
 MODULE PARALLEL_FIELD_IO
 
-# if defined (PARALLEL)
       
 USE GLOBAL
 
+      LOGICAL :: FILE_CLOSED = .TRUE.
+      LOGICAL :: HAS_SHARED_FILE_NAME = .FALSE.
+      CHARACTER(80) :: SHARED_FILE_NAME = ''
+      
+      INTEGER :: ncid
+      INTEGER, DIMENSION(2) :: dimids
+
+# if defined (PARALLEL)
   
 CONTAINS
 
+!------------------------------------------------------
+!     ASCII Output
+!------------------------------------------------------
+      
 SUBROUTINE PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
     
      IMPLICIT NONE
@@ -172,6 +183,11 @@ SUBROUTINE PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
 
 END SUBROUTINE PutfileASCII
 
+
+!------------------------------------------------------
+!     Binary Output
+!------------------------------------------------------
+      
 ! Code derived from William D. Gropp lecture slides 33 
 ! http://wgropp.cs.illinois.edu/courses/cs598-s16/lectures/lecture33.pdf
 SUBROUTINE PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
@@ -246,30 +262,47 @@ SUBROUTINE PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 
 END SUBROUTINE PutfileBinary
 
+# if defined (EXTERNAL_PACKAGES)
 
-# if defined (EXTERNAL_PACKAGES)  
 
-SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
-
+!------------------------------------------------------
+!     NetCDF Output
+!------------------------------------------------------
       
+! Wrapper to fixed 'Error NetCDF: Variable not found'
+! that appeared to be system dependent    
+SUBROUTINE NetCDFAttWrapper(NAME,VALUE)
+
       USE netcdf
-      
       IMPLICIT NONE
-      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
-      REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
-      REAL(SP):: dummy_val
-      REAL(SP) , DIMENSION(Mloc- 2*Nghost  , Nloc - 2*Nghost) :: TEST_DATA
-      INTEGER :: mode_flag, ncid, x_dimid , y_dimid, varid
+  !    INTEGER, INTENT(IN) :: ncid
+      CHARACTER(LEN=*), INTENT(IN) :: NAME
+      REAL(SP) , INTENT(IN) :: VALUE
+     
       INTEGER :: dummy_id
-      INTEGER, DIMENSION(ndims) :: start, count, dimids, chunk_size
+            
+      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, NAME ,VALUE))
+      
+END SUBROUTINE
 
+      
+SUBROUTINE CreateFileNetCDF(FILE_NAME)
+
+      USE netcdf
+      IMPLICIT NONE
+      
+      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
+    !  INTEGER, INTENT(OUT) :: ncid
+     ! INTEGER, DIMENSION(ndims), INTENT(OUT) :: dimids
+      INTEGER :: mode_flag
+
+      INTEGER :: x_dimid , y_dimid
       
       mode_flag = IOR(NF90_MPIIO, NF90_CLOBBER)
       mode_flag = IOR(mode_flag, NF90_NETCDF4)
          
       CALL CheckNetCDF(nf90_create_par(FILE_NAME, mode_flag , &
                          MPI_COMM_WORLD,  MPI_INFO_NULL, ncid)) 
-
 
 # if defined (CARTESIAN)
       CALL CheckNetCDF(nf90_def_dim(ncid, "x", Mglob , x_dimid))
@@ -278,50 +311,82 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
       CALL CheckNetCDF(nf90_def_dim(ncid, "Dphi", Mglob , x_dimid))
       CALL CheckNetCDF(nf90_def_dim(ncid, "Dtheta", Nglob , y_dimid))
 # endif
-
       
       dimids = (/ x_dimid, y_dimid /)
+  
+      CALL NetCDFAttWrapper( "TIME" , TIME )
+      CALL NetCDFAttWrapper( "TOTAL_TIME" , TOTAL_TIME )
+      
+      CALL NetCDFAttWrapper( "PLOT_INTV" , PLOT_INTV )
+      CALL NetCDFAttWrapper( "PLOT_INTV_STATION" , PLOT_INTV_STATION )
+      CALL NetCDFAttWrapper( "SCREEN_INTV" , SCREEN_INTV )
+      
+# if defined (CARTESIAN)
+      CALL NetCDFAttWrapper( "DX" , DX )
+      CALL NetCDFAttWrapper( "DY" , DY )
+# else
+      CALL NetCDFAttWrapper( "Lon_West", Lon_West))
+      CALL NetCDFAttWrapper( "Lat_South", Lat_South))
+      CALL NetCDFAttWrapper( "Dphi", Dphi))
+      CALL NetCDFAttWrapper( "Dtheta", Dtheta))
+      
+# endif
+      
+      CALL CheckNetCDF(nf90_enddef(ncid))
+      
+END SUBROUTINE CreateFileNetCDF
 
+   
+SUBROUTINE PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
+      
+      USE netcdf
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
+      CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
+      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
+
+      
+      CHARACTER(LEN=80) :: FILE_NAME
+      REAL(SP) , DIMENSION(Mloc- 2*Nghost  , Nloc - 2*Nghost) :: TEST_DATA
+      INTEGER :: mode_flag, x_dimid , y_dimid, varid
+      INTEGER :: dummy_id
+      INTEGER, DIMENSION(ndims) :: start, count, chunk_size
+ 
+! Filter off file number for depth and breakwater
+      IF ( TRIM(SHARED_FILE_NAME) == '' ) THEN
+         IF (TRIM(FILE_NUMBER)=='') THEN
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+         ELSE
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+         END IF
+      ELSE
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)
+      END IF
+
+      
+      IF ( FILE_CLOSED.EQV..TRUE. ) THEN
+         CALL CreateFileNetCDF(FILE_NAME)
+         FILE_CLOSED = .FALSE.   
+      END IF
+      
+      CALL CheckNetCDF(nf90_redef(ncid)) 
+      
 # if defined (DOUBLE_PRECISION)
       CALL CheckNetCDF(nf90_def_var( &
       ncid, &
-      "fff", &
+      VAR_NAME , &
       NF90_DOUBLE, &
       dimids, &
       varid))
 # else
        CALL CheckNetCDF(nf90_def_var( &
       ncid, &
-      "fff", &
+      VAR_NAME , &
       NF90_FLOAT, &
       dimids, &
       varid))
 # endif  
-      
-
-
-
-      dummy_val=TIME
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "TIME", TIME))
-      
-# if defined (CARTESIAN)
-      dummy_val=DX
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DX", DX))
-      dummy_val=DY
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "DY", DY))
-# else
-      
-      dummy_val=Lon_West
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lon_West", dummy_val))
-      dummy_val=Lat_South
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Lat_South", dummy_val))
-      dummy_val=Dphi
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dphi", dummy_val))
-      dummy_val=Dtheta
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, "Dtheta", dummy_val))
-# endif
-      
-     
+            
       CALL CheckNetCDF(nf90_enddef(ncid))
        
       start = (/ iista , jjsta /)
@@ -333,13 +398,19 @@ SUBROUTINE PutFileNetCDF(FILE_NAME,PHI)
     !  TEST_DATA , & 
       start = start, &
       count = count)) 
- 
-      CALL CheckNetCDF( nf90_close(ncid) )
 
-      
 END SUBROUTINE PutFileNetCDF
 
+      
+SUBROUTINE ClosePutFileNetCDF()
+      
+      USE netcdf
+      IMPLICIT NONE
+      CALL CheckNetCDF( nf90_close(ncid) )
 
+END SUBROUTINE ClosePutFileNetCDF
+
+      
 SUBROUTINE CheckNetCDF(status)
 
       USE netcdf
@@ -352,18 +423,24 @@ SUBROUTINE CheckNetCDF(status)
          CALL MPI_ABORT (MPI_COMM_WORLD, errorcode , ierr) 
          
       END IF
-
-      
+  
 END SUBROUTINE CheckNetCDF
 
+      
+!------------------------------------------------------
+!     XDMF Output
+!------------------------------------------------------
 
-SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
-
+SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+      
       USE HDF5
       IMPLICIT NONE
-      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
-      REAL(SP),DIMENSION(Mloc,Nloc), INTENT(IN) :: PHI
-      CHARACTER(LEN=80) :: dsetname
+      CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
+      CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
+      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
+
+    
+      CHARACTER(LEN=80) :: FILE_NAME
       INTEGER :: error, error_n
 
       INTEGER :: mpi_info
@@ -382,7 +459,16 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       INTEGER(HSIZE_T),  DIMENSION(ndims) :: stride
       INTEGER(HSIZE_T),  DIMENSION(ndims) :: block
       
-      dsetname = "test"
+
+    ! Filter off file number for depth and breakwater 
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      ELSE
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+      ENDIF
+
+      IF (myid.eq.0) WRITE(*,*) "HERE 1"
+      
       dimsf = (/Mglob,Nglob/) 
       chunk_dims = (/Mloc-2*Nghost,Nloc-2*Nghost/) 
       ! Initialize HDF5 library and Fortran interfaces.
@@ -401,15 +487,16 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       CALL h5screate_simple_f(ndims, dimsf, filespace, error)
       CALL h5screate_simple_f(ndims, chunk_dims, memspace, error)
 
+      IF (myid.eq.0) WRITE(*,*) "HERE 2"
      ! Create chunked dataset.
      !
       CALL h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
       CALL h5pset_chunk_f(plist_id, ndims, chunk_dims, error)
 # if defined (DOUBLE_PRECISION)
-      CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_DOUBLE, filespace, &
+      CALL h5dcreate_f(file_id, TRIM(VAR_NAME), H5T_NATIVE_DOUBLE, filespace, &
       dset_id, error, plist_id)
 # else
-      CALL h5dcreate_f(file_id, TRIM(dsetname), H5T_NATIVE_REAL , filespace, &
+      CALL h5dcreate_f(file_id, TRIM(VAR_NAME), H5T_NATIVE_REAL , filespace, &
       dset_id, error, plist_id)
 # endif       
       CALL h5sclose_f(filespace, error)
@@ -421,7 +508,7 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       block(1) = chunk_dims(1)
       block(2) = chunk_dims(2)
       offset(1) = iista - 1 ! 0 start index even in Fortran 
-      offset(2) = jjsta - 1     ! 0 start index even in Fortran
+      offset(2) = jjsta - 1 ! 0 start index even in Fortran
 
       ! Select hyperslab in the file.
       CALL h5dget_space_f(dset_id, filespace, error)
@@ -432,6 +519,7 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       CALL h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
 
       
+      IF (myid.eq.0) WRITE(*,*) "HERE 3"
       ! Write the dataset collectively. 
 # if defined (DOUBLE_PRECISION)
       CALL h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
@@ -452,9 +540,12 @@ SUBROUTINE PutFileXDMF(FILE_NAME,PHI)
       ! Close the property list.
       CALL h5pclose_f(plist_id, error)
       
+      IF (myid.eq.0) WRITE(*,*) "HERE 4"
       ! Close the file.
       CALL h5fclose_f(file_id, error)
 
+      IF (myid.eq.0) WRITE(*,*) "HERE 5"
+      
       ! Close FORTRAN interfaces and HDF5 library.
       CALL h5close_f(error)
       

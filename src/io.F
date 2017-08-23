@@ -3350,7 +3350,7 @@ SUBROUTINE PREVIEW
 # if defined(METEO)
      USE METEO_MODULE
 # endif
-
+      USE PARALLEL_FIELD_IO
 ! Check PutFile call for new signature
      ! INTERFACE 
       !   SUBROUTINE PutFile(VAR_NAME,PHI)
@@ -3396,9 +3396,11 @@ SUBROUTINE PREVIEW
         FILE_NAME=''
         VAR_NAME='dep.out'
         call PutFile(VAR_NAME,FILE_NAME,DEPTH)
+        CALL ClosePutFile()
 !TMP_NAME = TRIM(FDIR)//'cd_breakwater.out'
         VAR_NAME='cd_breakwater.out'
         call PutFile(VAR_NAME,FILE_NAME,CD_breakwater) 
+        CALL ClosePutFile()
      ENDIF
      ENDIF
 
@@ -3422,9 +3424,7 @@ SUBROUTINE PREVIEW
 ![ykchoi
      write(10000,*)time, dt
 !ykchoi]
-
-   
-        
+     CALL SetSharedFileName('field_output')   
      IF(OUT_ETA)THEN
 !TMP_NAME = TRIM(FDIR)//'eta_'//TRIM(FILE_NAME)
         VAR_NAME='eta'
@@ -3572,6 +3572,7 @@ SUBROUTINE PREVIEW
         call PutFile(VAR_NAME,FILE_NAME,tmp4preview)
      ENDIF
 
+     CALL ClosePutFile()
 101   continue
 
 END SUBROUTINE PREVIEW
@@ -3620,6 +3621,7 @@ SUBROUTINE PREVIEW_MEAN
     	write(file_name(5:5),'(I1)')itmp5  
 
 
+     CALL SetSharedFileName('averaged_field_output')
         
         IF(OUT_Umean)THEN
 ! TMP_NAME = TRIM(FDIR)//'umean_'//TRIM(FILE_NAME)
@@ -3647,8 +3649,9 @@ SUBROUTINE PREVIEW_MEAN
           VAR_NAME='Hsig'
           call PutFile(VAR_NAME,FILE_NAME,SigWaveHeight)
         ENDIF
-                    
-
+        
+     CALL ClosePutFile()
+        
 END SUBROUTINE PREVIEW_MEAN
 
 
@@ -3764,6 +3767,47 @@ END SUBROUTINE Getfile
 
 # endif
 
+SUBROUTINE SetSharedFileName(FILE_NAME )
+  
+      USE GLOBAL
+      USE PARALLEL_FIELD_IO
+      CHARACTER(LEN=*), INTENT(IN) :: FILE_NAME
+      
+# if defined (EXTERNAL_PACKAGES)
+      SHARED_FILE_NAME = FILE_NAME
+# endif
+      
+END SUBROUTINE SetSharedFileName
+!-------------------------------------------------------------------------------------
+!
+!    ClosePutFile is a subroutine for closing a the shared global file 
+!    when outputing all varibles to one file for NetCDF and XDMF.
+!    Does nothing if not these formats      
+!      
+!    HISTORY:
+!     15/08/2017  Michael-Angelo Y.-H. Lam      
+!-------------------------------------------------------------------------------------
+SUBROUTINE ClosePutFile()
+      
+# if defined (EXTERNAL_PACKAGES) 
+      USE GLOBAL
+      USE PARALLEL_FIELD_IO
+      
+      SELECT CASE (TRIM(FIELD_IO_TYPE))
+      CASE ( 'NETCDF' , 'netcdf' )
+         Call ClosePutFileNetCDF()
+      !CASE ( 'XDMF' , 'xdmf' )
+         !Call ClosePutFileXDMF()
+
+      END SELECT
+      
+      FILE_CLOSED=.TRUE.
+      SHARED_FILE_NAME = ''
+# endif
+      
+END SUBROUTINE ClosePutFile
+
+      
 # if defined (PARALLEL)
 !-------------------------------------------------------------------------------------
 !
@@ -3793,13 +3837,6 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
  !     start_time = MPI_Wtime()
 !   
 
-      
-
-      
- 
-
-  
-      
       SELECT CASE (TRIM(FIELD_IO_TYPE))
       CASE ('ASCII' , 'ascii')
          CALL PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
@@ -3807,9 +3844,9 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
          Call PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 # if defined (EXTERNAL_PACKAGES)  
       CASE ( 'NETCDF' , 'netcdf' )
-         Call PutFileNetCDF(VAR_NAME,PHI)
+         Call PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
       CASE ( 'XDMF' , 'xdmf' )
-         Call PutFileXDMF(VAR_NAME,PHI)
+         Call PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 # endif
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input
