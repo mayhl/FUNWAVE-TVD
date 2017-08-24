@@ -165,6 +165,7 @@ SUBROUTINE INDEX
 # endif
 !--------------ykchoi 04/May/2017]
 
+    
     Mloc1=Mloc+1
     Nloc1=Nloc+1
 
@@ -174,6 +175,18 @@ SUBROUTINE INDEX
     Jbeg=Nghost+1
     Jend=Nloc-Nghost
     Jend1=Nloc1-Nghost
+
+
+    Mloc0=Mloc - 2*Nghost
+    Nloc0=Nloc - 2*Nghost
+    
+# if defined (PARALLEL)
+    CALL MPI_AllReduce( Mloc0 ,  Mloc0Max , 1 , MPI_INTEGER , MPI_MAX , MPI_COMM_WORLD, ier)
+    CALL MPI_AllReduce( Nloc0 ,  Nloc0Max , 1 , MPI_INTEGER , MPI_MAX , MPI_COMM_WORLD, ier)
+# else
+    Mloc0Max = Mloc0
+    Nloc0Max = Nloc0
+# endif
 
 END SUBROUTINE INDEX
 

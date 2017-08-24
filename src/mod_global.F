@@ -132,7 +132,13 @@ MODULE GLOBAL
 
 ! some global variables
 ! Mloc1=Mloc+1, Nloc1=Nloc+1
+       
        INTEGER :: Mglob,Nglob,Mloc,Nloc,Mloc1,Nloc1
+! Mloc0 = Mloc - 2*Nghost, Nloc - 2*Nghost 
+! Mloc0Max = max Mloc0 over all ranks (used for const chunk sizes in HDF5 format)  
+! Nloc0Max = max Nloc0 over all ranks 
+       INTEGER :: Mloc0 , Nloc0 , Mloc0Max , Nloc0Max
+   
        INTEGER, PARAMETER :: Nghost = 3
        INTEGER :: Ibeg,Iend,Jbeg,Jend,Iend1,Jend1
 # if defined (CARTESIAN)
