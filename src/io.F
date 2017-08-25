@@ -58,7 +58,7 @@ SUBROUTINE OUTPUT
      USE METEO_MODULE
 # endif
 
-    IMPLICIT NONE
+     IMPLICIT NONE
 
      SCREEN_COUNT=SCREEN_COUNT+DT
 
@@ -84,8 +84,9 @@ SUBROUTINE OUTPUT
 
 	PLOT_COUNT=PLOT_COUNT+DT
       IF(PLOT_COUNT>=PLOT_INTV)THEN
-       PLOT_COUNT=PLOT_COUNT-PLOT_INTV
-       CALL PREVIEW
+         PLOT_COUNT=PLOT_COUNT-PLOT_INTV
+
+         CALL PREVIEW
       ENDIF
 # if defined (VESSEL)
       PLOT_COUNT_VESSEL=PLOT_COUNT_VESSEL+DT
@@ -3396,11 +3397,7 @@ SUBROUTINE PREVIEW
      CHARACTER(LEN=80)::VAR_NAME
      CHARACTER(LEN=80)::FDIR=' '
      
-      REAL(SP) :: start_time , end_time, elapsed_time
-      REAL(SP) :: max_time, min_time, mean_time
-       INTEGER :: ierr
-      start_time = MPI_Wtime()
-      
+  
      FDIR=TRIM(RESULT_FOLDER)
 
      ICOUNT=ICOUNT+1
@@ -3612,13 +3609,7 @@ SUBROUTINE PREVIEW
      CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
       CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
 
-      IF ( myid.EQ.0 ) THEN
-         mean_time = mean_time/(PY*PX)
-         WRITE(*,*) 'Mean Time: ' , mean_time
-         WRITE(*,*) 'Max Time: ' , mean_time
-         WRITE(*,*) 'Min Time: ' , min_time
-     END IF
-
+ 
 
 
      

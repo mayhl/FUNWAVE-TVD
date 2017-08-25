@@ -68,6 +68,50 @@ USE GLOBAL
   
 CONTAINS
 
+
+SUBROUTINE MetaDataWrapper(NAME,VALUE)
+
+      IMPLICIT NONE
+      CHARACTER(LEN=*), INTENT(IN) :: NAME
+      REAL(SP) , INTENT(INOUT) :: VALUE
+
+      SELECT CASE (FIELD_IO_TYPE_ID)
+      CASE ( XDMF_IO_ID )
+         Call NetCDFAttWrapper(NAME,VALUE)
+      CASE ( NETCDF_IO_ID )
+         Call NetCDFAttWrapper(NAME,VALUE)
+      END SELECT
+      
+END SUBROUTINE MetaDataWrapper
+
+SUBROUTINE SpatialMetaData
+  
+      IMPLICIT NONE
+# if defined (CARTESIAN)
+      CALL MetaDataWrapper( "DX" , DX )
+      CALL MetaDataWrapper( "DY" , DY )
+# else
+      CALL MetaDataWrapper( "Lon_West", Lon_West))
+      CALL MetaDataWrapper( "Lat_South", Lat_South))
+      CALL MetaDataWrapper( "Dphi", Dphi))
+      CALL MetaDataWrapper( "Dtheta", Dtheta))
+      
+# endif
+       
+END SUBROUTINE SpatialMetaData
+    
+SUBROUTINE TimeMetaData
+  
+      IMPLICIT NONE
+      CALL MetaDataWrapper( "TIME" , TIME )
+      CALL MetaDataWrapper( "TOTAL_TIME" , TOTAL_TIME )
+      
+      CALL MetaDataWrapper( "PLOT_INTV" , PLOT_INTV )
+      CALL MetaDataWrapper( "PLOT_INTV_STATION" , PLOT_INTV_STATION )
+      CALL MetaDataWrapper( "SCREEN_INTV" , SCREEN_INTV )
+       
+END SUBROUTINE TimeMetaData
+    
 !------------------------------------------------------
 !     ASCII Output
 !------------------------------------------------------
@@ -265,6 +309,9 @@ END SUBROUTINE PutfileBinary
 # if defined (EXTERNAL_PACKAGES)
 
 
+
+
+
 !------------------------------------------------------
 !     NetCDF Output
 !------------------------------------------------------
@@ -279,9 +326,7 @@ SUBROUTINE NetCDFAttWrapper(NAME,VALUE)
       CHARACTER(LEN=*), INTENT(IN) :: NAME
       REAL(SP) , INTENT(IN) :: VALUE
      
-      INTEGER :: dummy_id
-            
-      CALL CheckNetCDF(nf90_put_att(ncid, dummy_id, NAME ,VALUE))
+      CALL CheckNetCDF(nf90_put_att(ncid, NF90_GLOBAL , NAME ,VALUE))
       
 END SUBROUTINE
 
@@ -314,24 +359,9 @@ SUBROUTINE CreateFileNetCDF(FILE_NAME)
       
       dimids = (/ x_dimid, y_dimid /)
   
-      CALL NetCDFAttWrapper( "TIME" , TIME )
-      CALL NetCDFAttWrapper( "TOTAL_TIME" , TOTAL_TIME )
-      
-      CALL NetCDFAttWrapper( "PLOT_INTV" , PLOT_INTV )
-      CALL NetCDFAttWrapper( "PLOT_INTV_STATION" , PLOT_INTV_STATION )
-      CALL NetCDFAttWrapper( "SCREEN_INTV" , SCREEN_INTV )
-      
-# if defined (CARTESIAN)
-      CALL NetCDFAttWrapper( "DX" , DX )
-      CALL NetCDFAttWrapper( "DY" , DY )
-# else
-      CALL NetCDFAttWrapper( "Lon_West", Lon_West))
-      CALL NetCDFAttWrapper( "Lat_South", Lat_South))
-      CALL NetCDFAttWrapper( "Dphi", Dphi))
-      CALL NetCDFAttWrapper( "Dtheta", Dtheta))
-      
-# endif
-      
+      CALL TimeMetaData
+      CALL SpatialMetaData
+        
       CALL CheckNetCDF(nf90_enddef(ncid))
       
 END SUBROUTINE CreateFileNetCDF
@@ -486,7 +516,6 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 
       CALL h5pset_fclose_degree_f(plist_id, H5F_CLOSE_WEAK_F, error) 
       CALL CheckXDMF(error)
-
       
       ! Create the file collectively.
       CALL h5fcreate_f(FILE_NAME, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
