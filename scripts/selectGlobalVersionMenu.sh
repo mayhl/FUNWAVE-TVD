@@ -2,13 +2,15 @@
 
 
 # List of available builds 
-BUILDS=( "Linux Generic"
-	 "Mac Generic"
+BUILDS=( "Linux GNU"
+	 "Linux Intel"
+	 "Mac GNU"
+	 "Mac Intel [untested]"
          "Topaz Intel"
          "Topaz SGI"
          "Topaz SGI OpenSS"
-         "Lightning Cray"
-         "Lightning Intel" )
+         "Lightning Cray [untested]"
+         "Lightning Intel [untested]" )
 
 # Max attempts for valid input for build selection
 MAX_ATTEMPTS=5
