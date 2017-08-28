@@ -23,13 +23,19 @@ else
 
     read RESPONSE
 
-    if [[ "${RESPONSE^^}" == "Y" ]]; then
+    RESPONSE=$(echo ${RESPONSE} | tr '[:lower:]' '[:upper:]') 
+ 
+    
+    if [[ "${RESPONSE}" == "Y" ]]; then
 
 	echo $PWD
 	cd ../${DIRECTORY}
 	echo $PWD
- 
-	TITLE="Current ${NAME} ${SUB_NAME^} Files"
+
+	
+	SUB_NAME2="$(tr '[:lower:]' '[:upper:]' <<< ${SUB_NAME:0:1})${SUB_NAME:1}"
+	
+	TITLE="Current ${NAME} ${SUB_NAME2} Files"
 	printTitle
     
 	START=${#SUB_NAME}
@@ -88,8 +94,10 @@ else
 
 			read RESPONSE
 			echo ""
+
+			RESPONSE=$(echo ${RESPONSE} | tr '[:lower:]' '[:upper:]') 
 			
-			if [[ "${RESPONSE^^}" == "Y" ]]; then
+			if [[ "${RESPONSE}" == "Y" ]]; then
 			    exit 0
 			else
 			    echo ""
