@@ -1,0 +1,1 @@
+CC=${MPICC_VERSION} ./configure --shared --prefix=${FUNWAVE_PREFIX}
