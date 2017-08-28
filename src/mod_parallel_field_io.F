@@ -491,25 +491,27 @@ SUBROUTINE CreateFileHDF5(FILE_NAME)
       
       ! Initialize HDF5 library and Fortran interfaces.
       CALL h5open_f(error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
       ! Setup file access property list with parallel I/O access.
       mpi_info = MPI_INFO_NULL 
       CALL h5pcreate_f(H5P_FILE_ACCESS_F, plist_id, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
+      
       CALL h5pset_fapl_mpio_f(plist_id, MPI_COMM_WORLD , mpi_info , error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 
       CALL h5pset_fclose_degree_f(plist_id, H5F_CLOSE_WEAK_F, error) 
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
       ! Create the file collectively.
       CALL h5fcreate_f(FILE_NAME, H5F_ACC_TRUNC_F, file_id, error, access_prp = plist_id)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
+      
       CALL h5pclose_f(plist_id, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 
-
+!      CALL h5acreate_f( file_id , 'TEST'
   
 
 END SUBROUTINE CreateFileHDF5
@@ -523,15 +525,15 @@ SUBROUTINE ClosePutFileHDF5()
 
       ! Close the property list.
       CALL h5pclose_f(plist_id, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
        ! Close the file.
       CALL h5fclose_f(file_id, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 
       ! Close FORTRAN interfaces and HDF5 library.
       CALL h5close_f(error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
       FILE_CLOSED=.TRUE.
       SHARED_FILE_NAME = ''
@@ -539,7 +541,7 @@ SUBROUTINE ClosePutFileHDF5()
 END SUBROUTINE ClosePutFileHDF5
 
     
-SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+SUBROUTINE PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
       
       USE HDF5
       IMPLICIT NONE
@@ -552,11 +554,6 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
       INTEGER :: error, error_n
 
       INTEGER :: mpi_info
-
-
-
-      
-      
 
       INTEGER(HSIZE_T),  DIMENSION(ndims) :: count  
       INTEGER(HSSIZE_T), DIMENSION(ndims) :: offset 
@@ -589,17 +586,18 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 
       ! Create the data space for the  dataset. 
       CALL h5screate_simple_f(ndims, dimsf, filespace, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       CALL h5screate_simple_f(ndims, loc_dims, memspace, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 
      ! Create chunked dataset.
      !
       CALL h5pcreate_f(H5P_DATASET_CREATE_F, plist_id, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
       CALL h5pset_chunk_f(plist_id, ndims, chunk_dims, error)
-      CALL CheckXDMF(error)        
+      CALL CheckHDF5(error)
+      
 # if defined (DOUBLE_PRECISION) 
       CALL h5dcreate_f(file_id, TRIM(VAR_NAME), H5T_NATIVE_DOUBLE, filespace, &
       dset_id, error, plist_id)
@@ -608,9 +606,10 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
       dset_id, error, plist_id)
       
 # endif
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
+      
       CALL h5sclose_f(filespace, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
  
       stride(1) = 1 
       stride(2) = 1 
@@ -622,60 +621,60 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 
       ! Select hyperslab in the file.
       CALL h5dget_space_f(dset_id, filespace, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       CALL h5sselect_hyperslab_f (filespace, H5S_SELECT_SET_F, offset, count, error, &
                                  stride, loc_dims)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 
       ! Create property list for collective dataset write
       CALL h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) 
       CALL h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 
       ! Write the dataset collectively. 
 # if defined (DOUBLE_PRECISION)
       CALL h5dwrite_f(dset_id, H5T_NATIVE_DOUBLE, PHI( (Nghost+1):(Mloc-Nghost) ,(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
            file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
       
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 # else
       CALL h5dwrite_f(dset_id, H5T_NATIVE_REAL , PHI( (Nghost+1):(Mloc-Nghost),(Nghost+1):(Nloc-Nghost)) , dimsf, error, &
            file_space_id = filespace, mem_space_id = memspace, xfer_prp = plist_id)
       
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
 # endif
 
       ! Close dataspaces.
       CALL h5sclose_f(memspace, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       CALL h5sclose_f(filespace, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
       ! Close the dataset.
       CALL h5dclose_f(dset_id, error)
-      CALL CheckXDMF(error)
+      CALL CheckHDF5(error)
       
       !CALL  ClosePutFile()
 
 
       
-END SUBROUTINE PutFileXDMF
+END SUBROUTINE PutFileHDF5
 
 
-SUBROUTINE CheckXDMF(error)
+SUBROUTINE CheckHDF5(error)
 
       USE HDF5
       IMPLICIT NONE
       INTEGER, INTENT (IN) :: error
       INTEGER :: errorcode, ierr
-      CALL MPI_BARRIER(MPI_COMM_WORLD,ierr)
+      
       IF(error.LT.0) THEN
          !WRITE (*,*) "Error " ,  trim(nf90_strerror(status))
          CALL MPI_ABORT (MPI_COMM_WORLD, errorcode , ierr) 
          
       END IF
   
-END SUBROUTINE CheckXDMF
+END SUBROUTINE CheckHDF5
 
 
 # endif

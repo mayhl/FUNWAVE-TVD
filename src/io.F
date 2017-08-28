@@ -3884,7 +3884,7 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
       CASE ( NETCDF_IO_ID )
          Call PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
       CASE ( XDMF_IO_ID )
-         Call PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+         Call PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
 # endif
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input
