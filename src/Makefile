@@ -17,7 +17,7 @@
 #            FLAG_3 = -DSAMPLES
             FLAG_4 = -DCARTESIAN
 
-#             FLAG_7 = -DMIXING
+             FLAG_7 = -DMIXING
 #              FLAG_8 = -DCOUPLING
 #             FLAG_9 = -DZALPHA
 #             FLAG_10 = -DMANNING
@@ -72,7 +72,7 @@ endif
 
 # Adding links to external packages if flag is defined
 ifneq (,$(findstring DEXTERNAL_PACKAGES,$(CPPARGS)))
-	     LIBS ?= -L${shell cat ../currentVersion/flibs} 
+	     LIBS ?= ${shell cat ../currentVersion/flibs} 
 	     INCS ?= -I${shell cat ../currentVersion/include}
 endif
 
