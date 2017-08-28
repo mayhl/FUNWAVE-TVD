@@ -57,13 +57,26 @@ MODULE PARALLEL_FIELD_IO
       
 USE GLOBAL
 
+#if defined(EXTERNAL_PACKAGES)  
+USE HDF5, ONLY: HID_T
+#endif
+
       LOGICAL :: FILE_CLOSED = .TRUE.
       LOGICAL :: HAS_SHARED_FILE_NAME = .FALSE.
       CHARACTER(80) :: SHARED_FILE_NAME = ''
-      
+
+#if defined(EXTERNAL_PACKAGES)        
       INTEGER :: ncid
       INTEGER, DIMENSION(2) :: dimids
 
+      INTEGER(HID_T) :: file_id       ! File identifier 
+      INTEGER(HID_T) :: dset_id       ! Dataset identifier 
+      INTEGER(HID_T) :: filespace     ! Dataspace identifier in file 
+      INTEGER(HID_T) :: memspace      ! Dataspace identifier in memory
+      INTEGER(HID_T) :: plist_id      ! Property list identifier
+
+#endif      
+      
 # if defined (PARALLEL)
   
 CONTAINS
@@ -463,41 +476,14 @@ END SUBROUTINE CheckNetCDF
 !     XDMF Output
 !------------------------------------------------------
 
-SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
-      
+SUBROUTINE CreateFileHDF5(FILE_NAME)
+
       USE HDF5
       IMPLICIT NONE
-      CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
-      CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
-      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
-
-    
-      CHARACTER(LEN=80) :: FILE_NAME
-      INTEGER :: error, error_n
-
-      INTEGER :: mpi_info
-
-
-      INTEGER(HID_T) :: file_id       ! File identifier 
-      INTEGER(HID_T) :: dset_id       ! Dataset identifier 
-      INTEGER(HID_T) :: filespace     ! Dataspace identifier in file 
-      INTEGER(HID_T) :: memspace      ! Dataspace identifier in memory
-      INTEGER(HID_T) :: plist_id      ! Property list identifier 
-
-      INTEGER(HSIZE_T), DIMENSION(ndims) :: dimsf , chunk_dims, loc_dims
-
-      INTEGER(HSIZE_T),  DIMENSION(ndims) :: count  
-      INTEGER(HSSIZE_T), DIMENSION(ndims) :: offset 
-      INTEGER(HSIZE_T),  DIMENSION(ndims) :: stride
-      INTEGER(HSIZE_T),  DIMENSION(ndims) :: block
+      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
       
-
-    ! Filter off file number for depth and breakwater 
-      IF (TRIM(FILE_NUMBER)=='') THEN
-         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
-      ELSE
-         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
-      ENDIF
+      INTEGER(HSIZE_T), DIMENSION(ndims) :: dimsf , chunk_dims, loc_dims
+      INTEGER :: error, mpi_info
       
       dimsf = (/Mglob,Nglob/) 
       loc_dims = (/Mloc0,Nloc0/)
@@ -523,6 +509,84 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
       CALL h5pclose_f(plist_id, error)
       CALL CheckXDMF(error)
 
+
+  
+
+END SUBROUTINE CreateFileHDF5
+
+SUBROUTINE ClosePutFileHDF5()
+      
+      USE HDF5
+      IMPLICIT NONE
+
+      INTEGER :: error
+
+      ! Close the property list.
+      CALL h5pclose_f(plist_id, error)
+      CALL CheckXDMF(error)
+      
+       ! Close the file.
+      CALL h5fclose_f(file_id, error)
+      CALL CheckXDMF(error)
+
+      ! Close FORTRAN interfaces and HDF5 library.
+      CALL h5close_f(error)
+      CALL CheckXDMF(error)
+      
+      FILE_CLOSED=.TRUE.
+      SHARED_FILE_NAME = ''
+
+END SUBROUTINE ClosePutFileHDF5
+
+    
+SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+      
+      USE HDF5
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
+      CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
+      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
+
+    
+      CHARACTER(LEN=80) :: FILE_NAME
+      INTEGER :: error, error_n
+
+      INTEGER :: mpi_info
+
+
+
+      
+      
+
+      INTEGER(HSIZE_T),  DIMENSION(ndims) :: count  
+      INTEGER(HSSIZE_T), DIMENSION(ndims) :: offset 
+      INTEGER(HSIZE_T),  DIMENSION(ndims) :: stride
+      INTEGER(HSIZE_T),  DIMENSION(ndims) :: block
+      
+      INTEGER(HSIZE_T), DIMENSION(ndims) :: dimsf , chunk_dims, loc_dims
+
+      dimsf = (/Mglob,Nglob/) 
+      loc_dims = (/Mloc0,Nloc0/)
+      chunk_dims = (/Mloc0Max,Nloc0Max/)
+
+!     Filter off file number for depth and breakwater
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+      ELSE
+         IF ( COMBINE_FIELD_IO.EQV..TRUE. ) THEN
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)
+         ELSE
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+         END IF
+      END IF
+
+      
+      IF ( FILE_CLOSED.EQV..TRUE. ) THEN
+         CALL CreateFileHDF5(FILE_NAME)
+         FILE_CLOSED = .FALSE.   
+      END IF
+      
+
       ! Create the data space for the  dataset. 
       CALL h5screate_simple_f(ndims, dimsf, filespace, error)
       CALL CheckXDMF(error)
@@ -535,8 +599,8 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
       CALL CheckXDMF(error)
       
       CALL h5pset_chunk_f(plist_id, ndims, chunk_dims, error)
-      CALL CheckXDMF(error)    
-# if defined (DOUBLE_PRECISION)
+      CALL CheckXDMF(error)        
+# if defined (DOUBLE_PRECISION) 
       CALL h5dcreate_f(file_id, TRIM(VAR_NAME), H5T_NATIVE_DOUBLE, filespace, &
       dset_id, error, plist_id)
 # else
@@ -563,12 +627,9 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
                                  stride, loc_dims)
       CALL CheckXDMF(error)
 
-
-      
       ! Create property list for collective dataset write
       CALL h5pcreate_f(H5P_DATASET_XFER_F, plist_id, error) 
-      CALL h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_INDEPENDENT_F, error)
-   !   CALL h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
+      CALL h5pset_dxpl_mpio_f(plist_id, H5FD_MPIO_COLLECTIVE_F, error)
       CALL CheckXDMF(error)
 
       ! Write the dataset collectively. 
@@ -594,17 +655,9 @@ SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
       CALL h5dclose_f(dset_id, error)
       CALL CheckXDMF(error)
       
-      ! Close the property list.
-      CALL h5pclose_f(plist_id, error)
-      CALL CheckXDMF(error)
+      !CALL  ClosePutFile()
 
-      ! Close the file.
-      CALL h5fclose_f(file_id, error)
-      CALL CheckXDMF(error)
 
-      ! Close FORTRAN interfaces and HDF5 library.
-      CALL h5close_f(error)
-      CALL CheckXDMF(error)
       
 END SUBROUTINE PutFileXDMF
 

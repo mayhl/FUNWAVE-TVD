@@ -3601,13 +3601,13 @@ SUBROUTINE PREVIEW
 
      IF (COMBINE_FIELD_IO.EQV..TRUE.) CALL ClosePutFile()
 
-     end_time = MPI_Wtime()
+    ! end_time = MPI_Wtime()
 
-      elapsed_time = end_time - start_time
+   !   elapsed_time = end_time - start_time
 
-     CALL MPI_Reduce( elapsed_time ,  max_time , 1 , mpi_sp , MPI_MAX , 0 , MPI_COMM_WORLD, ierr)
-     CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
-      CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
+   !  CALL MPI_Reduce( elapsed_time ,  max_time , 1 , mpi_sp , MPI_MAX , 0 , MPI_COMM_WORLD, ierr)
+  !   CALL MPI_Reduce( elapsed_time ,  min_time , 1 , mpi_sp , MPI_MIN , 0 , MPI_COMM_WORLD, ierr)
+   !  CALL MPI_Reduce( elapsed_time ,  mean_time , 1 , mpi_sp , MPI_SUM , 0 , MPI_COMM_WORLD, ierr)
 
  
 
@@ -3835,9 +3835,9 @@ SUBROUTINE ClosePutFile()
       
       SELECT CASE (FIELD_IO_TYPE_ID)
       CASE ( NETCDF_IO_ID )
-         Call ClosePutFileNetCDF()
-      !CASE ( XDMF_IO_ID )
-         !Call ClosePutFileXDMF()
+         CALL ClosePutFileNetCDF()
+      CASE ( XDMF_IO_ID )
+         CALL ClosePutFileHDF5()
 
       END SELECT
       
@@ -3883,7 +3883,6 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
 # if defined (EXTERNAL_PACKAGES)  
       CASE ( NETCDF_IO_ID )
          Call PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
-         IF (COMBINE_FIELD_IO.EQV..FALSE.) CALL ClosePutFileNetCDF()
       CASE ( XDMF_IO_ID )
          Call PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
 # endif
@@ -3892,7 +3891,8 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
          CALL PutFileASCII(VAR_NAME,FILE_NUMBER,PHI) 
      END SELECT
 
-         
+     
+     IF (COMBINE_FIELD_IO.EQV..FALSE.) CALL ClosePutFile()    
   !    end_time = MPI_Wtime()
 
   !    elapsed_time = end_time - start_time
