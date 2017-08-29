@@ -3838,6 +3838,7 @@ SUBROUTINE ClosePutFile()
          CALL ClosePutFileNetCDF()
       CASE ( XDMF_IO_ID )
          CALL ClosePutFileHDF5()
+         CALL ClosePutFileXDMF()
 
       END SELECT
       
@@ -3879,12 +3880,13 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
       CASE (ASCII_IO_ID)
          CALL PutFileASCII(VAR_NAME,FILE_NUMBER,PHI)
       CASE (BINARY_IO_ID )
-         Call PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
+         CALL PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 # if defined (EXTERNAL_PACKAGES)  
       CASE ( NETCDF_IO_ID )
-         Call PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
+         CALL PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
       CASE ( XDMF_IO_ID )
-         Call PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
+         CALL PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+         CALL PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
 # endif
       CASE DEFAULT
          !Defaults to ASCII case for non-valid input

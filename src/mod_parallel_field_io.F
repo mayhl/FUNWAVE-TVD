@@ -62,8 +62,16 @@ USE HDF5, ONLY: HID_T
 #endif
 
       LOGICAL :: FILE_CLOSED = .TRUE.
+      LOGICAL :: FILE_CLOSED_2ND = .TRUE.
       LOGICAL :: HAS_SHARED_FILE_NAME = .FALSE.
       CHARACTER(80) :: SHARED_FILE_NAME = ''
+      CHARACTER(LEN=1) , PARAMETER :: TAB_CHAR = char(9)
+
+#if defined(DOUBLE_PRECISION)
+      CHARACTER(LEN=1) , PARAMETER :: PRECISION_CHAR = '8'
+#else
+      CHARACTER(LEN=1) , PARAMETER :: PRECISION_CHAR = '4'
+#endif
 
 #if defined(EXTERNAL_PACKAGES)        
       INTEGER :: ncid
@@ -264,9 +272,9 @@ SUBROUTINE PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 
       ! Filter off file number for depth and breakwater 
       IF (TRIM(FILE_NUMBER)=='') THEN
-         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'.bin'
       ELSE
-         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+         FILE =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)//'.bin'
       ENDIF
       
      offset = 0
@@ -320,9 +328,6 @@ SUBROUTINE PutFileBinary(VAR_NAME,FILE_NUMBER,PHI)
 END SUBROUTINE PutfileBinary
 
 # if defined (EXTERNAL_PACKAGES)
-
-
-
 
 
 !------------------------------------------------------
@@ -473,7 +478,7 @@ END SUBROUTINE CheckNetCDF
 
       
 !------------------------------------------------------
-!     XDMF Output
+!     HDF5 Output
 !------------------------------------------------------
 
 SUBROUTINE CreateFileHDF5(FILE_NAME)
@@ -568,12 +573,12 @@ SUBROUTINE PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
 
 !     Filter off file number for depth and breakwater
       IF (TRIM(FILE_NUMBER)=='') THEN
-         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'.h5'
       ELSE
          IF ( COMBINE_FIELD_IO.EQV..TRUE. ) THEN
-            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)//'.h5'
          ELSE
-            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)//'.h5'
          END IF
       END IF
 
@@ -603,8 +608,7 @@ SUBROUTINE PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
       dset_id, error, plist_id)
 # else
       CALL h5dcreate_f(file_id, TRIM(VAR_NAME), H5T_NATIVE_REAL , filespace, &
-      dset_id, error, plist_id)
-      
+      dset_id, error, plist_id)      
 # endif
       CALL CheckHDF5(error)
       
@@ -676,6 +680,155 @@ SUBROUTINE CheckHDF5(error)
   
 END SUBROUTINE CheckHDF5
 
+
+!------------------------------------------------------
+!     XDMF Output
+!------------------------------------------------------
+
+SUBROUTINE PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+      
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(IN) :: VAR_NAME
+      CHARACTER(LEN=10), INTENT(IN) :: FILE_NUMBER
+      REAL(SP),DIMENSION(Mloc,Nloc),INTENT(IN) :: PHI
+
+      
+      CHARACTER(LEN=80) :: FILE_NAME
+      CHARACTER(LEN=80) :: FILE_DIR
+
+      CHARACTER(LEN=10) :: Mglob_char, Nglob_char
+      CHARACTER(LEN=10) :: DX_char, DY_char
+!     Filter off file number for depth and breakwater
+ 
+
+      IF (TRIM(FILE_NUMBER)=='') THEN
+         FILE_NAME = TRIM(VAR_NAME)//'.h5'
+         FILE_DIR =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'.xmf'
+      ELSE
+         IF ( COMBINE_FIELD_IO.EQV..TRUE. ) THEN
+            FILE_NAME = TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)//'.h5'
+            FILE_DIR =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)//'.xmf'
+         ELSE
+            FILE_NAME = TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)//'.h5'
+            FILE_DIR =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)//'.xmf'
+         END IF
+      END IF
+      
+      IF ( FILE_CLOSED.EQV..TRUE. ) THEN         
+         CALL CreateFileXDMF(FILE_DIR)
+         FILE_CLOSED_2ND = .FALSE.   
+      END IF
+
+       IF (myid.EQ.0) THEN
+          WRITE (Mglob_char,'(I10)') Mglob
+          WRITE (Nglob_char,'(I10)') Nglob
+
+          Mglob_char = ADJUSTL(Mglob_char)
+          Nglob_char = ADJUSTL(Nglob_char)
+
+          ! Note: format-code '(a)' is required. Using * places a leading space in output line.
+          WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//'<Attribute Name="'//TRIM(VAR_NAME)//&
+               '" AttributeType="Scalar" Center="Node">'
+          ! Note: Nglob is before Mglob
+          WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'<DataItem Dimensions="' &
+               //TRIM(Nglob_char)//' '//TRIM(Mglob_char)//'" NumberType="Float" Precision="'&
+               //PRECISION_CHAR//'" Format="HDF">'
+
+          WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR// &
+               TRIM(FILE_NAME)//':/'//TRIM(VAR_NAME)
+          WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'</DataItem>'
+          WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//'</Attribute>'
+          WRITE(244136,'(a)') ''
+      END IF
+      
+END SUBROUTINE PutFileXDMF
+
+
+SUBROUTINE CreateFileXDMF(FILE_NAME)
+
+      USE HDF5
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(IN) :: FILE_NAME
+
+      CHARACTER(LEN=10) :: Mglob_char, Nglob_char, TIME_char
+      CHARACTER(LEN=10) :: DX_char, DY_char
+      
+      IF (myid.EQ.0) THEN
+
+        
+         WRITE (Mglob_char,'(I10)') Mglob
+         WRITE (Nglob_char,'(I10)') Nglob
+
+         Mglob_char = ADJUSTL(Mglob_char)
+         Nglob_char = ADJUSTL(Nglob_char)
+
+         WRITE (DX_char,'(F10.5)') DX
+         WRITE (DY_char,'(F10.5)') DY
+         
+         DX_char = ADJUSTL(DX_char)
+         DY_char = ADJUSTL(DY_char)
+
+
+         WRITE (TIME_char,'(E10.1)') TIME
+         
+         TIME_char = ADJUSTL(TIME_char)
+
+         ! Unit number corroponds to numerical representation of XMDF i.e X=24,D=4,M=13,F=6
+         ! Chosen to (most likely) ensure unique unit number
+         OPEN(244136,FILE=TRIM(FILE_NAME))
+
+         ! Note: format-code '(a)' is required. Using * places a leading space in output line. 
+         !       Leading space in first (below) line causes a crash when loading into  paraview.         
+         WRITE(244136,'(a)')'<?xml version="1.0" ?>'
+         WRITE(244136,'(a)')'<!DOCTYPE Xdmf SYSTEM "Xdmf.dtd" []>'
+         WRITE(244136,'(a)')'<Xdmf Version="2.0" xmlns:xi="[http://www.w3.org/2001/XInclude]">'
+         WRITE(244136,'(a)') TAB_CHAR//'<Domain>'
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//'<Grid Name="Structured Grid" GridType="Uniform">'
+         WRITE(244136,'(a)') ''
+         
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//'<Time Value="'//TRIM(TIME_char)//'" />'
+         WRITE(244136,'(a)') ''
+
+         ! Note: Nglob is before Mglob
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//'<Topology TopologyType="2DCoRectMesh" NumberOfElements="' &
+              //TRIM(Nglob_char)//' '//TRIM(Mglob_char)//'"/>'
+         WRITE(244136,'(a)') ''
+         
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//'<Geometry GeometryType="ORIGIN_DXDY">'
+         WRITE(244136,'(a)') ''
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'<DataItem Name="Origin" Dimensions="2"' &
+              //' NumberType="Float" Precision="'//PRECISION_CHAR//'" Format="XML">'
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'0 0'
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'</DataItem>'
+         WRITE(244136,'(a)') ''
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'<DataItem Name="Spacing" Dimensions="2"' &
+              //' NumberType="Float" Precision="'//PRECISION_CHAR//'" Format="XML">'
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//TRIM(DY_char)//' '//TRIM(DX_char)
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//TAB_CHAR//'</DataItem>'
+         WRITE(244136,'(a)') ''
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//TAB_CHAR//'</Geometry>'
+         WRITE(244136,'(a)') ''
+     ENDIF 
+
+END SUBROUTINE CreateFileXDMF
+
+
+SUBROUTINE ClosePutFileXDMF()
+      
+  IMPLICIT NONE
+  
+      ! Note: format-code '(a)' is required. Using * places a leading space in output line.
+      IF (myid.EQ.0) THEN
+         WRITE(244136,'(a)') TAB_CHAR//TAB_CHAR//'</Grid>'
+         WRITE(244136,'(a)') TAB_CHAR//'</Domain>'
+         WRITE(244136,'(a)') '</Xdmf>'
+         CLOSE(244136)
+      ENDIF
+      
+      FILE_CLOSED_2ND=.TRUE.
+      SHARED_FILE_NAME = ''
+
+END SUBROUTINE ClosePutFileXDMF   
 
 # endif
 ! end external packages
