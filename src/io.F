@@ -2869,7 +2869,6 @@ SUBROUTINE READ_INPUT
 
       IF(ierr.EQ.1) FIELD_IO_TYPE = 'ASCII'
       
-      IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
 
       SELECT CASE (TRIM(FIELD_IO_TYPE))
       CASE ('ASCII' , 'ascii')
@@ -2885,18 +2884,33 @@ SUBROUTINE READ_INPUT
          FIELD_IO_TYPE_ID = HDF5_IO_ID
 # endif
       CASE DEFAULT
-         FIELD_IO_TYPE_ID = ASCII_IO_ID 
+         IF (myid.EQ.0) WRITE(*,*) 'INVALID VALUE SPECIFIED FOR FIELD_IO_TYPE, DEFAULTING TO ASCII.'
+         FIELD_IO_TYPE_ID = ASCII_IO_ID
+         FIELD_IO_TYPE = 'ASCII' 
      END SELECT
 
+     IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
+     
+# if defined (EXTERNAL_PACKAGES)       
       CALL READ_LOGICAL(COMBINE_FIELD_IO,FILE_NAME,'COMBINE_FIELD_IO',ierr)
 
+      
       IF (myid.EQ.0) THEN
          IF( COMBINE_FIELD_IO.EQV..TRUE.) THEN
-            WRITE(3,*) 'COMBINE_FIELD_IO = YES'
+
+            IF( (FIELD_IO_TYPE_ID.EQ.ASCII_IO_ID).OR. &
+                 (FIELD_IO_TYPE_ID.EQ.BINARY_IO_ID) ) THEN
+               WRITE(*,*) 'CAN NOT COMBINE FIELD OUTPUT FOR '//FIELD_IO_TYPE//' OUTPUT TYPE.'
+               COMBINE_FIELD_IO=.FALSE.
+            ELSE
+               WRITE(3,*) 'COMBINE_FIELD_IO = YES'
+            ENDIF            
          ELSE
             WRITE(3,*) 'COMBINE_FIELD_IO = NO'
          END IF
-      END IF 
+      END IF
+# endif
+      
 # endif
 ! mayhl]
  
