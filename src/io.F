@@ -2881,6 +2881,8 @@ SUBROUTINE READ_INPUT
          FIELD_IO_TYPE_ID = NETCDF_IO_ID
       CASE ( 'XDMF' , 'xdmf' )
          FIELD_IO_TYPE_ID = XDMF_IO_ID
+      CASE ( 'HDF5' , 'hdf5' )
+         FIELD_IO_TYPE_ID = HDF5_IO_ID
 # endif
       CASE DEFAULT
          FIELD_IO_TYPE_ID = ASCII_IO_ID 
@@ -3839,7 +3841,8 @@ SUBROUTINE ClosePutFile()
       CASE ( XDMF_IO_ID )
          CALL ClosePutFileHDF5()
          CALL ClosePutFileXDMF()
-
+      CASE (HDF5_IO_ID)
+         CALL ClosePutFileHDF5()
       END SELECT
       
 # endif
@@ -3886,6 +3889,8 @@ SUBROUTINE PutFile(VAR_NAME,FILE_NUMBER,PHI)
          CALL PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
       CASE ( XDMF_IO_ID )
          CALL PutFileXDMF(VAR_NAME,FILE_NUMBER,PHI)
+         CALL PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
+      CASE (HDF5_IO_ID)   
          CALL PutFileHDF5(VAR_NAME,FILE_NUMBER,PHI)
 # endif
       CASE DEFAULT

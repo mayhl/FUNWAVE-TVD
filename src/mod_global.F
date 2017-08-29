@@ -114,6 +114,7 @@ MODULE GLOBAL
        INTEGER, PARAMETER :: BINARY_IO_ID = 1
        INTEGER, PARAMETER :: NETCDF_IO_ID = 2
        INTEGER, PARAMETER :: XDMF_IO_ID   = 3
+       INTEGER, PARAMETER :: HDF5_IO_ID   = 4
 
        
        ![ykchoi(14.12.24)
