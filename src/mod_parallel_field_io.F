@@ -44,12 +44,11 @@
 !-------------------------------------------------------------------------------------
 !
 !    PARALLEL_FIELD_IO is a module that contains subroutines for outputting
-!                      field data in various data format
+!                      field data in various data formats
 !
 !    HISTORY:
 !      12/06/2017 Michael-Angelo Y.-H. Lam
 !-------------------------------------------------------------------------------------
-
 
 
 MODULE PARALLEL_FIELD_IO
@@ -89,6 +88,11 @@ USE HDF5, ONLY: HID_T
   
 CONTAINS
 
+# if defined (EXTERNAL_PACKAGES)
+  
+!------------------------------------------------------------------------
+!     Wrappers to unify Metadata/Light Data  for all output formats
+!------------------------------------------------------------------------
 
 SUBROUTINE MetaDataWrapper(NAME,VALUE)
 
@@ -97,10 +101,12 @@ SUBROUTINE MetaDataWrapper(NAME,VALUE)
       REAL(SP) , INTENT(INOUT) :: VALUE
 
       SELECT CASE (FIELD_IO_TYPE_ID)
-      CASE ( XDMF_IO_ID )
-         Call NetCDFAttWrapper(NAME,VALUE)
       CASE ( NETCDF_IO_ID )
          Call NetCDFAttWrapper(NAME,VALUE)
+      CASE ( XDMF_IO_ID )
+         Call HDF5AttWrapper(NAME,VALUE)
+      CASE ( HDF5_IO_ID )
+         Call HDF5AttWrapper(NAME,VALUE)
       END SELECT
       
 END SUBROUTINE MetaDataWrapper
@@ -132,7 +138,10 @@ SUBROUTINE TimeMetaData
       CALL MetaDataWrapper( "SCREEN_INTV" , SCREEN_INTV )
        
 END SUBROUTINE TimeMetaData
-    
+
+# endif
+! end external packages
+
 !------------------------------------------------------
 !     ASCII Output
 !------------------------------------------------------
@@ -329,11 +338,10 @@ END SUBROUTINE PutfileBinary
 
 # if defined (EXTERNAL_PACKAGES)
 
-
 !------------------------------------------------------
 !     NetCDF Output
 !------------------------------------------------------
-      
+     
 ! Wrapper to fixed 'Error NetCDF: Variable not found'
 ! that appeared to be system dependent    
 SUBROUTINE NetCDFAttWrapper(NAME,VALUE)
@@ -402,12 +410,12 @@ SUBROUTINE PutFileNetCDF(VAR_NAME,FILE_NUMBER,PHI)
       
 !     Filter off file number for depth and breakwater
       IF (TRIM(FILE_NUMBER)=='') THEN
-         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)
+         FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'.nc'
       ELSE
          IF ( COMBINE_FIELD_IO.EQV..TRUE. ) THEN
-            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(SHARED_FILE_NAME)//'_'//TRIM(FILE_NUMBER)//'.nc'
          ELSE
-            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)
+            FILE_NAME =  TRIM(RESULT_FOLDER)//TRIM(VAR_NAME)//'_'//TRIM(FILE_NUMBER)//'.nc'
          END IF
       END IF
 
@@ -481,6 +489,46 @@ END SUBROUTINE CheckNetCDF
 !     HDF5 Output
 !------------------------------------------------------
 
+SUBROUTINE HDF5AttWrapper(NAME,VALUE)
+
+      USE HDF5
+      IMPLICIT NONE
+  !    INTEGER, INTENT(IN) :: ncid
+      CHARACTER(LEN=*), INTENT(IN) :: NAME
+      REAL(SP) , INTENT(IN) :: VALUE
+
+      INTEGER(HID_T) :: attr_id
+      INTEGER(HID_T) :: atype_id      ! Attribute Dataspace identifier
+      INTEGER(HID_T) :: aspace_id     ! Attribute Dataspace identifier
+      INTEGER(HSIZE_T), DIMENSION(1) :: adims = (/1/) ! Attribute dimension
+      INTEGER     ::   arank = 1                      ! Attribure rank
+      INTEGER     ::   error ! Error flag
+      
+
+      
+      
+      CALL h5screate_simple_f(arank,adims, aspace_id, error) 
+      CALL CheckHDF5(error)
+
+# if defined (DOUBLE_PRECISION) 
+      CALL h5acreate_f (file_id, NAME, H5T_NATIVE_DOUBLE, aspace_id , attr_id, error)
+# else
+      CALL h5acreate_f (file_id, NAME, H5T_NATIVE_REAL, aspace_id , attr_id, error)    
+# endif    
+      CALL CheckHDF5(error)
+      
+# if defined (DOUBLE_PRECISION) 
+      CALL h5awrite_f(attr_id, H5T_NATIVE_DOUBLE, VALUE, adims, error) 
+# else
+      CALL h5awrite_f(attr_id, H5T_NATIVE_REAL  , VALUE, adims, error) 
+# endif 
+      CALL CheckHDF5(error)
+           
+      CALL h5aclose_f (attr_id, error)
+      CALL CheckHDF5(error)
+      
+END SUBROUTINE HDF5AttWrapper
+
 SUBROUTINE CreateFileHDF5(FILE_NAME)
 
       USE HDF5
@@ -515,7 +563,9 @@ SUBROUTINE CreateFileHDF5(FILE_NAME)
       
       CALL h5pclose_f(plist_id, error)
       CALL CheckHDF5(error)
-
+      
+      CALL TimeMetaData
+      CALL SpatialMetaData
 !      CALL h5acreate_f( file_id , 'TEST'
   
 
