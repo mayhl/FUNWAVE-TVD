@@ -157,7 +157,49 @@ SUBROUTINE STATISTICS
      endif
 # endif
 
+
+# if defined (PARALLEL)
+     if (myid.eq.0) then
+# endif
+
+     CALL CHECK_STATISTICS(MassVolume)
+     CALL CHECK_STATISTICS(Energy)
+     CALL CHECK_STATISTICS(MaxEta)
+     CALL CHECK_STATISTICS(MinEta)
+     CALL CHECK_STATISTICS(MaxU)
+     CALL CHECK_STATISTICS(MaxV)
+     CALL CHECK_STATISTICS(UTotalMax)
+     CALL CHECK_STATISTICS(Fr)
+     CALL CHECK_STATISTICS(UTotalMax/Fr)
+     CALL CHECK_STATISTICS(Dmass)
+# if defined (PARALLEL)
+     endif
+# endif
+
+
+
+
 101  FORMAT(6E12.4)
 
 
 END SUBROUTINE STATISTICS
+
+SUBROUTINE CHECK_STATISTICS( val )
+
+    USE GLOBAL
+    IMPLICIT NONE
+    REAL(SP), INTENT(IN) :: val
+
+
+    IF (ISNAN(val)) THEN
+       WRITE(*,*) 'NaN detected in statistics, stopping simulation!'
+       WRITE(3,*) 'NaN detected in statistics, stopping simulation!'
+
+#if defined (PARALLEL)
+       CALL MPI_ABORT( MPI_COMM_WORLD , 9 , ier)
+#endif
+       STOP
+
+    END IF
+
+END SUBROUTINE CHECK_STATISTICS
