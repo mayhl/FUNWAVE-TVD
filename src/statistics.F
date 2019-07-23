@@ -177,6 +177,8 @@ SUBROUTINE STATISTICS
      endif
 # endif
 
+    CALL ESTIMATE_TIME_REMAINING()
+
 
 END SUBROUTINE STATISTICS
 
@@ -198,9 +200,72 @@ SUBROUTINE CHECK_STATISTICS( val )
 
      END IF
 
- END SUBROUTINE CHECK_STATISTICS
+END SUBROUTINE CHECK_STATISTICS
+
+SUBROUTINE ESTIMATE_TIME_REMAINING()
 
 
+    USE MPI, ONLY : MPI_Wtime
+    USE PARAM, ONLY : SP
+    USE GLOBAL, ONLY : tbegin, t_stat_last,  myid, SCREEN_INTV, TOTAL_TIME, Time
+    IMPLICIT NONE
+    REAL(SP) :: t_now, t_stat_elapsed, t_elapsed
+    CHARACTER(LEN=80) :: t_stat_elapsed_str , t_elapsed_str   
+    REAL(SP) real_per_sim, real_per_sim_stat     
+    REAL(SP) t_estimate_stat, t_estimate_left, t_estimate_total
+    CHARACTER(LEN=80) :: t_estimate_stat_str, t_estimate_left_str, t_estimate_total_str
+
+
+# if defined (PARALLEL)
+    IF ( myid.EQ.0 ) t_now = MPI_Wtime()
+# else
+    CALL CPU_TIME( t_now )
+# endif
+
+# if defined (PARALLEL)
+    IF ( myid.EQ.0 ) THEN
+# endif
+
+   t_stat_elapsed = t_now - t_stat_last
+   t_elapsed = t_now - tbegin
+
+   real_per_sim = t_elapsed/Time
+   real_per_sim_stat = t_stat_elapsed/SCREEN_INTV
+
+   t_estimate_stat = 0.5*(real_per_sim+real_per_sim_stat)*SCREEN_INTV
+   t_estimate_left = 0.5*(real_per_sim+real_per_sim_stat)*(TOTAL_TIME-Time)
+
+   t_estimate_total = t_elapsed + t_estimate_left
+
+
+   CALL CONVERT_TIME_NICE ( t_stat_elapsed  , t_stat_elapsed_str   )
+   CALL CONVERT_TIME_NICE ( t_elapsed       , t_elapsed_str        )
+   CALL CONVERT_TIME_NICE ( t_estimate_stat , t_estimate_stat_str  )
+   CALL CONVERT_TIME_NICE ( t_estimate_left , t_estimate_left_str  )
+   CALL CONVERT_TIME_NICE ( t_estimate_total, t_estimate_total_str )
+
+
+   WRITE(3,*) '------------------ TIMING -------------------'   
+   WRITE(3,*) "Time Elapsed            : " , TRIM(t_elapsed_str)
+   WRITE(3,*) "Estimate Remaining      : " , TRIM(t_estimate_left_str)
+   WRITE(3,*) "Estimate Total          : " , TRIM(t_estimate_total_str)
+   WRITE(3,*) "Time Last Statistic     : " , TRIM(t_stat_elapsed_str)
+   WRITE(3,*) "Estimate Next Statistic : " , TRIM(t_estimate_stat_str)
+
+
+   WRITE(*,*) '------------------ TIMING -------------------'
+   WRITE(*,*) "Time Elapsed            : " , TRIM(t_elapsed_str)
+   WRITE(*,*) "Estimate Remaining      : " , TRIM(t_estimate_left_str)
+   WRITE(*,*) "Estimate Total          : " , TRIM(t_estimate_total_str)
+   WRITE(*,*) "Time Last Statistic     : " , TRIM(t_stat_elapsed_str)
+   WRITE(*,*) "Estimate Next Statistic : " , TRIM(t_estimate_stat_str)
+
+
+# if defined (PARALLEL)
+    ENDIF
+# endif
+
+END SUBROUTINE ESTIMATE_TIME_REMAINING
 
 
 

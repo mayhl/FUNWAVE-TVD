@@ -523,3 +523,48 @@ SUBROUTINE SHAPIRO_3(M,N,Nghost,MASK,VAR_IN_OUT)
 END SUBROUTINE SHAPIRO_3
 # endif
 
+SUBROUTINE CONVERT_TIME_NICE( time_total_secs , nice_time_str ) 
+
+    USE PARAM, ONLY : SP
+    IMPLICIT NONE
+
+    REAL(SP) , INTENT(IN) :: time_total_secs 
+    CHARACTER(LEN=80) , INTENT(OUT) :: nice_time_str
+
+    INTEGER :: secs, mins, hrs, days
+
+    REAL(SP) , PARAMETER :: sec_per_min = 60.0
+    REAL(SP) , PARAMETER :: min_per_hr = 60.0
+    REAL(SP) , PARAMETER :: hr_per_day = 24.0
+
+    secs = NINT(time_total_secs)
+
+    IF ( secs < sec_per_min ) THEN
+
+        WRITE(nice_time_str, "(I2.2,A5)") secs , ' secs'
+
+    ELSE
+        mins = INT( secs/sec_per_min )
+        secs = INT( secs - mins*sec_per_min )
+
+        IF( mins < min_per_hr ) THEN
+            WRITE(nice_time_str, "(I2.2,A6,I2.2,A5)" ) mins , ' mins ' , secs , ' secs'
+        ELSE            
+
+            hrs = INT( mins/min_per_hr )
+            mins = INT( mins - hrs*min_per_hr )
+
+            IF( hrs < hr_per_day ) THEN
+                WRITE(nice_time_str, "(I2.2,A5,I2.2,A6,I2.2,A5)") hrs, ' hrs ' , mins , ' mins ' , secs , ' secs'
+            ELSE
+                days = INT( hrs/hr_per_day )
+                hrs = INT( hrs - days*hr_per_day)
+                WRITE(nice_time_str, "(I3.3,A6,I2.2,A5,I2.2,A6,I2.2,A5)") days, ' days ' , hrs, ' hrs ' , mins , ' mins ' , secs , ' secs'
+            ENDIF
+
+        ENDIF
+
+    ENDIF
+
+END SUBROUTINE CONVERT_TIME_NICE
+

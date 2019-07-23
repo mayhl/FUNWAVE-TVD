@@ -79,6 +79,8 @@ MODULE GLOBAL
 ! timer
        REAL(SP) :: tbegin,tend
        INTEGER :: ISTAGE
+       REAL(SP) :: t_stat_last
+       CHARACTER(LEN=80) :: time_str
 
 # if defined(FILTERING)
        INTEGER :: filter_count=0, filter_interval = 1

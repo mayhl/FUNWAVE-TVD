@@ -242,9 +242,13 @@ Program FUNWAVE_TVD
 
      ! record wall time
 # if defined (PARALLEL)
-     if(myid == 0) tbegin = MPI_Wtime( )
+     IF (myid == 0) THEN 
+         tbegin = MPI_Wtime( )
+         t_stat_last = tbegin
+     ENDIF
 # else
      CALL CPU_TIME(tbegin)
+     t_stat_last = tbegin
 # endif
 
 
@@ -452,17 +456,26 @@ ENDDO
      CALL CPU_TIME (tend)
 # endif
 
+
+
+
 # if defined (PARALLEL)
-     if(myid.eq.0) write(*,*) 'Simulation takes',tend-tbegin,'seconds'
-     if(myid.eq.0) write(3,*) 'Simulation takes',tend-tbegin,'seconds'
-     if (myid.eq.0) WRITE(*,*)'Normal Termination!'
-     if (myid.eq.0) WRITE(3,*)'Normal Termination!'
-# else
-     write(*,*) 'Simulation takes',tend-tbegin,'seconds'
-     write(3,*) 'Simulation takes',tend-tbegin,'seconds'
+IF ( myid.eq.0 ) THEN
+# endif
+
+     CALL CONVERT_TIME_NICE( tend-tbegin , time_str )
+
+     WRITE(*,*) 'Simulation elapsed time: ' , TRIM(time_str)
+     WRITE(3,*) 'Simulation elapsed time: ' , TRIM(time_str)
+ 
      WRITE(*,*)'Normal Termination!'
      WRITE(3,*)'Normal Termination!'
+
+# if defined (PARALLEL)
+ENDIF
 # endif
+
+
 
 # if defined (PARALLEL)
      call MPI_FINALIZE ( ier )
