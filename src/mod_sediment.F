@@ -58,7 +58,7 @@ MODULE SEDIMENT_MODULE
   USE GLOBAL,ONLY : Mloc,Nloc,Mloc1,Nloc1,Nghost,Ibeg,Iend,Jbeg,Jend,DX,DY, &
                     H,ETA,U,V,P,Q,MinDepth,MASK,DT,Gamma3,Depth,tmp4preview, &
                     ALPHA,BETA,MASK9,DepthX,DepthY,PERIODIC, &
-                    UNDERTOW_U, UNDERTOW_V, ROLLER_SWITCH
+                    UNDERTOW_U, UNDERTOW_V, ROLLER_SWITCH,ROLLER
   USE INPUT_READ
 #if defined (PARALLEL)
   USE GLOBAL,ONLY : myid,ier, npx,npy,PX,PY
@@ -546,7 +546,11 @@ SUBROUTINE SEDIMENT_ADVECTION_DIFFUSION(ISTEP)
      Scalx = ZERO
      DO J=Jbeg,Jend
      DO I=Ibeg,Iend+1
-      tmp1=P(I,J)+0.5_SP*(UNDERTOW_U(I-1,J)+UNDERTOW_U(I,J))*ROLLER_SWITCH
+      IF(ROLLER) THEN
+       tmp1=P(I,J)+0.5_SP*(UNDERTOW_U(I-1,J)+UNDERTOW_U(I,J))
+      ELSE
+       tmp1=P(I,J)
+      ENDIF
       IF(tmp1>=0.0)THEN
         IF(MASK(I-1,J)==0)THEN
           Scalx(I,J) = ZERO
@@ -567,7 +571,11 @@ SUBROUTINE SEDIMENT_ADVECTION_DIFFUSION(ISTEP)
      Scaly = ZERO
      DO J=Jbeg,Jend+1
      DO I=Ibeg,Iend
-      tmp2=Q(I,J)+0.5_SP*(UNDERTOW_V(I,J-1)+UNDERTOW_V(I,J))*ROLLER_SWITCH
+      IF(ROLLER) THEN
+        tmp2=Q(I,J)+0.5_SP*(UNDERTOW_V(I,J-1)+UNDERTOW_V(I,J))
+      ELSE
+        tmp2=Q(I,J)
+      ENDIF
       IF(tmp2>=0.0)THEN
         IF(MASK(I,J-1)==0)THEN
           Scaly(I,J) = ZERO
@@ -590,7 +598,11 @@ SUBROUTINE SEDIMENT_ADVECTION_DIFFUSION(ISTEP)
      Scalx = ZERO
      DO J=Jbeg,Jend
      DO I=Ibeg,Iend+1
-      tmp1=P(I,J)+0.5_SP*(UNDERTOW_U(I-1,J)+UNDERTOW_U(I,J))*ROLLER_SWITCH
+      IF(ROLLER)THEN
+        tmp1=P(I,J)+0.5_SP*(UNDERTOW_U(I-1,J)+UNDERTOW_U(I,J))
+      ELSE
+        tmp1=P(I,J)
+      ENDIF
       IF(tmp1>=ZERO)THEN
         IF(MASK(I-1,J)==0)THEN
           Scalx(I,J) = ZERO
@@ -611,7 +623,11 @@ SUBROUTINE SEDIMENT_ADVECTION_DIFFUSION(ISTEP)
      Scaly = ZERO
      DO J=Jbeg,Jend+1
      DO I=Ibeg,Iend
-      tmp2=Q(I,J)+0.5_SP*(UNDERTOW_V(I,J-1)+UNDERTOW_V(I,J))*ROLLER_SWITCH
+      IF(ROLLER)THEN
+        tmp2=Q(I,J)+0.5_SP*(UNDERTOW_V(I,J-1)+UNDERTOW_V(I,J))
+      ELSE
+        tmp2=Q(I,J)
+      ENDIF
       IF(tmp2>=ZERO)THEN
         IF(MASK(I,J-1)==0)THEN
           Scaly(I,J) = ZERO

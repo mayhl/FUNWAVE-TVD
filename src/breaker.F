@@ -124,6 +124,7 @@ SUBROUTINE BREAKING(M,N,ETAx,ETAy,ETAT,Cbrk1,Cbrk2,H,MinDepthFrc,&
      tmp3=SQRT(GRAV*MAX(MinDepthFrc,H(I,J)))
      tmp1=Cbrk1*tmp3
      tmp2=Cbrk2*tmp3
+     tmp4=SMALL
 
      ANGLE=ATAN2(-ETAy(I,J),-ETAx(I,J))*180.0_SP/PI
 
@@ -142,6 +143,11 @@ SUBROUTINE BREAKING(M,N,ETAx,ETAy,ETAT,Cbrk1,Cbrk2,H,MinDepthFrc,&
      
 # else
 
+!    I moved tmp4 outside the continuting breaking because tmp4 can be wrong
+!    if not continuting breaking 08/04/2019
+
+     tmp4=MAX(SQRT(ETAx(I,J)*ETAx(I,J)+ETAy(I,J)*ETAy(I,J)),SMALL)
+
      IF(ETAt(I,J).GE.tmp1.AND.(  &
        AGE(I,J).EQ.ZERO.OR.AGE(I,J).GT.T_brk))THEN
       AGE(I,J)=DT
@@ -149,7 +155,6 @@ SUBROUTINE BREAKING(M,N,ETAx,ETAy,ETAT,Cbrk1,Cbrk2,H,MinDepthFrc,&
       IF(AGE(I,J).GT.ZERO)THEN
         AGE(I,J)=AGE(I,J)+DT
       ELSE
-        tmp4=MAX(SQRT(ETAx(I,J)*ETAx(I,J)+ETAy(I,J)*ETAy(I,J)),SMALL)
         C=MIN(ABS(ETAt(I,J))/tmp4,SQRT(GRAV*ABS(H(I,J))))
 ! propagation time between a dx, dy and ds
 # if defined (CARTESIAN)
@@ -316,8 +321,12 @@ SUBROUTINE BREAKING(M,N,ETAx,ETAy,ETAT,Cbrk1,Cbrk2,H,MinDepthFrc,&
 !    R is limited by angle =20deg, schaffer et al 1993
 !    which gives R = 0.1638
 !
-!         C1=MIN(ABS(ETAt(I,J))/tmp4,SQRT(GRAV*ABS(H(I,J))))
+
          C1=MAX(ABS(ETAt(I,J))/tmp4,SQRT(GRAV*ABS(H(I,J))))
+
+! its interesting for some compiler that C1 could be infinity if tmp4=0
+! I made a protection by moving tmp4 calculation outside continuting breaking 08/04/2019
+
          R=ABS(0.45*ETAt(I,J)/MAX(C1,SMALL))
 !         tmp4preview(I,J) = ETAt(I,J)
          R=MIN(R,0.1638_SP)  

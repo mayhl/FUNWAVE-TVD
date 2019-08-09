@@ -280,7 +280,7 @@ SUBROUTINE VESSEL_INITIAL
 End SUBROUTINE VESSEL_INITIAL
 
 SUBROUTINE VESSEL_FORCING
-  USE GLOBAL,ONLY : Mloc,Nloc,tmp1,tmp2,SMALL,TIME,ZERO
+  USE GLOBAL,ONLY : Mloc,Nloc,tmp1,tmp2,SMALL,TIME,ZERO,DT
   USE INPUT_READ
   IMPLICIT NONE
   INTEGER :: Ifile,ierr,I,J
@@ -300,7 +300,10 @@ SUBROUTINE VESSEL_FORCING
 
     Ifile = 200 + Kves
 
-    READ(Ifile,*,END=120)  TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
+! I add while to avoid dt is smaller than the time interval of vessel path 08/05/2019
+    DO WHILE (TimeVessel2(Kves).LT.TIME+DT)
+      READ(Ifile,*,END=120)  TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
+    END DO
 
 # if defined (PARALLEL)
    IF(MYID==0)THEN
@@ -337,7 +340,7 @@ SUBROUTINE VESSEL_FORCING
       ELSE
       tmp2=(TimeVessel2(Kves)-TIME) &
             /MAX(SMALL, ABS(TimeVessel2(Kves)-TimeVessel1(Kves)))
-      tmp1=1.0_SP - tmp2;
+      tmp1=1.0_SP - tmp2
       ENDIF  ! no more data?
     ENDIF ! time>time_1
 

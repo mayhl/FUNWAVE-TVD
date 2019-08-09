@@ -27,7 +27,7 @@ MPI         = openmpi
 DEBUG       = false
 INCS        = $(IOINCS) $(GOTMINCS)
 LIBS        = $(PV3LIB) $(CLIB)  $(PARLIB) $(IOLIBS) $(MPILIB) $(GOTMLIB)
-CLIB        =
+CLIB        = -lmpi -Bdynamic
 MDEPFLAGS   = --cpp --fext=f90 --file=-
 RANLIB      = ranlib
 
