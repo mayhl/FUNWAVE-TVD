@@ -173,7 +173,7 @@ SUBROUTINE READ_LOGICAL_TMP( ReturnValue, InputFileName, VariableName, ErrID )
 
    CHARACTER(LEN=40)             :: ValueString
   
-   CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'string' , ErrID )
+   CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'logical' , ErrID )
 
    IF ( ErrID.NE.0 ) RETURN
 
