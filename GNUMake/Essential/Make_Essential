@@ -174,7 +174,7 @@ FCFLAGS := $(DEBFLGS) $(OPT) $(INCS)
 endif
 
 #----------------FUNWAVE souce code-------------------
-MODS  = mod_param.F mod_global.F mod_input.F mod_vessel.F mod_bathy_correction.F \
+MODS  = mod_param.F mod_global.F mod_log_output.F mod_input.F mod_vessel.F mod_bathy_correction.F \
         mod_meteo.F mod_parallel_field_io.F mod_sediment.F mod_tide.F\
         mod_tracer.F
 
