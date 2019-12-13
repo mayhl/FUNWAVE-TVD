@@ -73,6 +73,120 @@ CONTAINS
   
 ! INTEGER
 
+
+SUBROUTINE PARSE_VALUE( ReturnValue, InputFileName, VariableName, VariableType, ErrID )
+   IMPLICIT NONE
+
+   CHARACTER(LEN=*) , INTENT(OUT) :: ReturnValue
+   CHARACTER(LEN=*) , INTENT(IN ) :: InputFileName
+   CHARACTER(LEN=*) , INTENT(IN ) :: VariableName
+   CHARACTER(LEN=*) , INTENT(IN ) :: VariableType
+   INTEGER          , INTENT(OUT) :: ErrID
+
+   CHARACTER(LEN=12)             :: ValueType
+   LOGICAL                       :: FileExists 
+   IF (.NOT.FileExists ) THEN
+      ErrID = 3
+      RETURN
+   END IF
+
+   CALL READ_VALUE( InputFileName, VariableName, ReturnValue, ErrID )
+
+   IF ( ErrID.EQ.1 ) THEN
+      ErrId = 2
+      RETURN
+   END IF
+
+   CALL CHECK_CONSISTENCY_TYPE( ReturnValue, ValueType )
+
+   IF ( TRIM(VariableType).NE.TRIM(ValueType) ) THEN
+     ErrID = 1
+     RETURN
+   END IF
+
+   ErrID = 0
+
+END SUBROUTINE PARSE_VALUE
+
+
+SUBROUTINE READ_INTEGER_TMP( ReturnValue, InputFileName, VariableName, ErrID )
+   IMPLICIT NONE
+
+   INTEGER         , INTENT(OUT) :: ReturnValue
+   CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
+   CHARACTER(LEN=*), INTENT(IN ) :: VariableName 
+   INTEGER         , INTENT(OUT) :: ErrID
+
+   CHARACTER(LEN=40)             :: ValueString
+  
+   CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'INTEGER' , ErrID )
+
+   IF ( ErrID.NE.0 ) RETURN
+   
+   READ(ValueString,*) ReturnValue
+
+END SUBROUTINE READ_INTEGER_TMP
+ 
+SUBROUTINE READ_FLOAT_TMP( ReturnValue, InputFileName, VariableName, ErrID )
+   IMPLICIT NONE
+
+   REAL(SP)        , INTENT(OUT) :: ReturnValue
+   CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
+   CHARACTER(LEN=*), INTENT(IN ) :: VariableName
+   INTEGER         , INTENT(OUT) :: ErrID
+
+   CHARACTER(LEN=40)             :: ValueString
+  
+   CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'float' , ErrID )
+
+   IF ( ErrID.NE.0 ) RETURN
+   
+   READ(ValueString,*) ReturnValue
+
+END SUBROUTINE READ_FLOAT_TMP
+
+SUBROUTINE READ_STRING_TMP( ReturnValue, InputFileName, VariableName, ErrID )
+   IMPLICIT NONE
+
+   CHARACTER(LEN=*), INTENT(OUT) :: ReturnValue
+   CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
+   CHARACTER(LEN=*), INTENT(IN ) :: VariableName
+   INTEGER         , INTENT(OUT) :: ErrID
+
+   CHARACTER(LEN=40)             :: ValueString
+  
+   CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'string' , ErrID )
+
+   IF ( ErrID.NE.0 ) RETURN
+
+   ReturnValue = ADJUSTL(TRIM(ValueString))
+
+END SUBROUTINE READ_STRING_TMP
+
+SUBROUTINE READ_LOGICAL_TMP( ReturnValue, InputFileName, VariableName, ErrID )
+   IMPLICIT NONE
+
+   LOGICAL         , INTENT(OUT) :: ReturnValue
+   CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
+   CHARACTER(LEN=*), INTENT(IN ) :: VariableName
+   INTEGER         , INTENT(OUT) :: ErrID
+
+   CHARACTER(LEN=40)             :: ValueString
+  
+   CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'string' , ErrID )
+
+   IF ( ErrID.NE.0 ) RETURN
+
+   IF ( ValueString(1:1) == 'T' ) THEN 
+      ReturnValue = .TRUE.
+   ELSE
+      ReturnValue = .FALSE.
+   END IF
+
+END SUBROUTINE READ_LOGICAL_TMP
+
+
+
 SUBROUTINE READ_INTEGER(INTEGER_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
   IMPLICIT NONE
   INTEGER,          INTENT(OUT) :: INTEGER_VAL 
@@ -309,8 +423,8 @@ SUBROUTINE READ_INTEGER(INTEGER_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)
 
   SUBROUTINE CHECK_CONSISTENCY_TYPE(VREAD,VTYPE)
   IMPLICIT NONE
-  CHARACTER(LEN=80), INTENT(OUT) :: VTYPE 
-  CHARACTER(LEN=80), INTENT(IN ) :: VREAD  
+  CHARACTER(LEN=*), INTENT(OUT) :: VTYPE 
+  CHARACTER(LEN=*), INTENT(IN ) :: VREAD  
 
   CHARACTER(LEN=16) :: NUMBERS
   INTEGER           :: LOGICAL_VAL_READ
