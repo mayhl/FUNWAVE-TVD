@@ -424,6 +424,30 @@ SUBROUTINE CHECK_BLOWUP
 
 END SUBROUTINE CHECK_BLOWUP
 
+
+!-------------------------------------------------------------------------------------
+!
+!    TERMINATE is a subroutine to stop program and MPI execution (if in PARALLEL mode)
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE TERMINATE( ierr )
+#if defined (PARALLEL)
+   USE MPI
+#endif
+   IMPLICIT NONE
+   INTEGER, INTENT(OUT) :: ierr
+#if defined (PARALLEL)
+   CALL MPI_FINALIZE( ierr )
+#endif 
+   STOP
+
+END SUBROUTINE TERMINATE
+
+
+
 !-------------------------------------------------------------------------------------
 !
 !   wall_time_secs is used to calculate current wall time
