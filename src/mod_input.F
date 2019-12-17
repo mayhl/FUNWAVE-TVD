@@ -151,7 +151,7 @@ SUBROUTINE READ_CHECK( InputFileName, VariableName, ValueType,  ErrID , DefaultV
          ! Stopping code if not default value found
          Msg = TRIM(Msg)//" STOPPING SIMULATION!"
          CALL WRITE_ALL( Msg )
-;:         CALL TERMINATE
+         CALL TERMINATE
       END IF
 
    ELSE IF( ErrID.EQ.1 ) THEN
