@@ -213,8 +213,6 @@ SUBROUTINE READ_INPUT
       CALL READ_VALUE_CHECK(PX, FILE_NAME, 'PX', DefaultValue=1 )
       CALL READ_VALUE_CHECK(PY, FILE_NAME, 'PY', DefaultValue=1 )
 
-      SWRITE(FMT_STR_BUFF, '(A7,I3,A7,I3)') 'PX   =' ,PX, 'PY   =', PY
-      CALL WRITE_LOG( FMT_STR_BUFF)
 # endif
 
 
@@ -226,18 +224,12 @@ SUBROUTINE READ_INPUT
       CALL READ_VALUE_CHECK(Mglob, FILE_NAME, 'Mglob' )
       CALL READ_VALUE_CHECK(Nglob, FILE_NAME, 'Nglob' )
 
-      SWRITE(FMT_STR_BUFF,'(A7,I8,A7,I8)') 'Mglob=', Mglob, 'Nglob=', Nglob
-      CALL WRITE_LOG(FMT_STR_BUFF)
-
 ! grid 
 # if defined (CARTESIAN)
 
       CALL WRITE_ALL( 'Equispaced Cartesian Coordinates Mode' )
       CALL READ_VALUE_CHECK(DX, FILE_NAME, 'DX' )
       CALL READ_VALUE_CHECK(DY, FILE_NAME, 'DY' )
-
-      SWRITE(FMT_STR_BUFF,'(A4,F12.2,A4,F12.2)')'DX=',DX,'DY=',DY
-      CALL WRITE_LOG( FMT_STR_BUFF )
 
 # else
 
@@ -258,45 +250,25 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( Dphi     , FILE_NAME, 'Dphi'      )
         CALL READ_VALUE_CHECK( Dtheta   , FILE_NAME, 'Dtheta'    )
 
-        SWRITE(FMT_STR_BUFF, '(A10,F12.2)') 'Lon_West=' , Lon_West
-        CALL WRITE_LOG( FMT_STR_BUFF )
-        SWRITE(FMT_STR_BUFF, '(A11,F12.2)') 'Lat_South=', Lat_South
-        CALL WRITE_LOG( FMT_STR_BUFF )
-        SWRITE(FMT_STR_BUFF, '(A11,F12.2)') 'Dphi     =', Dphi
-        CALL WRITE_LOG( FMT_STR_BUFF )
-        SWRITE(FMT_STR_BUFF, '(A11,F12.2)') 'Dtheta   =', Dtheta
-        CALL WRITE_LOG( FMT_STR_BUFF )
      END IF
 # endif
 
 ! depth
  
      CALL READ_VALUE_CHECK(DEPTH_TYPE, FILE_NAME, 'DEPTH_TYPE' , DefaultValue='FLAT') 
-     CALL WRITE_LOG( 'DEPTH_TYPE: '//TRIM(DEPTH_TYPE) )
 
      IF ( DEPTH_TYPE(1:3).EQ.'DAT' ) THEN
         CALL READ_VALUE_CHECK( DEPTH_FILE, FILE_NAME, 'DEPTH_FILE' )
-        CALL WRITE_LOG( 'DEPTH_FILE: '//TRIM(DEPTH_FILE) )
      END IF  ! end type=data
 
      IF( DEPTH_TYPE(1:3).EQ.'FLA' ) THEN
         CALL READ_VALUE_CHECK( DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT' , DefaultValue=10.0_SP , Units='m' ) 
-
-        SWRITE (FMT_STR_BUFF, '(A10,F12.2)' ) 'DEPTH_FLAT=', DEPTH_FLAT
-        CALL WRITE_LOG( FMT_STR_BUFF ) 
      END IF ! endif type=flat
 
      IF ( DEPTH_TYPE(1:3).EQ.'SLO' ) THEN
         CALL READ_VALUE_CHECK( DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT' , DefaultValue=10.0_SP , Units='m' )
         CALL READ_VALUE_CHECK( SLP       , FILE_NAME, 'SLP'        , DefaultValue=0.1_SP              ) 
         CALL READ_VALUE_CHECK( Xslp      ,FILE_NAME , 'Xslp'       , DefaultValue=0.0_SP              ) 
-
-        SWRITE(FMT_STR_BUFF, '(A10,F12.2)') 'DEPTH_FLAT=', DEPTH_FLAT 
-        CALL WRITE_LOG( FMT_STR_BUFF )
-        SWRITE(FMT_STR_BUFF, '(A5,F12.2)') 'SLP=', SLP
-        CALL WRITE_LOG( FMT_STR_BUFF )
-        SWRITE(FMT_STR_BUFF, '(A6,F12.2)') 'Xslp=', Xslp  
-        CALL WRITE_LOG( FMT_STR_BUFF )
      END IF  ! endif type=slope
 
 ! depth correction
@@ -313,16 +285,6 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( PLOT_INTV_STATION  , FILE_NAME, 'PLOT_INTV_STATION'  , DefaultValue=1.0_SP, Units='s' )
      CALL READ_VALUE_CHECK( StationOutputBuffer, FILE_NAME, 'StationOutputBuffer', DefaultValue=1000              )
      CALL READ_VALUE_CHECK( SCREEN_INTV        , FILE_NAME,' SCREEN_INTV'        , DefaultValue=1.0_SP, Units='s' )
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'TOTAL_TIME=', TOTAL_TIME
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'PLOT_INTV= ', PLOT_INTV
-      if (myid.eq.0) WRITE(3,'(A13,F12.2)')'SCREEN_INTV=', SCREEN_INTV
-# else
-      WRITE(3,'(A12,F12.2)')'TOTAL_TIME=', TOTAL_TIME
-      WRITE(3,'(A12,F12.2)')'PLOT_INTV= ', PLOT_INTV
-      WRITE(3,'(A13,F12.2)')'SCREEN_INTV=', SCREEN_INTV
-# endif
 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,*)'                                         '

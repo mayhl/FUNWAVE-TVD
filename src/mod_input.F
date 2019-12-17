@@ -85,8 +85,119 @@ INTERFACE READ_VALUE_CHECK
    MODULE PROCEDURE READ_FLOAT_CHECK
 END INTERFACE
 
+! Interface for overloading format value functions
+INTERFACE FORMAT_VALUE
+   MODULE PROCEDURE FORMAT_INTEGER
+   MODULE PROCEDURE FORMAT_FLOAT
+   MODULE PROCEDURE FORMAT_STRING
+   MODULE PROCEDURE FORMAT_LOGICAL
+END INTERFACE
 
 CONTAINS
+
+
+
+!-------------------------------------------------------------------------------------
+!
+!    FORMAT_XXXXX are simple subroutine for standardizing formating of value types to
+!                 strings
+! 
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+
+SUBROUTINE FORMAT_INTEGER( Val , ValStr )
+
+   IMPLICIT NONE
+   INTEGER         , INTENT(IN ) :: Val
+   CHARACTER(LEN=*), INTENT(OUT) :: ValStr
+
+   WRITE( ValStr,* ) Val
+
+END SUBROUTINE
+
+SUBROUTINE FORMAT_STRING( Val , ValStr )
+
+   IMPLICIT NONE
+   CHARACTER(LEN=*), INTENT(IN ) :: Val
+   CHARACTER(LEN=*), INTENT(OUT) :: ValStr
+
+   ValStr = Val
+
+END SUBROUTINE
+
+SUBROUTINE FORMAT_FLOAT( Val , ValStr )
+   
+   USE PARAM, ONLY: SP
+ 
+   IMPLICIT NONE
+   REAL(SP)        , INTENT(IN ) :: Val
+   CHARACTER(LEN=*), INTENT(OUT) :: ValStr
+
+   INTEGER                       :: N
+   INTEGER                       :: SepIdx
+   INTEGER                       :: CutIdx 
+   INTEGER                       :: i
+
+   WRITE( ValStr, '(F20.10)' ) Val
+   
+   ValStr=ADJUSTL(TRIM(ValStr))
+   N = LEN_TRIM(ValStr)
+
+   DO i = 1 , N
+      IF (ValStr(i:i).EQ.'.') THEN
+         SepIdx = i + 1
+         EXIT
+      END IF
+   END DO
+
+   DO i = N , SepIdx, -1 
+      IF ( ValStr(i:i).NE.'0' ) THEN
+         CutIdx = i
+         EXIT
+      END IF
+   END DO
+
+   ValStr = TRIM(ValStr(1:CutIdx))
+
+END SUBROUTINE
+
+SUBROUTINE FORMAT_LOGICAL( Val , ValStr )
+
+   IMPLICIT NONE
+   LOGICAL         , INTENT(IN ) :: Val
+   CHARACTER(LEN=*), INTENT(OUT) :: ValStr
+
+   IF ( Val ) THEN
+      ValStr = 'T'
+   ELSE
+      ValStr = 'F'
+   END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    WRITE_VARIABLE_VALUE is a simple wrapper subroutine for standardizing output
+! 
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE WRITE_VARIABLE_VALUE( VariableName, VariableValueStr)
+
+   USE LOG_OUTPUT, ONLY: WRITE_LOG
+
+   IMPLICIT NONE
+   CHARACTER(LEN=*), INTENT(IN) :: VariableName
+   CHARACTER(LEN=*), INTENT(IN) :: VariableValueStr
+
+   CALL WRITE_LOG( TRIM(VariableName)//" = "//TRIM(VariableValueStr) )
+
+END SUBROUTINE
+
 
 !-------------------------------------------------------------------------------------
 !
@@ -103,7 +214,6 @@ CONTAINS
 !        12/17/2019 Michael-Angelo Y.-H. Lam
 !
 !-------------------------------------------------------------------------------------
-
 SUBROUTINE READ_CHECK( InputFileName, VariableName, ValueType,  ErrID , DefaultValueStr, Units )
 
    USE LOG_OUTPUT, ONLY: WRITE_LOG, WRITE_ALL
@@ -191,22 +301,26 @@ SUBROUTINE READ_INTEGER_CHECK(ReturnValue, InputFileName, VariableName, DefaultV
 
   CHARACTER(LEN=7), PARAMETER             :: ValueType="integer"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: DefaultValueStr
+  CHARACTER(LEN=30)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
   IF ( PRESENT( DefaultValue ) ) THEN
-     WRITE(DefaultValueStr,*) DefaultValue
-      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+     IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
 
      IF ( PRESENT(Units) ) THEN
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr, Units )
      ELSE
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr )
      END IF
   ELSE
      CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
   END IF
+
+  CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+
 
 END SUBROUTINE
 
@@ -234,22 +348,26 @@ SUBROUTINE READ_FLOAT_CHECK(ReturnValue, InputFileName, VariableName, DefaultVal
 
   CHARACTER(LEN=5), PARAMETER             :: ValueType="float"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: DefaultValueStr
+  CHARACTER(LEN=30)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
   IF ( PRESENT( DefaultValue ) ) THEN
-     WRITE(DefaultValueStr,*) DefaultValue
-      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+
+     IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
 
      IF ( PRESENT(Units) ) THEN
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr, Units )
      ELSE
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr )
      END IF
   ELSE
      CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
   END IF
+
+  CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
 
 END SUBROUTINE
 
@@ -276,27 +394,26 @@ SUBROUTINE READ_LOGICAL_CHECK(ReturnValue, InputFileName, VariableName, DefaultV
 
   CHARACTER(LEN=7), PARAMETER             :: ValueType="logical"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: DefaultValueStr
+  CHARACTER(LEN=30)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
   IF ( PRESENT( DefaultValue ) ) THEN
-     IF ( DefaultValue ) THEN
-        DefaultValueStr = 'T'
-     ELSE
-        DefaultValueStr = 'F'
-     END IF
 
      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
 
      IF ( PRESENT(Units) ) THEN
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr, Units )
      ELSE
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr )
      END IF
   ELSE
      CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
   END IF
+
+  CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
 
 END SUBROUTINE
 
@@ -323,22 +440,26 @@ SUBROUTINE READ_STRING_CHECK(ReturnValue, InputFileName, VariableName, DefaultVa
 
   CHARACTER(LEN=6), PARAMETER             :: ValueType="string"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: DefaultValueStr
+  CHARACTER(LEN=30)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
   IF ( PRESENT( DefaultValue ) ) THEN
-     WRITE(DefaultValueStr,*) DefaultValue
-      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+
+     IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
 
      IF ( PRESENT(Units) ) THEN
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr, Units )
      ELSE
-        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, ValueStr )
      END IF
   ELSE
      CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
   END IF
+
+  CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
 
 END SUBROUTINE
 
