@@ -269,235 +269,50 @@ SUBROUTINE READ_INPUT
      END IF
 # endif
 
-! depth 
-      CALL READ_STRING(DEPTH_TYPE,FILE_NAME,'DEPTH_TYPE',ierr)
+! depth
+ 
+     CALL READ_VALUE_CHECK(DEPTH_TYPE, FILE_NAME, 'DEPTH_TYPE' , DefaultValue='FLAT') 
+     CALL WRITE_LOG( 'DEPTH_TYPE: '//TRIM(DEPTH_TYPE) )
 
-      IF(ierr==1)THEN
-        DEPTH_TYPE = 'FLAT'
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify DEPTH_TYPE, use FLAT.'
-         WRITE(3,'(A40)')'You dont specify DEPTH_TYPE, use FLAT.'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify DEPTH_TYPE, use FLAT.'
-         WRITE(3,'(A40)')'You dont specify DEPTH_TYPE, use FLAT.'
-# endif
-      ENDIF
+     IF ( DEPTH_TYPE(1:3).EQ.'DAT' ) THEN
+        CALL READ_VALUE_CHECK( DEPTH_FILE, FILE_NAME, 'DEPTH_FILE' )
+        CALL WRITE_LOG( 'DEPTH_FILE: '//TRIM(DEPTH_FILE) )
+     END IF  ! end type=data
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,A50)')'DEPTH_TYPE:', DEPTH_TYPE
-# else
-      WRITE(3,'(A12,A50)')'DEPTH_TYPE:', DEPTH_TYPE
-# endif
+     IF( DEPTH_TYPE(1:3).EQ.'FLA' ) THEN
+        CALL READ_VALUE_CHECK( DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT' , DefaultValue=10.0_SP , Units='m' ) 
 
-      IF(DEPTH_TYPE(1:3)=='DAT')THEN
-        CALL READ_STRING(DEPTH_FILE,FILE_NAME,'DEPTH_FILE',ierr)
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,A50)')'DEPTH_FILE:', DEPTH_FILE
-# else
-      WRITE(3,'(A12,A50)')'DEPTH_FILE:', DEPTH_FILE
-# endif
-      ENDIF  ! end type=data
+        SWRITE (FMT_STR_BUFF, '(A10,F12.2)' ) 'DEPTH_FLAT=', DEPTH_FLAT
+        CALL WRITE_LOG( FMT_STR_BUFF ) 
+     END IF ! endif type=flat
 
-    IF(DEPTH_TYPE(1:3)=='FLA')THEN
-      CALL READ_FLOAT(DEPTH_FLAT,FILE_NAME,'DEPTH_FLAT',ierr) 
-      
-      IF(ierr==1)THEN
-        DEPTH_FLAT = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-         WRITE(3,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-         WRITE(3,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-# endif
-      ENDIF      
+     IF ( DEPTH_TYPE(1:3).EQ.'SLO' ) THEN
+        CALL READ_VALUE_CHECK( DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT' , DefaultValue=10.0_SP , Units='m' )
+        CALL READ_VALUE_CHECK( SLP       , FILE_NAME, 'SLP'        , DefaultValue=0.1_SP              ) 
+        CALL READ_VALUE_CHECK( Xslp      ,FILE_NAME , 'Xslp'       , DefaultValue=0.0_SP              ) 
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'DEPTH_FLAT=', DEPTH_FLAT  
-# else
-      WRITE(3,'(A10,F12.2)')'DEPTH_FLAT=', DEPTH_FLAT 
-# endif
-    ENDIF ! endif type=flat
-
-
-      IF(DEPTH_TYPE(1:3)=='SLO')THEN
-      CALL READ_FLOAT(DEPTH_FLAT,FILE_NAME,'DEPTH_FLAT',ierr) 
-
-      IF(ierr==1)THEN
-        DEPTH_FLAT = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-         WRITE(3,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-         WRITE(3,'(A40)')'You dont specify DEPTH_FLAT, use 10 m.'
-# endif
-      ENDIF 
-
-      CALL READ_FLOAT(SLP,FILE_NAME,'SLP',ierr) 
-
-      IF(ierr==1)THEN
-        SLP = 0.1_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify SLP, use 0.1'
-         WRITE(3,'(A40)')'You dont specify SLP, use 0.1'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify SLP, use 0.1'
-         WRITE(3,'(A40)')'You dont specify SLP, use 0.1'
-# endif
-      ENDIF 
-
-      CALL READ_FLOAT(Xslp,FILE_NAME,'Xslp',ierr) 
-
-      IF(ierr==1)THEN
-        Xslp = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify Xslp, use 0.0'
-         WRITE(3,'(A40)')'You dont specify Xslp, use 0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify Xslp, use 0.0'
-         WRITE(3,'(A40)')'You dont specify Xslp, use 0.0'
-# endif
-      ENDIF 
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'DEPTH_FLAT=', DEPTH_FLAT 
-      if (myid.eq.0) WRITE(3,'(A5,F12.2)')'SLP=', SLP
-      if (myid.eq.0) WRITE(3,'(A6,F12.2)')'Xslp=', Xslp  
-# else
-      WRITE(3,'(A10,F12.2)')'DEPTH_FLAT=', DEPTH_FLAT 
-      WRITE(3,'(A5,F12.2)')'SLP=', SLP
-      WRITE(3,'(A6,F12.2)')'Xslp=', Xslp  
-# endif
-      ENDIF  ! endif type=slope
+        SWRITE(FMT_STR_BUFF, '(A10,F12.2)') 'DEPTH_FLAT=', DEPTH_FLAT 
+        CALL WRITE_LOG( FMT_STR_BUFF )
+        SWRITE(FMT_STR_BUFF, '(A5,F12.2)') 'SLP=', SLP
+        CALL WRITE_LOG( FMT_STR_BUFF )
+        SWRITE(FMT_STR_BUFF, '(A6,F12.2)') 'Xslp=', Xslp  
+        CALL WRITE_LOG( FMT_STR_BUFF )
+     END IF  ! endif type=slope
 
 ! depth correction
 
-      CALL READ_LOGICAL(BATHY_CORRECTION,FILE_NAME,'BATHY_CORRECTION',ierr)
-      IF(ierr == 1)THEN
-       BATHY_CORRECTION = .FALSE. 
-      ENDIF
-      IF(BATHY_CORRECTION)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0)then
-       WRITE(3,'(A40)')'Bathymetry is corrected !'
-       WRITE(*,'(A40)')'Bathymetry is corrected !'
-      endif
-# else
-      WRITE(3,'(A40)')'Bathymetry is corrected !'
-      WRITE(*,'(A40)')'Bathymetry is corrected !'
-# endif 
-      ENDIF
+     CALL READ_VALUE_CHECK( BATHY_CORRECTION, FILE_NAME, 'BATHY_CORRECTION', DefaultValue=.FALSE. )
+     IF (BATHY_CORRECTION) CALL WRITE_ALL( 'Bathymetry has been corrected!' )
 
 ! time
+     CALL WRITE_LOG( '\n-------------- TIME INFO -----------------' )
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- TIME INFO -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- TIME INFO -----------------'   
-# endif
-
-      CALL READ_FLOAT(TOTAL_TIME,FILE_NAME,'TOTAL_TIME',ierr)
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'TOTAL_TIME:', 'NOT FOUND, STOP'
-         WRITE(3,'(A40,A40)')'TOTAL_TIME:', 'NOT FOUND, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'TOTAL_TIME:', 'NOT FOUND, STOP'
-         WRITE(3,'(A40,A40)')'TOTAL_TIME:', 'NOT FOUND, STOP'
-# endif
-        STOP
-      ENDIF
-
-      CALL READ_FLOAT(PLOT_START_TIME,FILE_NAME,'PLOT_START_TIME',ierr)
-
-      IF(ierr==1)THEN
-        PLOT_START_TIME = 0.0
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'PLOT_START_TIME Default:  0.0 s'
-         WRITE(3,'(A40)')'PLOT_START_TIME Default:  0.0 s'
-      endif
-# else
-         WRITE(*,'(A40)')'PLOT_START_TIME Default:  0.0 s'
-         WRITE(3,'(A40)')'PLOT_START_TIME Default:  0.0 s'
-# endif
-       ENDIF
-
-      CALL READ_FLOAT(PLOT_INTV,FILE_NAME,'PLOT_INTV',ierr)
-
-      IF(ierr==1)THEN
-        PLOT_INTV = 1.0
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'PLOT_INTV Default:  1.0 s'
-         WRITE(3,'(A40)')'PLOT_INTV Default:  1.0 s'
-      endif
-# else
-         WRITE(*,'(A40)')'PLOT_INTV Default:  1.0 s'
-         WRITE(3,'(A40)')'PLOT_INTV Default:  1.0 s'
-# endif
-       ENDIF
-
-      CALL READ_FLOAT(PLOT_INTV_STATION,FILE_NAME,'PLOT_INTV_STATION',ierr)
-
-      IF(ierr==1)THEN
-        PLOT_INTV_STATION = 1.0
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'PLOT_INTV_STATION Default:  1.0 s'
-         WRITE(3,'(A40)')'PLOT_INTV_STATION Default:  1.0 s'
-      endif
-# else
-         WRITE(*,'(A40)')'PLOT_INTV_STATION Default:  1.0 s'
-         WRITE(3,'(A40)')'PLOT_INTV_STATION Default:  1.0 s'
-# endif
-       ENDIF
-
-      CALL READ_INTEGER(StationOutputBuffer,FILE_NAME,'StationOutputBuffer',ierr)
-      IF(ierr==1)THEN
-        StationOutputBuffer = 1000
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'StationOutputBuffer not specified, use default:1000'
-         WRITE(3,'(A80)')'StationOutputBuffer not specified, use default:1000'
-      endif
-# else
-         WRITE(*,'(A80)')'StationOutputBuffer not specified, use default:1000'
-         WRITE(3,'(A80)')'StationOutputBuffer not specified, use default:1000'
-# endif
-      ENDIF
-
-      CALL READ_FLOAT(SCREEN_INTV,FILE_NAME,'SCREEN_INTV',ierr)
-      IF(ierr==1)THEN
-        SCREEN_INTV = 1.0
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'SCREEN_INTV Default:  1.0 s'
-         WRITE(3,'(A40)')'SCREEN_INTV Default:  1.0 s'
-      endif
-# else
-         WRITE(*,'(A40)')'SCREEN_INTV Default:  1.0 s'
-         WRITE(3,'(A40)')'SCREEN_INTV Default:  1.0 s'
-# endif
-       ENDIF
-
+     CALL READ_VALUE_CHECK( TOTAL_TIME         , FILE_NAME, 'TOTAL_TIME'                                          )
+     CALL READ_VALUE_CHECK( PLOT_START_TIME    , FILE_NAME, 'PLOT_START_TIME'    , DefaultValue=0.0_SP, Units='s' )
+     CALL READ_VALUE_CHECK( PLOT_INTV          , FILE_NAME, 'PLOT_INTV'          , DefaultValue=1.0_SP, Units='s' )
+     CALL READ_VALUE_CHECK( PLOT_INTV_STATION  , FILE_NAME, 'PLOT_INTV_STATION'  , DefaultValue=1.0_SP, Units='s' )
+     CALL READ_VALUE_CHECK( StationOutputBuffer, FILE_NAME, 'StationOutputBuffer', DefaultValue=1000              )
+     CALL READ_VALUE_CHECK( SCREEN_INTV        , FILE_NAME,' SCREEN_INTV'        , DefaultValue=1.0_SP, Units='s' )
 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,'(A12,F12.2)')'TOTAL_TIME=', TOTAL_TIME
