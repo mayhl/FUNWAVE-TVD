@@ -49,6 +49,14 @@
 !      12/06/2017  Michael-Angelo Y.-H. Lam
 !      01/10/2011  Fengyan SHi
 !-------------------------------------------------------------------------------------
+
+# if defined (PARALLEL)
+#define SWRITE IF (myid.EQ.0 ) WRITE
+# else
+#define SWRITE WRITE
+# endif
+
+
 SUBROUTINE OUTPUT
     USE GLOBAL
 # if defined(VESSEL)
@@ -137,6 +145,7 @@ END SUBROUTINE OUTPUT
 
 SUBROUTINE READ_INPUT
     USE GLOBAL
+    USE LOG_OUTPUT
     USE INPUT_READ
 ![jychoi added this for intel compiler 14.12.23    
 # if defined(INTEL)
@@ -151,6 +160,8 @@ SUBROUTINE READ_INPUT
     INTEGER :: ierr
     INTEGER :: I_comp
     LOGICAL :: INPUT_PHASE = .FALSE.
+
+    CHARACTER(LEN=100) :: FMT_STR_BUFF
 
     !>by Zhouteng Ye
     CHARACTER(LEN=80)::INPUT_NAME=''
@@ -188,264 +199,75 @@ SUBROUTINE READ_INPUT
         !write(*,*) 'No TITLE in ', FILE_NAME, 'use default'
         TITLE='---TEST RUN---'
       ENDIF
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'-------------- LOG FILE -----------------'
-      if (myid.eq.0) WRITE(3,*)TITLE
-      if (myid.eq.0) WRITE(3,*)' --------------input start --------------'
-# else
-      WRITE(3,*)'-------------- LOG FILE -----------------'
-      WRITE(3,*)TITLE
-      WRITE(3,*)' --------------input start --------------'  
-      WRITE(3,*)'                                         '   
-# endif
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- PARALLEL -----------------'    
-# endif
+      CALL WRITE_LOG( '-------------- LOG FILE -----------------' )
+      CALL WRITE_LOG( TITLE )
+      CALL WRITE_LOG( ' --------------input start --------------' )
 
 
 # if defined (PARALLEL)
 ! parallel info
-      CALL READ_INTEGER(PX,FILE_NAME,'PX',ierr)
-      IF(ierr == 1) THEN
-        PX = 1
-        if (myid.eq.0)write(*,*) 'No PX sepecified ', 'use PX=1'
-        if (myid.eq.0)WRITE(3,'(A20,A20)')'No PX sepecified ', 'use PX=1'
-      ENDIF
-      CALL READ_INTEGER(PY,FILE_NAME,'PY',ierr)  
-      IF(ierr == 1) THEN
-        PY = 1
-        if (myid.eq.0)write(*,*) 'No PY sepecified ', 'use PY=1'
-        if (myid.eq.0)WRITE(3,'(A20,A20)')'No PY sepecified ', 'use PY=1'
-      ENDIF
-      if (myid.eq.0) WRITE(3,'(A7,I3,A7,I3)') 'PX   =',PX,'PY   =', PY
+
+      CALL WRITE_LOG( '\n-------------- PARALLEL -----------------' )
+
+      CALL READ_VALUE_CHECK(PX, FILE_NAME, 'PX', DefaultValue=1 )
+      CALL READ_VALUE_CHECK(PY, FILE_NAME, 'PY', DefaultValue=1 )
+
+      SWRITE(FMT_STR_BUFF, '(A7,I3,A7,I3)') 'PX   =' ,PX, 'PY   =', PY
+      CALL WRITE_LOG( FMT_STR_BUFF)
 # endif
 
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- GRID INFO -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- GRID INFO -----------------'   
-# endif
+
+! Grid Info 
+      CALL WRITE_LOG( '\n-------------- GRID INFO -----------------' )
 
 ! dimension
-      CALL READ_INTEGER(Mglob,FILE_NAME,'Mglob',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'Mglob:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'Mglob:', 'NOT DEFINED, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'Mglob:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'Mglob:', 'NOT DEFINED, STOP'
-# endif
-        STOP
-      ENDIF
+      CALL READ_VALUE_CHECK(Mglob, FILE_NAME, 'Mglob' )
+      CALL READ_VALUE_CHECK(Nglob, FILE_NAME, 'Nglob' )
 
-      CALL READ_INTEGER(Nglob,FILE_NAME,'Nglob',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'Nglob:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'Nglob:', 'NOT DEFINED, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'Nglob:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'Nglob:', 'NOT DEFINED, STOP'
-# endif
-        STOP
-      ENDIF
+      SWRITE(FMT_STR_BUFF,'(A7,I8,A7,I8)') 'Mglob=', Mglob, 'Nglob=', Nglob
+      CALL WRITE_LOG(FMT_STR_BUFF)
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A7,I8,A7,I8)') 'Mglob=',Mglob,'Nglob=', Nglob
-# else
-      WRITE(3,'(A7,I8,A7,I8)') 'Mglob=',Mglob,'Nglob=', Nglob
-# endif
 ! grid 
 # if defined (CARTESIAN)
 
-      CALL READ_FLOAT(DX,FILE_NAME,'DX',ierr)
+      CALL WRITE_ALL( 'Equispaced Cartesian Coordinates Mode' )
+      CALL READ_VALUE_CHECK(DX, FILE_NAME, 'DX' )
+      CALL READ_VALUE_CHECK(DY, FILE_NAME, 'DY' )
 
-      IF(ierr==1)THEN
-         PRINT *,"Did you intend to use Spherical Coordinates?"
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'DX:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'DX:', 'NOT DEFINED, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'DX:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'DX:', 'NOT DEFINED, STOP'
-# endif
-        STOP
-      ENDIF
-
-
-      CALL READ_FLOAT(DY,FILE_NAME,'DY',ierr)
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'DY:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'DY:', 'NOT DEFINED, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'DY:', 'NOT DEFINED, STOP'
-         WRITE(3,'(A40,A40)')'DY:', 'NOT DEFINED, STOP'
-# endif
-        STOP
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A4,F12.2,A4,F12.2)')'DX=',DX,'DY=',DY
-# else
-      WRITE(3,'(A4,F12.2,A4,F12.2)')'DX=',DX,'DY=',DY
-# endif
+      SWRITE(FMT_STR_BUFF,'(A4,F12.2,A4,F12.2)')'DX=',DX,'DY=',DY
+      CALL WRITE_LOG( FMT_STR_BUFF )
 
 # else
-      CALL READ_LOGICAL(StretchGrid,FILE_NAME,'StretchGrid',ierr)   
-     IF(ierr==1)THEN
-       StretchGrid = .FALSE.
-     ENDIF
-     if (StretchGrid) then
-        CALL READ_STRING(DX_FILE,FILE_NAME,'DX_FILE',ierr)  
 
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use StretchGrid ', 'but no DX_FILE found, STOP'
-         WRITE(3,'(A40,A40)')'You use StretchGrid ', 'but no DX_FILE found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use StretchGrid ', 'but no DX_FILE found, STOP'
-         WRITE(3,'(A40,A40)')'You use StretchGrid ', 'but no DX_FILE found, STOP'
-# endif
-        STOP
-      ENDIF
+     CALL READ_VALUE_CHECK( StretchGrid, FILE_NAME, 'StretchGrid', DefaultValue=.FALSE. )
 
-        CALL READ_STRING(DY_FILE,FILE_NAME,'DY_FILE',ierr)   
+     IF ( StretchGrid ) THEN
+        CALL WRITE_ALL( 'Stretched Cartesian Coordinates Mode' )
 
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use StretchGrid ', 'but no DY_FILE found, STOP'
-         WRITE(3,'(A40,A40)')'You use StretchGrid ', 'but no DY_FILE found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use StretchGrid ', 'but no DY_FILE found, STOP'
-         WRITE(3,'(A40,A40)')'You use StretchGrid ', 'but no DY_FILE found, STOP'
-# endif
-        STOP
-      ENDIF
-
-        CALL READ_STRING(Coriolis_FILE,FILE_NAME,'CORIOLIS_FILE',ierr) 
+        CALL READ_VALUE_CHECK( DX_FILE      , FILE_NAME, 'DX_FILE'       )  
+        CALL READ_VALUE_CHECK( DY_FILE      , FILE_NAME, 'DY_FILE'       )  
+        CALL READ_VALUE_CHECK( Coriolis_FILE, FILE_NAME, 'CORIOLIS_FILE' ) 
   
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-         WRITE(3,'(A40,A40)')'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-         WRITE(3,'(A40,A40)')'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
+     ELSE 
+        CALL WRITE_ALL( 'Spherical Coordinates Mode' )
+
+        CALL READ_VALUE_CHECK( Lon_West , FILE_NAME, 'Lon_West'  )
+        CALL READ_VALUE_CHECK( Lat_South, FILE_NAME, 'Lat_South' )
+        CALL READ_VALUE_CHECK( Dphi     , FILE_NAME, 'Dphi'      )
+        CALL READ_VALUE_CHECK( Dtheta   , FILE_NAME, 'Dtheta'    )
+
+        SWRITE(FMT_STR_BUFF, '(A10,F12.2)') 'Lon_West=' , Lon_West
+        CALL WRITE_LOG( FMT_STR_BUFF )
+        SWRITE(FMT_STR_BUFF, '(A11,F12.2)') 'Lat_South=', Lat_South
+        CALL WRITE_LOG( FMT_STR_BUFF )
+        SWRITE(FMT_STR_BUFF, '(A11,F12.2)') 'Dphi     =', Dphi
+        CALL WRITE_LOG( FMT_STR_BUFF )
+        SWRITE(FMT_STR_BUFF, '(A11,F12.2)') 'Dtheta   =', Dtheta
+        CALL WRITE_LOG( FMT_STR_BUFF )
+     END IF
 # endif
-        STOP
-      ENDIF
- 
-     else  ! not stretch
-
-      CALL READ_FLOAT(Lon_West,FILE_NAME,'Lon_West',ierr)
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Lon_West found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Lon_West found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Lon_West found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Lon_West found, STOP'
-# endif
-        STOP
-      ENDIF
-
-      CALL READ_FLOAT(Lat_South,FILE_NAME,'Lat_South',ierr)
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Lat_South found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Lat_South found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Lat_South found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Lat_South found, STOP'
-# endif
-        STOP
-      ENDIF
-
-      CALL READ_FLOAT(Dphi,FILE_NAME,'Dphi',ierr)
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Dphi found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Dphi found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Dphi found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Dphi found, STOP'
-# endif
-        STOP
-      ENDIF
- 
-      CALL READ_FLOAT(Dtheta,FILE_NAME,'Dtheta',ierr)
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Dtheta found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Dtheta found, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40,A40)')'You use Spherical mode ', 'but no Dtheta found, STOP'
-         WRITE(3,'(A40,A40)')'You use Spherical mode ', 'but no Dtheta found, STOP'
-# endif
-        STOP
-      ENDIF
-
-     endif  ! endif stretch
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Lon_West=',Lon_West
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Lat_South=',Lat_South
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Dphi     =',Dphi
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Dtheta   =',Dtheta
-# else
-      WRITE(3,'(A10,F12.2)')'Lon_West=',Lon_West
-      WRITE(3,'(A11,F12.2)')'Lat_South=',Lat_South
-      WRITE(3,'(A11,F12.2)')'Dphi     =',Dphi
-      WRITE(3,'(A11,F12.2)')'Dtheta   =',Dtheta
-# endif
-
-# endif
-  ! end spherical
 
 ! depth 
       CALL READ_STRING(DEPTH_TYPE,FILE_NAME,'DEPTH_TYPE',ierr)
