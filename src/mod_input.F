@@ -69,11 +69,289 @@ INTERFACE READ_FOUR_TYPE_VALUES
   Module Procedure READ_INTEGER
 END INTERFACE
 
+! Interface for function overloading
+INTERFACE READ_VALUE_TMP
+   MODULE PROCEDURE READ_FLOAT_TMP
+   MODULE PROCEDURE READ_STRING_TMP
+   MODULE PROCEDURE READ_LOGICAL_TMP
+   MODULE PROCEDURE READ_INTEGER_TMP
+END INTERFACE 
+
+! Interface for function overloading and optional arguments
+INTERFACE READ_VALUE_CHECK
+   MODULE PROCEDURE READ_INTEGER_CHECK
+   MODULE PROCEDURE READ_STRING_CHECK
+   MODULE PROCEDURE READ_LOGICAL_CHECK
+   MODULE PROCEDURE READ_FLOAT_CHECK
+END INTERFACE
+
+
 CONTAINS
-  
-! INTEGER
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_CHECK is a subroutine to automatically generate error message from 
+!               READ_VALUE_TMP.
+!    NOTE 1: Subroutine terminate program unless 
+!            1) ErrID is 0 (value successfully read from file), or
+!            2) ErrID is 2 (variable name not found in file) AND DefaultValueStr 
+!               (DefaultValue is wrapping subroutines) is specified  
+!    NOTE 2: Units is an optional argument for adding units to DefaultValueStr in
+!            output message.
+! 
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+
+SUBROUTINE READ_CHECK( InputFileName, VariableName, ValueType,  ErrID , DefaultValueStr, Units )
+
+   USE LOG_OUTPUT, ONLY: WRITE_LOG, WRITE_ALL
+
+   IMPLICIT NONE
+   CHARACTER(LEN=*)          , INTENT(IN) :: InputFileName
+   CHARACTER(LEN=*)          , INTENT(IN) :: VariableName
+   CHARACTER(LEN=*)          , INTENT(IN) :: ValueType
+   INTEGER                   , INTENT(IN) :: ErrID
+   CHARACTER(LEN=*), OPTIONAL, INTENT(IN) :: DefaultValueStr
+   CHARACTER(LEN=*), OPTIONAL, INTENT(IN) :: Units
+
+   CHARACTER(LEN=120)                     :: Msg
+
+   Msg = TRIM(VariableName)//" not read,"
+
+   IF      ( ErrID.EQ.3 ) THEN
+      ! File not found error
+      CALL WRITE_ALL( "ERROR: "//TRIM(Msg)//" file '"//TRIM(InputFileName)//"' not found. STOPING SIMULATION!" )
+      CALL TERMINATE
+
+   ELSE IF ( ErrID.EQ.2 ) THEN
+      ! Varible not found error 
+
+      IF ( PRESENT( DefaultValueStr) ) THEN
+         Msg = "WARNING: "//TRIM(Msg)//" variable not found in input file."
+      ELSE
+         Msg = "ERROR: "//TRIM(Msg)//" variable not found in input file."
+      END IF
+
+      IF ( PRESENT( DefaultValueStr ) ) THEN
+         ! Using default value and units if specified.
+
+         Msg = TRIM(Msg)//" Defaulting to "//TRIM(DefaultValueStr)
+
+         IF ( PRESENT( Units ) ) THEN
+            Msg = TRIM(Msg)//"."
+         ELSE
+            Msg = TRIM(Msg)//" "//TRIM(Units)//"."
+         END IF
+
+         CALL WRITE_ALL( Msg )
+         RETURN
+      ELSE
+         ! Stopping code if not default value found
+         Msg = TRIM(Msg)//" STOPPING SIMULATION!"
+         CALL WRITE_ALL( Msg )
+;:         CALL TERMINATE
+      END IF
+
+   ELSE IF( ErrID.EQ.1 ) THEN
+      ! Error type mismatch error
+      CALL WRITE_ALL( "ERROR: "//TRIM(Msg)//" "//TRIM(ValueType)//" value type not detected. STOPPING SIMULATION!" )
+      CALL TERMINATE
+
+   ELSE IF ( ErrID.NE.0 ) THEN
+      ! Invalid ErrID error
+      CALL WRITE_ALL("ERROR: "//TRIM(Msg)//" invalid ErrID returned from READ_INPUT. STOPPING SIMULATION!" )
+      CALL TERMINATE
+
+   END IF
+
+END SUBROUTINE
 
 
+!-------------------------------------------------------------------------------------
+!
+!    READ_INTEGER_CHECK is a soubroutine wrapping READ_CHECK subroutine for integer
+!                       type values, defaulting to DefaultValue (if specified), and
+!                       adding Units to DefaultValue in output message (if specified). 
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_INTEGER_CHECK(ReturnValue, InputFileName, VariableName, DefaultValue, Units  )
+
+  IMPLICIT NONE
+
+  INTEGER         ,           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  INTEGER         , OPTIONAL, INTENT(IN ) :: DefaultValue
+  CHARACTER(LEN=*), OPTIONAL, INTENT(IN ) :: Units
+
+  CHARACTER(LEN=7), PARAMETER             :: ValueType="integer"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: DefaultValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+
+  IF ( PRESENT( DefaultValue ) ) THEN
+     WRITE(DefaultValueStr,*) DefaultValue
+      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+
+     IF ( PRESENT(Units) ) THEN
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+     ELSE
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+     END IF
+  ELSE
+     CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_FLOAT_CHECK is a soubroutine wrapping READ_CHECK subroutine for float
+!                     type values, defaulting to DefaultValue (if specified), and
+!                     adding Units to DefaultValue in output message (if specified).  
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_FLOAT_CHECK(ReturnValue, InputFileName, VariableName, DefaultValue, Units  )
+
+  USE PARAM, ONLY: SP
+  IMPLICIT NONE
+
+  REAL(SP)        ,           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  REAL(SP)        , OPTIONAL, INTENT(IN ) :: DefaultValue
+  CHARACTER(LEN=*), OPTIONAL, INTENT(IN ) :: Units
+
+  CHARACTER(LEN=5), PARAMETER             :: ValueType="float"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: DefaultValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+
+  IF ( PRESENT( DefaultValue ) ) THEN
+     WRITE(DefaultValueStr,*) DefaultValue
+      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+
+     IF ( PRESENT(Units) ) THEN
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+     ELSE
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+     END IF
+  ELSE
+     CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_LOGICAL_CHECK is a soubroutine wrapping READ_CHECK subroutine for logical
+!                       type values, defaulting to DefaultValue (if specified), and
+!                       adding Units to DefaultValue in output message (if specified).  
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_LOGICAL_CHECK(ReturnValue, InputFileName, VariableName, DefaultValue, Units  )
+
+  IMPLICIT NONE
+
+  LOGICAL         ,           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  LOGICAL         , OPTIONAL, INTENT(IN ) :: DefaultValue
+  CHARACTER(LEN=*), OPTIONAL, INTENT(IN ) :: Units
+
+  CHARACTER(LEN=7), PARAMETER             :: ValueType="logical"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: DefaultValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+
+  IF ( PRESENT( DefaultValue ) ) THEN
+     IF ( DefaultValue ) THEN
+        DefaultValueStr = 'T'
+     ELSE
+        DefaultValueStr = 'F'
+     END IF
+
+     IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+
+     IF ( PRESENT(Units) ) THEN
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+     ELSE
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+     END IF
+  ELSE
+     CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_STRING_CHECK is a soubroutine wrapping READ_CHECK subroutine for string
+!                      type values, defaulting to DefaultValue (if specified), and
+!                      adding Units to DefaultValue in output message (if specified).  
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_STRING_CHECK(ReturnValue, InputFileName, VariableName, DefaultValue, Units  )
+
+  IMPLICIT NONE
+
+  CHARACTER(LEN=*),           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  CHARACTER(LEN=*), OPTIONAL, INTENT(IN ) :: DefaultValue
+  CHARACTER(LEN=*), OPTIONAL, INTENT(IN ) :: Units
+
+  CHARACTER(LEN=6), PARAMETER             :: ValueType="string"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: DefaultValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+
+  IF ( PRESENT( DefaultValue ) ) THEN
+     WRITE(DefaultValueStr,*) DefaultValue
+      IF (ErrID.NE.0 ) ReturnValue = DefaultValue
+
+     IF ( PRESENT(Units) ) THEN
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr, Units )
+     ELSE
+        CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID, DefaultValueStr )
+     END IF
+  ELSE
+     CALL READ_CHECK( InputFileName, VariableName, ValueType, ErrID )
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    PARSE_VALUE is a subroutine for opening file, parsing file for variable name, and 
+!                get variable value as a string 
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
 SUBROUTINE PARSE_VALUE( ReturnValue, InputFileName, VariableName, VariableType, ErrID )
    IMPLICIT NONE
 
@@ -109,6 +387,14 @@ SUBROUTINE PARSE_VALUE( ReturnValue, InputFileName, VariableName, VariableType, 
 END SUBROUTINE PARSE_VALUE
 
 
+!-------------------------------------------------------------------------------------
+!
+!    READ_INTEGER_TMP is a subroutine wrapping PARSE_VALUE for integer value types
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
 SUBROUTINE READ_INTEGER_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    IMPLICIT NONE
 
@@ -126,7 +412,16 @@ SUBROUTINE READ_INTEGER_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    READ(ValueString,*) ReturnValue
 
 END SUBROUTINE READ_INTEGER_TMP
- 
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_FLOAT_TMP is a subroutine wrapping PARSE_VALUE for float value types
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!------------------------------------------------------------------------------------- 
 SUBROUTINE READ_FLOAT_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    IMPLICIT NONE
 
@@ -145,6 +440,15 @@ SUBROUTINE READ_FLOAT_TMP( ReturnValue, InputFileName, VariableName, ErrID )
 
 END SUBROUTINE READ_FLOAT_TMP
 
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_STRING_TMP is a subroutine wrapping PARSE_VALUE for string value types
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
 SUBROUTINE READ_STRING_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    IMPLICIT NONE
 
@@ -163,6 +467,15 @@ SUBROUTINE READ_STRING_TMP( ReturnValue, InputFileName, VariableName, ErrID )
 
 END SUBROUTINE READ_STRING_TMP
 
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_LOGICAL_TMP is a subroutine wrapping PARSE_VALUE for logical value types
+!
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
 SUBROUTINE READ_LOGICAL_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    IMPLICIT NONE
 
@@ -184,7 +497,6 @@ SUBROUTINE READ_LOGICAL_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    END IF
 
 END SUBROUTINE READ_LOGICAL_TMP
-
 
 
 SUBROUTINE READ_INTEGER(INTEGER_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
