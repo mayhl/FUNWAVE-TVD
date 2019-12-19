@@ -286,52 +286,17 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( StationOutputBuffer, FILE_NAME, 'StationOutputBuffer', DefaultValue=1000              )
      CALL READ_VALUE_CHECK( SCREEN_INTV        , FILE_NAME,' SCREEN_INTV'        , DefaultValue=1.0_SP, Units='s' )
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- HOT START -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- HOT START -----------------'   
-# endif
+
+     CALL WRITE_LOG( '\n-------------- HOT START -----------------' )
+
+     CALL READ_VALUE_CHECK( INI_UVZ, FILE_NAME, 'INI_UVZ', DefaultValue=.FALSE. )
 
 ! initial uvz
-      CALL READ_LOGICAL(INI_UVZ,FILE_NAME,'INI_UVZ',ierr)
-      IF(ierr==1)THEN
-        INI_UVZ = .FALSE.
-      ENDIF
-    IF(INI_UVZ)THEN
-        CALL READ_STRING(ETA_FILE,FILE_NAME,'ETA_FILE',ierr)
+     IF ( INI_UVZ ) THEN
+        CALL READ_VALUE_CHECK( ETA_FILE, FILE_NAME, 'ETA_FILE' )
 
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'You use INI_UVZ, ETA_FILE NOT FOUND, STOP'
-         WRITE(3,'(A50)')'You use INI_UVZ, ETA_FILE NOT FOUND, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'You use INI_UVZ, ETA_FILE NOT FOUND, STOP'
-         WRITE(3,'(A50)')'You use INI_UVZ, ETA_FILE NOT FOUND, STOP'
-# endif
-        STOP
-      ENDIF
-
-        CALL READ_STRING(U_FILE,FILE_NAME,'U_FILE',ierr)
-
-        IF(ierr==1)THEN
-          NO_UV_FILE = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'U_FILE Default:  ZERO.'
-         WRITE(3,'(A40)')'U_FILE Default:  ZERO.'
-      endif
-# else
-         WRITE(*,'(A40)')'U_FILE Default:  ZERO.'
-         WRITE(3,'(A40)')'U_FILE Default:  ZERO.'
-# endif
-        ELSE
-          NO_UV_FILE = .FALSE.
-        ENDIF
+        CALL READ_VALUE_CHECK_DELAY_DEFAULT( U_FILE, FILE_NAME, 'U_FILE' , IsDefault=NO_UV_FILE )
+        IF ( NO_UV_FILE ) CALL WRITE_ALL( 'WARNING: U_FILE not found in input file. Defaulting U and V to ZERO.' )
 
         CALL READ_STRING(V_FILE,FILE_NAME,'V_FILE',ierr)
 
