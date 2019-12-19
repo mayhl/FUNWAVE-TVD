@@ -296,25 +296,15 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( ETA_FILE, FILE_NAME, 'ETA_FILE' )
 
         CALL READ_VALUE_CHECK_DELAY_DEFAULT( U_FILE, FILE_NAME, 'U_FILE' , IsDefault=NO_UV_FILE )
-        IF ( NO_UV_FILE ) CALL WRITE_ALL( 'WARNING: U_FILE not found in input file. Defaulting U and V to ZERO.' )
-
-        CALL READ_STRING(V_FILE,FILE_NAME,'V_FILE',ierr)
-
-        IF(ierr==1)THEN
-          NO_UV_FILE = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'V_FILE Default:  ZERO.'
-         WRITE(3,'(A40)')'V_FILE Default:  ZERO.'
-      endif
-# else
-         WRITE(*,'(A40)')'V_FILE Default:  ZERO.'
-         WRITE(3,'(A40)')'V_FILE Default:  ZERO.'
-# endif
+        IF ( NO_UV_FILE ) THEN
+           CALL WRITE_ALL( 'WARNING: U_FILE not found in input file. Defaulting U and V to ZERO.' )
         ELSE
-          NO_UV_FILE = .FALSE.
-          IF(NO_UV_FILE) NO_UV_FILE = .TRUE.    ! in case you dont have u file
-        ENDIF
+           ! Only check for V_FILE if U_FILE is found
+           CALL READ_VALUE_CHECK_DELAY_DEFAULT( V_FILE, FILE_NAME, 'V_FILE' , IsDefault=NO_UV_FILE )
+           IF ( NO_UV_FILE ) THEN
+              CALL WRITE_ALL( 'WARNING: U_FILE found but V_FILE not found in input file. Defaulting U and V to ZERO.' )
+           END IF
+        END IF
 
         CALL READ_STRING(MASK_FILE,FILE_NAME,'MASK_FILE',ierr)
 
