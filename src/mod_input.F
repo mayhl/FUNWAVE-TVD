@@ -85,6 +85,15 @@ INTERFACE READ_VALUE_CHECK
    MODULE PROCEDURE READ_FLOAT_CHECK
 END INTERFACE
 
+! Interface for function overloadings
+INTERFACE READ_VALUE_CHECK_DELAY_DEFAULT
+   MODULE PROCEDURE READ_INTEGER_CHECK_DELAY_DEFAULT
+   MODULE PROCEDURE READ_FLOAT_CHECK_DELAY_DEFAULT
+   MODULE PROCEDURE READ_STRING_CHECK_DELAY_DEFAULT
+   MODULE PROCEDURE READ_LOGICAL_CHECK_DELAY_DEFAULT
+END INTERFACE
+
+
 ! Interface for overloading format value functions
 INTERFACE FORMAT_VALUE
    MODULE PROCEDURE FORMAT_INTEGER
@@ -462,6 +471,230 @@ SUBROUTINE READ_STRING_CHECK(ReturnValue, InputFileName, VariableName, DefaultVa
   CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
 
 END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_FLOAT_CHECK_DELAY_DEFAULT is a soubroutine wrapping READ_CHECK_DELAY_DEFAULT
+!                                   subroutine for integer type values and delays defaulting
+!                                   to a default value in the case variable is not 
+!                                   VariableName 
+!    HISTORY: 
+!        12/19/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+
+  USE PARAM, ONLY: SP
+  USE LOG_OUTPUT, ONLY: WRITE_ALL
+  IMPLICIT NONE
+
+  REAL(SP)        ,           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  LOGICAL         ,           INTENT(OUT) :: IsDefault
+
+
+  CHARACTER(LEN=5), PARAMETER             :: ValueType="float"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: ValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+  CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
+
+  IF       ( ErrID.EQ.2 ) THEN
+     IsDefault=.TRUE.
+  ELSE IF  ( ErrID.EQ.1 ) THEN
+     IsDefault=.FALSE.
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
+     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+  ELSE
+     ! Saftey check, code should not be called. 
+     CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" )
+     CALL TERMINATE
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_LOGICAL_CHECK_DELAY_DEFAULT is a soubroutine wrapping READ_CHECK_DELAY_DEFAULT
+!                                     subroutine for logical type values and delays defaulting
+!                                     to a default value in the case variable is not 
+!                                     VariableName 
+!    HISTORY: 
+!        12/19/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+
+  USE LOG_OUTPUT, ONLY: WRITE_ALL
+  IMPLICIT NONE
+
+  LOGICAL         ,           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  LOGICAL         ,           INTENT(OUT) :: IsDefault
+
+
+  CHARACTER(LEN=7), PARAMETER             :: ValueType="logical"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: ValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+  CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
+
+  IF       ( ErrID.EQ.2 ) THEN
+     IsDefault=.TRUE.
+  ELSE IF  ( ErrID.EQ.1 ) THEN
+     IsDefault=.FALSE.
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
+     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+  ELSE
+     ! Saftey check, code should not be called. 
+     CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" )
+     CALL TERMINATE
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_INTEGER_CHECK_DELAY_DEFAULT is a soubroutine wrapping READ_CHECK_DELAY_DEFAULT
+!                                     subroutine for integer type values and delays defaulting
+!                                     to a default value in the case variable is not 
+!                                     VariableName 
+!    HISTORY: 
+!        12/19/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_INTEGER_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+
+  USE LOG_OUTPUT, ONLY: WRITE_ALL
+  IMPLICIT NONE
+
+  INTEGER         ,           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  LOGICAL         ,           INTENT(OUT) :: IsDefault
+
+
+  CHARACTER(LEN=7), PARAMETER             :: ValueType="integer"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: ValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+  CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
+
+  IF       ( ErrID.EQ.2 ) THEN
+     IsDefault=.TRUE.
+  ELSE IF  ( ErrID.EQ.1 ) THEN
+     IsDefault=.FALSE.
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
+     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+  ELSE
+     ! Saftey check, code should not be called. 
+     CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" )
+     CALL TERMINATE
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_STRING_CHECK_DELAY_DEFAULT is a soubroutine wrapping READ_CHECK_DELAY_DEFAULT
+!                                    subroutine for string type values and delays defaulting
+!                                    to a default value in the case variable is not 
+!                                    VariableName 
+!    HISTORY: 
+!        12/19/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+
+  USE LOG_OUTPUT, ONLY: WRITE_ALL
+  IMPLICIT NONE
+
+  CHARACTER(LEN=*),           INTENT(OUT) :: ReturnValue
+  CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
+  CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
+  LOGICAL         ,           INTENT(OUT) :: IsDefault
+
+
+  CHARACTER(LEN=6), PARAMETER             :: ValueType="string"
+  INTEGER                                 :: ErrID
+  CHARACTER(LEN=30)                       :: ValueStr
+
+  CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
+  CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
+
+  IF       ( ErrID.EQ.2 ) THEN
+     IsDefault=.TRUE.
+  ELSE IF  ( ErrID.EQ.1 ) THEN
+     IsDefault=.FALSE.
+     CALL FORMAT_VALUE( ReturnValue , ValueStr)
+     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+  ELSE
+     ! Saftey check, code should not be called. 
+     CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" ) 
+     CALL TERMINATE
+  END IF
+
+END SUBROUTINE
+
+
+!-------------------------------------------------------------------------------------
+!
+!    READ_CHECK_DELAY_DEFAULT is a subroutine to automatically generate error message
+!                             from READ_VALUE_TMP. Delay proccessing of default value
+!                             in the case VariableName defaults a different variable.
+! 
+!    HISTORY: 
+!        12/17/2019 Michael-Angelo Y.-H. Lam
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType,  ErrID )
+
+   USE LOG_OUTPUT, ONLY: WRITE_LOG, WRITE_ALL
+
+   IMPLICIT NONE
+   CHARACTER(LEN=*)          , INTENT(IN) :: InputFileName
+   CHARACTER(LEN=*)          , INTENT(IN) :: VariableName
+   CHARACTER(LEN=*)          , INTENT(IN) :: ValueType
+   INTEGER                   , INTENT(IN) :: ErrID
+
+   CHARACTER(LEN=120)                     :: Msg
+
+   Msg = TRIM(VariableName)//" not read,"
+
+   IF      ( ErrID.EQ.3 ) THEN
+      ! File not found error
+      CALL WRITE_ALL( "ERROR: "//TRIM(Msg)//" file '"//TRIM(InputFileName)//"' not found. STOPPING SIMULATION!" )
+      CALL TERMINATE
+
+   ELSE IF ( ErrID.EQ.2 ) THEN
+      ! Varible not found error 
+      RETURN 
+
+   ELSE IF( ErrID.EQ.1 ) THEN
+      ! Error type mismatch error
+      CALL WRITE_ALL( "ERROR: "//TRIM(Msg)//" "//TRIM(ValueType)//" value type not detected. STOPPING SIMULATION!" )
+      CALL TERMINATE
+
+   ELSE IF ( ErrID.NE.0 ) THEN
+      ! Invalid ErrID error
+      CALL WRITE_ALL("ERROR: "//TRIM(Msg)//" invalid ErrID returned from READ_INPUT. STOPPING SIMULATION!" )
+      CALL TERMINATE
+
+   END IF
+
+END SUBROUTINE
+
+
+
 
 
 !-------------------------------------------------------------------------------------
