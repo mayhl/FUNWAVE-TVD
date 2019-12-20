@@ -170,6 +170,8 @@ SUBROUTINE READ_INPUT
     CHARACTER(LEN=80)::FDIR=' '
 !ykchoi]
 
+    LOGICAL :: IsDelayed
+
 # if defined (PARALLEL)
     CALL MPI_COMM_SIZE (MPI_COMM_WORLD, nprocs, ier)   !ykchoi(04/May/2017)
     CALL MPI_COMM_RANK (MPI_COMM_WORLD, myid, ier)
@@ -306,1291 +308,256 @@ SUBROUTINE READ_INPUT
            END IF
         END IF
 
-        CALL READ_STRING(MASK_FILE,FILE_NAME,'MASK_FILE',ierr)
 
-        IF(ierr==1)THEN
-          NO_MASK_FILE = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'MASK_FILE NOT FOUND, USE NO_MASK option'
-         WRITE(3,'(A40)')'MASK_FILE NOT FOUND, USE NO_MASK option'
-      endif
-# else
-         WRITE(*,'(A40)')'MASK_FILE NOT FOUND, USE NO_MASK option'
-         WRITE(3,'(A40)')'MASK_FILE NOT FOUND, USE NO_MASK option'
-# endif
+        CALL READ_VALUE_CHECK_DELAY_DEFAULT( MASK_FILE, FILE_NAME, 'MASK_FILE', IsDefault=NO_MASK_FILE )
+        IF ( NO_MASK_FILE ) CALL WRITE_ALL( 'WARNING: MASK_FILE not found in input file. Using NO_MASK option.' )
 
-        ELSE
-          NO_MASK_FILE = .FALSE.
-        ENDIF
-
-	![ykchoi(14.12.24.)
-	  CALL READ_FLOAT(HotStartTime,FILE_NAME,'HotStartTime',ierr)
-
-      IF(ierr==1)THEN
-        HotStartTime = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'HotStartTime Default:  0.0 s'
-         WRITE(3,'(A40)')'HotStartTime Default:  0.0 s'
-      endif
-# else
-         WRITE(*,'(A40)')'HotStartTime Default:  0.0 s'
-         WRITE(3,'(A40)')'HotStartTime Default:  0.0 s'
-# endif
-       ENDIF
-
-	!ykchoi(14.12.24.)]
-        CALL READ_INTEGER(icount,FILE_NAME,'OutputStartNumber',ierr)
-      IF(ierr==1)THEN
-        icount = 1
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'OutputStartNumber Default:  1'
-         WRITE(3,'(A40)')'OutputStartNumber Default:  1'
-      endif
-# else
-         WRITE(*,'(A40)')'OutputStartNumber Default:  1'
-         WRITE(3,'(A40)')'OutputStartNumber Default:  1'
-# endif
-       ENDIF
-
+        CALL READ_VALUE_CHECK( HotStartTime, FILE_NAME, 'HotStartTime'     , DefaultValue=0.0_SP , Units='s' )
+        CALL READ_VALUE_CHECK( icount      , FILE_NAME, 'OutputStartNumber', DefaultValue=1                  )
         icount = icount-1
+     END IF
+! end initial hot start file
 
-       ENDIF  ! end initial hot start file
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- STILL WATER INFO -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- STILL WATER INFO -----------------'   
-# endif
 
 ! add water level 03/29/2016
-
-        CALL READ_FLOAT(WaterLevel,FILE_NAME,'WaterLevel',ierr)
-        IF(ierr==1)THEN
-          WaterLevel = 0.0
-        ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,F12.5)')'WaterLevel = ', WaterLevel
-# else
-      WRITE(3,'(A20,F12.5)')'WaterLevel = ', WaterLevel
-# endif 
-
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- WAVEMAKER -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- WAVEMAKER -----------------'   
-# endif
+     CALL WRITE_LOG( '\n-------------- STILL WATER INFO -----------------' )
+     CALL READ_VALUE_CHECK( WaterLevel, FILE_NAME, 'WaterLevel', DefaultValue=0.0_SP, Units='m' )
 
 ! wavemaker
-      CALL READ_STRING(WaveMaker,FILE_NAME,'WAVEMAKER',ierr)
-      IF(ierr==1)THEN
-        WaveMaker = 'nothing'
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'No WaveMaker'
-         WRITE(3,'(A40)')'No WaveMaker'
-      endif
-# else
-         WRITE(*,'(A40)')'No WaveMaker'
-         WRITE(3,'(A40)')'No WaveMaker'
-# endif
-       ENDIF
+     CALL WRITE_LOG( '\n-------------- WAVEMAKER -----------------' )
+     
+     CALL READ_VALUE_CHECK( WaveMaker, FILE_NAME, 'WAVEMAKER', DefaultValue='nothing' )
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A11,A50)')'WAVEMAKER:', WAVEMAKER
-# else
-      WRITE(3,'(A11,A50)')'WAVEMAKER:', WAVEMAKER
-# endif
+     IF ( WaveMaker(1:7).EQ.'LEF_SOL' ) THEN
+        CALL READ_VALUE_CHECK( AMP_SOLI, FILE_NAME, 'AMP'                                      )
+        CALL READ_VALUE_CHECK( DEP_SOLI, FILE_NAME, 'DEP'                                      )
+        CALL READ_VALUE_CHECK( LAG_SOLI, FILE_NAME, 'LAGTIME', DefaultValue=0.0_SP , Units='s' )
 
-        IF(WaveMaker(1:7)=='LEF_SOL')THEN
-          CALL READ_FLOAT(AMP_SOLI,FILE_NAME,'AMP',ierr)
+     END IF
 
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-# endif
-        STOP
-      ENDIF
+     IF ( WaveMaker(1:7).EQ.'WK_TIME' ) THEN
 
-          CALL READ_FLOAT(DEP_SOLI,FILE_NAME,'DEP',ierr)
+        CALL READ_VALUE_CHECK( NumWaveComp , FILE_NAME, 'NumWaveComp'                                   )
+        CALL READ_VALUE_CHECK( PeakPeriod  , FILE_NAME, 'PeakPeriod'                                    )
+        CALL READ_VALUE_CHECK( WaveCompFile, FILE_NAME, 'WaveCompFile'                                  )
+        CALL READ_VALUE_CHECK( Xc_WK       , FILE_NAME, 'Xc_WK'                                         )
+        CALL READ_VALUE_CHECK( Yc_WK       , FILE_NAME, 'Yc_WK'        , DefaultValue=0.0_SP            )
+        CALL READ_VALUE_CHECK( DEP_WK      , FILE_NAME, 'DEP_WK'                                        )
+        CALL READ_VALUE_CHECK( Time_ramp   , FILE_NAME, 'Time_ramp'    , DefaultValue=0.0_SP, Units='s' )
+        CALL READ_VALUE_CHECK( Delta_WK    , FILE_NAME, 'Delta_WK'     , DefaultValue=0.5_SP            )
+        CALL READ_VALUE_CHECK( Ywidth_WK   , FILE_NAME, 'Ywidth_WK'    , DefaultValue=LARGE , Units='m' )
 
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-         WRITE(3,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-         WRITE(3,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-# endif
-        STOP
-      ENDIF
+     END IF  ! end WK_TIME
 
+     IF (WaveMaker(1:7).EQ.'INI_SOL' ) THEN
 
-          CALL READ_FLOAT(LAG_SOLI,FILE_NAME,'LAGTIME',ierr)
+        CALL READ_VALUE_CHECK( SolitaryPositiveDirection,FILE_NAME,  &
+                              'SolitaryPositiveDirection', DefaultValue=.TRUE. )
 
-      IF(ierr==1)THEN
-       LAG_SOLI = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'LAGTIME Default:  0.0'
-         WRITE(3,'(A40)')'LAGTIME Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'LAGTIME Default:  0.0'
-         WRITE(3,'(A40)')'LAGTIME Default:  0.0'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'AMP_SOLI=', AMP_SOLI
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'DEP_SOLI=', DEP_SOLI
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'LAG_SOLI=', LAG_SOLI
-# else
-      WRITE(3,'(A10,F12.2)')'AMP_SOLI=', AMP_SOLI
-      WRITE(3,'(A10,F12.2)')'DEP_SOLI=', DEP_SOLI
-      WRITE(3,'(A10,F12.2)')'LAG_SOLI=', LAG_SOLI
-# endif
-        ENDIF
-
-        IF(WaveMaker(1:7)=='WK_TIME')THEN
-        CALL READ_INTEGER(NumWaveComp,FILE_NAME,'NumWaveComp',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'NumWaveComp NOT FOUND, specify NumWaveComp in input.txt'
-         WRITE(3,'(A80)')'NumWaveComp NOT FOUND, specify NumWaveComp in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'NumWaveComp NOT FOUND, specify NumWaveComp in input.txt'
-         WRITE(3,'(A80)')'NumWaveComp NOT FOUND, specify NumWaveComp in input.txt'
-# endif
-        STOP
-      ENDIF
-
-        CALL READ_FLOAT(PeakPeriod,FILE_NAME,'PeakPeriod',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'PeakPeriod NOT FOUND, specify PeakPeriod in input.txt'
-         WRITE(3,'(A80)')'PeakPeriod NOT FOUND, specify PeakPeriod in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'PeakPeriod NOT FOUND, specify PeakPeriod in input.txt'
-         WRITE(3,'(A80)')'PeakPeriod NOT FOUND, specify PeakPeriod in input.txt'
-# endif
-        STOP
-      ENDIF
-
-        CALL READ_STRING(WaveCompFile,FILE_NAME,'WaveCompFile',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-         WRITE(3,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-         WRITE(3,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Xc_WK,FILE_NAME,'Xc_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Yc_WK,FILE_NAME,'Yc_WK',ierr)
-      IF(ierr==1)THEN
-       Yc_WK = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Yc_WK defalt: 0.0'
-         WRITE(3,'(A50)')'Yc_WK defalt: 0.0'
-      endif
-# else
-         WRITE(*,'(A50)')'Yc_WK defalt: 0.0'
-         WRITE(3,'(A50)')'Yc_WK defalt: 0.0'
-# endif
-       ENDIF
-
-          CALL READ_FLOAT(DEP_WK,FILE_NAME,'DEP_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Time_ramp,FILE_NAME,'Time_ramp',ierr)
-      IF(ierr==1)THEN
-        Time_ramp = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A40)')'Time_ramp Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A40)')'Time_ramp Default:  0.0'
-# endif
-       ENDIF
-
-          CALL READ_FLOAT(Delta_WK,FILE_NAME,'Delta_WK',ierr)
-      IF(ierr==1)THEN
-        Delta_WK = 0.5_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A40)')'Delta_WK Default:  0.5'
-      endif
-# else
-         WRITE(*,'(A40)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A40)')'Delta_WK Default:  0.5'
-# endif
-       ENDIF
-
-
-          CALL READ_FLOAT(Ywidth_WK,FILE_NAME,'Ywidth_WK',ierr)
-      IF(ierr==1)THEN
-        Ywidth_WK = LARGE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A40)')'Ywidth_WK Default:  LARGE'
-      endif
-# else
-         WRITE(*,'(A40)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A40)')'Ywidth_WK Default:  LARGE'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Xc_WK   =', Xc_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'DEP_WK  =', DEP_WK
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Time_ramp=', Time_ramp
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Delta_WK=', Delta_WK
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-# else
-      WRITE(3,'(A10,F12.2)')'Xc_WK   =', Xc_WK
-      WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      WRITE(3,'(A10,F12.2)')'DEP_WK  =', DEP_WK
-      WRITE(3,'(A11,F12.2)')'Time_ramp=', Time_ramp
-      WRITE(3,'(A11,F12.2)')'Delta_WK=', Delta_WK
-      WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-# endif
-
-        ENDIF  ! end WK_TIME
-
-        IF(WaveMaker(1:7)=='INI_SOL')THEN
-
-          CALL READ_LOGICAL(SolitaryPositiveDirection,FILE_NAME,  &
-               'SolitaryPositiveDirection',ierr)
-
-        IF(ierr==1)THEN
-          SolitaryPositiveDirection = .TRUE.
-        ENDIF
-
-        IF(SolitaryPositiveDirection) THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'Solitary wave propagate in + X direction'
-         WRITE(3,'(A60)')'Solitary wave propagate in + X direction'
-      endif
-# else
-         WRITE(*,'(A60)')'Solitary wave propagate in + X direction'
-         WRITE(3,'(A60)')'Solitary wave propagate in + X direction'
-# endif
+        IF ( SolitaryPositiveDirection ) THEN
+           CALL WRITE_ALL( 'Solitary wave propagate in + X direction' )
         ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'Solitary wave propagate in - X direction'
-         WRITE(3,'(A60)')'Solitary wave propagate in - X direction'
-      endif
-# else
-         WRITE(*,'(A60)')'Solitary wave propagate in - X direction'
-         WRITE(3,'(A60)')'Solitary wave propagate in - X direction'
-# endif
-        ENDIF
+           CALL WRITE_ALL( 'Solitary wave propagate in - X direction' )
+        END IF
 
-          CALL READ_FLOAT(AMP_SOLI,FILE_NAME,'AMP',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A60)')'AMP_SOLI NOT FOUND, specify AMP in input.txt'
-# endif
-        STOP
-      ENDIF
+        CALL READ_VALUE_CHECK( AMP_SOLI  , FILE_NAME, 'AMP'        )
+        CALL READ_VALUE_CHECK( DEP_SOLI  , FILE_NAME,' DEP'        )
+        CALL READ_VALUE_CHECK( XWAVEMAKER, FILE_NAME, 'XWAVEMAKER' )
 
-          CALL READ_FLOAT(DEP_SOLI,FILE_NAME,'DEP',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-         WRITE(3,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-         WRITE(3,'(A60)')'DEP_SOLI NOT FOUND, specify DEP in input.txt'
-# endif
-        STOP
-      ENDIF
+     END IF  ! end initial solitary
 
-          CALL READ_FLOAT(XWAVEMAKER,FILE_NAME,'XWAVEMAKER',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'XWAVEMAKER NOT FOUND, specify XWAVEMAKER in input.txt'
-         WRITE(3,'(A80)')'XWAVEMAKER NOT FOUND, specify XWAVEMAKER in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'XWAVEMAKER NOT FOUND, specify XWAVEMAKER in input.txt'
-         WRITE(3,'(A80)')'XWAVEMAKER NOT FOUND, specify XWAVEMAKER in input.txt'
-# endif
-        STOP
-      ENDIF
+     IF (WaveMaker(1:6).EQ.'N_WAVE' ) THEN
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'AMP_SOLI=', AMP_SOLI
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'DEP_SOLI=', DEP_SOLI
-# else
-      WRITE(3,'(A10,F12.2)')'AMP_SOLI=', AMP_SOLI
-      WRITE(3,'(A10,F12.2)')'DEP_SOLI=', DEP_SOLI
-# endif
-        ENDIF  ! end initial solitary
+        CALL READ_VALUE_CHECK( x1_Nwave   , FILE_NAME, 'x1_Nwave'    )
+        CALL READ_VALUE_CHECK( x2_Nwave   , FILE_NAME, 'x2_Nwave'    )
+        CALL READ_VALUE_CHECK( a0_Nwave   , FILE_NAME, 'a0_Nwave'    )
+        CALL READ_VALUE_CHECK( gamma_Nwave, FILE_NAME, 'gamma_Nwave' )
+        CALL READ_VALUE_CHECK( dep_Nwave  , FILE_NAME, 'dep_Nwave'   )
+     END IF  ! end N_wave
 
-        IF(WaveMaker(1:6)=='N_WAVE')THEN
-          CALL READ_FLOAT(x1_Nwave,FILE_NAME,'x1_Nwave',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'x1_Nwave NOT FOUND, specify x1_Nwave in input.txt'
-         WRITE(3,'(A80)')'x1_Nwave NOT FOUND, specify x1_Nwave in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'x1_Nwave NOT FOUND, specify x1_Nwave in input.txt'
-         WRITE(3,'(A80)')'x1_Nwave NOT FOUND, specify x1_Nwave in input.txt'
-# endif
-        STOP
-      ENDIF
+     IF ( WaveMaker(1:7).EQ.'INI_REC' ) THEN
 
-          CALL READ_FLOAT(x2_Nwave,FILE_NAME,'x2_Nwave',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'x2_Nwave NOT FOUND, specify x2_Nwave in input.txt'
-         WRITE(3,'(A80)')'x2_Nwave NOT FOUND, specify x2_Nwave in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'x2_Nwave NOT FOUND, specify x2_Nwave in input.txt'
-         WRITE(3,'(A80)')'x2_Nwave NOT FOUND, specify x2_Nwave in input.txt'
-# endif
-        STOP
-      ENDIF
+        CALL READ_VALUE_CHECK( AMP_SOLI, FILE_NAME, 'AMP'                       )
+        CALL READ_VALUE_CHECK( Xc      , FILE_NAME,' Xc'                        )
+        ! Should this default to 0.0?
+        CALL READ_VALUE_CHECK( Yc      , FILE_NAME, 'Yc'  , DefaultValue=0.0_SP )
+        CALL READ_VALUE_CHECK( WID     , FILE_NAME, 'WID'                       )
+     END IF ! endif rectangular hump
 
-          CALL READ_FLOAT(a0_Nwave,FILE_NAME,'a0_Nwave',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'a0_Nwave NOT FOUND, specify a0_Nwave in input.txt'
-         WRITE(3,'(A80)')'a0_Nwave NOT FOUND, specify a0_Nwave in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'a0_Nwave NOT FOUND, specify a0_Nwave in input.txt'
-         WRITE(3,'(A80)')'a0_Nwave NOT FOUND, specify a0_Nwave in input.txt'
-# endif
-        STOP
-      ENDIF
+     IF ( WaveMaker(1:7).EQ.'INI_GAU'.OR.&
+          WaveMaker(1:7).EQ.'INI_DIP'      )THEN
 
-          CALL READ_FLOAT(gamma_Nwave,FILE_NAME,'gamma_Nwave',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'gamma_Nwave NOT FOUND, specify gamma_Nwave in input.txt'
-         WRITE(3,'(A80)')'gamma_Nwave NOT FOUND, specify gamma_Nwave in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'gamma_Nwave NOT FOUND, specify gamma_Nwave in input.txt'
-         WRITE(3,'(A80)')'gamma_Nwave NOT FOUND, specify gamma_Nwave in input.txt'
-# endif
-        STOP
-      ENDIF
+        CALL READ_VALUE_CHECK( AMP_SOLI, FILE_NAME, 'AMP' )
+        CALL READ_VALUE_CHECK( Xc      , FILE_NAME, 'Xc'  )
+        CALL READ_VALUE_CHECK( Yc      , FILE_NAME, 'Yc'  )
+        CALL READ_VALUE_CHECK( WID     , FILE_NAME, 'WID' )
 
-          CALL READ_FLOAT(dep_Nwave,FILE_NAME,'dep_Nwave',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'dep_Nwave NOT FOUND, specify dep_Nwave in input.txt'
-         WRITE(3,'(A80)')'dep_Nwave NOT FOUND, specify dep_Nwave in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'dep_Nwave NOT FOUND, specify dep_Nwave in input.txt'
-         WRITE(3,'(A80)')'dep_Nwave NOT FOUND, specify dep_Nwave in input.txt'
-# endif
-        STOP
-      ENDIF
+     END IF ! endif gaussian hump
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'x1_Nwave=', x1_Nwave
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'x2_Nwave=', x2_Nwave
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'a0_Nwave=', a0_Nwave
-      if (myid.eq.0) WRITE(3,'(A13,F12.2)')'gamma_Nwave=', gamma_Nwave
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'dep_Nwave=', dep_Nwave
-# else
-      WRITE(3,'(A10,F12.2)')'x1_Nwave=', x1_Nwave
-      WRITE(3,'(A10,F12.2)')'x2_Nwave=', x2_Nwave
-      WRITE(3,'(A10,F12.2)')'a0_Nwave=', a0_Nwave
-      WRITE(3,'(A13,F12.2)')'gamma_Nwave=', gamma_Nwave
-      WRITE(3,'(A11,F12.2)')'dep_Nwave=', dep_Nwave
-# endif
-        ENDIF  ! end N_wave
+     IF ( WaveMaker(1:6).EQ.'WK_REG' ) THEN
 
-        IF(WaveMaker(1:7)=='INI_REC')THEN
-          CALL READ_FLOAT(AMP_SOLI,FILE_NAME,'AMP',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-# endif
-        STOP
-      ENDIF
+        CALL READ_VALUE_CHECK( Xc_WK    , FILE_NAME, 'Xc_WK'                                     )
+        CALL READ_VALUE_CHECK( Yc_WK    , FILE_NAME, 'Yc_WK'    , DefaultValue=0.0_SP            )
+        CALL READ_VALUE_CHECK( Tperiod  , FILE_NAME, 'Tperiod'                                   )
+        CALL READ_VALUE_CHECK( AMP_WK   , FILE_NAME,' AMP_WK'                                    )
+        CALL READ_VALUE_CHECK( DEP_WK   , FILE_NAME, 'DEP_WK'                                    )
+        CALL READ_VALUE_CHECK( Theta_WK , FILE_NAME, 'Theta_WK' , DefaultValue=0.0_SP            )
+        CALL READ_VALUE_CHECK( Time_ramp, FILE_NAME, 'Time_ramp', DefaultValue=0.0_SP, Units='s' )
+        CALL READ_VALUE_CHECK( Delta_WK , FILE_NAME, 'Delta_WK' , DefaultValue=0.5_SP            )
+        CALL READ_VALUE_CHECK( Ywidth_WK, FILE_NAME, 'Ywidth_WK', DefaultValue=LARGE             )
 
-          CALL READ_FLOAT(Xc,FILE_NAME,'Xc',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Xc NOT FOUND, specify Xc in input.txt'
-         WRITE(3,'(A40)')'Xc NOT FOUND, specify Xc in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A40)')'Xc NOT FOUND, specify Xc in input.txt'
-         WRITE(3,'(A40)')'Xc NOT FOUND, specify Xc in input.txt'
-# endif
-        STOP
-      ENDIF
+     END IF  ! endif WK_REG
 
-          CALL READ_FLOAT(Yc,FILE_NAME,'Yc',ierr)
-      IF(ierr==1)THEN
-       Yc = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Yc NOT FOUND, specify Yc in input.txt'
-         WRITE(3,'(A40)')'Yc NOT FOUND, specify Yc in input.txt'
-      endif
-# else
-         WRITE(*,'(A40)')'Yc NOT FOUND, specify Yc in input.txt'
-         WRITE(3,'(A40)')'Yc NOT FOUND, specify Yc in input.txt'
-# endif
-      ENDIF
+     IF( WaveMaker(1:6).EQ.'WK_IRR'.OR.WaveMaker(1:6).EQ.'TMA_1D'.OR.&
+         WaveMaker(1:6).EQ.'JON_1D'.OR.WaveMaker(1:6).EQ.'JON_2D'      ) THEN
+
+        CALL READ_VALUE_CHECK( Xc_WK    , FILE_NAME, 'Xc_WK'                                     )
+        CALL READ_VALUE_CHECK( Yc_WK    , FILE_NAME, 'Yc_WK'    , DefaultValue=0.0_SP            )
+        CALL READ_VALUE_CHECK( DEP_WK   , FILE_NAME, 'DEP_WK'                                    )
+        CALL READ_VALUE_CHECK( Time_ramp, FILE_NAME, 'Time_ramp', DefaultValue=0.0_SP, Units='s' )
+        CALL READ_VALUE_CHECK( Delta_WK , FILE_NAME, 'Delta_WK' , DefaultValue=0.5_SP            )
+        CALL READ_VALUE_CHECK( FreqPeak , FILE_NAME, 'FreqPeak'                                  )
+        CALL READ_VALUE_CHECK( FreqMin  , FILE_NAME, 'FreqMin'                                   )
+        CALL READ_VALUE_CHECK( FreqMax  , FILE_NAME, 'FreqMax'                                   )
+        CALL READ_VALUE_CHECK( Hmo      , FILE_NAME, 'Hmo'                                       )
+        CALL READ_VALUE_CHECK( GammaTMA , FILE_NAME, 'GammaTMA' , DefaultValue=3.3_SP            )
 
 
-          CALL READ_FLOAT(WID,FILE_NAME,'WID',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-         WRITE(3,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-         WRITE(3,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-# endif
-        STOP
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'AMP     =', AMP_SOLI
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Xc      =', Xc
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Yc      =', Yc
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'WID     =', WID
-# else
-      WRITE(3,'(A10,F12.2)')'AMP     =', AMP_SOLI
-      WRITE(3,'(A10,F12.2)')'Xc      =', Xc
-      WRITE(3,'(A10,F12.2)')'Yc      =', Yc
-      WRITE(3,'(A10,F12.2)')'WID     =', WID
-# endif
-        ENDIF ! endif rectangular hump
-
-        IF(WaveMaker(1:7)=='INI_GAU'.OR.&
-           WaveMaker(1:7)=='INI_DIP')THEN
-
-          CALL READ_FLOAT(AMP_SOLI,FILE_NAME,'AMP',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-         WRITE(3,'(A50)')'AMP NOT FOUND, specify AMP in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Xc,FILE_NAME,'Xc',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Xc NOT FOUND, specify Xc in input.txt'
-         WRITE(3,'(A50)')'Xc NOT FOUND, specify Xc in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'Xc NOT FOUND, specify Xc in input.txt'
-         WRITE(3,'(A50)')'Xc NOT FOUND, specify Xc in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Yc,FILE_NAME,'Yc',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Yc NOT FOUND, specify Yc in input.txt'
-         WRITE(3,'(A50)')'Yc NOT FOUND, specify Yc in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'Yc NOT FOUND, specify Yc in input.txt'
-         WRITE(3,'(A50)')'Yc NOT FOUND, specify Yc in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(WID,FILE_NAME,'WID',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-         WRITE(3,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-         WRITE(3,'(A50)')'WID NOT FOUND, specify WID in input.txt'
-# endif
-        STOP
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'AMP     =', AMP_SOLI
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Xc      =', Xc
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Yc      =', Yc
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'WID(gamma)=', WID
-# else
-      WRITE(3,'(A10,F12.2)')'AMP     =', AMP_SOLI
-      WRITE(3,'(A10,F12.2)')'Xc      =', Xc
-      WRITE(3,'(A10,F12.2)')'Yc      =', Yc
-      WRITE(3,'(A12,F12.2)')'WID(gamma)=', WID
-# endif
-        ENDIF ! endif gaussian hump
-
-        IF(WaveMaker(1:6)=='WK_REG')THEN
-          CALL READ_FLOAT(Xc_WK,FILE_NAME,'Xc_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Yc_WK,FILE_NAME,'Yc_WK',ierr)
-      IF(ierr==1)THEN
-       Yc_WK = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Yc_WK defalt: 0.0'
-         WRITE(3,'(A40)')'Yc_WK defalt: 0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Yc_WK defalt: 0.0'
-         WRITE(3,'(A40)')'Yc_WK defalt: 0.0'
-# endif
-       ENDIF
+        ! Verify logic has been duplicated successfully 
+        IF ( WaveMaker(1:3).EQ.'TMA'.OR. &
+             WaveMaker(1:3).EQ.'JON'       ) THEN
+           CALL READ_VALUE_CHECK( Nfreq, FILE_NAME, 'Nfreq', DefaultValue=45 )
 
 
-          CALL READ_FLOAT(Tperiod,FILE_NAME,'Tperiod',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'Tperiod NOT FOUND, specify Tperiod in input.txt'
-         WRITE(3,'(A60)')'Tperiod NOT FOUND, specify Tperiod in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'Tperiod NOT FOUND, specify Tperiod in input.txt'
-         WRITE(3,'(A60)')'Tperiod NOT FOUND, specify Tperiod in input.txt'
-# endif
-        STOP
-      ENDIF
+           IF ( Wavemaker(5:6).EQ.'1D' ) THEN
+              Ntheta    = 1
+              ThetaPeak = 0.0_SP
+           ELSE
+              CALL READ_VALUE_CHECK( Ntheta     , FILE_NAME, 'Ntheta'     , DefaultValue=24      )
+              CALL READ_VALUE_CHECK( ThetaPeak  , FILE_NAME, 'ThetaPeak'  , DefaultValue=0.0_SP  )
+              CALL READ_VALUE_CHECK( Sigma_Theta, FILE_NAME, 'Sigma_Theta', DefaultValue=10.0_SP )
+           END IF
+        END IF
 
-          CALL READ_FLOAT(AMP_WK,FILE_NAME,'AMP_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'AMP_WK NOT FOUND, specify AMP_WK in input.txt'
-         WRITE(3,'(A60)')'AMP_WK NOT FOUND, specify AMP_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'AMP_WK NOT FOUND, specify AMP_WK in input.txt'
-         WRITE(3,'(A60)')'AMP_WK NOT FOUND, specify AMP_WK in input.txt'
-# endif
-        STOP
-      ENDIF
+        CALL READ_VALUE_CHECK( Ywidth_WK, FILE_NAME, 'Ywidth_WK' , DefaultValue=LARGE )
+     END IF ! endif wk_irr 
 
-          CALL READ_FLOAT(DEP_WK,FILE_NAME,'DEP_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-# endif
-        STOP
-      ENDIF
+     ! Check this is the correct placement of code
+     CALL READ_VALUE_CHECK( ETA_LIMITER,FILE_NAME, 'ETA_LIMITER', DefaultValue=.FALSE. )
+     IF( ETA_LIMITER ) THEN
+        CALL READ_VALUE_CHECK( CrestLimit , FILE_NAME, 'CrestLimit'  )
+        CALL READ_VALUE_CHECK( TroughLimit, FILE_NAME, 'TroughLimit' )
+     END IF
 
-          CALL READ_FLOAT(Theta_WK,FILE_NAME,'Theta_WK',ierr)
-      IF(ierr==1)THEN
-        Theta_WK = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Theta_WK Default:  0.0'
-         WRITE(3,'(A40)')'Theta_WK Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Theta_WK Default:  0.0'
-         WRITE(3,'(A40)')'Theta_WK Default:  0.0'
-# endif
-       ENDIF
+     IF( WaveMaker(1:9).EQ.'WK_DATA2D' ) THEN
 
-          CALL READ_FLOAT(Time_ramp,FILE_NAME,'Time_ramp',ierr)
-      IF(ierr==1)THEN
-        Time_ramp = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A40)')'Time_ramp Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A40)')'Time_ramp Default:  0.0'
-# endif
-       ENDIF
+        CALL READ_VALUE_CHECK( Xc_WK       , FILE_NAME, 'Xc_WK'                                        )
+        CALL READ_VALUE_CHECK( Yc_WK       , FILE_NAME, 'Yc_WK'       , DefaultValue=0.0_SP            )
+        CALL READ_VALUE_CHECK( DEP_WK      , FILE_NAME, 'DEP_WK'                                       )
+        CALL READ_VALUE_CHECK( Time_ramp   , FILE_NAME, 'Time_ramp'   , DefaultValue=0.0_SP, Units='s' )
+        CALL READ_VALUE_CHECK( Delta_WK    , FILE_NAME, 'Delta_WK'    , DefaultValue=0.5_SP            )
+        CALL READ_VALUE_CHECK( WaveCompFile, FILE_NAME, 'WaveCompFile'                                 )
+        CALL READ_VALUE_CHECK( Ywidth_WK   , FILE_NAME, 'Ywidth_WK'   , DefaultValue=LARGE             )
 
-          CALL READ_FLOAT(Delta_WK,FILE_NAME,'Delta_WK',ierr)
-      IF(ierr==1)THEN
-        Delta_WK = 0.5_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A40)')'Delta_WK Default:  0.5'
-      endif
-# else
-         WRITE(*,'(A40)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A40)')'Delta_WK Default:  0.5'
-# endif
-       ENDIF
+     ENDIF ! end wk_data2D
 
-          CALL READ_FLOAT(Ywidth_WK,FILE_NAME,'Ywidth_WK',ierr)
-      IF(ierr==1)THEN
-        Ywidth_WK = LARGE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A40)')'Ywidth_WK Default:  LARGE'
-      endif
-# else
-         WRITE(*,'(A40)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A40)')'Ywidth_WK Default:  LARGE'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Xc_WK   =', Xc_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Tperiod =', Tperiod
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'AMP_WK  =', AMP_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'DEP_WK  =', DEP_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Theta_WK=', Theta_WK
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Time_ramp=', Time_ramp
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Delta_WK=', Delta_WK
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-# else
-      WRITE(3,'(A10,F12.2)')'Xc_WK   =', Xc_WK
-      WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      WRITE(3,'(A10,F12.2)')'Tperiod =', Tperiod
-      WRITE(3,'(A10,F12.2)')'AMP_WK  =', AMP_WK
-      WRITE(3,'(A10,F12.2)')'DEP_WK  =', DEP_WK
-      WRITE(3,'(A10,F12.2)')'Theta_WK=', Theta_WK
-      WRITE(3,'(A11,F12.2)')'Time_ramp=', Time_ramp
-      WRITE(3,'(A11,F12.2)')'Delta_WK=', Delta_WK
-      WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-# endif
-        ENDIF  ! endif WK_REG
-
-        IF(WaveMaker(1:6)=='WK_IRR'.OR.WaveMaker(1:6)=='TMA_1D'  &
-           .OR.WaveMaker(1:6)=='JON_1D'.OR.WaveMaker(1:6)=='JON_2D')THEN
-
-          CALL READ_FLOAT(Xc_WK,FILE_NAME,'Xc_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A60)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Yc_WK,FILE_NAME,'Yc_WK',ierr)
-      IF(ierr==1)THEN
-       Yc_WK = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Yc_WK defalt: 0.0'
-         WRITE(3,'(A40)')'Yc_WK defalt: 0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Yc_WK defalt: 0.0'
-         WRITE(3,'(A40)')'Yc_WK defalt: 0.0'
-# endif
-      ENDIF
-
-          CALL READ_FLOAT(DEP_WK,FILE_NAME,'DEP_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A60)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Time_ramp,FILE_NAME,'Time_ramp',ierr)
-      IF(ierr==1)THEN
-        Time_ramp = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A40)')'Time_ramp Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A40)')'Time_ramp Default:  0.0'
-# endif
-       ENDIF
-
-          CALL READ_FLOAT(Delta_WK,FILE_NAME,'Delta_WK',ierr)
-      IF(ierr==1)THEN
-        Delta_WK = 0.5_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A40)')'Delta_WK Default:  0.5'
-      endif
-# else
-         WRITE(*,'(A40)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A40)')'Delta_WK Default:  0.5'
-# endif
-       ENDIF
-
-          CALL READ_FLOAT(FreqPeak,FILE_NAME,'FreqPeak',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-         WRITE(3,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-         WRITE(3,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(FreqMin,FILE_NAME,'FreqMin',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-         WRITE(3,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-         WRITE(3,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(FreqMax,FILE_NAME,'FreqMax',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-         WRITE(3,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-         WRITE(3,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Hmo,FILE_NAME,'Hmo',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-         WRITE(3,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-         WRITE(3,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-# endif
-        STOP
-      ENDIF
-          CALL READ_FLOAT(GammaTMA,FILE_NAME,'GammaTMA',ierr)
-          IF(ierr==1)THEN
-             GammaTMA = 3.3
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A14,A50)')'GammaTMA', 'NOT DEFINED, USE 3.3'
-# else
-      WRITE(3,'(A14,A50)')'GammaTMA', 'NOT DEFINED, USE 3.3'
-# endif
-          ENDIF
-
-          CALL READ_INTEGER(Nfreq,FILE_NAME,'Nfreq',ierr)
-          IF(ierr==1)THEN
-             Nfreq = 45
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'Nfreq for TMA or JON', 'NOT DEFINED, USE 45'
-# else
-      WRITE(3,'(A25,A50)')'Nfreq for TMA or JON', 'NOT DEFINED, USE 45'
-# endif
-          ENDIF
-
-         IF(WaveMaker(1:6)=='TMA_1D'  &
-           .OR.WaveMaker(1:6)=='JON_1D')THEN
-          Ntheta = 1
-         ELSE
-          CALL READ_INTEGER(Ntheta,FILE_NAME,'Ntheta',ierr)
-          IF(ierr==1)THEN
-             Ntheta = 24
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'Ntheta for TMA or JON', 'NOT DEFINED, USE 24'
-# else
-      WRITE(3,'(A25,A50)')'Ntheta for TMA or JON', 'NOT DEFINED, USE 24'
-# endif
-          ENDIF
-
-         ENDIF ! 1D or not
-
-         IF(WaveMaker(1:6)=='TMA_1D'  &
-           .OR.WaveMaker(1:6)=='JON_1D')THEN
-          ThetaPeak = 0.0_SP
-         ELSE
-          CALL READ_FLOAT(ThetaPeak,FILE_NAME,'ThetaPeak',ierr)
-          IF(ierr==1)THEN
-             ThetaPeak = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'ThetaPeak', 'NOT DEFINED, USE 0.0'
-# else
-      WRITE(3,'(A25,A50)')'ThetaPeak', 'NOT DEFINED, USE 0.0'
-# endif
-          ENDIF ! end ierr
-         ENDIF ! 1D or not
-
-         IF(WaveMaker(1:6)=='TMA_1D'  &
-           .OR.WaveMaker(1:6)=='JON_1D')THEN
-          ! do nothing
-         ELSE
-          CALL READ_FLOAT(Sigma_Theta,FILE_NAME,'Sigma_Theta',ierr)
-          IF(ierr==1)THEN
-             Sigma_Theta = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'Sigma_Theta', 'NOT DEFINED, USE 10.0'
-# else
-      WRITE(3,'(A25,A50)')'Sigma_Theta', 'NOT DEFINED, USE 10.0'
-# endif
-          ENDIF ! end ierr
-
-         ENDIF ! 1D or not
-
-          CALL READ_FLOAT(Ywidth_WK,FILE_NAME,'Ywidth_WK',ierr)
-      IF(ierr==1)THEN
-        Ywidth_WK = LARGE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A50)')'Ywidth_WK Default:  LARGE'
-      endif
-# else
-         WRITE(*,'(A50)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A50)')'Ywidth_WK Default:  LARGE'
-# endif
-       ENDIF
-
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Xc_WK   =  ', Xc_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'DEP_WK  =  ', DEP_WK
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Time_ramp= ', Time_ramp
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Delta_WK=  ', Delta_WK
-      if (myid.eq.0) WRITE(3,'(A12,I12)')'Nfreq=  ', Nfreq
-      if (myid.eq.0) WRITE(3,'(A12,I12)')'Ntheta=  ', Ntheta
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FreqPeak=  ', FreqPeak
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FreqMin =  ', FreqMin
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FreqMax =  ', FreqMax
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Hmo     =  ', Hmo
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'GammaTMA=  ', GammaTMA
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'ThetaPeak= ', ThetaPeak
-      if (myid.eq.0) WRITE(3,'(A13,F12.2)')'Sigma_Theta=', Sigma_Theta
-# else
-      WRITE(3,'(A12,F12.2)')'Xc_WK   =  ', Xc_WK
-      WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-      WRITE(3,'(A12,F12.2)')'DEP_WK  =  ', DEP_WK
-      WRITE(3,'(A12,F12.2)')'Time_ramp= ', Time_ramp
-      WRITE(3,'(A12,F12.2)')'Delta_WK=  ', Delta_WK
-      WRITE(3,'(A12,I12)')'Nfreq=  ', Nfreq
-      WRITE(3,'(A12,I12)')'Ntheta=  ', Ntheta
-      WRITE(3,'(A12,F12.2)')'FreqPeak=  ', FreqPeak
-      WRITE(3,'(A12,F12.2)')'FreqMin =  ', FreqMin
-      WRITE(3,'(A12,F12.2)')'FreqMax =  ', FreqMax
-      WRITE(3,'(A12,F12.2)')'Hmo     =  ', Hmo
-      WRITE(3,'(A12,F12.2)')'GammaTMA=  ', GammaTMA
-      WRITE(3,'(A12,F12.2)')'ThetaPeak= ', ThetaPeak
-      WRITE(3,'(A13,F12.2)')'Sigma_Theta=', Sigma_Theta
-# endif
-        ENDIF ! endif wk_irr 
-
-       CALL READ_LOGICAL(ETA_LIMITER,FILE_NAME,'ETA_LIMITER',ierr)
-       IF(ETA_LIMITER)THEN
-          CALL READ_FLOAT(CrestLimit,FILE_NAME,'CrestLimit',ierr)
-          CALL READ_FLOAT(TroughLimit,FILE_NAME,'TroughLimit',ierr)
-       ENDIF
-
-        IF(WaveMaker(1:9)=='WK_DATA2D')THEN
-          CALL READ_FLOAT(Xc_WK,FILE_NAME,'Xc_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-         WRITE(3,'(A80)')'Xc_WK NOT FOUND, specify Xc_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Yc_WK,FILE_NAME,'Yc_WK',ierr)
-      IF(ierr==1)THEN
-         Yc_WK = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Yc_WK NOT FOUND, specify Yc_WK in input.txt'
-         WRITE(3,'(A80)')'Yc_WK NOT FOUND, specify Yc_WK in input.txt'
-      endif
-# else
-         WRITE(*,'(A80)')'Yc_WK NOT FOUND, specify Yc_WK in input.txt'
-         WRITE(3,'(A80)')'Yc_WK NOT FOUND, specify Yc_WK in input.txt'
-# endif
-      ENDIF
-
-          CALL READ_FLOAT(DEP_WK,FILE_NAME,'DEP_WK',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-         WRITE(3,'(A80)')'DEP_WK NOT FOUND, specify DEP_WK in input.txt'
-# endif
-        STOP
-      ENDIF
-
-          CALL READ_FLOAT(Time_ramp,FILE_NAME,'Time_ramp',ierr)
-      IF(ierr==1)THEN
-        Time_ramp = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A50)')'Time_ramp Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A50)')'Time_ramp Default:  0.0'
-         WRITE(3,'(A50)')'Time_ramp Default:  0.0'
-# endif
-       ENDIF
-
-          CALL READ_FLOAT(Delta_WK,FILE_NAME,'Delta_WK',ierr)
-      IF(ierr==1)THEN
-        Delta_WK = 0.5_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A50)')'Delta_WK Default:  0.5'
-      endif
-# else
-         WRITE(*,'(A50)')'Delta_WK Default:  0.5'
-         WRITE(3,'(A50)')'Delta_WK Default:  0.5'
-# endif
-       ENDIF
-
-          CALL READ_STRING(WaveCompFile,FILE_NAME,'WaveCompFile',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-         WRITE(3,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-         WRITE(3,'(A80)')'WaveCompFile NOT FOUND, specify WaveCompFile in input.txt'
-# endif
-        STOP
-      ENDIF
-
-! data reading will be in wavemaker.F
-
-          CALL READ_FLOAT(Ywidth_WK,FILE_NAME,'Ywidth_WK',ierr)
-      IF(ierr==1)THEN
-        Ywidth_WK = LARGE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A50)')'Ywidth_WK Default:  LARGE'
-      endif
-# else
-         WRITE(*,'(A50)')'Ywidth_WK Default:  LARGE'
-         WRITE(3,'(A50)')'Ywidth_WK Default:  LARGE'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Xc_WK   =  ', Xc_WK
-      if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      if (myid.eq.0) WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'DEP_WK  =  ', DEP_WK
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Time_ramp= ', Time_ramp
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Delta_WK=  ', Delta_WK
-# else
-      WRITE(3,'(A12,F12.2)')'Xc_WK   =  ', Xc_WK
-      WRITE(3,'(A10,F12.2)')'Yc_WK   =', Yc_WK
-      WRITE(3,'(A11,F12.2)')'Ywidth_WK=', Ywidth_WK
-      WRITE(3,'(A12,F12.2)')'DEP_WK  =  ', DEP_WK
-      WRITE(3,'(A12,F12.2)')'Time_ramp= ', Time_ramp
-      WRITE(3,'(A12,F12.2)')'Delta_WK=  ', Delta_WK
-# endif
-        ENDIF ! end ierr
-
-       CALL READ_LOGICAL(EqualEnergy,FILE_NAME,'EqualEnergy',ierr)
-        IF(ierr==1)THEN
-             EqualEnergy = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A50)') 'EqualEnergy NOT USED in frequency domain'
-# else
-      WRITE(3,'(A50)')'EqualEnergy NOT USED in frequency domain'
-# endif
-          ENDIF 
+     CALL READ_VALUE_CHECK( EqualEnergy, FILE_NAME, 'EqualEnergy', DefaultValue=.FALSE. )
 
 ! absorbing generating wavemaker, more tests needed 
-     IF(WaveMaker(1:3)=='ABS'.OR.WaveMaker(1:11)=='LEFT_BC_IRR') THEN
+     IF ( WaveMaker(1:3 ).EQ.'ABS'.OR.&
+          WaveMaker(1:11).EQ.'LEFT_BC_IRR') THEN
 
-       CALL READ_STRING(WAVE_DATA_TYPE,FILE_NAME,'WAVE_DATA_TYPE',ierr)
+        ! Orginal code had no error checking, default value?
+        CALL READ_VALUE_CHECK( WAVE_DATA_TYPE, FILE_NAME, 'WAVE_DATA_TYPE' )
+        
+        CALL READ_VALUE_CHECK_DELAY_DEFAULT( DEP_Ser, FILE_NAME, 'DepthWaveMaker', IsDelayed )
 
-       CALL READ_FLOAT(DEP_Ser,FILE_NAME,'DepthWaveMaker',ierr)
+        IF ( IsDelayed ) THEN
+           CALL WRITE_ALL( 'WARNING: DepthWaveMaker not specified, reading DEP_WK instead.' )
+           CALL READ_VALUE_CHECK_DELAY_DEFAULT( DEP_Ser, FILE_NAME, 'DEP_WK', IsDelayed ) 
+           IF ( IsDelayed ) THEN
+              CALL WRITE_ALL( 'ERROR: DepthWaveMark and DEP_WK not specified, specify either. STOPPING SIMULATION.' )
+              CALL TERMINATE
+           END IF
 
-        IF(ierr==1)THEN
-       CALL READ_FLOAT(DEP_Ser,FILE_NAME,'DEP_WK',ierr)
+        END IF 
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A50)') 'DepthWaveMaker not defined, read DEP_WK'
-# else
-      WRITE(3,'(A50)')'DepthWaveMaker not defined, read DEP_WK'
-# endif
-      IF(ierr==1)THEN ! if can not find again
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'you should specify either DepthWaveMaker or DEP_WK,STOP'
-         WRITE(3,'(A80)')'you should specify either DepthWaveMaker or DEP_WK,STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'you should specify either DepthWaveMaker or DEP_WK,STOP'
-         WRITE(3,'(A80)')'you should specify either DepthWaveMaker or DEP_WK,STOP'
-# endif
-        STOP
-      ENDIF
-
-          ENDIF ! end read DepthWaveMaker
-
-
-      IF(WaveMaker(1:3)=='ABS')THEN
-       CALL READ_FLOAT(WidthWaveMaker,FILE_NAME,'WidthWaveMaker',ierr) 
+        IF( WaveMaker(1:3).EQ.'ABS' ) THEN
+           ! NOTE: Original code had no error checks. 
+           CALL READ_VALUE_CHECK( WidthWaveMaker    , FILE_NAME, 'WidthWaveMaker'     ) 
 !  get R and A for sponge_wavemaker calculation  
-        CALL READ_FLOAT(R_sponge_wavemaker,FILE_NAME,'R_sponge_wavemaker',ierr)
-        CALL READ_FLOAT(A_sponge_wavemaker,FILE_NAME,'A_sponge_wavemaker',ierr)
-      ENDIF
+           CALL READ_VALUE_CHECK( R_sponge_wavemaker, FILE_NAME, 'R_sponge_wavemaker' )
+           CALL READ_VALUE_CHECK( A_sponge_wavemaker, FILE_NAME, 'A_sponge_wavemaker' )
+        END IF
 
-      IF(WAVE_DATA_TYPE(1:4)=='DATA')THEN
-       CALL READ_STRING(WaveCompFile,FILE_NAME,'WaveCompFile',ierr)
+        IF ( WAVE_DATA_TYPE(1:4).EQ.'DATA' ) THEN
+           CALL READ_VALUE_CHECK( WaveCompFile, FILE_NAME, 'WaveCompFile' )
 
-      OPEN(1,FILE=TRIM(WaveCompFile))
-       READ(1,*)NumFreq,NumDir
-       ALLOCATE (Amp_Ser(NumFreq,NumDir),  &
-          Per_Ser(NumFreq),Theta_Ser(NumDir),Phase_LEFT(NumFreq,NumDir))
-       READ(1,*)PeakPeriod  ! useless for this application but should keep for consistency
-       DO J=1,NumFreq
-          READ(1,*)Per_Ser(J)  ! read in as frequency
+           OPEN(1,FILE=TRIM(WaveCompFile))
+           READ(1,*)NumFreq,NumDir
+           ALLOCATE( Amp_Ser(NumFreq,NumDir)   , &
+                     Per_Ser(NumFreq)          , &
+                     Theta_Ser(NumDir)         , &
+                     Phase_LEFT(NumFreq,NumDir) )
+
+           READ(1,*)PeakPeriod  ! useless for this application but should keep for consistency
+           DO J=1, NumFreq
+             READ(1,*)Per_Ser(J)  ! read in as frequency
 !print*,J,Per_Ser(J)
-       ENDDO
-       DO I=1,NumDir
-          READ(1,*)Theta_Ser(I)
-       ENDDO
-       DO I=1,NumDir
-         READ(1,*)(Amp_Ser(J,I),J=1,NumFreq)
+           END DO
+           DO I=1, NumDir
+             READ(1,*)Theta_Ser(I)
+           END DO
+           DO I=1, NumDir
+              READ(1,*)(Amp_Ser(J,I),J=1,NumFreq)
 !print*,I,Amp_Ser(J,I)
-       ENDDO
-       DO I=1,NumDir
-         READ(1,*,END=991)(Phase_LEFT(J,I),J=1,NumFreq)
-       ENDDO
-     CLOSE(1)
+           END DO
+           DO I=1, NumDir
+              READ(1,*,END=991)(Phase_LEFT(J,I),J=1,NumFreq)
+           END DO
+           CLOSE(1)
+! NOTE: Do the below two lines do anything?
 881  INPUT_PHASE = .TRUE.
 991  CONTINUE
 
-    DO J=1,NumFreq
-     DO I=1,NumDir
+           DO J = 1, NumFreq
+              DO I = 1, NumDir
 
-     IF(INPUT_PHASE)THEN
-         Phase_LEFT(J,I)=Phase_LEFT(J,I)*3.1415926/180.0_SP
-     ELSE
+                 IF( INPUT_PHASE ) THEN
+                    Phase_LEFT(J,I)=Phase_LEFT(J,I)*3.1415926/180.0_SP
+                 ELSE
 # if defined (INTEL)
-          Phase_LEFT(J,I)=rand()*2.0_SP*3.1415926
+                    Phase_LEFT(J,I)=rand()*2.0_SP*3.1415926
 # elif defined (CRAY)
-          Phase_LEFT(J,I)=rand()*2.0_SP*3.1415926
+                    Phase_LEFT(J,I)=rand()*2.0_SP*3.1415926
 # else
-          Phase_LEFT(J,I)=rand(0)*2.0_SP*3.1415926
+                    Phase_LEFT(J,I)=rand(0)*2.0_SP*3.1415926
 # endif
-     ENDIF
+                 END IF
 
-    ENDDO
-   ENDDO
+              END DO
+           END DO
 
 ! to make consistent with cm and sm approach we use phase_ser which is 
 ! only is random with frequency
-       ALLOCATE(Phase_Ser(NumFreq))
+           ALLOCATE( Phase_Ser(NumFreq) )
+           ALLOCATE( Segma_Ser(NumFreq), Wave_Number_Ser(NumFreq) )
+           DO J = 1 ,NumFreq
+              Phase_Ser(J)=Phase_LEFT(J,1)
+              IF (Per_Ser(J).EQ.ZERO ) THEN
+                 WRITE(*,*) 'wave frequency is zero, STOP'
+                 STOP
+              ELSE
+                 Per_Ser(J)=1.0_SP/Per_Ser(J)
+              END IF
+           END DO
 
-       ALLOCATE(Segma_Ser(NumFreq),Wave_Number_Ser(NumFreq) )
-       DO J=1,NumFreq
-          Phase_Ser(J)=Phase_LEFT(J,1)
-          IF(Per_Ser(J).EQ.ZERO)THEN
-          WRITE(*,*) 'wave frequency is zero, STOP'
-          STOP
-         ELSE
-          Per_Ser(J)=1.0_SP/Per_Ser(J)
-         ENDIF
-       ENDDO
-       DO I=1,NumDir
-         Theta_Ser(I)=Theta_Ser(I)*DEG2RAD
-       ENDDO  
+           DO I = 1, NumDir
+              Theta_Ser(I)=Theta_Ser(I)*DEG2RAD
+           END DO  
 
+
+! ORIGINAL CODE - NOTE: Inconsistent messages 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,'(A40)')'absorbing generating wave maker'
       if (myid.eq.0) WRITE(3,'(A40)')'use DATA'
@@ -1598,160 +565,27 @@ SUBROUTINE READ_INPUT
       WRITE(3,'(A40)')'abs or left_bc_irr wave maker'
       WRITE(3,'(A40)')'use DATA'
 # endif
- 
-     ELSE ! use TMA or JON
+! END ORIGINAL
+        ELSE ! use TMA or JON
 
-          CALL READ_FLOAT(FreqPeak,FILE_NAME,'FreqPeak',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-         WRITE(3,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-         WRITE(3,'(A80)')'FreqPeak NOT FOUND, specify FreqPeak in input.txt'
-# endif
-        STOP
-      ENDIF
+           CALL READ_VALUE_CHECK( FreqPeak, FILE_NAME, 'FreqPeak'                       )
+           CALL READ_VALUE_CHECK( FreqMin , FILE_NAME, 'FreqMin'                        )
+           CALL READ_VALUE_CHECK( FreqMax , FILE_NAME, 'FreqMax'                        )
+           CALL READ_VALUE_CHECK( Hmo     , FILE_NAME, 'Hmo'                            )
+           CALL READ_VALUE_CHECK( GammaTMA, FILE_NAME, 'GammaTMA' , DefaultValue=3.3_SP )
+           CALL READ_VALUE_CHECK( Nfreq    ,FILE_NAME, 'Nfreq'    , DefaultValue=45     )
 
-          CALL READ_FLOAT(FreqMin,FILE_NAME,'FreqMin',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-         WRITE(3,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-         WRITE(3,'(A80)')'FreqMin NOT FOUND, specify FreqMin in input.txt'
-# endif
-        STOP
-      ENDIF
+           IF ( WAVE_DATA_TYPE(5:6).EQ.'1D' ) THEN
+              Ntheta = 1
+              ThetaPeak = 0.0_SP
+           ELSE
+              CALL READ_VALUE_CHECK( Ntheta     , FILE_NAME, 'Ntheta'     , DefaultValue=24      )
+              CALL READ_VALUE_CHECK( ThetaPeak  , FILE_NAME, 'ThetaPeak'  , DefaultValue=0.0_SP  )
+              CALL READ_VALUE_CHECK( Sigma_Theta, FILE_NAME, 'Sigma_Theta', DefaultValue=10.0_SP )
+           END IF 
 
-          CALL READ_FLOAT(FreqMax,FILE_NAME,'FreqMax',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-         WRITE(3,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-         WRITE(3,'(A80)')'FreqMax NOT FOUND, specify FreqMax in input.txt'
-# endif
-        STOP
-      ENDIF
+        END IF ! end if data or tma
 
-          CALL READ_FLOAT(Hmo,FILE_NAME,'Hmo',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-         WRITE(3,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-         WRITE(3,'(A50)')'Hmo NOT FOUND, specify Hmo in input.txt'
-# endif
-        STOP
-      ENDIF
-          CALL READ_FLOAT(GammaTMA,FILE_NAME,'GammaTMA',ierr)
-          IF(ierr==1)THEN
-             GammaTMA = 3.3
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A14,A50)')'GammaTMA', 'NOT DEFINED, USE 3.3'
-# else
-      WRITE(3,'(A14,A50)')'GammaTMA', 'NOT DEFINED, USE 3.3'
-# endif
-          ENDIF
-
-          CALL READ_INTEGER(Nfreq,FILE_NAME,'Nfreq',ierr)
-          IF(ierr==1)THEN
-             Nfreq = 45
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'Nfreq for TMA or JON', 'NOT DEFINED, USE 45'
-# else
-      WRITE(3,'(A25,A50)')'Nfreq for TMA or JON', 'NOT DEFINED, USE 45'
-# endif
-          ENDIF
-
-         IF(WAVE_DATA_TYPE(1:6)=='TMA_1D'  &
-           .OR.WAVE_DATA_TYPE(1:6)=='JON_1D')THEN
-          Ntheta = 1
-         ELSE
-          CALL READ_INTEGER(Ntheta,FILE_NAME,'Ntheta',ierr)
-          IF(ierr==1)THEN
-             Ntheta = 24
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'Ntheta for TMA or JON', 'NOT DEFINED, USE 24'
-# else
-      WRITE(3,'(A25,A50)')'Ntheta for TMA or JON', 'NOT DEFINED, USE 24'
-# endif
-          ENDIF
-
-         ENDIF ! 1D or not
-
-         IF(WAVE_DATA_TYPE(1:6)=='TMA_1D'  &
-           .OR.WAVE_DATA_TYPE(1:6)=='JON_1D')THEN
-          ThetaPeak = 0.0_SP
-         ELSE
-          CALL READ_FLOAT(ThetaPeak,FILE_NAME,'ThetaPeak',ierr)
-          IF(ierr==1)THEN
-             ThetaPeak = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'ThetaPeak', 'NOT DEFINED, USE 0.0'
-# else
-      WRITE(3,'(A25,A50)')'ThetaPeak', 'NOT DEFINED, USE 0.0'
-# endif
-          ENDIF ! end ierr
-         ENDIF ! 1D or not
-
-         IF(WAVE_DATA_TYPE(1:6)=='TMA_1D'  &
-           .OR.WAVE_DATA_TYPE(1:6)=='JON_1D')THEN
-          ! do nothing
-         ELSE
-          CALL READ_FLOAT(Sigma_Theta,FILE_NAME,'Sigma_Theta',ierr)
-          IF(ierr==1)THEN
-             Sigma_Theta = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A25,A50)')'Sigma_Theta', 'NOT DEFINED, USE 10.0'
-# else
-      WRITE(3,'(A25,A50)')'Sigma_Theta', 'NOT DEFINED, USE 10.0'
-# endif
-          ENDIF ! end ierr
-
-         ENDIF ! 1D or not
-
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,I12)')'Nfreq=  ', Nfreq
-      if (myid.eq.0) WRITE(3,'(A12,I12)')'Ntheta=  ', Ntheta
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FreqPeak=  ', FreqPeak
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FreqMin =  ', FreqMin
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FreqMax =  ', FreqMax
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'Hmo     =  ', Hmo
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'GammaTMA=  ', GammaTMA
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'ThetaPeak= ', ThetaPeak
-      if (myid.eq.0) WRITE(3,'(A13,F12.2)')'Sigma_Theta=', Sigma_Theta
-# else
-      WRITE(3,'(A12,I12)')'Nfreq=  ', Nfreq
-      WRITE(3,'(A12,I12)')'Ntheta=  ', Ntheta
-      WRITE(3,'(A12,F12.2)')'FreqPeak=  ', FreqPeak
-      WRITE(3,'(A12,F12.2)')'FreqMin =  ', FreqMin
-      WRITE(3,'(A12,F12.2)')'FreqMax =  ', FreqMax
-      WRITE(3,'(A12,F12.2)')'Hmo     =  ', Hmo
-      WRITE(3,'(A12,F12.2)')'GammaTMA=  ', GammaTMA
-      WRITE(3,'(A12,F12.2)')'ThetaPeak= ', ThetaPeak
-      WRITE(3,'(A13,F12.2)')'Sigma_Theta=', Sigma_Theta
-# endif
-
-
-      ENDIF ! end if data or tma
      ENDIF ! end absorbing-generating or left bc wave maker
 
 # if defined (PARALLEL)
