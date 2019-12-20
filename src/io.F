@@ -588,323 +588,69 @@ SUBROUTINE READ_INPUT
 
      ENDIF ! end absorbing-generating or left bc wave maker
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- PERIODIC BC -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- PERIODIC BC -----------------'   
-# endif
+
+     CALL WRITE_LOG( '\n-------------- PERIODIC BC -----------------' )
 
 # if defined (CARTESIAN)
 ! south-north periodic boundary condition
-      CALL READ_LOGICAL(PERIODIC,FILE_NAME,'PERIODIC',ierr)
-      IF(ierr==1)THEN
-        PERIODIC = .FALSE.
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A11,L2)')'PERIODIC:', PERIODIC
-# else
-      WRITE(3,'(A11,L2)')'PERIODIC:', PERIODIC
-# endif
+     CALL READ_VALUE_CHECK( PERIODIC, FILE_NAME, 'PERIODIC', DefaultValue=.FALSE. )
 # endif
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- SPONGE -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- SPONGE -----------------'   
-# endif
+     CALL WRITE_LOG( '\n-------------- SPONGE -----------------' )
 
-      CALL READ_LOGICAL(DIFFUSION_SPONGE,FILE_NAME,'DIFFUSION_SPONGE',ierr)
-      IF(ierr==1)THEN
-        DIFFUSION_SPONGE = .FALSE.
-      ENDIF
+     CALL READ_VALUE_CHECK( DIFFUSION_SPONGE, FILE_NAME, 'DIFFUSION_SPONGE', DefaultValue=.FALSE. )
+     CALL READ_VALUE_CHECK( DIRECT_SPONGE   , FILE_NAME, 'DIRECT_SPONGE'   , DefaultValue=.FALSE. )
+     CALL READ_VALUE_CHECK( FRICTION_SPONGE , FILE_NAME, 'FRICTION_SPONGE' , DefaultValue=.FALSE. )
 
-      CALL READ_LOGICAL(DIRECT_SPONGE,FILE_NAME,'DIRECT_SPONGE',ierr)
-      IF(ierr==1)THEN
-        DIRECT_SPONGE = .FALSE.
-      ENDIF
+      IF ( DIRECT_SPONGE ) CALL WRITE_ALL( 'Direct sponge was set.' )
 
-      CALL READ_LOGICAL(FRICTION_SPONGE,FILE_NAME,'FRICTION_SPONGE',ierr)
-      IF(ierr==1)THEN
-        FRICTION_SPONGE = .FALSE.
-      ENDIF
+      IF ( DIFFUSION_SPONGE ) THEN
+         CALL WRITE_ALL( 'Diffusion sponge was set.' )
+         CALL READ_VALUE_CHECK( Csp, FILE_NAME, 'Csp', DefaultValue=0.1_SP )
+      END IF ! end diffusion_sponge
 
-      IF(DIRECT_SPONGE)THEN
-
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'DIRECT_SPONGE IS USED'
-         WRITE(3,'(A40)')'DIRECT_SPONGE IS USED'
-      endif
-# else
-         WRITE(*,'(A40)')'DIRECT_SPONGE IS USED'
-         WRITE(3,'(A40)')'DIRECT_SPONGE IS USED'
-# endif
-       ENDIF
-
-      IF(DIFFUSION_SPONGE)THEN
-
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'DIFFUSION_SPONGE IS USED'
-         WRITE(3,'(A40)')'DIFFUSION_SPONGE IS USED'
-      endif
-# else
-         WRITE(*,'(A40)')'DIFFUSION_SPONGE IS USED'
-         WRITE(3,'(A40)')'DIFFUSION_SPONGE IS USED'
-# endif
-
-        CALL READ_FLOAT(Csp,FILE_NAME,'Csp',ierr)
-      IF(ierr==1)THEN
-        Csp = 0.1_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Csp Default:  0.1'
-         WRITE(3,'(A40)')'Csp Default:  0.1'
-      endif
-# else
-         WRITE(*,'(A40)')'Csp Default:  0.1'
-         WRITE(3,'(A40)')'Csp Default:  0.1'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-        if (myid.eq.0) WRITE(3,'(A22,F12.2)')'DIFFUSION_SPONGE Csp=', Csp
-# else
-        WRITE(3,'(A22,F12.2)')'DIFFUSION_SPONGE Csp=', Csp
-# endif
-      ENDIF ! end diffusion_sponge
-
-      IF(FRICTION_SPONGE)THEN
-
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'FRICTION_SPONGE IS USED'
-         WRITE(3,'(A40)')'FRICTION_SPONGE IS USED'
-      endif
-# else
-         WRITE(*,'(A40)')'FRICTION_SPONGE IS USED'
-         WRITE(3,'(A40)')'FRICTION_SPONGE IS USED'
-# endif
-
-        CALL READ_FLOAT(CDsponge,FILE_NAME,'CDsponge',ierr)
-      IF(ierr==1)THEN
-        CDsponge = 5.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'CDsponge Default:  5.0'
-         WRITE(3,'(A40)')'CDsponge Default:  5.0'
-      endif
-# else
-         WRITE(*,'(A40)')'CDsponge Default:  5.0'
-         WRITE(3,'(A40)')'CDsponge Default:  5.0'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-        if (myid.eq.0) WRITE(3,'(A26,F12.2)')'FRICTION_SPONGE CDsponge=', CDsponge
-# else
-        WRITE(3,'(A26,F12.2)')'FRICTION_SPONGE CDsponge=', CDsponge
-# endif
+      IF ( FRICTION_SPONGE ) THEN
+         CALL WRITE_ALL( 'Friction spong was set.' )
+         CALL READ_VALUE_CHECK( CDsponge, FILE_NAME, 'CDsponge', DefaultValue=0.5_SP )
       ENDIF  ! endif friction_sponge
 
-      IF(DIFFUSION_SPONGE.OR.DIRECT_SPONGE.OR.FRICTION_SPONGE)THEN
-        CALL READ_FLOAT(Sponge_west_width,FILE_NAME,'Sponge_west_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_west_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_west_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_west_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_west_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_west_width Default:  0.0'
-# endif
-       ENDIF
 
-        CALL READ_FLOAT(Sponge_east_width,FILE_NAME,'Sponge_east_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_east_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_east_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_east_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_east_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_east_width Default:  0.0'
-# endif
-       ENDIF
-
-        CALL READ_FLOAT(Sponge_south_width,FILE_NAME,'Sponge_south_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_south_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_south_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_south_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_south_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_south_width Default:  0.0'
-# endif
-       ENDIF
-
-        CALL READ_FLOAT(Sponge_north_width,FILE_NAME,'Sponge_north_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_north_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_north_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_north_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_north_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_north_width Default:  0.0'
-# endif
-       ENDIF
-
-        CALL READ_FLOAT(R_sponge,FILE_NAME,'R_sponge',ierr)
-      IF(ierr==1)THEN
-        R_sponge = 0.85_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'R_sponge Default:  0.85'
-         WRITE(3,'(A40)')'R_sponge Default:  0.85'
-      endif
-# else
-         WRITE(*,'(A40)')'R_sponge Default:  0.85'
-         WRITE(3,'(A40)')'R_sponge Default:  0.85'
-# endif
-       ENDIF
-
-        CALL READ_FLOAT(A_sponge,FILE_NAME,'A_sponge',ierr)
-      IF(ierr==1)THEN
-        A_sponge = 5.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'A_sponge Default:  5.0'
-         WRITE(3,'(A40)')'A_sponge Default:  5.0'
-      endif
-# else
-         WRITE(*,'(A40)')'A_sponge Default:  5.0'
-         WRITE(3,'(A40)')'A_sponge Default:  5.0'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_west_width =', Sponge_west_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_east_width =', Sponge_east_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_south_width=', Sponge_south_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_north_width=', Sponge_north_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'R_sponge          =', R_sponge
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'A_sponge          =', A_sponge
-# else
-        WRITE(3,'(A20,F12.2)')'Sponge_west_width =', Sponge_west_width
-        WRITE(3,'(A20,F12.2)')'Sponge_east_width =', Sponge_east_width
-        WRITE(3,'(A20,F12.2)')'Sponge_south_width=', Sponge_south_width
-        WRITE(3,'(A20,F12.2)')'Sponge_north_width=', Sponge_north_width
-        WRITE(3,'(A20,F12.2)')'R_sponge          =', R_sponge
-        WRITE(3,'(A20,F12.2)')'A_sponge          =', A_sponge
-# endif
-       ENDIF ! endif sponge
+      IF( DIFFUSION_SPONGE.OR.DIRECT_SPONGE.OR.FRICTION_SPONGE ) THEN
+        CALL READ_VALUE_CHECK( Sponge_west_width , FILE_NAME, 'Sponge_west_width' , DefaultValue=0.0_SP , Units='m' )
+        CALL READ_VALUE_CHECK( Sponge_east_width , FILE_NAME, 'Sponge_east_width' , DefaultValue=0.0_SP , Units='m' )
+        CALL READ_VALUE_CHECK( Sponge_south_width, FILE_NAME, 'Sponge_south_width', DefaultValue=0.0_SP , Units='m' )
+        CALL READ_VALUE_CHECK( Sponge_north_width, FILE_NAME, 'Sponge_north_width', DefaultValue=0.0_SP , Units='m' )
+        CALL READ_VALUE_CHECK( R_sponge          , FILE_NAME, 'R_sponge'          , DefaultValue=0.85_SP            )
+        CALL READ_VALUE_CHECK( A_sponge          , FILE_NAME, 'A_sponge'          , DefaultValue=5.0_SP             )
+      END IF ! endif sponge
 
 ! to avoid longshore current caused by extra momentum flux
 ! we can add bottom friction make momentum balance
-
-      CALL READ_FLOAT(WaveMakerCd,FILE_NAME,'WaveMakerCd',ierr)
-      IF(ierr==1)THEN
+! [mayhl] Is this code in the right place?
+     CALL READ_VALUE_CHECK_DELAY_DEFAULT(WaveMakerCd,FILE_NAME,'WaveMakerCd', IsDelayed )
+        
+     IF ( IsDelayed ) THEN
         WaveMakerCurrentBalance=.FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A40)')'No WavemakerCurrentBalance'
-# else
-       WRITE(3,'(A40)')'No WavemakerCurrentBalance'
-# endif
-      ELSE
+        CALL WRITE_LOG( 'No Wavemaker current balance.' )
+     ELSE
         WaveMakerCurrentBalance=.TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,F6.2)')'WaveMakerCd:', WaveMakerCd
-# else
-      WRITE(3,'(A15,F6.2)')'WaveMakerCd:', WaveMakerCd
-# endif
-      ENDIF
+     END IF
 
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------- OBSTACLE and BREAKWATER -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------- OBSTACLE and BREAKWATER -----------------'   
-# endif
+     CALL WRITE_LOG( '\n-------- OBSTACLE and BREAKWATER -----------------' )
 
 ! obstacle structures
-      CALL READ_STRING(OBSTACLE_FILE,FILE_NAME,'OBSTACLE_FILE',ierr)
-      IF(ierr==1)THEN
-        OBSTACLE=.FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A5)')'OBSTACLE_FILE:', 'NO'
-# else
-      WRITE(3,'(A15,A5)')'OBSTACLE_FILE:', 'NO'
-# endif
-      ELSE
-        OBSTACLE=.TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A50)')'OBSTACLE_FILE:', OBSTACLE_FILE
-# else
-      WRITE(3,'(A15,A50)')'OBSTACLE_FILE:', OBSTACLE_FILE
-# endif
-      ENDIF
-
+     CALL READ_VALUE_CHECK_DELAY_DEFAULT( OBSTACLE_FILE, FILE_NAME, 'OBSTACLE_FILE', IsDelayed )
+     OBSTACLE=.NOT.IsDelayed
+     IF ( .NOT.OBSTACLE ) CALL WRITE_LOG( 'OBSTACLE_FILE: Not specified' )
+        
 ! breakwater
-      CALL READ_STRING(BREAKWATER_FILE,FILE_NAME,'BREAKWATER_FILE',ierr)
-      IF(ierr==1)THEN
-        BREAKWATER=.FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,A5)')'BREAKWATER_FILE:', 'NO'
-# else
-      WRITE(3,'(A20,A5)')'BREAKWATER_FILE:', 'NO'
-# endif
-      ELSE
-        BREAKWATER=.TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,A50)')'BREAKWATER_FILE:', BREAKWATER_FILE
-# else
-      WRITE(3,'(A20,A50)')'BREAKWATER_FILE:', BREAKWATER_FILE
-# endif
-      ENDIF
-
+     CALL READ_VALUE_CHECK_DELAY_DEFAULT( BREAKWATER_FILE, FILE_NAME, 'BREAKWATER_FILE', IsDelayed )
+     BREAKWATER=.NOT.IsDelayed
+     IF (.NOT.BREAKWATER) CALL WRITE_LOG( 'BREAKWATER_FILE: Not specified.' )
+ 
 ! breakwater reflection stength
-
-          CALL READ_FLOAT(BreakWaterAbsorbCoef,FILE_NAME,'BreakWaterAbsorbCoef',ierr)
-      IF(ierr==1)THEN
-        BreakWaterAbsorbCoef = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-         WRITE(3,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-      endif
-# else
-         WRITE(*,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-         WRITE(3,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-# endif
-       ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-         WRITE(3,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-      endif
-# else
-         WRITE(*,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-         WRITE(3,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-# endif
-       ENDIF
-
+     ! NOTE: Should this be read only when BREAKWATER file is set?
+     CALL READ_VALUE_CHECK( BreakWaterAbsorbCoef, FILE_NAME, 'BreakWaterAbsorbCoef', DefaultValue=10.0_SP )
 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,*)'                                         '
