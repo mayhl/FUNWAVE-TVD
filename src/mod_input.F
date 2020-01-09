@@ -717,6 +717,9 @@ SUBROUTINE PARSE_VALUE( ReturnValue, InputFileName, VariableName, VariableType, 
 
    CHARACTER(LEN=12)             :: ValueType
    LOGICAL                       :: FileExists 
+
+   INQUIRE(FILE=InputFileName,EXIST=FileExists)
+
    IF (.NOT.FileExists ) THEN
       ErrID = 3
       RETURN
