@@ -124,6 +124,8 @@ SUBROUTINE FORMAT_INTEGER( Val , ValStr )
 
    WRITE( ValStr,* ) Val
 
+   ValStr = ADJUSTL(ValStr)
+
 END SUBROUTINE
 
 SUBROUTINE FORMAT_STRING( Val , ValStr )
@@ -132,7 +134,7 @@ SUBROUTINE FORMAT_STRING( Val , ValStr )
    CHARACTER(LEN=*), INTENT(IN ) :: Val
    CHARACTER(LEN=*), INTENT(OUT) :: ValStr
 
-   ValStr = Val
+   ValStr = ADJUSTL(Val)
 
 END SUBROUTINE
 
@@ -168,7 +170,7 @@ SUBROUTINE FORMAT_FLOAT( Val , ValStr )
       END IF
    END DO
 
-   ValStr = TRIM(ValStr(1:CutIdx))
+   ValStr = ValStr(1:CutIdx)
 
 END SUBROUTINE
 
