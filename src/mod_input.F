@@ -243,7 +243,7 @@ SUBROUTINE READ_CHECK( InputFileName, VariableName, ValueType,  ErrID , DefaultV
 
    IF      ( ErrID.EQ.3 ) THEN
       ! File not found error
-      CALL WRITE_ALL( "ERROR: "//TRIM(Msg)//" file '"//TRIM(InputFileName)//"' not found. STOPING SIMULATION!" )
+      CALL WRITE_ALL( "ERROR: "//TRIM(Msg)//" file '"//TRIM(InputFileName)//"' not found. STOPPING SIMULATION!" )
       CALL TERMINATE
 
    ELSE IF ( ErrID.EQ.2 ) THEN
@@ -261,9 +261,9 @@ SUBROUTINE READ_CHECK( InputFileName, VariableName, ValueType,  ErrID , DefaultV
          Msg = TRIM(Msg)//" Defaulting to "//TRIM(DefaultValueStr)
 
          IF ( PRESENT( Units ) ) THEN
-            Msg = TRIM(Msg)//"."
-         ELSE
             Msg = TRIM(Msg)//" "//TRIM(Units)//"."
+         ELSE
+            Msg = TRIM(Msg)//"."
          END IF
 
          CALL WRITE_ALL( Msg )
