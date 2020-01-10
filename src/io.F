@@ -202,15 +202,15 @@ SUBROUTINE READ_INPUT
         TITLE='---TEST RUN---'
       ENDIF
 
-      CALL WRITE_LOG( '-------------- LOG FILE -----------------' )
+      CALL WRITE_LOG( LOG_BANNER( 'LOG FILE' ) )
       CALL WRITE_LOG( TITLE )
-      CALL WRITE_LOG( ' --------------input start --------------' )
+      CALL WRITE_LOG( LOG_BANNER ( 'INPUT START' ) )
 
 
 # if defined (PARALLEL)
 ! parallel info
 
-      CALL WRITE_LOG( '\n-------------- PARALLEL -----------------' )
+      CALL WRITE_LOG( LOG_BANNER('PARALLEL' ) )
 
       CALL READ_VALUE_CHECK(PX, FILE_NAME, 'PX', DefaultValue=1 )
       CALL READ_VALUE_CHECK(PY, FILE_NAME, 'PY', DefaultValue=1 )
@@ -220,7 +220,7 @@ SUBROUTINE READ_INPUT
 
 
 ! Grid Info 
-      CALL WRITE_LOG( '\n-------------- GRID INFO -----------------' )
+      CALL WRITE_LOG( LOG_BANNER( 'GRID INFO' ) )
 
 ! dimension
       CALL READ_VALUE_CHECK(Mglob, FILE_NAME, 'Mglob' )
@@ -279,7 +279,7 @@ SUBROUTINE READ_INPUT
      IF (BATHY_CORRECTION) CALL WRITE_ALL( 'Bathymetry has been corrected!' )
 
 ! time
-     CALL WRITE_LOG( '\n-------------- TIME INFO -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'TIME INFO' ) )
 
      CALL READ_VALUE_CHECK( TOTAL_TIME         , FILE_NAME, 'TOTAL_TIME'                                          )
      CALL READ_VALUE_CHECK( PLOT_START_TIME    , FILE_NAME, 'PLOT_START_TIME'    , DefaultValue=0.0_SP, Units='s' )
@@ -289,7 +289,7 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( SCREEN_INTV        , FILE_NAME,' SCREEN_INTV'        , DefaultValue=1.0_SP, Units='s' )
 
 
-     CALL WRITE_LOG( '\n-------------- HOT START -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'HOT START' ) )
 
      CALL READ_VALUE_CHECK( INI_UVZ, FILE_NAME, 'INI_UVZ', DefaultValue=.FALSE. )
 
@@ -320,11 +320,11 @@ SUBROUTINE READ_INPUT
 
 
 ! add water level 03/29/2016
-     CALL WRITE_LOG( '\n-------------- STILL WATER INFO -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'STILL WATER INFO' ) )
      CALL READ_VALUE_CHECK( WaterLevel, FILE_NAME, 'WaterLevel', DefaultValue=0.0_SP, Units='m' )
 
 ! wavemaker
-     CALL WRITE_LOG( '\n-------------- WAVEMAKER -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'WAVEMAKER' ) )
      
      CALL READ_VALUE_CHECK( WaveMaker, FILE_NAME, 'WAVEMAKER', DefaultValue='nothing' )
 
@@ -589,14 +589,14 @@ SUBROUTINE READ_INPUT
      ENDIF ! end absorbing-generating or left bc wave maker
 
 
-     CALL WRITE_LOG( '\n-------------- PERIODIC BC -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'PERIODIC BC' ) )
 
 # if defined (CARTESIAN)
 ! south-north periodic boundary condition
      CALL READ_VALUE_CHECK( PERIODIC, FILE_NAME, 'PERIODIC', DefaultValue=.FALSE. )
 # endif
 
-     CALL WRITE_LOG( '\n-------------- SPONGE -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'SPONGE' ) )
 
      CALL READ_VALUE_CHECK( DIFFUSION_SPONGE, FILE_NAME, 'DIFFUSION_SPONGE', DefaultValue=.FALSE. )
      CALL READ_VALUE_CHECK( DIRECT_SPONGE   , FILE_NAME, 'DIRECT_SPONGE'   , DefaultValue=.FALSE. )
@@ -636,7 +636,7 @@ SUBROUTINE READ_INPUT
         WaveMakerCurrentBalance=.TRUE.
      END IF
 
-     CALL WRITE_LOG( '\n-------- OBSTACLE and BREAKWATER -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'OBSTACLE and BREAKWATER' ) )
 
 ! obstacle structures
      CALL READ_VALUE_CHECK_DELAY_DEFAULT( OBSTACLE_FILE, FILE_NAME, 'OBSTACLE_FILE', IsDelayed )
@@ -653,7 +653,7 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( BreakWaterAbsorbCoef, FILE_NAME, 'BreakWaterAbsorbCoef', DefaultValue=10.0_SP )
 
 
-     CALL WRITE_LOG( '\n-------------- PHYSICS -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'PHYSICS' ) )
 
      CALL READ_VALUE_CHECK( DISPERSION, FILE_NAME, 'DISPERSION', DefaultValue=.TRUE.    )
      CALL READ_VALUE_CHECK( Gamma1    , FILE_NAME, 'Gamma1'    , DefaultValue=1.0_SP    ) 
@@ -685,7 +685,7 @@ SUBROUTINE READ_INPUT
      END IF
 
 
-     CALL WRITE_LOG( '\n-------------- NUMERICS -----------------' )
+     CALL WRITE_LOG( LOG_BANNER( 'NUMERICS' ) )
 
      CALL READ_VALUE_CHECK( Time_Scheme, FILE_NAME, 'Time_Scheme' , DefaultValue='Runge_Kutta' )
      CALL READ_VALUE_CHECK( CONSTR     , FILE_NAME, 'CONSTRUCTION', DefaultValue='HLLC'        )

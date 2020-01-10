@@ -47,12 +47,45 @@
 MODULE LOG_OUTPUT
 
    USE PARAM, ONLY : SP
-
 # if defined (PARALLEL)
    USE GLOBAL, ONLY : myid
    USE MPI
 # endif
+   INTEGER         , PARAMETER  :: BannerLength = 50
+
    CONTAINS 
+
+
+   !-------------------------------------------------------------------------------------
+   !
+   !    LOG_BANNER: Wrapper function for standardizing banners for log file 
+   !
+   !    HISTORY:
+   !      01/10/2020  Michael-Angelo Y.-H. Lam
+   !-------------------------------------------------------------------------------------
+   PURE CHARACTER(LEN=3*BannerLength+5) FUNCTION LOG_BANNER( Title )
+      IMPLICIT NONE
+
+      CHARACTER(LEN=*), INTENT(IN) :: Title
+!      INTEGER         , PARAMETER  :: BannerLength = 20
+      CHARACTER(LEN=1), PARAMETER  :: BannerChar = '-'
+      INTEGER                      :: TitleLength
+      INTEGER                      :: ExtraLength
+      INTEGER                      :: LeftLength
+      INTEGER                      :: RightLength
+
+      TitleLength = LEN_TRIM(ADJUSTL(Title))
+      ExtraLength = BannerLength - TitleLength
+      LeftLength = ExtraLength/2 - 1
+      RightLength = LeftLength + MOD( ExtraLength , 2 )
+
+      LOG_BANNER = NEW_LINE('A')//&
+                   REPEAT( BannerChar, LeftLength)//&
+                   ' '//TRIM(ADJUSTL(Title))//' '//&
+                   REPEAT( BannerChar, RightLength)
+
+   END FUNCTION
+
 
    !-------------------------------------------------------------------------------------
    !
