@@ -174,7 +174,12 @@ SUBROUTINE FORMAT_FLOAT( Val , ValStr )
       WRITE(TmpStr,FmtStr) Val
       
       READ(TmpStr,*) TmpVal
-      ConvErr = ABS( (TmpVal-Val)/Val )
+
+      IF ( Val.LT.ErrTol ) THEN
+         ConvErr = ABS( TmpVal - Val )
+      ELSE
+         ConvErr = ABS( (TmpVal-Val)/Val )
+      END IF
 
       IF( ConvErr.LT.ErrTol ) THEN
          ValStr = TmpStr
