@@ -206,23 +206,28 @@ SUBROUTINE READ_INPUT
       CALL WRITE_LOG( TITLE )
       CALL WRITE_LOG( LOG_BANNER ( 'INPUT START' ) )
 
+      CALL INIT_TMP_LOG
+
 
 # if defined (PARALLEL)
-! parallel info
-
+! ---------------------------------------
+! -            Parallel Info            -
+! ---------------------------------------
       CALL WRITE_LOG( LOG_BANNER('PARALLEL' ) )
 
       CALL READ_VALUE_CHECK(PX, FILE_NAME, 'PX', DefaultValue=1 )
       CALL READ_VALUE_CHECK(PY, FILE_NAME, 'PY', DefaultValue=1 )
 
+      CALL FLUSH_TMP_LOG
+
 # endif
 
 
-
-! Grid Info 
+! ---------------------------------------
+! -              Grid Info              -
+! ---------------------------------------
       CALL WRITE_LOG( LOG_BANNER( 'GRID INFO' ) )
 
-! dimension
       CALL READ_VALUE_CHECK(Mglob, FILE_NAME, 'Mglob' )
       CALL READ_VALUE_CHECK(Nglob, FILE_NAME, 'Nglob' )
 
@@ -278,7 +283,13 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( BATHY_CORRECTION, FILE_NAME, 'BATHY_CORRECTION', DefaultValue=.FALSE. )
      IF (BATHY_CORRECTION) CALL WRITE_ALL( 'Bathymetry has been corrected!' )
 
-! time
+     CALL FLUSH_TMP_LOG
+
+
+! ---------------------------------------
+! -           Time Info                 -
+! ---------------------------------------
+
      CALL WRITE_LOG( LOG_BANNER( 'TIME INFO' ) )
 
      CALL READ_VALUE_CHECK( TOTAL_TIME         , FILE_NAME, 'TOTAL_TIME'                                          )
@@ -286,9 +297,14 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( PLOT_INTV          , FILE_NAME, 'PLOT_INTV'          , DefaultValue=1.0_SP, Units='s' )
      CALL READ_VALUE_CHECK( PLOT_INTV_STATION  , FILE_NAME, 'PLOT_INTV_STATION'  , DefaultValue=1.0_SP, Units='s' )
      CALL READ_VALUE_CHECK( StationOutputBuffer, FILE_NAME, 'StationOutputBuffer', DefaultValue=1000              )
-     CALL READ_VALUE_CHECK( SCREEN_INTV        , FILE_NAME,' SCREEN_INTV'        , DefaultValue=1.0_SP, Units='s' )
+     CALL READ_VALUE_CHECK( SCREEN_INTV        , FILE_NAME, 'SCREEN_INTV'        , DefaultValue=1.0_SP, Units='s' )
+
+     CALL FLUSH_TMP_LOG
 
 
+! ---------------------------------------
+! -          Hot Start Info             -
+! ---------------------------------------
      CALL WRITE_LOG( LOG_BANNER( 'HOT START' ) )
 
      CALL READ_VALUE_CHECK( INI_UVZ, FILE_NAME, 'INI_UVZ', DefaultValue=.FALSE. )
@@ -316,14 +332,21 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( icount      , FILE_NAME, 'OutputStartNumber', DefaultValue=1                  )
         icount = icount-1
      END IF
+
+     CALL FLUSH_TMP_LOG
 ! end initial hot start file
 
-
+! ---------------------------------------
+! -         Water Level Info            -
+! ---------------------------------------
 ! add water level 03/29/2016
      CALL WRITE_LOG( LOG_BANNER( 'STILL WATER INFO' ) )
      CALL READ_VALUE_CHECK( WaterLevel, FILE_NAME, 'WaterLevel', DefaultValue=0.0_SP, Units='m' )
+     CALL FLUSH_TMP_LOG
 
-! wavemaker
+! ---------------------------------------
+! -          Wavemake Info              -
+! ---------------------------------------
      CALL WRITE_LOG( LOG_BANNER( 'WAVEMAKER' ) )
      
      CALL READ_VALUE_CHECK( WaveMaker, FILE_NAME, 'WAVEMAKER', DefaultValue='nothing' )
@@ -588,14 +611,24 @@ SUBROUTINE READ_INPUT
 
      ENDIF ! end absorbing-generating or left bc wave maker
 
+     CALL FLUSH_TMP_LOG    
+
+
+! ---------------------------------------
+! -         Perodic BC Info             -
+! ---------------------------------------
 
      CALL WRITE_LOG( LOG_BANNER( 'PERIODIC BC' ) )
-
 # if defined (CARTESIAN)
 ! south-north periodic boundary condition
      CALL READ_VALUE_CHECK( PERIODIC, FILE_NAME, 'PERIODIC', DefaultValue=.FALSE. )
 # endif
+     CALL FLUSH_TMP_LOG
 
+
+! ---------------------------------------
+! -           Sponge Info               -
+! ---------------------------------------
      CALL WRITE_LOG( LOG_BANNER( 'SPONGE' ) )
 
      CALL READ_VALUE_CHECK( DIFFUSION_SPONGE, FILE_NAME, 'DIFFUSION_SPONGE', DefaultValue=.FALSE. )
@@ -636,6 +669,12 @@ SUBROUTINE READ_INPUT
         WaveMakerCurrentBalance=.TRUE.
      END IF
 
+     CALL FLUSH_TMP_LOG
+
+
+! ---------------------------------------
+! -   Obstacle and Breakwater Info      -
+! ---------------------------------------
      CALL WRITE_LOG( LOG_BANNER( 'OBSTACLE and BREAKWATER' ) )
 
 ! obstacle structures
@@ -652,7 +691,12 @@ SUBROUTINE READ_INPUT
      ! NOTE: Should this be read only when BREAKWATER file is set?
      CALL READ_VALUE_CHECK( BreakWaterAbsorbCoef, FILE_NAME, 'BreakWaterAbsorbCoef', DefaultValue=10.0_SP )
 
+     CALL FLUSH_TMP_LOG
 
+
+! ---------------------------------------
+! -          Physics Info               -
+! ---------------------------------------
      CALL WRITE_LOG( LOG_BANNER( 'PHYSICS' ) )
 
      CALL READ_VALUE_CHECK( DISPERSION, FILE_NAME, 'DISPERSION', DefaultValue=.TRUE.    )
@@ -684,7 +728,12 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( Cd_fixed, FILE_NAME, 'Cd'           , DefaultValue=0.0_SP )
      END IF
 
+     CALL FLUSH_TMP_LOG
 
+
+! ---------------------------------------
+! -          Numerics Info              -
+! ---------------------------------------
      CALL WRITE_LOG( LOG_BANNER( 'NUMERICS' ) )
 
      CALL READ_VALUE_CHECK( Time_Scheme, FILE_NAME, 'Time_Scheme' , DefaultValue='Runge_Kutta' )
@@ -700,6 +749,8 @@ SUBROUTINE READ_INPUT
      CALL READ_VALUE_CHECK( FroudeCap  , FILE_NAME, 'FroudeCap'  , DefaultValue=3.0_SP            ) 
      CALL READ_VALUE_CHECK( MinDepth   , FILE_NAME, 'MinDepth'   , DefaultValue=0.1_SP, Units='m' )
      CALL READ_VALUE_CHECK( MinDepthFrc, FILE_NAME, 'MinDepthFrc', DefaultValue=0.1_SP, Units='m' )
+
+     CALL FLUSH_TMP_LOG
 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,*)'                                         '

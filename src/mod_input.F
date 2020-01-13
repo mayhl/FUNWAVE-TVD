@@ -112,9 +112,40 @@ END INTERFACE
 #endif
    INTEGER , PARAMETER :: FltStrLen = 2*MaxDigits+1
 
+   CHARACTER(LEN=:), ALLOCATABLE :: TmpLog
+
+
 CONTAINS
 
 
+
+SUBROUTINE INIT_TMP_LOG()
+   
+   IMPLICIT NONE
+   INTEGER, PARAMETER :: LogLen = 400
+
+!   ALLOCATE( TmpLog(LogLen), mold=REPEAT( '', LogLen ) )
+
+END SUBROUTINE 
+
+SUBROUTINE FLUSH_TMP_LOG()
+
+   USE LOG_OUTPUT, ONLY: WRITE_LOG
+   IMPLICIT NONE
+
+
+   CALL WRITE_LOG( TmpLog )
+
+   TmpLog = ""
+
+END SUBROUTINE
+
+SUBROUTINE CLOSE_TMP_LOG()
+
+   IMPLICIT NONE
+   DEALLOCATE( TmpLog )
+
+END SUBROUTINE
 
 !-------------------------------------------------------------------------------------
 !
@@ -217,13 +248,15 @@ END SUBROUTINE
 !-------------------------------------------------------------------------------------
 SUBROUTINE WRITE_VARIABLE_VALUE( VariableName, VariableValueStr)
 
-   USE LOG_OUTPUT, ONLY: WRITE_LOG
+!   USE LOG_OUTPUT, ONLY: WRITE_LOG
 
    IMPLICIT NONE
    CHARACTER(LEN=*), INTENT(IN) :: VariableName
    CHARACTER(LEN=*), INTENT(IN) :: VariableValueStr
 
-   CALL WRITE_LOG( TRIM(VariableName)//" = "//TRIM(VariableValueStr) )
+   TmpLog = TRIM(TmpLog)//NEW_LINE('A')//TRIM(VariableName)//" = "//TRIM(VariableValueStr) 
+
+!   CALL WRITE_LOG( TRIM(VariableName)//" = "//TRIM(VariableValueStr) )
 
 END SUBROUTINE
 
