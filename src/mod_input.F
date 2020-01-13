@@ -456,7 +456,7 @@ SUBROUTINE READ_LOGICAL_CHECK(ReturnValue, InputFileName, VariableName, DefaultV
 
   CHARACTER(LEN=7), PARAMETER             :: ValueType="logical"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: ValueStr
+  CHARACTER(LEN=80)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
@@ -593,7 +593,7 @@ SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
 
   CHARACTER(LEN=7), PARAMETER             :: ValueType="logical"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: ValueStr
+  CHARACTER(LEN=80)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
   CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
@@ -894,7 +894,7 @@ SUBROUTINE READ_LOGICAL_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    CHARACTER(LEN=*), INTENT(IN ) :: VariableName
    INTEGER         , INTENT(OUT) :: ErrID
 
-   CHARACTER(LEN=40)             :: ValueString
+   CHARACTER(LEN=80)             :: ValueString
   
    CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'logical' , ErrID )
 
