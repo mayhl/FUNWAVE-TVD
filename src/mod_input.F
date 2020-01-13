@@ -102,6 +102,16 @@ INTERFACE FORMAT_VALUE
    MODULE PROCEDURE FORMAT_LOGICAL
 END INTERFACE
 
+
+#if defined(DOUBLE_PRECISION)
+   INTEGER , PARAMETER :: MaxDigits = 16
+   REAL(SP), PARAMETER :: ErrTol = 1.0E-15
+#else
+   INTEGER , PARAMETER :: MaxDigits = 8
+   REAL(SP), PARAMETER :: ErrTol = 1.0E-7
+#endif
+   INTEGER , PARAMETER :: FltStrLen = 2*MaxDigits+1
+
 CONTAINS
 
 
@@ -139,38 +149,41 @@ SUBROUTINE FORMAT_STRING( Val , ValStr )
 END SUBROUTINE
 
 SUBROUTINE FORMAT_FLOAT( Val , ValStr )
-   
+
    USE PARAM, ONLY: SP
- 
+
    IMPLICIT NONE
    REAL(SP)        , INTENT(IN ) :: Val
    CHARACTER(LEN=*), INTENT(OUT) :: ValStr
 
-   INTEGER                       :: N
-   INTEGER                       :: SepIdx
-   INTEGER                       :: CutIdx 
+   REAL(SP)                      :: TmpVal
+
    INTEGER                       :: i
+   CHARACTER(LEN=10)             :: FmtStr
+   CHARACTER(LEN=FltStrLen)      :: TmpStr
+   REAL(SP)                      :: ConvErr
 
-   WRITE( ValStr, '(F20.10)' ) Val
-   
-   ValStr=ADJUSTL(TRIM(ValStr))
-   N = LEN_TRIM(ValStr)
+   WRITE(FmtStr,'(A2,I2,A1,I2,A1)') '(F', (2*MaxDigits+1) , '.' , MaxDigits , ')' 
+   WRITE(ValStr,FmtStr) Val   
 
-   DO i = 1 , N
-      IF (ValStr(i:i).EQ.'.') THEN
-         SepIdx = i + 1
+   ! Formatting REAL to STRING with increasing number of digits and
+   ! back to REAL until error tolerance is met
+   DO i = 1, MaxDigits
+
+      WRITE(FmtStr,'(A2,I2,A1,I2,A1)') '(F', (2*MaxDigits+1) , '.' , i , ')'
+      WRITE(TmpStr,FmtStr) Val
+      
+      READ(TmpStr,*) TmpVal
+      ConvErr = ABS( (TmpVal-Val)/Val )
+
+      IF( ConvErr.LT.ErrTol ) THEN
+         ValStr = TmpStr
          EXIT
       END IF
+
    END DO
 
-   DO i = N , SepIdx, -1 
-      IF ( ValStr(i:i).NE.'0' ) THEN
-         CutIdx = i
-         EXIT
-      END IF
-   END DO
-
-   ValStr = ValStr(1:CutIdx)
+   ValStr = ADJUSTL( ValStr )
 
 END SUBROUTINE
 
@@ -359,7 +372,7 @@ SUBROUTINE READ_FLOAT_CHECK(ReturnValue, InputFileName, VariableName, DefaultVal
 
   CHARACTER(LEN=5), PARAMETER             :: ValueType="float"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: ValueStr
+  CHARACTER(LEN=FltStrLen)                :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
@@ -499,7 +512,7 @@ SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableNa
 
   CHARACTER(LEN=5), PARAMETER             :: ValueType="float"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: ValueStr
+  CHARACTER(LEN=FltStrLen)                :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
   CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
