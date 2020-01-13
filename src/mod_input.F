@@ -464,7 +464,7 @@ SUBROUTINE READ_STRING_CHECK(ReturnValue, InputFileName, VariableName, DefaultVa
 
   CHARACTER(LEN=6), PARAMETER             :: ValueType="string"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: ValueStr
+  CHARACTER(LEN=80)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
 
@@ -641,7 +641,7 @@ SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableN
 
   CHARACTER(LEN=6), PARAMETER             :: ValueType="string"
   INTEGER                                 :: ErrID
-  CHARACTER(LEN=30)                       :: ValueStr
+  CHARACTER(LEN=80)                       :: ValueStr
 
   CALL READ_VALUE_TMP( ReturnValue, InputFileName, VariableName, ErrID)
   CALL READ_CHECK_DELAY_DEFAULT( InputFileName, VariableName, ValueType, ErrID )
@@ -829,7 +829,7 @@ SUBROUTINE READ_STRING_TMP( ReturnValue, InputFileName, VariableName, ErrID )
    CHARACTER(LEN=*), INTENT(IN ) :: VariableName
    INTEGER         , INTENT(OUT) :: ErrID
 
-   CHARACTER(LEN=40)             :: ValueString
+   CHARACTER(LEN=80)             :: ValueString
   
    CALL PARSE_VALUE( ValueString, InputFileName, VariableName, 'string' , ErrID )
 
