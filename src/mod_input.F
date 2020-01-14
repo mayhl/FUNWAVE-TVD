@@ -557,7 +557,7 @@ SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableNa
 
   IF       ( ErrID.EQ.2 ) THEN
      IsDefault=.TRUE.
-  ELSE IF  ( ErrID.EQ.1 ) THEN
+  ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
      CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
@@ -600,7 +600,7 @@ SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
 
   IF       ( ErrID.EQ.2 ) THEN
      IsDefault=.TRUE.
-  ELSE IF  ( ErrID.EQ.1 ) THEN
+  ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
      CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
@@ -643,7 +643,7 @@ SUBROUTINE READ_INTEGER_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
 
   IF       ( ErrID.EQ.2 ) THEN
      IsDefault=.TRUE.
-  ELSE IF  ( ErrID.EQ.1 ) THEN
+  ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
      CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
@@ -686,7 +686,7 @@ SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableN
 
   IF       ( ErrID.EQ.2 ) THEN
      IsDefault=.TRUE.
-  ELSE IF  ( ErrID.EQ.1 ) THEN
+  ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
      CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
