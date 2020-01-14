@@ -83,7 +83,7 @@ MODULE TIDE_MODULE
 CONTAINS
   
 SUBROUTINE TIDE_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL,INPUT_FILE_NAME
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   
 # endif
@@ -97,7 +97,7 @@ SUBROUTINE TIDE_INITIAL
 
 
 ! read  from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
       CALL READ_LOGICAL(TIDAL_BC,FILE_NAME,'TIDAL_BC',ierr)
       IF(ierr == 1)THEN

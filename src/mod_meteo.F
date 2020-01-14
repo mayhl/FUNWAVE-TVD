@@ -109,7 +109,7 @@ CONTAINS
 ! READ STORM
 
 SUBROUTINE METEO_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE,INPUT_FILE_NAME
                     
   USE INPUT_READ
   IMPLICIT NONE
@@ -133,7 +133,7 @@ SUBROUTINE METEO_INITIAL
 
 
 ! read storm from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,*)'                                         '
@@ -380,7 +380,7 @@ SUBROUTINE METEO_FORCING
 END SUBROUTINE METEO_FORCING
 
 SUBROUTINE Holland_Model_Setup
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE, INPUT_FILE_NAME
 # if defined (PARALLEL)
   USE GLOBAL,ONLY :   iista,jjsta  !ykchoi Jan/23/2018
 # endif
@@ -393,7 +393,7 @@ SUBROUTINE Holland_Model_Setup
   CHARACTER(LEN=80):: StormName
 
 ! read storm from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
 ! storm file
       CALL READ_STRING(STORM_FILE,FILE_NAME,'STORM_FILE',ierr)
@@ -494,7 +494,7 @@ SUBROUTINE Holland_Model_Setup
 END SUBROUTINE Holland_Model_Setup
 
 SUBROUTINE Contant_Wind_Field_Setup
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE,INPUT_FILE_NAME
   USE INPUT_READ
   IMPLICIT NONE
   CHARACTER(LEN=80)::FILE_NAME=' '
@@ -505,7 +505,7 @@ SUBROUTINE Contant_Wind_Field_Setup
   CHARACTER(LEN=80) :: WHAT
 
 ! read storm from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
   CALL READ_STRING(WIND_FILE,FILE_NAME,'CONSTANT_WIND_FILE',ierr)
 
@@ -729,7 +729,7 @@ SUBROUTINE Constant_Wind_Forcing
 END SUBROUTINE Constant_Wind_Forcing
 
 SUBROUTINE Slide_Model_Setup
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE,INPUT_FILE_NAME
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta    !ykchoi Jan/23/2018
 # endif
@@ -746,7 +746,7 @@ SUBROUTINE Slide_Model_Setup
     WindForce = .FALSE.
 
 ! read slide from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
 ! storm file
       CALL READ_STRING(SLIDE_FILE,FILE_NAME,'SLIDE_FILE',ierr)
@@ -946,7 +946,7 @@ SUBROUTINE Slide_Model_Forcing
 END SUBROUTINE Slide_Model_Forcing
 
 SUBROUTINE MeteoGausian_Setup
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE,INPUT_FILE_NAME
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
@@ -959,7 +959,7 @@ SUBROUTINE MeteoGausian_Setup
   CHARACTER(LEN=80):: StormName
 
 ! read storm from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
 ! storm file
       CALL READ_STRING(STORM_FILE,FILE_NAME,'METEO_GAUSIAN_FILE',ierr)

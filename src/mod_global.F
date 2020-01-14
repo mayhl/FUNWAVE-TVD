@@ -86,6 +86,9 @@ MODULE GLOBAL
 # endif
 
 ! define parameters
+
+       ! [mayhl] Added global input file name for modules
+       CHARACTER(LEN=80) INPUT_FILE_NAME
        CHARACTER(LEN=80) TITLE
        CHARACTER(LEN=80) ReadType
        CHARACTER(LEN=80) DEPTH_TYPE

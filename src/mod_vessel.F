@@ -100,7 +100,7 @@ CONTAINS
 ! READ VESSEL
 
 SUBROUTINE VESSEL_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL, INPUT_FILE_NAME
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
@@ -116,7 +116,7 @@ SUBROUTINE VESSEL_INITIAL
 
 
 ! read vessel number and folder from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
 ! vessel folder
       CALL READ_STRING(VESSEL_FOLDER,FILE_NAME,'VESSEL_FOLDER',ierr)

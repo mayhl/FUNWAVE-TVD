@@ -106,7 +106,7 @@ MODULE SEDIMENT_MODULE
 CONTAINS
   
 SUBROUTINE SEDIMENT_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL, INPUT_FILE_NAME
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
@@ -119,8 +119,10 @@ SUBROUTINE SEDIMENT_INITIAL
   INTEGER :: Ifile,ierr
 
 ! read  from input.txt
-      FILE_NAME='input.txt'
+      FILE_NAME=INPUT_FILE_NAME
 
+      WRITE(*,*) '----------------------'
+      WRITE(*,*) FILE_NAME
 ! input is based on Babaks original but make default values
       CALL READ_STRING(Sed_Scheme,FILE_NAME,'Sed_Scheme',ierr)
 
