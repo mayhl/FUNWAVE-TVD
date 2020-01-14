@@ -161,8 +161,6 @@ SUBROUTINE READ_INPUT
     INTEGER :: I_comp
     LOGICAL :: INPUT_PHASE = .FALSE.
 
-    CHARACTER(LEN=100) :: FMT_STR_BUFF
-
     !>by Zhouteng Ye
     CHARACTER(LEN=80)::INPUT_NAME=''
 
@@ -170,7 +168,11 @@ SUBROUTINE READ_INPUT
     CHARACTER(LEN=80)::FDIR=' '
 !ykchoi]
 
-    LOGICAL :: IsDelayed
+    ! [mayhl] Temporay values for extra I/O logic
+    CHARACTER(LEN=80) :: FmtStrBuff
+    LOGICAL :: IsDelayed, IsNotMinDepth, IsNotMinDepthFrc 
+    REAL(SP) :: ValDiff
+
 
 # if defined (PARALLEL)
     CALL MPI_COMM_SIZE (MPI_COMM_WORLD, nprocs, ier)   !ykchoi(04/May/2017)
@@ -747,8 +749,46 @@ SUBROUTINE READ_INPUT
      FIXED_DT=.NOT.IsDelayed 
 
      CALL READ_VALUE_CHECK( FroudeCap  , FILE_NAME, 'FroudeCap'  , DefaultValue=3.0_SP            ) 
-     CALL READ_VALUE_CHECK( MinDepth   , FILE_NAME, 'MinDepth'   , DefaultValue=0.1_SP, Units='m' )
-     CALL READ_VALUE_CHECK( MinDepthFrc, FILE_NAME, 'MinDepthFrc', DefaultValue=0.1_SP, Units='m' )
+
+     ! Somewhat hacky solution check if variables are in input file and valid but not output to temp log buffer
+     CALL READ_VALUE_CHECK_DELAY_DEFAULT( MinDepth   , FILE_NAME, 'MinDepth'    , IsNotMinDepth    , IsOutput=.FALSE. )
+     CALL READ_VALUE_CHECK_DELAY_DEFAULT( MinDepthFrc, FILE_NAME, 'MinDepthFrc' , IsNotMinDepthFrc , IsOutput=.FALSE. )
+
+     ! Checking if either MinDepth or MinDepthFrc have been read
+     IF      ( IsNotMinDepth.AND.IsNotMinDepthFrc ) THEN
+        ! If neither MinDepthFrc or MinDepth are read from input file
+        CALL READ_VALUE_CHECK( MinDepth   , FILE_NAME, 'MinDepth'   , DefaultValue=0.1_SP, Units='m' )
+        MinDepthFrc = MinDepth
+     ELSE IF ( IsNotMinDepth.AND..NOT.IsNotMinDepthFrc ) THEN
+        ! If only MinDepthFrc is read from input file
+        CALL READ_VALUE_CHECK( MinDepthFrc, FILE_NAME, 'MinDepthFrc', DefaultValue=0.1_SP, Units='m' )
+        MinDepth = MinDepthFrc
+        CALL FORMAT_VALUE( MinDepth , FmtStrBuff )
+        CALL WRITE_VARIABLE_VALUE( 'MinDepth' , FmtStrBuff )
+     ELSE IF ( .NOT.IsNotMinDepth.AND.IsNotMinDepthFrc ) THEN
+        ! If only MinDepth is read from input file
+        MinDepthFrc = MinDepth
+        CALL FORMAT_VALUE( MinDepth , FmtStrBuff )
+        CALL WRITE_VARIABLE_VALUE( 'MinDepth' , FmtStrBuff )
+     ELSE
+        ! If both MinDepth and MinDepthFrc are read from input file
+        IF ( ABS(MinDepth) < ErrTol ) THEN
+           ValDiff = ABS( MinDepth - MinDepthFrc )
+        ELSE
+           ValDiff = ABS( ( MinDepth - MinDepthFrc ) / MinDepth )
+        END IF
+
+        IF ( ValDiff > ErrTol ) THEN
+           CALL WRITE_ALL ( 'WARNING: MinDepth and MinDepthFrc are different, taking maximum of values.' )
+           MinDepth = MAX( MinDepth, MinDepthFrc )
+           MinDepthFrc = MinDepth
+        END IF
+
+        CALL FORMAT_VALUE( MinDepth , FmtStrBuff )
+        CALL WRITE_VARIABLE_VALUE( 'MinDepth'    , FmtStrBuff )
+        CALL WRITE_VARIABLE_VALUE( 'MinDepthFrc' , FmtStrBuff )
+
+     END IF
 
      CALL FLUSH_TMP_LOG
 
