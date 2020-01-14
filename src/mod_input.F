@@ -536,7 +536,7 @@ END SUBROUTINE
 !        12/19/2019 Michael-Angelo Y.-H. Lam
 !
 !-------------------------------------------------------------------------------------
-SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault , IsOutput  )
 
   USE PARAM, ONLY: SP
   USE LOG_OUTPUT, ONLY: WRITE_ALL
@@ -546,7 +546,7 @@ SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableNa
   CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
   CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
   LOGICAL         ,           INTENT(OUT) :: IsDefault
-
+  LOGICAL         , OPTIONAL, INTENT(IN ) :: IsOutput
 
   CHARACTER(LEN=5), PARAMETER             :: ValueType="float"
   INTEGER                                 :: ErrID
@@ -560,7 +560,11 @@ SUBROUTINE READ_FLOAT_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableNa
   ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
-     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     IF ( PRESENT( IsOutput) ) THEN 
+        IF ( IsOutput ) CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     ELSE
+        CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     END IF
   ELSE
      ! Saftey check, code should not be called. 
      CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" )
@@ -580,7 +584,7 @@ END SUBROUTINE
 !        12/19/2019 Michael-Angelo Y.-H. Lam
 !
 !-------------------------------------------------------------------------------------
-SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault, IsOutput  )
 
   USE LOG_OUTPUT, ONLY: WRITE_ALL
   IMPLICIT NONE
@@ -589,7 +593,7 @@ SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
   CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
   CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
   LOGICAL         ,           INTENT(OUT) :: IsDefault
-
+  LOGICAL         , OPTIONAL, INTENT(IN ) :: IsOutput
 
   CHARACTER(LEN=7), PARAMETER             :: ValueType="logical"
   INTEGER                                 :: ErrID
@@ -603,7 +607,12 @@ SUBROUTINE READ_LOGICAL_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
   ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
-     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     IF ( PRESENT( IsOutput) ) THEN
+        IF ( IsOutput ) CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     ELSE
+        CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     END IF
+
   ELSE
      ! Saftey check, code should not be called. 
      CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" )
@@ -623,7 +632,7 @@ END SUBROUTINE
 !        12/19/2019 Michael-Angelo Y.-H. Lam
 !
 !-------------------------------------------------------------------------------------
-SUBROUTINE READ_INTEGER_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+SUBROUTINE READ_INTEGER_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault, IsOutput )
 
   USE LOG_OUTPUT, ONLY: WRITE_ALL
   IMPLICIT NONE
@@ -632,7 +641,7 @@ SUBROUTINE READ_INTEGER_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
   CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
   CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
   LOGICAL         ,           INTENT(OUT) :: IsDefault
-
+  LOGICAL         , OPTIONAL, INTENT(IN ) :: IsOutput
 
   CHARACTER(LEN=7), PARAMETER             :: ValueType="integer"
   INTEGER                                 :: ErrID
@@ -646,7 +655,11 @@ SUBROUTINE READ_INTEGER_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, Variable
   ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
-     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     IF ( PRESENT( IsOutput) ) THEN
+        IF ( IsOutput ) CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     ELSE
+        CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     END IF
   ELSE
      ! Saftey check, code should not be called. 
      CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" )
@@ -666,7 +679,7 @@ END SUBROUTINE
 !        12/19/2019 Michael-Angelo Y.-H. Lam
 !
 !-------------------------------------------------------------------------------------
-SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault  )
+SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableName, IsDefault, IsOutput )
 
   USE LOG_OUTPUT, ONLY: WRITE_ALL
   IMPLICIT NONE
@@ -675,7 +688,7 @@ SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableN
   CHARACTER(LEN=*),           INTENT(IN ) :: InputFileName
   CHARACTER(LEN=*),           INTENT(IN ) :: VariableName
   LOGICAL         ,           INTENT(OUT) :: IsDefault
-
+  LOGICAL         , OPTIONAL, INTENT(IN ) :: IsOutput
 
   CHARACTER(LEN=6), PARAMETER             :: ValueType="string"
   INTEGER                                 :: ErrID
@@ -689,7 +702,11 @@ SUBROUTINE READ_STRING_CHECK_DELAY_DEFAULT(ReturnValue, InputFileName, VariableN
   ELSE IF  ( ErrID.EQ.0 ) THEN
      IsDefault=.FALSE.
      CALL FORMAT_VALUE( ReturnValue , ValueStr)
-     CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     IF ( PRESENT( IsOutput) ) THEN
+        IF ( IsOutput ) CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     ELSE
+        CALL WRITE_VARIABLE_VALUE( VariableName, ValueStr )
+     END IF
   ELSE
      ! Saftey check, code should not be called. 
      CALL WRITE_ALL ("FATAL: Unexpected error state. STOPPING SIMULATION!" ) 
