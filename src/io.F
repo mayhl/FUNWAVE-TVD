@@ -197,18 +197,17 @@ SUBROUTINE READ_INPUT
         FILE_NAME=INPUT_NAME
       endif
 
-! title
-      CALL READ_STRING(TITLE,FILE_NAME,'TITLE',ierr)
-      IF(ierr==1)THEN
-        !write(*,*) 'No TITLE in ', FILE_NAME, 'use default'
-        TITLE='---TEST RUN---'
-      ENDIF
+      CALL INIT_TMP_LOG
 
+! ---------------------------------------
+! -             Title Info              -
+! ---------------------------------------
+      
       CALL WRITE_LOG( LOG_BANNER( 'LOG FILE' ) )
+      CALL READ_VALUE_CHECK( TITLE, FILE_NAME, 'TITLE', DefaultValue='---TEST RUN---')
       CALL WRITE_LOG( TITLE )
       CALL WRITE_LOG( LOG_BANNER ( 'INPUT START' ) )
-
-      CALL INIT_TMP_LOG
+      CALL FLUSH_TMP_LOG
 
 
 # if defined (PARALLEL)
@@ -830,149 +829,48 @@ SUBROUTINE READ_INPUT
 
      CALL FLUSH_TMP_LOG
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------- WAVE-AVERAGED PROPERTY -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'------- WAVE-AVERAGED PROPERTY -----------------'   
-# endif
 
-      CALL READ_FLOAT(T_INTV_mean,FILE_NAME,'T_INTV_mean',ierr)
-      IF(ierr==1)THEN
-        T_INTV_mean = LARGE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'T_INTV_mean Default:  LARGE'
-         WRITE(3,'(A40)')'T_INTV_mean Default:  LARGE'
-      endif
-# else
-         WRITE(*,'(A40)')'T_INTV_mean Default:  LARGE'
-         WRITE(3,'(A40)')'T_INTV_mean Default:  LARGE'
-# endif
-       ENDIF
+! ---------------------------------------
+! -    WAVE-AVERAGED PROPERTIES INFO    -
+! ---------------------------------------
 
-	CALL READ_FLOAT(STEADY_TIME,FILE_NAME,'STEADY_TIME',ierr)
-      IF(ierr==1)THEN
-        STEADY_TIME = LARGE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'STEADY_TIME Default:  LARGE'
-         WRITE(3,'(A40)')'STEADY_TIME Default:  LARGE'
-      endif
-# else
-         WRITE(*,'(A40)')'STEADY_TIME Default:  LARGE'
-         WRITE(3,'(A40)')'STEADY_TIME Default:  LARGE'
-# endif
-       ENDIF
+     CALL WRITE_LOG( LOG_BANNER( 'WAVE-AVERAGED PROPERTIES' ) )
 
-      CALL READ_FLOAT(C_smg,FILE_NAME,'C_smg',ierr)
-      IF(ierr==1)THEN
-        C_smg = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'C_smg Default:  0.0'
-         WRITE(3,'(A40)')'C_smg Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'C_smg Default:  0.0'
-         WRITE(3,'(A40)')'C_smg Default:  0.0'
-# endif
-       ENDIF
+     CALL READ_VALUE_CHECK( T_INTV_mean, FILE_NAME, 'T_INTV_mean', DefaultValue=LARGE  )
+     CALL READ_VALUE_CHECK( STEADY_TIME, FILE_NAME, 'STEADY_TIME', DefaultValue=LARGE  )
+     CALL READ_VALUE_CHECK( C_smg      , FILE_NAME, 'C_smg'      , DefaultValue=0.0_SP )
+     CALL READ_VALUE_CHECK( nu_bkg     , FILE_NAME, 'nu_bkg'     , DefaultValue=0.0_SP )
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A14,F12.6)')'T_INTV_mean =', T_INTV_mean
-      if (myid.eq.0) WRITE(3,'(A14,F12.6)')'STEADY_TIME =', STEADY_TIME
-      if (myid.eq.0) WRITE(3,'(A8,F12.6)')'C_smg =', C_smg
-# else
-      WRITE(3,'(A14,F12.6)')'T_INTV_mean =', T_INTV_mean
-      WRITE(3,'(A14,F12.6)')'STEADY_TIME =', STEADY_TIME
-      WRITE(3,'(A8,F12.6)')'C_smg =', C_smg
-# endif
-	
-      CALL READ_FLOAT(nu_bkg,FILE_NAME,'nu_bkg',ierr)
-      IF(ierr==1)THEN
-        nu_bkg = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'nu_bkg Default:  0.0'
-         WRITE(3,'(A40)')'nu_bkg Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'nu_bkg Default:  0.0'
-         WRITE(3,'(A40)')'nu_bkg Default:  0.0'
-# endif
-       ENDIF
+     CALL FLUSH_TMP_LOG
+
 
 # if defined (COUPLING)
+! ---------------------------------------
+! -           COUPLING INFO             -
+! ---------------------------------------
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- COUPLING -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- COUPLING -----------------'   
+     CALL WRITE_LOG( LOG_BANNER( 'COUPLING' ) )  
+     CALL READ_VALUE_CHECK( COUPLING_FILE, FILE_NAME, 'COUPLING_FILE' )
+     CALL FLUSH_TMP_LOG
 # endif
 
-      CALL READ_STRING(COUPLING_FILE,FILE_NAME,'COUPLING_FILE',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You use coupling option, specify COUPLING_FILE in input.txt'
-         WRITE(3,'(A80)')'You use coupling option, specify COUPLING_FILE in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'You use coupling option, specify COUPLING_FILE in input.txt'
-         WRITE(3,'(A80)')'You use coupling option, specify COUPLING_FILE in input.txt'
-# endif
-        STOP
-      ENDIF
 
+! ---------------------------------------
+! -            OUTPUT INFO              -
+! ---------------------------------------
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A50)')'COUPLING_FILE:', COUPLING_FILE
-# else
-      WRITE(3,'(A15,A50)')'COUPLING_FILE:', COUPLING_FILE
-# endif
-# endif
-  ! end coupling file
+     CALL WRITE_LOG( LOG_BANNER( 'OUTPUT INFO' ) )
 
+     CALL READ_VALUE_CHECK( RESULT_FOLDER, FILE_NAME, 'RESULT_FOLDER', DefaultValue='./output/' )
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- OUTPUT INFO -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- OUTPUT INFO -----------------'   
-# endif
-
-! result folder
-      CALL READ_STRING(RESULT_FOLDER,FILE_NAME,'RESULT_FOLDER',ierr)
-      IF(ierr==1)THEN
-        RESULT_FOLDER = './output/'
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A50)')'RESULT_FOLDER:', RESULT_FOLDER
-# else
-      WRITE(3,'(A15,A50)')'RESULT_FOLDER:', RESULT_FOLDER
-# endif
-
+# if defined (PARALLEL)     
 ![mayhl 17/06/12
 ! Note 1: Serial code only output is ASCII
 ! Note 2: Placing code after result folder creation seems to delay
 !         writing to LOG.txt till after simulation is completed.
-# if defined (PARALLEL)
-      CALL READ_STRING(FIELD_IO_TYPE,FILE_NAME,'FIELD_IO_TYPE',ierr)
-
-      IF(ierr.EQ.1) FIELD_IO_TYPE = 'ASCII'
-      
-      IF (myid.EQ.0) WRITE(3,*) 'FIELD_IO_TYPE = ' , FIELD_IO_TYPE
-# endif
+      CALL READ_VALUE_CHECK( FIELD_IO_TYPE, FILE_NAME, 'FIELD_IO_TYPE', DefaultValue='ASCII' )
 ! mayhl]
- 
-
+# endif  
 
 ! create result folder
       MKFOLDER = "mkdir -p "//TRIM(RESULT_FOLDER)
@@ -993,132 +891,69 @@ SUBROUTINE READ_INPUT
 # endif
 
 ! station files
-      CALL READ_INTEGER(NumberStations,FILE_NAME,'NumberStations',ierr)
-      IF(NumberStations>0)THEN
-      CALL READ_STRING(STATIONS_FILE,FILE_NAME,'STATIONS_FILE',ierr)
-      ENDIF
+      CALL READ_VALUE_CHECK( NumberStations, FILE_NAME, 'NumberStations', DefaultValue=0 )
+
+      IF ( NumberStations.GT.0 ) CALL READ_VALUE_CHECK( STATIONS_FILE, FILE_NAME, 'STATIONS_FILE' )
 
 ! output parameters
-      CALL READ_INTEGER(OUTPUT_RES,FILE_NAME,'OUTPUT_RES',ierr)
-      IF(ierr==1)THEN
-        OUTPUT_RES = 1
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'OUTPUT_RES NOT FOUND, OUTPUT_RES=1: full resolution'
-         WRITE(3,'(A60)')'OUTPUT_RES NOT FOUND, OUTPUT_RES=1: full resolution'
-      endif
-# else
-         WRITE(*,'(A60)')'OUTPUT_RES NOT FOUND, OUTPUT_RES=1: full resolution'
-         WRITE(3,'(A60)')'OUTPUT_RES NOT FOUND, OUTPUT_RES=1: full resolution'
-# endif
-       ENDIF
 
-# if defined (PARALLEL)
-       if (myid.eq.0) WRITE(3,'(A15,I10)')'OUTPUT_RES',OUTPUT_RES
-# else
-       WRITE(3,'(A15,I10)')'OUTPUT_RES',OUTPUT_RES
-# endif 
+      CALL READ_VALUE_CHECK( OUTPUT_RES, FILE_NAME, 'OUTPUT_RES', DefaultValue=1 )
 
-      CALL READ_LOGICAL(OUT_DEPTH,FILE_NAME,'DEPTH_OUT',ierr)
-      CALL READ_LOGICAL(OUT_U,FILE_NAME,'U',ierr)
-      CALL READ_LOGICAL(OUT_V,FILE_NAME,'V',ierr)
-      CALL READ_LOGICAL(OUT_ETA,FILE_NAME,'ETA',ierr)
-      CALL READ_LOGICAL(OUT_Hmax,FILE_NAME,'Hmax',ierr)
-      CALL READ_LOGICAL(OUT_Hmin,FILE_NAME,'Hmin',ierr)
-      CALL READ_LOGICAL(OUT_Umax,FILE_NAME,'Umax',ierr)
-      CALL READ_LOGICAL(OUT_MFmax,FILE_NAME,'MFmax',ierr)
-      CALL READ_LOGICAL(OUT_VORmax,FILE_NAME,'VORmax',ierr)
-      CALL READ_LOGICAL(OUT_MASK,FILE_NAME,'MASK',ierr)
-      CALL READ_LOGICAL(OUT_MASK9,FILE_NAME,'MASK9',ierr)
-      CALL READ_LOGICAL(OUT_Umean,FILE_NAME,'Umean',ierr)
-      CALL READ_LOGICAL(OUT_Vmean,FILE_NAME,'Vmean',ierr)
-      CALL READ_LOGICAL(OUT_ETAmean,FILE_NAME,'ETAmean',ierr)
-      CALL READ_LOGICAL(OUT_WaveHeight,FILE_NAME,'WaveHeight',ierr)
-      CALL READ_LOGICAL(OUT_SXL,FILE_NAME,'SXL',ierr)
-      CALL READ_LOGICAL(OUT_SXR,FILE_NAME,'SXR',ierr)
-      CALL READ_LOGICAL(OUT_SYL,FILE_NAME,'SYL',ierr)
-      CALL READ_LOGICAL(OUT_SYR,FILE_NAME,'SYR',ierr)
-      CALL READ_LOGICAL(OUT_SourceX,FILE_NAME,'SourceX',ierr)
-      CALL READ_LOGICAL(OUT_SourceY,FILE_NAME,'SourceY',ierr)
-      CALL READ_LOGICAL(OUT_P,FILE_NAME,'P',ierr)
-      CALL READ_LOGICAL(OUT_Q,FILE_NAME,'Q',ierr)
-      CALL READ_LOGICAL(OUT_Fx,FILE_NAME,'Fx',ierr)
-      CALL READ_LOGICAL(OUT_Fy,FILE_NAME,'Fy',ierr)
-      CALL READ_LOGICAL(OUT_Gx,FILE_NAME,'Gx',ierr)
-      CALL READ_LOGICAL(OUT_Gy,FILE_NAME,'Gy',ierr)
-      CALL READ_LOGICAL(OUT_AGE,FILE_NAME,'AGE',ierr)
-      CALL READ_LOGICAL(OUT_ROLLER,FILE_NAME,'ROLLER',ierr)
-      CALL READ_LOGICAL(OUT_UNDERTOW,FILE_NAME,'UNDERTOW',ierr)
-      CALL READ_LOGICAL(OUT_NU,FILE_NAME,'OUT_NU',ierr)
-      CALL READ_LOGICAL(OUT_TMP,FILE_NAME,'TMP',ierr)
+      CALL READ_VALUE_CHECK( OUT_DEPTH     , FILE_NAME, 'DEPTH_OUT' , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_U         , FILE_NAME, 'U'         , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_V         , FILE_NAME, 'V'         , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_ETA       , FILE_NAME, 'ETA'       , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Hmax      , FILE_NAME, 'Hmax'      , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Hmin      , FILE_NAME, 'Hmin'      , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Umax      , FILE_NAME, 'Umax'      , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_MFmax     , FILE_NAME, 'MFmax'     , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_VORmax    , FILE_NAME, 'VORmax'    , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_MASK      , FILE_NAME, 'MASK'      , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_MASK9     , FILE_NAME, 'MASK9'     , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Umean     , FILE_NAME, 'Umean'     , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Vmean     , FILE_NAME, 'Vmean'     , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_ETAmean   , FILE_NAME, 'ETAmean'   , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_WaveHeight, FILE_NAME, 'WaveHeight', DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_SXL       , FILE_NAME, 'SXL'       , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_SXR       , FILE_NAME, 'SXR'       , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_SYL       , FILE_NAME, 'SYL'       , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_SYR       , FILE_NAME, 'SYR'       , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_SourceX   , FILE_NAME, 'SourceX'   , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_SourceY   , FILE_NAME, 'SourceY'   , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_P         , FILE_NAME, 'P'         , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Q         , FILE_NAME, 'Q'         , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Fx        , FILE_NAME, 'Fx'        , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Fy        , FILE_NAME, 'Fy'        , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Gx        , FILE_NAME, 'Gx'        , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_Gy        , FILE_NAME, 'Gy'        , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_AGE       , FILE_NAME, 'AGE'       , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_ROLLER    , FILE_NAME, 'ROLLER'    , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_UNDERTOW  , FILE_NAME, 'UNDERTOW'  , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_NU        , FILE_NAME, 'OUT_NU'    , DefaultValue=.FALSE. )
+      CALL READ_VALUE_CHECK( OUT_TMP       , FILE_NAME, 'TMP'       , DefaultValue=.FALSE. )
 
+      CALL FLUSH_TMP_LOG
+
+!mayhl: commented out code as it seems no longer relevant 
 !ykchoi
 !	CALL READ_FLOAT(EtaBlowVal,FILE_NAME,'EtaBlowVal',ierr)
-      IF(ierr==1)THEN
-        EtaBlowVal = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'EtaBlowVal Default:  100xmax_depth'
-         WRITE(3,'(A40)')'EtaBlowVal Default:  100xmax_depth'
-      endif
-# else
-         WRITE(*,'(A40)')'EtaBlowVal Default:  100xmax_depth'
-         WRITE(3,'(A40)')'EtaBlowVal Default:  100xmax_depth'
-# endif
-       ENDIF
-
+!      IF(ierr==1)THEN
+!        EtaBlowVal = 10.0_SP
+!# if defined (PARALLEL)
+!      if (myid.eq.0) THEN
+!         WRITE(*,'(A40)')'EtaBlowVal Default:  100xmax_depth'
+!         WRITE(3,'(A40)')'EtaBlowVal Default:  100xmax_depth'
+!      endif
+!# else
+!         WRITE(*,'(A40)')'EtaBlowVal Default:  100xmax_depth'
+!         WRITE(3,'(A40)')'EtaBlowVal Default:  100xmax_depth'
+!# endif
+!       ENDIF
+!
 !  fyshi set blowup value is 100xmax_depth in init.F  
 
-# if defined (PARALLEL)
-      if (myid.eq.0)   then
-# endif
-      WRITE(3,'(A15,L2)')'OUT_DEPTH',OUT_DEPTH
-      WRITE(3,'(A15,L2)')'OUT_U',OUT_U
-      WRITE(3,'(A15,L2)')'OUT_V',OUT_V
-      WRITE(3,'(A15,L2)')'OUT_ETA',OUT_ETA
-      WRITE(3,'(A15,L2)')'OUT_Hmax',OUT_Hmax
-      WRITE(3,'(A15,L2)')'OUT_Hmin',OUT_Hmin
-      WRITE(3,'(A15,L2)')'OUT_Umax',OUT_Umax
-      WRITE(3,'(A15,L2)')'OUT_MFmax',OUT_MFmax
-      WRITE(3,'(A15,L2)')'OUT_VORmax',OUT_VORmax
-      WRITE(3,'(A15,L2)')'OUT_MASK',OUT_MASK
-      WRITE(3,'(A15,L2)')'OUT_MASK9',OUT_MASK9
-      WRITE(3,'(A15,L2)')'OUT_Umean',OUT_Umean
-      WRITE(3,'(A15,L2)')'OUT_Vmean',OUT_Vmean
-      WRITE(3,'(A15,L2)')'OUT_ETAmean',OUT_ETAmean
-      WRITE(3,'(A15,L2)')'OUT_WaveHeight',OUT_WaveHeight
-      WRITE(3,'(A15,L2)')'OUT_SXL',OUT_SXL
-      WRITE(3,'(A15,L2)')'OUT_SXR',OUT_SXR
-      WRITE(3,'(A15,L2)')'OUT_SYL',OUT_SYL
-      WRITE(3,'(A15,L2)')'OUT_SYR',OUT_SYR
-      WRITE(3,'(A15,L2)')'OUT_SourceX',OUT_SourceX
-      WRITE(3,'(A15,L2)')'OUT_SourceY',OUT_SourceY
-      WRITE(3,'(A15,L2)')'OUT_P',OUT_P
-      WRITE(3,'(A15,L2)')'OUT_Q',OUT_Q
-      WRITE(3,'(A15,L2)')'OUT_Fx',OUT_Fx
-      WRITE(3,'(A15,L2)')'OUT_Fy',OUT_Fy
-      WRITE(3,'(A15,L2)')'OUT_Gx',OUT_Gx
-      WRITE(3,'(A15,L2)')'OUT_Gy',OUT_Gy
-      WRITE(3,'(A15,L2)')'OUT_AGE',OUT_AGE
-      WRITE(3,'(A15,L2)')'OUT_ROLLER',OUT_ROLLER
-      WRITE(3,'(A15,L2)')'OUT_UNDERTOW',OUT_UNDERTOW
-      WRITE(3,'(A15,L2)')'OUT_NU',OUT_NU
-      WRITE(3,'(A15,L2)')'OUT_TMP',OUT_TMP
-# if defined (PARALLEL)
-      endif
-# endif
-
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)' --------------input end --------------' 
-      if (myid.eq.0) WRITE(3,*)'                                         '
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)' --------------input end --------------' 
-      WRITE(3,*)'                                         '
-# endif
-
+      CALL WRITE_LOG( LOG_BANNER( 'INPUT END' ) )
+      CALL CLOSE_TMP_LOG
 END SUBROUTINE READ_INPUT
 
 # if defined (CARTESIAN)
