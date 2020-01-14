@@ -83,337 +83,130 @@ MODULE TIDE_MODULE
 CONTAINS
   
 SUBROUTINE TIDE_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL,INPUT_FILE_NAME
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL,INPUT_FILE_NAME, SPONGE_ON
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   
 # endif
                     
-  USE INPUT_READ
+  USE INPUT_READ !, ONLY: READ_VALUE_CHECK
+  USE LOG_OUTPUT
   IMPLICIT NONE
 
   CHARACTER(LEN=80)::FILE_NAME=' '
   CHARACTER(LEN=80)::TMP_NAME=' '
   INTEGER :: Ifile,ierr
-
+  LOGICAL :: IsNotRead
 
 ! read  from input.txt
       FILE_NAME=INPUT_FILE_NAME
 
-      CALL READ_LOGICAL(TIDAL_BC,FILE_NAME,'TIDAL_BC',ierr)
-      IF(ierr == 1)THEN
-       TIDAL_BC = .FALSE. 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A80)')'TIDAL_BC not defined, Default: False'
-       WRITE(*,'(A80)')'TIDAL_BC not defined, Default: False'
-      endif
-# else
-      WRITE(3,'(A80)')'TIDAL_BC not defined, Default: False'
-      WRITE(*,'(A80)')'TIDAL_BC not defined, Default: False'
-# endif 
-      ENDIF
+      CALL WRITE_LOG( LOG_BANNER( 'TIDE INFO' ) )
+      CALL READ_VALUE_CHECK( TIDAL_BC, FILE_NAME, 'TIDAL_BC', DefaultValue=.FALSE. )
 
-    IF (TIDAL_BC) THEN
+      IF ( TIDAL_BC ) THEN
 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A80)')'TIDAL_BC is defined'
-       WRITE(*,'(A80)')'TIDAL_BC is defined'
-      endif
-# else
-      WRITE(3,'(A80)')'TIDAL_BC is defined'
-      WRITE(*,'(A80)')'TIDAL_BC is defined'
-# endif 
+         ALLOCATE(SPONGE_TIDE_WEST(Mloc,Nloc) , SPONGE_TIDE_EAST(Mloc,Nloc) , &
+                  SPONGE_TIDE_SOUTH(Mloc,Nloc), SPONGE_TIDE_NORTH(Mloc,Nloc)    )
 
-      ALLOCATE(SPONGE_TIDE_WEST(Mloc,Nloc),SPONGE_TIDE_EAST(Mloc,Nloc), &
-                SPONGE_TIDE_SOUTH(Mloc,Nloc),SPONGE_TIDE_NORTH(Mloc,Nloc))
-
-      CALL TIDE_SPONGE
+         CALL TIDE_SPONGE
 
 ! input tide details
-      CALL READ_STRING(TideBcType,FILE_NAME,'TideBcType',ierr)
-      IF(ierr==1)THEN
-        TideBcType = 'CONSTANT'
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-         WRITE(3,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-      endif
-# else
-         WRITE(*,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-         WRITE(3,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-# endif
-      ENDIF
+         CALL READ_VALUE_CHECK( TideBcType, FILE_NAME, 'TideBcType', DefaultValue='CONSTANT' )
 
-    IF(TideBcType(1:4)=='CONS')THEN
+         IF( TideBcType(1:4) == 'CONS' ) THEN
+!  west ---                 
+            CALL READ_VALUE_CHECK_DELAY_DEFAULT( TideWest_ETA, FILE_NAME, 'TideWest_ETA', IsDefault=IsNotRead )
+            TideWest = .NOT.IsNotRead 
 
-!  west ---
-
-      CALL READ_Float(TideWest_ETA,FILE_NAME,'TideWest_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideWest = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideWest_U,FILE_NAME,'TideWest_U',ierr)
-
-      IF(ierr==1)THEN
-        TideWest_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideWest_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideWest_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideWest_V,FILE_NAME,'TideWest_V',ierr)
-
-      IF(ierr==1)THEN
-        TideWest_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideWest_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideWest_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_V, use default: 0'
-# endif
-      ENDIF
-
+            IF ( TideWest ) THEN
+               CALL READ_VALUE_CHECK( TideWest_U, FILE_NAME, 'TideWest_U' , DefaultValue=0.0_SP )
+               CALL READ_VALUE_CHECK( TideWest_V, FILE_NAME, 'TideWest_V' , DefaultValue=0.0_SP )
+            ELSE
+               CALL WRITE_ALL ( 'WARNING: TideWest_ETA not found in input file, Defaulting TideWest to F.' )
+            END IF
 
 !  east ---
+            CALL READ_VALUE_CHECK_DELAY_DEFAULT( TideEast_ETA, FILE_NAME, 'TideEast_ETA', IsDefault=IsNotRead )
+            TideEast = .NOT.IsNotRead
 
-      CALL READ_Float(TideEast_ETA,FILE_NAME,'TideEast_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideEast = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideEast_U,FILE_NAME,'TideEast_U',ierr)
-
-      IF(ierr==1)THEN
-        TideEast_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideEast_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideEast_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideEast_V,FILE_NAME,'TideEast_V',ierr)
-
-      IF(ierr==1)THEN
-        TideEast_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideEast_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideEast_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_V, use default: 0'
-# endif
-      ENDIF
-
+            IF ( TideEast ) THEN
+               CALL READ_VALUE_CHECK( TideEast_U, FILE_NAME, 'TideEast_U', DefaultValue=0.0_SP )
+               CALL READ_VALUE_CHECK( TideEast_V, FILE_NAME, 'TideEast_V', DefaultValue=0.0_SP )
+            ELSE
+               CALL WRITE_ALL ( 'WARNING: TideEast_ETA not found in input file, Defaulting TideEast to F.' )
+            END IF
 
 !  south ---
+            CALL READ_VALUE_CHECK_DELAY_DEFAULT( TideSouth_ETA, FILE_NAME, 'TideSouth_ETA', IsDefault=IsNotRead )
+            TideSouth = .NOT.IsNotRead
 
-      CALL READ_Float(TideSouth_ETA,FILE_NAME,'TideSouth_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideSouth = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideSouth_U,FILE_NAME,'TideSouth_U',ierr)
-
-      IF(ierr==1)THEN
-        TideSouth_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideSouth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideSouth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideSouth_V,FILE_NAME,'TideSouth_V',ierr)
-
-      IF(ierr==1)THEN
-        TideSouth_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideSouth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideSouth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_V, use default: 0'
-# endif
-      ENDIF
+            IF ( TideSouth ) THEN
+               CALL READ_VALUE_CHECK( TideSouth_U, FILE_NAME, 'TideSouth_U', DefaultValue=0.0_SP )
+               CALL READ_VALUE_CHECK( TideSouth_V, FILE_NAME, 'TideSouth_V', DefaultValue=0.0_SP )
+            ELSE
+               CALL WRITE_ALL ( 'WARNING: TideSouth_ETA not found in input file, Defaulting TideSouth to F.' )
+            END IF
 
 !  north ---
+            CALL READ_VALUE_CHECK_DELAY_DEFAULT( TideNorth_ETA, FILE_NAME, 'TideNorth_ETA', IsDefault=IsNotRead )
+            TideNorth = .NOT.IsNotRead
 
-      CALL READ_Float(TideNorth_ETA,FILE_NAME,'TideNorth_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideNorth = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideNorth_U,FILE_NAME,'TideNorth_U',ierr)
-
-      IF(ierr==1)THEN
-        TideNorth_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideNorth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideNorth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideNorth_V,FILE_NAME,'TideNorth_V',ierr)
-
-      IF(ierr==1)THEN
-        TideNorth_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideNorth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideNorth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_V, use default: 0'
-# endif
-      ENDIF
-
-      IF(TideWest)THEN
-
-        Sponge_west_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You sed TideWest BC,  Sponge_west is invalid '
-         WRITE(3,'(A80)')'You sed TideWest BC,  Sponge_west is invalid '
-      endif
-# else
-         WRITE(*,'(A80)')'You sed TideWest BC,  Sponge_west is invalid '
-         WRITE(3,'(A80)')'You sed TideWest BC,  Sponge_west is invalid '
-# endif         
-      ENDIF
-
-      IF(TideEast)THEN
-
-        Sponge_east_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You sed TideEast BC,  Sponge_east is invalid '
-         WRITE(3,'(A80)')'You sed TideEast BC,  Sponge_east is invalid '
-      endif
-# else
-         WRITE(*,'(A80)')'You sed TideEast BC,  Sponge_east is invalid '
-         WRITE(3,'(A80)')'You sed TideEast BC,  Sponge_east is invalid '
-# endif         
-      ENDIF
-
-      IF(TideSouth)THEN
-
-        Sponge_south_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You sed TideSouth BC,  Sponge_south is invalid '
-         WRITE(3,'(A80)')'You sed TideSouth BC,  Sponge_south is invalid '
-      endif
-# else
-         WRITE(*,'(A80)')'You sed TideSouth BC,  Sponge_south is invalid '
-         WRITE(3,'(A80)')'You sed TideSouth BC,  Sponge_south is invalid '
-# endif         
-      ENDIF
-
-      IF(TideNorth)THEN
-
-        Sponge_North_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You sed TideNorth BC,  Sponge_North is invalid '
-         WRITE(3,'(A80)')'You sed TideNorth BC,  Sponge_North is invalid '
-      endif
-# else
-         WRITE(*,'(A80)')'You sed TideNorth BC,  Sponge_North is invalid '
-         WRITE(3,'(A80)')'You sed TideNorth BC,  Sponge_North is invalid '
-# endif         
-      ENDIF
+            IF ( TideNorth ) THEN
+               CALL READ_VALUE_CHECK( TideNorth_U, FILE_NAME, 'TideNorth_U', DefaultValue=0.0_SP )
+               CALL READ_VALUE_CHECK( TideNorth_V, FILE_NAME, 'TideNorth_V', DefaultValue=0.0_SP )
+            ELSE
+               CALL WRITE_ALL ( 'WARNING: TideNorth_ETA not found in input file, Defaulting TideNorth to F.' )
+            END IF
 
 
-      IF((.NOT.TideWest).AND.(.NOT.TideEast)  &
-                        .AND.(.NOT.TideEast).AND.(.NOT.TideEast)) THEN
-        TIDAL_BC = .FALSE.
+            ! Checking if sponge layers have been set on any of the boundries 
+            IF ( SPONGE_ON ) THEN
 
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You specify Tide but no BCs, set tide as false'
-         WRITE(3,'(A80)')'You dont specify TideNorth_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You specify Tide but no BCs, set tide as false'
-         WRITE(3,'(A80)')'You specify Tide but no BCs, set tide as false'
-# endif      
+               IF( TideWest.AND.(Sponge_west_width > ErrTol) ) THEN
+                  CALL WRITE_LOG( 'WARNING: Invalid options, TideWest BC set and Sponge_west_width '//&
+                                  'is not zero. Setting Sponge_west_width=0.0.' )
+                  Sponge_west_width = 0.0_SP 
+               END IF
 
-      ENDIF ! end all false
- 
-     ENDIF ! end tide constant
+               IF( TideEast.AND.(Sponge_east_width > ErrTol) ) THEN
+                  CALL WRITE_LOG( 'WARNING: Invalid options, TideEast BC set and Sponge_east_width '//&
+                                  'is not zero. Setting Sponge_east_width=0.0.' )
+                  Sponge_east_width = 0.0_SP
+               END IF
 
-    ENDIF ! end tide
+               IF( TideSouth.AND.(Sponge_south_width > ErrTol) ) THEN
+                  CALL WRITE_LOG( 'WARNING: Invalid options, TideSouth BC set and Sponge_south_width '//&
+                                  'is not zero. Setting Sponge_south_width=0.0.' )
+                  Sponge_south_width = 0.0_SP
+               END IF
 
+               IF( TideNorth.AND.(Sponge_north_width > ErrTol) ) THEN
+                  CALL WRITE_LOG( 'WARNING: Invalid options, TideNorth BC set and Sponge_north_width '//&
+                                  'is not zero. Setting Sponge_north_width=0.0.' )
+                  Sponge_north_width = 0.0_SP
+               END IF
+
+            END IF
+                     
+            
+            IF ( (.NOT.TideWest ).AND.&
+                 (.NOT.TideEast ).AND.&
+                 (.NOT.TideSouth).AND.& 
+                 (.NOT.TideNorth)       ) THEN
+                TIDAL_BC = .FALSE.
+                CALL CLEAR_TMP_LOG
+                CALL FORMAT_VALUE(TIDAL_BC, TMP_NAME )
+                CALL WRITE_VARIABLE_VALUE( 'TIDAL_BC' , TMP_NAME )
+                CALL WRITE_ALL( 'WARNING: TIDAL_BC set, but no BC values set. Setting TIDAL_BC to FALSE. ' )
+
+            ENDIF ! end all false
+       
+         ENDIF ! end tide constant
+
+      ENDIF ! end tide
+    
+      CALL FLUSH_TMP_LOG
+      CALL CLOSE_TMP_LOG
 
 END SUBROUTINE TIDE_INITIAL
 
