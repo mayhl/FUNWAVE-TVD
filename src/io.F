@@ -752,181 +752,43 @@ SUBROUTINE READ_INPUT
 
      CALL FLUSH_TMP_LOG
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'--------- WAVE BREAKING -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------- WAVE BREAKING -----------------'   
-# endif
+
+! ---------------------------------------
+! -       Wave Breaking Info            -
+! ---------------------------------------
+     CALL WRITE_LOG( LOG_BANNER( 'WAVE BREAKING' ) )
 
 ! roller
 
-      CALL READ_LOGICAL(ROLLER,FILE_NAME,'ROLLER_EFFECT',ierr)
-      IF(ierr==1)THEN
-        ROLLER = .FALSE.
-      ENDIF
+     CALL READ_VALUE_CHECK( ROLLER, FILE_NAME, 'ROLLER_EFFECT', DefaultValue=.FALSE. )
+     IF ( ROLLER ) ROLLER_SWITCH = 1.0_SP
 
-       IF(ROLLER)THEN
-         ROLLER_SWITCH = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'ROLLER_EFFECT:  INCLUDED'
-         WRITE(3,'(A40)')'ROLLER_EFFECT:  INCLUDED'
-      endif
-# else
-         WRITE(*,'(A40)')'ROLLER_EFFECT:  INCLUDED'
-         WRITE(3,'(A40)')'ROLLER_EFFECT:  INCLUDED'
-# endif
-       ELSE
-         ROLLER_SWITCH = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'ROLLER_EFFECT:  NO'
-         WRITE(3,'(A40)')'ROLLER_EFFECT:  NO'
-      endif
-# else
-         WRITE(*,'(A40)')'ROLLER_EFFECT:  NO'
-         WRITE(3,'(A40)')'ROLLER_EFFECT:  NO'
-# endif
-       ENDIF
+     CALL READ_VALUE_CHECK( SHOW_BREAKING, FILE_NAME, 'SHOW_BREAKING', DefaultValue=.TRUE. )
 
-! end roller
+     ! [mayhl] Check logic with previous section
+     IF(VISCOSITY_BREAKING) SHOW_BREAKING = .TRUE.
 
-! show breaking
-      CALL READ_LOGICAL(SHOW_BREAKING,FILE_NAME,'SHOW_BREAKING',ierr)
-      IF(ierr==1)THEN
-        SHOW_BREAKING = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'SHOW_BREAKING Default:  TRUE'
-         WRITE(3,'(A40)')'SHOW_BREAKING Default:  TRUE'
-      endif
-# else
-         WRITE(*,'(A40)')'SHOW_BREAKING Default:  TRUE'
-         WRITE(3,'(A40)')'SHOW_BREAKING Default:  TRUE'
-# endif
-       ENDIF
-	
-      IF(VISCOSITY_BREAKING) SHOW_BREAKING = .TRUE.
+     IF( SHOW_BREAKING ) THEN
+        ! [mayhl] Documentation says value should be 0.45 instead of 0.65
+        CALL READ_VALUE_CHECK( Cbrk1, FILE_NAME, 'Cbrk1', DefaultValue=0.65_SP )
+     END IF
 
-      IF(SHOW_BREAKING)THEN
-      CALL READ_FLOAT(Cbrk1,FILE_NAME,'Cbrk1',ierr)
-      IF(ierr==1)THEN
-        Cbrk1 = 0.65_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Cbrk1 Default:  0.65'
-         WRITE(3,'(A40)')'Cbrk1 Default:  0.65'
-      endif
-# else
-         WRITE(*,'(A40)')'Cbrk1 Default:  0.65'
-         WRITE(3,'(A40)')'Cbrk1 Default:  0.65'
-# endif
-       ENDIF
+     ! [mayhl] Should value only be read when SHOW_BREAKING add/or VISCOSITY_BREAKING is true
+     CALL READ_VALUE_CHECK( Cbrk2, FILE_NAME, 'Cbrk2', DefaultValue=0.35_SP )
 
-      IF(VISCOSITY_BREAKING)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A8,F12.6)')'Cbrk1 =', Cbrk1
-# else
-      WRITE(3,'(A8,F12.6)')'Cbrk1 =', Cbrk1
-# endif
-      ENDIF
+     CALL READ_VALUE_CHECK( WAVEMAKER_Cbrk, FILE_NAME, 'WAVEMAKER_Cbrk', DefaultValue=1.0_SP )
 
-      CALL READ_FLOAT(Cbrk2,FILE_NAME,'Cbrk2',ierr)
-      IF(ierr==1)THEN
-        Cbrk2 = 0.35_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Cbrk2 Default:  0.35'
-         WRITE(3,'(A40)')'Cbrk2 Default:  0.35'
-      endif
-# else
-         WRITE(*,'(A40)')'Cbrk2 Default:  0.35'
-         WRITE(3,'(A40)')'Cbrk2 Default:  0.35'
-# endif
-       ENDIF
+     ![ykchoi(08.18.2015) : for viscosity of wavemaker
+     CALL READ_VALUE_CHECK( WAVEMAKER_VIS, FILE_NAME, 'WAVEMAKER_VIS', DefaultValue=.FALSE. )  
 
-      IF(VISCOSITY_BREAKING)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A8,F12.6)')'Cbrk2 =', Cbrk2
-# else
-      WRITE(3,'(A8,F12.6)')'Cbrk2 =', Cbrk2
-# endif
-      ENDIF
+     IF ( VISCOSITY_BREAKING.AND.WAVEMAKER_VIS ) THEN
+        CALL WRITE_ALL( 'ERROR: VISCOSITY_BREAKING and WAVEMAKER_VIS both set to TRUE, '//&
+                        'only one may be set to true. STOPPING SIMULATION!' )
+        CALL TERMINATE 
 
-      CALL READ_FLOAT(WAVEMAKER_Cbrk,FILE_NAME,'WAVEMAKER_Cbrk',ierr)
-      IF(ierr==1)THEN
-        WAVEMAKER_Cbrk = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'WAVEMAKER_Cbrk Default:  1.0'
-         WRITE(3,'(A40)')'WAVEMAKER_Cbrk Default:  1.0'
-      endif
-# else
-         WRITE(*,'(A40)')'WAVEMAKER_Cbrk Default:  1.0'
-         WRITE(3,'(A40)')'WAVEMAKER_Cbrk Default:  1.0'
-# endif
-       ENDIF
+     END IF
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A18,F17.6)')'WAVEMAKER_Cbrk =', WAVEMAKER_Cbrk
-# else
-      WRITE(3,'(A18,F17.6)')'WAVEMAKER_Cbrk =', WAVEMAKER_Cbrk
-# endif
-      ENDIF
-
-	![ykchoi(08.18.2015) : for viscosity of wavemaker
-      CALL READ_LOGICAL(WAVEMAKER_VIS,FILE_NAME,'WAVEMAKER_VIS',ierr)  
-      IF(ierr==1)THEN
-        WAVEMAKER_VIS = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'WAVEMAKER_VIS Default:  FALSE'
-         WRITE(3,'(A40)')'WAVEMAKER_VIS Default:  FALSE'
-      endif
-# else
-         WRITE(*,'(A40)')'WAVEMAKER_VIS Default:  FALSE'
-         WRITE(3,'(A40)')'WAVEMAKER_VIS Default:  FALSE'
-# endif
-       ENDIF
-	
-	IF( VISCOSITY_BREAKING .AND. WAVEMAKER_VIS ) THEN
-# if defined (PARALLEL)
-	  IF (myid.eq.0) then
-	     WRITE(*,*) "==============================================="
-	     WRITE(*,*)  "STOP :: VISCOSITY_BREAKING=T, WAVEMAKER_VIS=T"
-	     WRITE(*,*) "==============================================="
-          ENDIF
-          call MPI_FINALIZE ( ier )
-# else
-	     WRITE(*,*) "==============================================="
-	     WRITE(*,*)  "STOP :: VISCOSITY_BREAKING=T, WAVEMAKER_VIS=T"
-	     WRITE(*,*) "==============================================="
-	  STOP
-# endif
-      ENDIF
-
-      IF(WAVEMAKER_VIS)THEN
-# if defined (PARALLEL)
-       if (myid.eq.0) WRITE(3,*)'WAVEMAKER_VIS'
-# else
-       WRITE(3,*)'WAVEMAKER_VIS'
-# endif    
-      ENDIF
-
-!  suggest dont use wavemaker_vis 04/30
-      IF(WAVEMAKER_VIS)THEN
-      CALL READ_FLOAT(visbrk,FILE_NAME,'visbrk',ierr)
-	CALL READ_FLOAT(WAVEMAKER_visbrk,FILE_NAME,'WAVEMAKER_visbrk',ierr)
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A14,F12.6)')'visbrk =', visbrk
-      if (myid.eq.0) WRITE(3,'(A8,F12.6)')'WAVEMAKER_visbrk =', WAVEMAKER_visbrk
-# else
-      WRITE(3,'(A10,F12.6)')'visbrk =', visbrk
-      WRITE(3,'(A20,F12.6)')'WAVEMAKER_visbrk =', WAVEMAKER_visbrk
-# endif
-	ENDIF
+     CALL FLUSH_TMP_LOG
 
 # if defined (PARALLEL)
       if (myid.eq.0) WRITE(3,*)'                                         '
