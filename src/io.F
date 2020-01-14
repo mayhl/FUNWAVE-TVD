@@ -650,7 +650,9 @@ SUBROUTINE READ_INPUT
       ENDIF  ! endif friction_sponge
 
 
-      IF( DIFFUSION_SPONGE.OR.DIRECT_SPONGE.OR.FRICTION_SPONGE ) THEN
+      SPONGE_ON = DIFFUSION_SPONGE.OR.DIRECT_SPONGE.OR.FRICTION_SPONGE
+
+      IF( SPONGE_ON ) THEN
         CALL READ_VALUE_CHECK( Sponge_west_width , FILE_NAME, 'Sponge_west_width' , DefaultValue=0.0_SP , Units='m' )
         CALL READ_VALUE_CHECK( Sponge_east_width , FILE_NAME, 'Sponge_east_width' , DefaultValue=0.0_SP , Units='m' )
         CALL READ_VALUE_CHECK( Sponge_south_width, FILE_NAME, 'Sponge_south_width', DefaultValue=0.0_SP , Units='m' )
