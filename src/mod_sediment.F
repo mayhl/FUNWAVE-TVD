@@ -107,11 +107,13 @@ CONTAINS
   
 SUBROUTINE SEDIMENT_INITIAL
   USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL, INPUT_FILE_NAME
+  USE INPUT_READ
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
                     
-  USE INPUT_READ
+  USE INPUT_READ, ONLY: READ_VALUE_CHECK
+  USE LOG_OUTPUT
   IMPLICIT NONE
 
   CHARACTER(LEN=80)::FILE_NAME=' '
@@ -121,293 +123,38 @@ SUBROUTINE SEDIMENT_INITIAL
 ! read  from input.txt
       FILE_NAME=INPUT_FILE_NAME
 
-      WRITE(*,*) '----------------------'
-      WRITE(*,*) FILE_NAME
+      CALL INIT_TMP_LOG
+      CALL WRITE_LOG( LOG_BANNER( 'SEDIMENT MODULE INFO' )  ) 
+
+
 ! input is based on Babaks original but make default values
-      CALL READ_STRING(Sed_Scheme,FILE_NAME,'Sed_Scheme',ierr)
+      CALL READ_VALUE_CHECK( Sed_Scheme        , FILE_NAME, 'Sed_Scheme'        , DefaultValue='Upwinding'              )
+      CALL READ_VALUE_CHECK( D50               , FILE_NAME, 'D50'               , DefaultValue=0.0005_SP  , Units='m'   )
+      CALL READ_VALUE_CHECK( Sdensity          , FILE_NAME, 'Sdensity'          , DefaultValue=2.68_SP                  )
+      CALL READ_VALUE_CHECK( BED_CHANGE        , FILE_NAME, 'Bed_Change'        , DefaultValue=.FALSE.                  )
+      CALL READ_VALUE_CHECK( BedLoad           , FILE_NAME, 'BedLoad'           , DefaultValue=.FALSE.                  )
+      CALL READ_VALUE_CHECK( MinDepthPickup    , FILE_NAME, 'MinDepthPickup'    , DefaultValue=0.1_SP     , Units='m'   )
+      CALL READ_VALUE_CHECK( n_porosity        , FILE_NAME, 'n_porosity'        , DefaultValue=0.47_SP                  )
+      CALL READ_VALUE_CHECK( WS                , FILE_NAME, 'WS'                , DefaultValue=0.125_SP   , Units='m/s' )
+      CALL READ_VALUE_CHECK( Shields_cr        , FILE_NAME, 'Shields_cr'        , DefaultValue=0.055_SP                 )
+      CALL READ_VALUE_CHECK( Shields_cr_bedload, FILE_NAME, 'Shields_cr_bedload', DefaultValue=Shields_cr               )
+      CALL READ_VALUE_CHECK( Morph_step        , FILE_NAME, 'Morph_step'        , DefaultValue=25                       )
+      CALL READ_VALUE_CHECK( Morph_factor      , FILE_NAME, 'Morph_factor'      , DefaultValue=1                        )
+      CALL READ_VALUE_CHECK( Avalanche         , FILE_NAME, 'Avalanche'         , DefaultValue=.FALSE.                  )
+      CALL READ_VALUE_CHECK( tan_phi           , FILE_NAME, 'Tan_phi'           , DefaultValue=0.7_SP                   )
+      CALL READ_VALUE_CHECK( IN_Mask_s         , FILE_NAME, 'Hard_bottom'       , DefaultValue=.FALSE.                  )
 
-      IF(ierr==1)THEN
-        Sed_Scheme = 'Upwinding'
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'You dont specify Sed_Scheme, use Upwinding.'
-         WRITE(3,'(A50)')'You dont specify Sed_Scheme, use Upwinding.'
-      endif
-# else
-         WRITE(*,'(A50)')'You dont specify Sed_Scheme, use Upwinding.'
-         WRITE(3,'(A50)')'You dont specify Sed_Scheme, use Upwinding.'
-# endif
-      ENDIF
-
-      CALL READ_Float(D50,FILE_NAME,'D50',ierr)
-
-      IF(ierr==1)THEN
-        D50 = 0.0005_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify D50, use default: 0.5mm'
-         WRITE(3,'(A40)')'You dont specify D50, use default: 0.5mm'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify D50, use default: 0.5mm'
-         WRITE(3,'(A40)')'You dont specify D50, use default: 0.5mm'
-# endif
-      ENDIF 
-
-      CALL READ_Float(Sdensity,FILE_NAME,'Sdensity',ierr)
-
-      IF(ierr==1)THEN
-        Sdensity = 2.68_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify Sdensity, use default: 2.68'
-         WRITE(3,'(A60)')'You dont specify Sdensity, use default: 2.68'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify Sdensity, use default: 2.68'
-         WRITE(3,'(A60)')'You dont specify Sdensity, use default: 2.68'
-# endif
-      ENDIF 
-
-      CALL READ_LOGICAL(BED_CHANGE,FILE_NAME,'Bed_Change',ierr)
-
-      IF(ierr == 1)THEN
-       BED_CHANGE = .FALSE. 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A40)')'Bed_Change not defined, Default: False'
-       WRITE(*,'(A40)')'Bed_Change not defined, Default: False'
-      endif
-# else
-      WRITE(3,'(A40)')'Bed_Change not defined, Default: False'
-      WRITE(*,'(A40)')'Bed_Change not defined, Default: False'
-# endif 
-      ENDIF
-
-      CALL READ_LOGICAL(BedLoad,FILE_NAME,'BedLoad',ierr)
-
-      IF(ierr == 1)THEN
-       BedLoad = .FALSE. 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A40)')'BedLoad not defined, Default: False'
-       WRITE(*,'(A40)')'BedLoad not defined, Default: False'
-      endif
-# else
-      WRITE(3,'(A40)')'BedLoad not defined, Default: False'
-      WRITE(*,'(A40)')'BedLoad not defined, Default: False'
-# endif 
-      ENDIF
-
-      CALL READ_Float(MinDepthPickup,FILE_NAME,'MinDepthPickup',ierr)
-
-      IF(ierr == 1)THEN
-       MinDepthPickup = 0.1_SP 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A40)')'MinDepthPickup not defined, Default: 0.1m'
-       WRITE(*,'(A40)')'MinDepthPickup not defined, Default: 0.1m'
-      endif
-# else
-      WRITE(3,'(A40)')'MinDepthPickup not defined, Default: 0.1m'
-      WRITE(*,'(A40)')'MinDepthPickup not defined, Default: 0.1m'
-# endif 
-      ENDIF
-
-      CALL READ_Float(n_porosity,FILE_NAME,'n_porosity',ierr)
-
-      IF(ierr==1)THEN
-        n_porosity = 0.47_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify n_porosity, use default: 0.47'
-         WRITE(3,'(A60)')'You dont specify n_porosity, use default: 0.47'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify n_porosity, use default: 0.47'
-         WRITE(3,'(A60)')'You dont specify n_porosity, use default: 0.47'
-# endif
-      ENDIF 
-
-      CALL READ_Float(WS,FILE_NAME,'WS',ierr)
-
-      IF(ierr==1)THEN
-        WS = 0.0125_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify WS, use default: 0.0125m/s'
-         WRITE(3,'(A60)')'You dont specify WS, use default: 0.0125m/s'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify WS, use default: 0.0125m/s'
-         WRITE(3,'(A60)')'You dont specify WS, use default: 0.0125m/s'
-# endif
-      ENDIF
-
-      CALL READ_Float(Shields_cr,FILE_NAME,'Shields_cr',ierr)
-
-      IF(ierr==1)THEN
-        Shields_cr = 0.055_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify Shields_cr, use default: 0.055'
-         WRITE(3,'(A60)')'You dont specify Shields_cr, use default: 0.055'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify Shields_cr, use default: 0.055'
-         WRITE(3,'(A60)')'You dont specify Shields_cr, use default: 0.055'
-# endif
-      ENDIF
-
-      CALL READ_Float(Shields_cr_bedload,FILE_NAME,'Shields_cr_bedload',ierr)
-
-      IF(ierr==1)THEN
-        Shields_cr_bedload = Shields_cr
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify Shields_cr_bedload, use Shields_cr'
-         WRITE(3,'(A80)')'You dont specify Shields_cr_bedload, use Shields_cr'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify Shields_cr_bedload, use Shields_cr'
-         WRITE(3,'(A80)')'You dont specify Shields_cr_bedload, use Shields_cr'
-# endif
-      ENDIF
-
-      CALL READ_INTEGER(Morph_step,FILE_NAME,'Morph_step',ierr)
-
-      IF(ierr==1)THEN
-        Morph_step = 25
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify Morph_step, use default: 25'
-         WRITE(3,'(A60)')'You dont specify Morph_step, use default: 25'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify Morph_step, use default: 25'
-         WRITE(3,'(A60)')'You dont specify Morph_step, use default: 25'
-# endif
-      ENDIF
-
-      CALL READ_INTEGER(Morph_factor,FILE_NAME,'Morph_factor',ierr)
-
-      IF(ierr==1)THEN
-        Morph_factor = 1
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify Morph_factor, use default: 1'
-         WRITE(3,'(A60)')'You dont specify Morph_factor, use default: 1'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify Morph_factor, use default: 1'
-         WRITE(3,'(A60)')'You dont specify Morph_factor, use default: 1'
-# endif
-      ENDIF
-
-      CALL READ_LOGICAL(Avalanche,FILE_NAME,'Avalanche',ierr)
-      IF(ierr == 1)THEN
-       Avalanche = .FALSE. 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A40)')'Avalanche not defined, Default: False'
-       WRITE(*,'(A40)')'Avalanche not defined, Default: False'
-      endif
-# else
-      WRITE(3,'(A40)')'Avalanche not defined, Default: False'
-      WRITE(*,'(A40)')'Avalanche not defined, Default: False'
-# endif 
-      ENDIF
-
-      CALL READ_Float(tan_phi,FILE_NAME,'Tan_phi',ierr)
-
-      IF(ierr==1)THEN
-        Tan_phi = 0.7_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify Tan_phi, use default: 0.7'
-         WRITE(3,'(A60)')'You dont specify Tan_phi, use default: 0.7'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify Tan_phi, use default: 0.7'
-         WRITE(3,'(A60)')'You dont specify Tan_phi, use default: 0.7'
-# endif
-      ENDIF
-
-      CALL READ_LOGICAL(IN_Mask_s,FILE_NAME,'Hard_bottom',ierr)
-
-      IF(ierr==1)THEN
-        IN_Mask_s = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'You dont specify Hard_bottom, use default: False'
-         WRITE(3,'(A60)')'You dont specify Hard_bottom, use default: False'
-      endif
-# else
-         WRITE(*,'(A60)')'You dont specify Hard_bottom, use default: False'
-         WRITE(3,'(A60)')'You dont specify Hard_bottom, use default: False'
-# endif
-      ENDIF
-
-     IF(IN_Mask_s)THEN
-      CALL READ_STRING(Mask_s_File,FILE_NAME,'Hard_bottom_file',ierr) 
-
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You use Hard_bottom, Hard_bottom_file NOT FOUND, STOP'
-         WRITE(3,'(A80)')'You use Hard_bottom, Hard_bottom_file NOT FOUND, STOP'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'You use Hard_bottom, Hard_bottom_file NOT FOUND, STOP'
-         WRITE(3,'(A80)')'You use Hard_bottom, Hard_bottom_file NOT FOUND, STOP'
-# endif
-        STOP
-      ENDIF ! end ierr
-
-     ENDIF ! end IN_Mask_s
-
-
-      CALL READ_Float(Kappa1,FILE_NAME,'Kappa1',ierr)
-
-      IF(ierr==1)THEN
-        Kappa1 = 0.3333_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify Kappa1, use default 4th-order: 0.3333'
-         WRITE(3,'(A80)')'You dont specify Kappa1, use default 4th-order: 0.3333'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify Kappa1, use default 4th-order: 0.3333'
-         WRITE(3,'(A80)')'You dont specify Kappa1, use default 4th-order: 0.3333'
-# endif
-      ENDIF
-
-      CALL READ_Float(Kappa2,FILE_NAME,'Kappa2',ierr)
-      IF(ierr==1)THEN
-        Kappa2 = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify Kappa2, use default 4th-order: 1.0'
-         WRITE(3,'(A80)')'You dont specify Kappa2, use default 4th-order: 1.0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify Kappa2, use default 4th-order: 1.0'
-         WRITE(3,'(A80)')'You dont specify Kappa2, use default 4th-order: 1.0'
-# endif
-      ENDIF
+      IF ( IN_Mask_s ) CALL READ_VALUE_CHECK( Mask_s_File, FILE_NAME, 'Hard_bottom_file' ) 
+       
+      CALL READ_VALUE_CHECK( Kappa1, FILE_NAME, 'Kappa1', DefaultValue=0.333333333333333_SP , Units='(4th-order)' )
+      CALL READ_VALUE_CHECK( Kappa2, FILE_NAME, 'Kappa2', DefaultValue=1.0_SP               , Units='(4th-order)' )
 
 ! plot sediment intitial
-     PLOT_COUNT_SEDIMENT = 0
-     CALL READ_FLOAT(PLOT_INTV_SEDIMENT,FILE_NAME,'PLOT_INTV_SEDIMENT',ierr)
-     IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A80)')'PLOT_INTV_SEDIMENT not specified, use SAME'
-# else
-      WRITE(3,'(A50)')'PLOT_INTV_SEDIMENT not specified, use SAME'
-# endif
-       PLOT_INTV_SEDIMENT = SMALL
-     ENDIF
+      PLOT_COUNT_SEDIMENT = 0
+      CALL READ_VALUE_CHECK( PLOT_INTV_SEDIMENT, FILE_NAME, 'PLOT_INTV_SEDIMENT', DefaultValue=SMALL )
+
+      CALL FLUSH_TMP_LOG
+      CALL CLOSE_TMP_LOG
 
 ! ALLOCATION
 
