@@ -266,19 +266,26 @@ SUBROUTINE READ_INPUT
  
      CALL READ_VALUE_CHECK(DEPTH_TYPE, FILE_NAME, 'DEPTH_TYPE' , DefaultValue='FLAT') 
 
-     IF ( DEPTH_TYPE(1:3).EQ.'DAT' ) THEN
+     IF     ( DEPTH_TYPE(1:3).EQ.'DAT' ) THEN
+
         CALL READ_VALUE_CHECK( DEPTH_FILE, FILE_NAME, 'DEPTH_FILE' )
-     END IF  ! end type=data
 
-     IF( DEPTH_TYPE(1:3).EQ.'FLA' ) THEN
+     ELSE IF( DEPTH_TYPE(1:3).EQ.'FLA' ) THEN
+
         CALL READ_VALUE_CHECK( DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT' , DefaultValue=10.0_SP , Units='m' ) 
-     END IF ! endif type=flat
+     
+     ELSE IF ( DEPTH_TYPE(1:3).EQ.'SLO' ) THEN
 
-     IF ( DEPTH_TYPE(1:3).EQ.'SLO' ) THEN
         CALL READ_VALUE_CHECK( DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT' , DefaultValue=10.0_SP , Units='m' )
         CALL READ_VALUE_CHECK( SLP       , FILE_NAME, 'SLP'        , DefaultValue=0.1_SP              ) 
-        CALL READ_VALUE_CHECK( Xslp      ,FILE_NAME , 'Xslp'       , DefaultValue=0.0_SP              ) 
-     END IF  ! endif type=slope
+        CALL READ_VALUE_CHECK( Xslp      ,FILE_NAME , 'Xslp'       , DefaultValue=0.0_SP              )
+
+     ELSE 
+
+        CALL WRITE_ALL( 'ERROR: Invalid option set for DEPTH_TYPE. STOPPING SIMULATION!' )
+        CALL TERMINATE 
+
+     END IF 
 
 ! depth correction
 
@@ -353,14 +360,13 @@ SUBROUTINE READ_INPUT
      
      CALL READ_VALUE_CHECK( WaveMaker, FILE_NAME, 'WAVEMAKER', DefaultValue='nothing' )
 
-     IF ( WaveMaker(1:7).EQ.'LEF_SOL' ) THEN
+     IF     ( WaveMaker(1:7).EQ.'LEF_SOL' ) THEN
+
         CALL READ_VALUE_CHECK( AMP_SOLI, FILE_NAME, 'AMP'                                      )
         CALL READ_VALUE_CHECK( DEP_SOLI, FILE_NAME, 'DEP'                                      )
         CALL READ_VALUE_CHECK( LAG_SOLI, FILE_NAME, 'LAGTIME', DefaultValue=0.0_SP , Units='s' )
 
-     END IF
-
-     IF ( WaveMaker(1:7).EQ.'WK_TIME' ) THEN
+     ELSE IF ( WaveMaker(1:7).EQ.'WK_TIME' ) THEN
 
         CALL READ_VALUE_CHECK( NumWaveComp , FILE_NAME, 'NumWaveComp'                                   )
         CALL READ_VALUE_CHECK( PeakPeriod  , FILE_NAME, 'PeakPeriod'                                    )
@@ -372,9 +378,7 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( Delta_WK    , FILE_NAME, 'Delta_WK'     , DefaultValue=0.5_SP            )
         CALL READ_VALUE_CHECK( Ywidth_WK   , FILE_NAME, 'Ywidth_WK'    , DefaultValue=LARGE , Units='m' )
 
-     END IF  ! end WK_TIME
-
-     IF (WaveMaker(1:7).EQ.'INI_SOL' ) THEN
+     ELSE IF (WaveMaker(1:7).EQ.'INI_SOL' ) THEN
 
         CALL READ_VALUE_CHECK( SolitaryPositiveDirection,FILE_NAME,  &
                               'SolitaryPositiveDirection', DefaultValue=.TRUE. )
@@ -389,37 +393,31 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( DEP_SOLI  , FILE_NAME,' DEP'        )
         CALL READ_VALUE_CHECK( XWAVEMAKER, FILE_NAME, 'XWAVEMAKER' )
 
-     END IF  ! end initial solitary
-
-     IF (WaveMaker(1:6).EQ.'N_WAVE' ) THEN
+     ELSE IF (WaveMaker(1:6).EQ.'N_WAVE' ) THEN
 
         CALL READ_VALUE_CHECK( x1_Nwave   , FILE_NAME, 'x1_Nwave'    )
         CALL READ_VALUE_CHECK( x2_Nwave   , FILE_NAME, 'x2_Nwave'    )
         CALL READ_VALUE_CHECK( a0_Nwave   , FILE_NAME, 'a0_Nwave'    )
         CALL READ_VALUE_CHECK( gamma_Nwave, FILE_NAME, 'gamma_Nwave' )
         CALL READ_VALUE_CHECK( dep_Nwave  , FILE_NAME, 'dep_Nwave'   )
-     END IF  ! end N_wave
 
-     IF ( WaveMaker(1:7).EQ.'INI_REC' ) THEN
+     ELSE IF ( WaveMaker(1:7).EQ.'INI_REC' ) THEN
 
         CALL READ_VALUE_CHECK( AMP_SOLI, FILE_NAME, 'AMP'                       )
         CALL READ_VALUE_CHECK( Xc      , FILE_NAME,' Xc'                        )
         ! Should this default to 0.0?
         CALL READ_VALUE_CHECK( Yc      , FILE_NAME, 'Yc'  , DefaultValue=0.0_SP )
         CALL READ_VALUE_CHECK( WID     , FILE_NAME, 'WID'                       )
-     END IF ! endif rectangular hump
 
-     IF ( WaveMaker(1:7).EQ.'INI_GAU'.OR.&
-          WaveMaker(1:7).EQ.'INI_DIP'      )THEN
+     ELSE IF ( WaveMaker(1:7).EQ.'INI_GAU'.OR.&
+               WaveMaker(1:7).EQ.'INI_DIP'      )THEN
 
         CALL READ_VALUE_CHECK( AMP_SOLI, FILE_NAME, 'AMP' )
         CALL READ_VALUE_CHECK( Xc      , FILE_NAME, 'Xc'  )
         CALL READ_VALUE_CHECK( Yc      , FILE_NAME, 'Yc'  )
         CALL READ_VALUE_CHECK( WID     , FILE_NAME, 'WID' )
 
-     END IF ! endif gaussian hump
-
-     IF ( WaveMaker(1:6).EQ.'WK_REG' ) THEN
+     ELSE IF ( WaveMaker(1:6).EQ.'WK_REG' ) THEN
 
         CALL READ_VALUE_CHECK( Xc_WK    , FILE_NAME, 'Xc_WK'                                     )
         CALL READ_VALUE_CHECK( Yc_WK    , FILE_NAME, 'Yc_WK'    , DefaultValue=0.0_SP            )
@@ -431,10 +429,8 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( Delta_WK , FILE_NAME, 'Delta_WK' , DefaultValue=0.5_SP            )
         CALL READ_VALUE_CHECK( Ywidth_WK, FILE_NAME, 'Ywidth_WK', DefaultValue=LARGE             )
 
-     END IF  ! endif WK_REG
-
-     IF( WaveMaker(1:6).EQ.'WK_IRR'.OR.WaveMaker(1:6).EQ.'TMA_1D'.OR.&
-         WaveMaker(1:6).EQ.'JON_1D'.OR.WaveMaker(1:6).EQ.'JON_2D'      ) THEN
+     ELSE IF( WaveMaker(1:6).EQ.'WK_IRR'.OR.WaveMaker(1:6).EQ.'TMA_1D'.OR.&
+              WaveMaker(1:6).EQ.'JON_1D'.OR.WaveMaker(1:6).EQ.'JON_2D'      ) THEN
 
         CALL READ_VALUE_CHECK( Xc_WK    , FILE_NAME, 'Xc_WK'                                     )
         CALL READ_VALUE_CHECK( Yc_WK    , FILE_NAME, 'Yc_WK'    , DefaultValue=0.0_SP            )
@@ -465,16 +461,8 @@ SUBROUTINE READ_INPUT
         END IF
 
         CALL READ_VALUE_CHECK( Ywidth_WK, FILE_NAME, 'Ywidth_WK' , DefaultValue=LARGE )
-     END IF ! endif wk_irr 
 
-     ! Check this is the correct placement of code
-     CALL READ_VALUE_CHECK( ETA_LIMITER,FILE_NAME, 'ETA_LIMITER', DefaultValue=.FALSE. )
-     IF( ETA_LIMITER ) THEN
-        CALL READ_VALUE_CHECK( CrestLimit , FILE_NAME, 'CrestLimit'  )
-        CALL READ_VALUE_CHECK( TroughLimit, FILE_NAME, 'TroughLimit' )
-     END IF
-
-     IF( WaveMaker(1:9).EQ.'WK_DATA2D' ) THEN
+     ELSE IF( WaveMaker(1:9).EQ.'WK_DATA2D' ) THEN
 
         CALL READ_VALUE_CHECK( Xc_WK       , FILE_NAME, 'Xc_WK'                                        )
         CALL READ_VALUE_CHECK( Yc_WK       , FILE_NAME, 'Yc_WK'       , DefaultValue=0.0_SP            )
@@ -484,14 +472,9 @@ SUBROUTINE READ_INPUT
         CALL READ_VALUE_CHECK( WaveCompFile, FILE_NAME, 'WaveCompFile'                                 )
         CALL READ_VALUE_CHECK( Ywidth_WK   , FILE_NAME, 'Ywidth_WK'   , DefaultValue=LARGE             )
 
-     ENDIF ! end wk_data2D
-
-     CALL READ_VALUE_CHECK( EqualEnergy, FILE_NAME, 'EqualEnergy', DefaultValue=.FALSE. )
-
-! absorbing generating wavemaker, more tests needed 
-     IF ( WaveMaker(1:3 ).EQ.'ABS'.OR.&
-          WaveMaker(1:11).EQ.'LEFT_BC_IRR') THEN
-
+     ELSE IF ( WaveMaker(1:3 ).EQ.'ABS'.OR.&
+               WaveMaker(1:11).EQ.'LEFT_BC_IRR') THEN
+        ! absorbing generating wavemaker, more tests needed 
         ! Orginal code had no error checking, default value?
         CALL READ_VALUE_CHECK( WAVE_DATA_TYPE, FILE_NAME, 'WAVE_DATA_TYPE' )
         
@@ -611,11 +594,26 @@ SUBROUTINE READ_INPUT
 
         END IF ! end if data or tma
 
-     ENDIF ! end absorbing-generating or left bc wave maker
+     ELSE ! end absorbing-generating or left bc wave maker
 
-     CALL FLUSH_TMP_LOG    
+        IF ( WaveMaker(1:7).NE.'nothing' ) THEN
+           CALL WRITE_ALL( 'ERROR: Invalid option set for WAVEMAKER. STOPPING SIMULATION!' )
+           CALL TERMINATE
+        END IF
 
+     END IF ! end WaveMaker type check
 
+     ! Checking placement of code (only read for Irregular wave?)
+     CALL READ_VALUE_CHECK( EqualEnergy, FILE_NAME, 'EqualEnergy', DefaultValue=.FALSE. )
+
+     ! Check this is the correct placement of code (should be in Sponge?)
+     CALL READ_VALUE_CHECK( ETA_LIMITER,FILE_NAME, 'ETA_LIMITER', DefaultValue=.FALSE. )
+     IF( ETA_LIMITER ) THEN
+        CALL READ_VALUE_CHECK( CrestLimit , FILE_NAME, 'CrestLimit'  )
+        CALL READ_VALUE_CHECK( TroughLimit, FILE_NAME, 'TroughLimit' )
+     END IF
+
+     CALL FLUSH_TMP_LOG
 ! ---------------------------------------
 ! -         Perodic BC Info             -
 ! ---------------------------------------
