@@ -320,6 +320,11 @@ SUBROUTINE READ_INPUT
 
 ! initial uvz
      IF ( INI_UVZ ) THEN
+
+        CALL READ_VALUE_CHECK( BED_DEFORMATION, FILE_NAME, 'BED_DEFORMATION', DefaultValue=.FALSE.)
+        IF ( BED_DEFORMATION ) CALL WRITE_ALL( 'Bathymetry has been adjusted based on Bed deformation.' )
+
+
         CALL READ_VALUE_CHECK( ETA_FILE, FILE_NAME, 'ETA_FILE' )
 
         CALL READ_VALUE_CHECK_DELAY_DEFAULT( U_FILE, FILE_NAME, 'U_FILE' , IsDefault=NO_UV_FILE )

@@ -392,6 +392,7 @@ MODULE GLOBAL
         REAL(SP) :: Cbrk1=0.65,Cbrk2=0.35,T_brk
         ! use T_brk to judge breakers
         LOGICAL :: INI_UVZ=.FALSE.
+        LOGICAL :: BED_DEFORMATION = .FALSE.
 
        REAL(SP),DIMENSION(:,:),ALLOCATABLE :: nu_break,nu_sponge
        REAL(SP) :: nu_bkg

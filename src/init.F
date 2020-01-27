@@ -782,6 +782,13 @@ SUBROUTINE INITIALIZATION
 ! initial eta u and v for deforming
      IF(INI_UVZ) THEN
         CALL INITIAL_UVZ
+       IF(BED_DEFORMATION)THEN
+         DO J=1,Nloc
+         DO I=1,Mloc
+           Depth(I,J)=Depth(I,J)-ETA(I,J)
+         ENDDO
+         ENDDO         
+       ENDIF
      ENDIF 
 
 ! initial solitary wave
