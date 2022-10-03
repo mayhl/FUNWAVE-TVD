@@ -4826,4 +4826,28 @@ END SUBROUTINE OUTPUT_SEDIMENT
 # endif
 ! end sediment
 
+FUNCTION GET_UNIT()
 
+     IMPLICIT NONE
+     INTEGER :: new_unit
+     LOGICAL :: is_open
+
+     INTEGER, PARAMETER: MIN_UNIT_NUM = 500
+     INTEGER, PARAMETER: MAX_UNIT_NUM = 99999
+
+
+     DO new_unit = MIN_UNIT_NUM, MAX_UNIT_NUM
+
+        INQUIRE(unit=new_unit, opened = is_open)
+
+        IF( .NOT.is_open) THEN
+           GET_UNIT = UNIT
+           RETURN
+        ENDIF
+        
+     END DO 
+
+
+     GET_UNIT=-1
+
+END FUNCTION GET_UNIT
