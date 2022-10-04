@@ -448,4 +448,114 @@ MODULE GLOBAL
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
+
+    ! Units I/O ranges
+    INTEGER, PARAMETER :: UnitGenerateStart = 40
+    INTEGER, PARAMETER :: UnitGenerateEnd = 100
+
+    TYPE UnitRange
+       CHARACTER(20) :: name
+       INTEGER :: first
+       INTEGER :: last
+       TYPE(UnitRange), POINTER :: next => NULL()
+       TYPE(UnitRange), POINTER :: prev => NULL()
+    END TYPE
+
+    TYPE UnitRanges
+       TYPE(UnitRange), POINTER :: root => NULL()
+    CONTAINS
+        PROCEDURE :: add => AddUnitRange
+        PROCEDURE :: getFirstUnit => GetUnitRangeStart
+    END TYPE
+
+    TYPE(UnitRanges) :: unit_ranges
+
+CONTAINS
+
+     INTEGER FUNCTION GetUnitRangeStart(this, name)
+
+        IMPLICIT NONE
+
+        CLASS(UnitRanges), INTENT(IN)  :: this
+        CHARACTER(*)     , INTENT(IN)  :: name
+
+
+        TYPE(UnitRange), POINTER   :: current
+
+        current = this % root
+        DO WHILE (ASSOCIATED(current))
+           IF (TRIM(current%name).eq.TRIM(name)) THEN
+                GetUnitRangeStart = current % first
+                RETURN
+           END IF
+ 
+           current = current % next
+        END DO
+
+        ! Returns negative unit if range not found
+        GetUnitRangeStart = -1
+
+
+     END FUNCTION
+
+     INTEGER FUNCTION AddUnitRange(this, name, length)
+
+        IMPLICIT NONE
+
+        CLASS(UnitRanges), INTENT(INOUT) :: this
+        CHARACTER(*)     , INTENT(IN)    :: name
+        INTEGER          , INTENT(IN)    :: length
+
+        INTEGER        , PARAMETER :: MAX_SIZE=20
+        TYPE(UnitRange), POINTER   :: current, prev
+        INTEGER :: first, i
+
+        IF ( ASSOCIATED(this%root)) THEN
+           current = this % root
+           first = UnitGenerateEnd
+           prev => NULL()
+        ELSE
+
+           current = this % root
+
+           DO WHILE (.TRUE.)
+
+              ! Checking if named range list already exists 
+              IF (TRIM(current%name).eq.TRIM(name)) THEN
+                 AddUnitRange = 1
+                 RETURN
+              END IF  
+              
+              ! At last item in linked list 
+              IF ( .NOT.ASSOCIATED(current%next)) THEN
+                 prev = current
+                 current = current % next
+                 EXIT
+              END IF
+
+              current = current % next
+              first = current % last
+              i = i + 1
+
+              ! Safety check to avoid infinite loop
+              IF ( i.GT.MAX_SIZE) THEN
+                 AddUnitRange = 2
+                 Return
+              END IF
+           END DO
+        
+        END IF
+
+        ALLOCATE(current)       
+
+        current % prev = prev
+        current % prev % next = current
+        current % first = first 
+        current % last = first + length
+
+        ! Success exit code
+        AddUnitRange = 0
+
+     END FUNCTION
+
 END MODULE GLOBAL

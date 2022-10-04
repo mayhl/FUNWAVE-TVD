@@ -111,7 +111,7 @@ CONTAINS
 ! READ VESSEL
 
 SUBROUTINE VESSEL_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL, INPUT_FILE_NAME
+  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL, INPUT_FILE_NAME,unit_ranges
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
@@ -123,7 +123,7 @@ SUBROUTINE VESSEL_INITIAL
   CHARACTER(LEN=80) :: VESSEL_FOLDER=' '
   CHARACTER(LEN=80)::TMP_NAME=' '
   CHARACTER(LEN=80)::VesselName = ' '
-  INTEGER :: Ifile,ierr
+  INTEGER :: Ifile,ierr, unit_sta
 
 
 ! read vessel number and folder from input.txt
@@ -143,6 +143,8 @@ SUBROUTINE VESSEL_INITIAL
 # else
       WRITE(3,'(A12,I3)') 'NumVessel = ',NumVessel
 # endif
+
+      IF ( NumVessel > 0 ) unit_ranges % add('vessel', NumVessel) 
 
       CALL READ_LOGICAL(OUT_VESSEL,FILE_NAME,'OUT_VESSEL',ierr)
 
@@ -291,7 +293,9 @@ SUBROUTINE VESSEL_INITIAL
 # endif
        PLOT_INTV_VESSEL = SMALL
      ENDIF
-      
+  
+  unit_sta = unit_ranges % getFirstUnit('vessel')
+
   DO Kves = 1, NumVessel
 
 !  file name
@@ -324,7 +328,7 @@ SUBROUTINE VESSEL_INITIAL
   ENDIF
 
 ! open file
-  Ifile=Kves+2000
+  Ifile=unit_sta + Kves - 1
   OPEN(Ifile,FILE=TRIM(TMP_NAME))
 
 ! read file

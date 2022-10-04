@@ -3928,6 +3928,7 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
      CHARACTER(LEN=80)::FDIR=' '
      LOGICAL :: FirstCallStation = .TRUE.
      SAVE FirstCallStation, BufferCount,ZUV_Buffer
+     INTEGER :: unit_sf, unit_sta, err
 
 ! initialize stations
      FDIR=TRIM(RESULT_FOLDER)
@@ -3939,12 +3940,15 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
        ALLOCATE(BufferCount(NumberStations), &
             ZUV_Buffer(StationOutputBuffer,NumberStations,4))
        BufferCount = 0
-  
+
+       err = unit_ranges%add('stations', NumberStations)
+       unit_sta = unit_ranges % getFirstUnit ('stations')
+ 
 ! calculate how many output components
-              
-       open(100,FILE=TRIM(STATIONS_FILE))
+       unit_sf = get_unit()              
+       open(unit_sf, FILE=TRIM(STATIONS_FILE))
        do i=1,NumberStations
-          read(100,*) dum1,dum2
+          read(unit_sf ,*) dum1,dum2
 # if defined (PARALLEL)
 ![---ykchoi Jan/23/2018
           !ista(i) = Nghost+dum1-npx*Mglob/px
@@ -3957,7 +3961,7 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
              nsta(i) = 1
              write(file_name(1:4),'(I4.4)') i
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-             iunit=100+i
+             iunit=unit_sta + i - 1
              open(iunit,FILE=TMP_NAME)
           else
              nsta(i) = 0
@@ -3971,20 +3975,23 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
              nsta(i) = 1
              write(file_name(1:4),'(I4.4)') i
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-             iunit=100+i
+             iunit=unit_sta + i - 1
              open(iunit,FILE=TMP_NAME)
           else
              nsta(i) = 0
           endif
 # endif
        enddo
+
+     else
+        unit_sta = unit_ranges % getFirstUnit ('stations')
      endif
 
 ! write to stations
 
      do i=1,NumberStations
        if (nsta(i).eq.1) then
-          iunit=100+i
+          iunit=unit_sta + i - 1
           IF(mask(ista(i),jsta(i))<1)THEN
             eta_sta=ZERO
             u_sta=ZERO
@@ -4028,7 +4035,7 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
      if (TIME.ge.TOTAL_TIME) then
        do i=1,NumberStations
           if (nsta(i).eq.1) then
-             iunit=100+i
+             iunit=unit_sta + i - 1
              close(iunit)
           endif
        enddo
@@ -4058,7 +4065,7 @@ SUBROUTINE STATIONS
      CHARACTER(LEN=80)::FDIR=' '
      LOGICAL :: FirstCallStationSP = .TRUE.
      SAVE FirstCallStationSP, BufferCount,ZUV_Buffer
-
+     INTEGER :: unit_sf, unit_sta, err
 
 ! initialize stations
      FDIR=TRIM(RESULT_FOLDER)
@@ -4070,12 +4077,15 @@ SUBROUTINE STATIONS
        ALLOCATE(BufferCount(NumberStations), &
             ZUV_Buffer(StationOutputBuffer,NumberStations,4))
        BufferCount = 0
+       err = unit_ranges%add('stations', NumberStations)
+       unit_sta = unit_ranges % getFirstUnit ('stations')
 
 !       ALLOCATE(envelope(Mloc,Nloc))
 !       envelope = 0.d0
-       open(100,FILE=TRIM(STATIONS_FILE))
+       unit_sf = get_unit() 
+       open(unit_sf,FILE=TRIM(STATIONS_FILE))
        do i=1,NumberStations
-          read(100,*) dum1,dum2
+          read(unit_sa,*) dum1,dum2
 # if defined (PARALLEL)
 ![---ykchoi Jan/23/2018
 !          ista(i) = Nghost+1+nint((dum2-Lon_West)/Dphi) &
@@ -4092,7 +4102,7 @@ SUBROUTINE STATIONS
              nsta(i) = 1
              write(file_name(1:4),'(I4.4)') i
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-             iunit=100+i
+             iunit=get_unit()
              open(iunit,FILE=TMP_NAME)
           else
              nsta(i) = 0
@@ -4105,20 +4115,23 @@ SUBROUTINE STATIONS
              nsta(i) = 1
              write(file_name(1:4),'(I4.4)') i
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-             iunit=100+i
+             iunit=unit_sta + i - 1
              open(iunit,FILE=TMP_NAME)
           else
              nsta(i) = 0
           endif
 # endif
        enddo
+
+     else
+        unit_sta = unit_ranges % getFirstUnit ('stations')
      endif
 
 ! write to stations
  
      do i=1,NumberStations
        if (nsta(i).eq.1) then
-          iunit=100+i
+          iunit=unit_sta + i - 1
 
 ! for coupling, make sure dry point
           IF(mask(ista(i),jsta(i))<1)THEN
@@ -4169,7 +4182,7 @@ SUBROUTINE STATIONS
 
        do i=1,NumberStations
           if (nsta(i).eq.1) then
-             iunit=100+i
+             iunit=unit_sta + i - 1
              close(iunit)
           endif
        enddo
@@ -4826,14 +4839,15 @@ END SUBROUTINE OUTPUT_SEDIMENT
 # endif
 ! end sediment
 
-FUNCTION GET_UNIT()
+INTEGER FUNCTION GET_UNIT()
 
+     USE GLOBAL, ONLY : UnitGenerateStart, UnitGenerateEnd
      IMPLICIT NONE
      INTEGER :: new_unit
      LOGICAL :: is_open
 
-     INTEGER, PARAMETER: MIN_UNIT_NUM = 500
-     INTEGER, PARAMETER: MAX_UNIT_NUM = 99999
+     INTEGER, PARAMETER :: MIN_UNIT_NUM = UnitGenerateStart
+     INTEGER, PARAMETER :: MAX_UNIT_NUM = UnitGenerateEnd
 
 
      DO new_unit = MIN_UNIT_NUM, MAX_UNIT_NUM
@@ -4841,7 +4855,7 @@ FUNCTION GET_UNIT()
         INQUIRE(unit=new_unit, opened = is_open)
 
         IF( .NOT.is_open) THEN
-           GET_UNIT = UNIT
+           GET_UNIT = new_unit
            RETURN
         ENDIF
         
