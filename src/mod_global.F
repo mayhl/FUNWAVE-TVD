@@ -462,7 +462,8 @@ MODULE GLOBAL
     END TYPE
 
     TYPE UnitRanges
-       TYPE(UnitRange), POINTER :: root => NULL()
+       TYPE(UnitRange), POINTER :: head => NULL()
+       TYPE(UnitRange), POINTER :: tail => NULL()
     CONTAINS
         PROCEDURE :: add => AddUnitRange
         PROCEDURE :: getFirstUnit => GetUnitRangeStart
@@ -482,14 +483,14 @@ CONTAINS
 
         TYPE(UnitRange), POINTER   :: current
 
-        current = this % root
+        current = this % head
         DO WHILE (ASSOCIATED(current))
            IF (TRIM(current%name).eq.TRIM(name)) THEN
                 GetUnitRangeStart = current % first
                 RETURN
            END IF
  
-           current = current % next
+           current => current % next
         END DO
 
         ! Returns negative unit if range not found
@@ -506,50 +507,41 @@ CONTAINS
         CHARACTER(*)     , INTENT(IN)    :: name
         INTEGER          , INTENT(IN)    :: length
 
-        INTEGER        , PARAMETER :: MAX_SIZE=20
         TYPE(UnitRange), POINTER   :: current, prev
         INTEGER :: first, i
 
-        IF ( ASSOCIATED(this%root)) THEN
-           current = this % root
+
+        ALLOCATE(current)
+
+        IF ( .NOT.ASSOCIATED(this % head)) THEN
+
+           this % head => current
+           this % tail => current 
            first = UnitGenerateEnd
            prev => NULL()
+
         ELSE
 
-           current = this % root
+           current => this % head
 
-           DO WHILE (.TRUE.)
+           DO WHILE (ASSOCIATED(current))
 
               ! Checking if named range list already exists 
-              IF (TRIM(current%name).eq.TRIM(name)) THEN
+              IF (TRIM(current%name).EQ.TRIM(name)) THEN
                  AddUnitRange = 1
+                 DEALLOCATE(current)
                  RETURN
               END IF  
               
-              ! At last item in linked list 
-              IF ( .NOT.ASSOCIATED(current%next)) THEN
-                 prev = current
-                 current = current % next
-                 EXIT
-              END IF
-
-              current = current % next
-              first = current % last
-              i = i + 1
-
-              ! Safety check to avoid infinite loop
-              IF ( i.GT.MAX_SIZE) THEN
-                 AddUnitRange = 2
-                 Return
-              END IF
            END DO
-        
+
+           first = this % tail % last
+           current % prev => this % tail
+           this % tail % next => current
+           this % tail => current                    
+
         END IF
 
-        ALLOCATE(current)       
-
-        current % prev = prev
-        current % prev % next = current
         current % first = first 
         current % last = first + length
 
