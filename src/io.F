@@ -465,13 +465,13 @@ SUBROUTINE READ_INPUT
 
          END IF
 
-         IF (WaveMaker(1:3)=='ABS') THEN
+         IF (WAVE_DATA_TYPE(1:3)=='ABS') THEN
+
             CALL READ_PARAMETER(WidthWaveMaker    , 'WidthWaveMaker')
             CALL READ_PARAMETER(R_sponge_wavemaker, 'R_sponge_wavemaker')
             CALL READ_PARAMETER(A_sponge_wavemaker, 'A_sponge_wavemaker')
-         END IF
- 
-         IF (WAVE_DATA_TYPE(1:4)=='DATA') THEN
+
+         ELSE IF (WAVE_DATA_TYPE(1:4)=='DATA') THEN
             CALL READ_PARAMETER(WaveCompFile, 'WaveCompFile')
   
             OPEN(1,FILE=TRIM(WaveCompFile))
@@ -497,7 +497,7 @@ SUBROUTINE READ_INPUT
              ENDDO
              DO I=1,NumDir
                 READ(1,*,END=991)(Phase_LEFT(J,I),J=1,NumFreq)
-             ENDDO
+             ENDDOVE_DATA_TYPE
              CLOSE(1)
 881          INPUT_PHASE = .TRUE.
 991          CONTINUE
@@ -536,7 +536,8 @@ SUBROUTINE READ_INPUT
              ENDDO
              CALL WRITE_ALL('Using absorbing generating wave maker with DATA')
 
-         ELSE
+         ELSE IF (WAVE_DATA_TYPE(1:6)=='WK_IRR'.OR.WAVE_DATA_TYPE(1:6)=='TMA_1D'.OR.&
+                  WAVE_DATA_TYPE(1:6)=='JON_1D'.OR.WAVE_DATA_TYPE(1:6)=='JON_2D') THEN 
 
             CALL READ_PARAMETER(FreqPeak , 'FreqPeak')
             CALL READ_PARAMETER(FreqMin  , 'FreqMin')
@@ -554,6 +555,8 @@ SUBROUTINE READ_INPUT
                CALL READ_PARAMETER(Sigma_Theta, 'Sigma_Theta', 10.0_SP)
             END IF
 
+         ELSE
+            CALL WRITE_STOP("INVALID WAVE_DATA_TYPE SPECIFIED. STOP!!!")
          END IF 
 
       ELSE
@@ -561,12 +564,21 @@ SUBROUTINE READ_INPUT
       END IF
 
       IF (WaveMaker(1:4).NE.'NONE') THEN
+
          CALL READ_PARAMETER(ETA_LIMITER, 'ETA_LIMITER', .FALSE.)
          IF (ETA_LIMITER) THEN
             CALL READ_PARAMETER(CrestLimit , 'CrestLimit')
             CALL READ_PARAMETER(TroughLimit, 'TroughLimit')
          END IF 
-      END IF 
+
+! to avoid longshore current caused by extra momentum flux
+! we can add bottom friction make momentum balance
+
+         read_check = .TRUE.
+         CALL READ_PARAMETER(WaveMakerCd, 'WaveMakerCd', check=read_check)
+         WaveMakerCurrentBalance = read_check
+
+      END IF
 
       CALL logbuff % FLUSH2OUTPUT()
 
@@ -587,7 +599,6 @@ SUBROUTINE READ_INPUT
 
       IF (DIRECT_SPONGE) THEN
          CALL WRITE_ALL('Direct sponge used')
-         CALL READ_PARAMETER(Csp, 'Csp', 0.1_SP)
       END IF
 
       CALL READ_PARAMETER(DIFFUSION_SPONGE, 'DIFFUSION_SPONGE', .FALSE.)
@@ -605,574 +616,114 @@ SUBROUTINE READ_INPUT
       END IF
 
       IF (DIFFUSION_SPONGE.OR.DIRECT_SPONGE.OR.FRICTION_SPONGE) THEN
-         CALL READ_PARAMETER(Sponge_west_width, 'Sponge_west_width', 0.0_SP, 'm')
-         CALL READ_PARAMETER(Sponge_east_width, 'Sponge_east_width', 0.0_SP, 'm')
-         CALL READ_PARAMETER(
-         CALL READ_PARAMETER(
-         CALL READ_PARAMETER(
-         CALL READ_PARAMETER(
-         CALL READ_PARAMETER(
-         CALL READ_PARAMETER(
+         CALL READ_PARAMETER(Sponge_west_width , 'Sponge_west_width' , 0.0_SP , 'm')
+         CALL READ_PARAMETER(Sponge_east_width , 'Sponge_east_width' , 0.0_SP , 'm')
+         CALL READ_PARAMETER(Sponge_south_width, 'Sponge_south_width', 0.0_SP , 'm')
+         CALL READ_PARAMETER(Sponge_north_width, 'Sponge_north_width', 0.0_SP , 'm')
+         CALL READ_PARAMETER(R_sponge          , 'R_sponge'          , 0.85_SP)
+         CALL READ_PARAMETER(A_sponge          , 'A_sponge'          , 5.0_SP)
       END IF 
 
-      IF(DIFFUSION_SPONGE.OR.DIRECT_SPONGE.OR.FRICTION_SPONGE)THEN
-        CALL READ_FLOAT(Sponge_west_width,FILE_NAME,'Sponge_west_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_west_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_west_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_west_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_west_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_west_width Default:  0.0'
-# endif
-       ENDIF
+      CALL logbuff % FLUSH2OUTPUT()
+ 
+! -----------------------------------------------------------------------------
 
-        CALL READ_FLOAT(Sponge_east_width,FILE_NAME,'Sponge_east_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_east_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_east_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_east_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_east_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_east_width Default:  0.0'
-# endif
-       ENDIF
+      CALL WRITE_BANNER('OBSTACLE and BREAKWATER INFO')
 
-        CALL READ_FLOAT(Sponge_south_width,FILE_NAME,'Sponge_south_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_south_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_south_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_south_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_south_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_south_width Default:  0.0'
-# endif
-       ENDIF
+      read_check = .TRUE.
+      CALL READ_READ_PARAMETER(OBSTACLE_FILE, 'OBSTACLE_FILE', check=read_check)
+      OBSTACLE = read_check
+      IF (.NOT.OBSTACLE) CALL WRITE_ALL( 'No obstacle file.')
+    
+      read_check = .TRUE.
+      CALL READ_READ_PARAMETER(BREAKWATER_FILE, 'BREAKWATER_FILE', check=read_check)
+      BREAKWATER = read_check
 
-        CALL READ_FLOAT(Sponge_north_width,FILE_NAME,'Sponge_north_width',ierr)
-      IF(ierr==1)THEN
-        Sponge_north_width = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Sponge_north_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_north_width Default:  0.0'
-      endif
-# else
-         WRITE(*,'(A40)')'Sponge_north_width Default:  0.0'
-         WRITE(3,'(A40)')'Sponge_north_width Default:  0.0'
-# endif
-       ENDIF
-
-        CALL READ_FLOAT(R_sponge,FILE_NAME,'R_sponge',ierr)
-      IF(ierr==1)THEN
-        R_sponge = 0.85_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'R_sponge Default:  0.85'
-         WRITE(3,'(A40)')'R_sponge Default:  0.85'
-      endif
-# else
-         WRITE(*,'(A40)')'R_sponge Default:  0.85'
-         WRITE(3,'(A40)')'R_sponge Default:  0.85'
-# endif
-       ENDIF
-
-        CALL READ_FLOAT(A_sponge,FILE_NAME,'A_sponge',ierr)
-      IF(ierr==1)THEN
-        A_sponge = 5.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'A_sponge Default:  5.0'
-         WRITE(3,'(A40)')'A_sponge Default:  5.0'
-      endif
-# else
-         WRITE(*,'(A40)')'A_sponge Default:  5.0'
-         WRITE(3,'(A40)')'A_sponge Default:  5.0'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_west_width =', Sponge_west_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_east_width =', Sponge_east_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_south_width=', Sponge_south_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'Sponge_north_width=', Sponge_north_width
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'R_sponge          =', R_sponge
-        if (myid.eq.0) WRITE(3,'(A20,F12.2)')'A_sponge          =', A_sponge
-# else
-        WRITE(3,'(A20,F12.2)')'Sponge_west_width =', Sponge_west_width
-        WRITE(3,'(A20,F12.2)')'Sponge_east_width =', Sponge_east_width
-        WRITE(3,'(A20,F12.2)')'Sponge_south_width=', Sponge_south_width
-        WRITE(3,'(A20,F12.2)')'Sponge_north_width=', Sponge_north_width
-        WRITE(3,'(A20,F12.2)')'R_sponge          =', R_sponge
-        WRITE(3,'(A20,F12.2)')'A_sponge          =', A_sponge
-# endif
-       ENDIF ! endif sponge
-
-! to avoid longshore current caused by extra momentum flux
-! we can add bottom friction make momentum balance
-
-      CALL READ_FLOAT(WaveMakerCd,FILE_NAME,'WaveMakerCd',ierr)
-      IF(ierr==1)THEN
-        WaveMakerCurrentBalance=.FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A40)')'No WavemakerCurrentBalance'
-# else
-       WRITE(3,'(A40)')'No WavemakerCurrentBalance'
-# endif
+      IF (.NOT.BREAKWATER) THEN
+         CALL WRITE_ALL( 'No breakwater file.')      
       ELSE
-        WaveMakerCurrentBalance=.TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,F6.2)')'WaveMakerCd:', WaveMakerCd
-# else
-      WRITE(3,'(A15,F6.2)')'WaveMakerCd:', WaveMakerCd
-# endif
-      ENDIF
+         CALL READ_PARAMETER(BreakWaterAbsorbCoef, 'BreakWaterAbsorbCoef', 10.0_SP)
+      END IF
 
+      CALL logbuff % FLUSH2OUTPUT()
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------- OBSTACLE and BREAKWATER -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------- OBSTACLE and BREAKWATER -----------------'   
-# endif
+! -----------------------------------------------------------------------------
 
-! obstacle structures
-      CALL READ_STRING(OBSTACLE_FILE,FILE_NAME,'OBSTACLE_FILE',ierr)
-      IF(ierr==1)THEN
-        OBSTACLE=.FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A5)')'OBSTACLE_FILE:', 'NO'
-# else
-      WRITE(3,'(A15,A5)')'OBSTACLE_FILE:', 'NO'
-# endif
-      ELSE
-        OBSTACLE=.TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A50)')'OBSTACLE_FILE:', OBSTACLE_FILE
-# else
-      WRITE(3,'(A15,A50)')'OBSTACLE_FILE:', OBSTACLE_FILE
-# endif
-      ENDIF
+      CALL WRITE_BANNER('PHYSIC INFO')
 
-! breakwater
-      CALL READ_STRING(BREAKWATER_FILE,FILE_NAME,'BREAKWATER_FILE',ierr)
-      IF(ierr==1)THEN
-        BREAKWATER=.FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,A5)')'BREAKWATER_FILE:', 'NO'
-# else
-      WRITE(3,'(A20,A5)')'BREAKWATER_FILE:', 'NO'
-# endif
-      ELSE
-        BREAKWATER=.TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,A50)')'BREAKWATER_FILE:', BREAKWATER_FILE
-# else
-      WRITE(3,'(A20,A50)')'BREAKWATER_FILE:', BREAKWATER_FILE
-# endif
-      ENDIF
-
-! breakwater reflection stength
-
-          CALL READ_FLOAT(BreakWaterAbsorbCoef,FILE_NAME,'BreakWaterAbsorbCoef',ierr)
-      IF(ierr==1)THEN
-        BreakWaterAbsorbCoef = 10.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-         WRITE(3,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-      endif
-# else
-         WRITE(*,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-         WRITE(3,'(A40)')'BreakWaterAbsorbCoef Default:  10.0'
-# endif
-       ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-         WRITE(3,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-      endif
-# else
-         WRITE(*,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-         WRITE(3,'(A40,F6.2)')'BreakWaterAbsorbCoef:', BreakWaterAbsorbCoef
-# endif
-       ENDIF
-
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- PHYSICS -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- PHYSICS -----------------'   
-# endif
-
-! physics
-          CALL READ_LOGICAL(DISPERSION,FILE_NAME,'DISPERSION',ierr)
-      IF(ierr==1)THEN
-        DISPERSION = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'DISPERSION Default:  DISPERSION'
-         WRITE(3,'(A40)')'DISPERSION Default:  DISPERSION'
-      endif
-# else
-         WRITE(*,'(A40)')'DISPERSION Default:  DISPERSION'
-         WRITE(3,'(A40)')'DISPERSION Default:  DISPERSION'
-# endif
-       ENDIF
-
-          CALL READ_FLOAT(Gamma1,FILE_NAME,'Gamma1',ierr)
-      IF(ierr==1)THEN
-        Gamma1 = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Gamma1 Default:  1.0: DISPERSION'
-         WRITE(3,'(A40)')'Gamma1 Default:  1.0: DISPERSION'
-      endif
-# else
-         WRITE(*,'(A40)')'Gamma1 Default:  1.0: DISPERSION'
-         WRITE(3,'(A40)')'Gamma1 Default:  1.0: DISPERSION'
-# endif
-       ENDIF
-
+      CALL READ_PARAMETER(DISPERSION, 'DISPERSION',.TRUE.)
+      CALL READ_PARAMETER(Gamma1    , 'Gamma1'    , 1.0_SP)
 # if defined (CARTESIAN)
-          CALL READ_FLOAT(Gamma2,FILE_NAME,'Gamma2',ierr)
-      IF(ierr==1)THEN
-        Gamma2 = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Gamma2 Default:  1.0: Full nonlinear'
-         WRITE(3,'(A50)')'Gamma2 Default:  1.0: Full nonlinear'
-      endif
+      CALL READ_PARAMETER(Gamma2    , 'Gamma2'    , 1.0_SP)
+      CALL READ_PARAMETER(Beta_ref  , 'Beta_ref'  , -0.531_SP)
+      CALL READ_PARAMETER(Gamma3    , 'Gamma3'    , 1.0_SP)
 # else
-         WRITE(*,'(A50)')'Gamma2 Default:  1.0: Full nonlinear'
-         WRITE(3,'(A50)')'Gamma2 Default:  1.0: Full nonlinear'
-# endif
-       ENDIF
+# if define (ZALPHA)
+      CALL READ_PARAMETER(Beta_ref  , 'Beta_ref'  , -0.531_SP)
+# endif 
+# endif 
 
-          CALL READ_FLOAT(Beta_ref,FILE_NAME,'Beta_ref',ierr)
-      IF(ierr==1)THEN
-        Beta_ref = - 0.531_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Beta_ref Default:  -0.531'
-         WRITE(3,'(A40)')'Beta_ref Default:  -0.531'
-      endif
-# else
-         WRITE(*,'(A40)')'Beta_ref Default:  -0.531'
-         WRITE(3,'(A40)')'Beta_ref Default:  -0.531'
-# endif
-       ENDIF
 
-# endif
-# if defined (ZALPHA)
-          CALL READ_FLOAT(Beta_ref,FILE_NAME,'Beta_ref',ierr)
-      IF(ierr==1)THEN
-        Beta_ref = -0.531_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Beta_ref Default:  -0.531'
-         WRITE(3,'(A40)')'Beta_ref Default:  -0.531'
-      endif
-# else
-         WRITE(*,'(A40)')'Beta_ref Default:  -0.531'
-         WRITE(3,'(A40)')'Beta_ref Default:  -0.531'
-# endif
-       ENDIF
-# endif
+      CALL READ_PARAMETER(VISCOSITY_BREAKING, 'VISCOSITY_BREAKING', .TRUE.)
 
-          CALL READ_FLOAT(Gamma3,FILE_NAME,'Gamma3',ierr)
-      IF(ierr==1)THEN
-        Gamma3 = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'Gamma3 Default:  1.0: NOT fully linear'
-         WRITE(3,'(A60)')'Gamma3 Default:  1.0: NOT fully linear'
-      endif
-# else
-         WRITE(*,'(A60)')'Gamma3 Default:  1.0: NOT fully linear'
-         WRITE(3,'(A60)')'Gamma3 Default:  1.0: NOT fully linear'
-# endif
-       ENDIF
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20)')'Summary of Physics'
-# else
-      WRITE(3,'(A20)')'Summary of Physics'
-# endif
-
-# if defined (PARALLEL)
-
-       if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Gamma1 = ', Gamma1
-# if defined (CARTESIAN)
-       if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Gamma2 = ', Gamma2
-       if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Beta_ref= ', Beta_ref
-       if (myid.eq.0) WRITE(3,'(A10,F12.2)')'Gamma3 = ', Gamma3
-# endif
-# else
-
-       WRITE(3,'(A10,F12.2)')'Gamma1 = ', Gamma1
-# if defined (CARTESIAN)
-       WRITE(3,'(A10,F12.2)')'Gamma2 = ', Gamma2
-       WRITE(3,'(A10,F12.2)')'Beta_ref= ', Beta_ref
-# endif
-       WRITE(3,'(A10,F12.2)')'Gamma3 = ', Gamma3
-# endif
-
-      CALL READ_LOGICAL(VISCOSITY_BREAKING,FILE_NAME,'VISCOSITY_BREAKING',ierr)
-      IF(ierr==1)THEN
-        VISCOSITY_BREAKING = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A60)')'VISCOSITY_BREAKING Default:  VIS Breaking'
-         WRITE(3,'(A60)')'VISCOSITY_BREAKING Default:  VIS Breaking'
-      endif
-# else
-         WRITE(*,'(A60)')'VISCOSITY_BREAKING Default:  VIS Breaking'
-         WRITE(3,'(A60)')'VISCOSITY_BREAKING Default:  VIS Breaking'
-# endif
-       ENDIF
+! Move to breaking
 
       IF(ROLLER) VISCOSITY_BREAKING = .TRUE.
 
-      IF(VISCOSITY_BREAKING)THEN
-# if defined (PARALLEL)
-       if (myid.eq.0) WRITE(3,*)'VISCOSITY_BREAKING IS USED'
-# else
-       WRITE(3,*)'VISCOSITY_BREAKING IS USED'
-# endif    
-      ENDIF
+      IF (VISCOSITY_BREAKING) CALL WRITE_ALL('Viscosity breaking used.')
 
-      CALL READ_FLOAT(SWE_ETA_DEP,FILE_NAME,'SWE_ETA_DEP',ierr)
-      IF(ierr==1)THEN
-        SWE_ETA_DEP = 0.80_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'SWE_ETA_DEP Default:  0.8'
-         WRITE(3,'(A40)')'SWE_ETA_DEP Default:  0.8'
-      endif
-# else
-         WRITE(*,'(A40)')'SWE_ETA_DEP Default:  0.8'
-         WRITE(3,'(A40)')'SWE_ETA_DEP Default:  0.8'
-# endif
-       ENDIF
+      CALL READ_PARAMETER(SWE_ETA_DEP, 'SWE_ETA_DEP', 0.8_SP)
 
+      ! Check depends on VISCOSITY_BREAKING
 
-      IF(VISCOSITY_BREAKING)THEN
-        ! say nothing
+      CALL READ_PARAMETER(In_Cd, 'FRICTION_MATRIX', .FALSE.)
+
+      IF (IN_Cd) THEN
+         CALL READ_PARAMETER(CD_FILE, 'FRICTION_FILE')
       ELSE
-# if defined (PARALLEL)
-       if (myid.eq.0) WRITE(3,'(A13,F12.2)')'SWE_ETA_DEP=', SWE_ETA_DEP
-# else
-       WRITE(3,'(A13,F12.2)')'SWE_ETA_DEP=', SWE_ETA_DEP
-# endif
-      ENDIF
+         CALL READ_PARAMETER(Cd_fixed, 'Cd', 0.0_SP)
+      END IF 
 
-      CALL READ_LOGICAL(IN_Cd,FILE_NAME,'FRICTION_MATRIX',ierr)
-      IF(ierr==1)THEN
-        IN_Cd = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'Friction_Matrix Default:  constant Cd'
-         WRITE(3,'(A50)')'Friction_Matrix Default:  constant Cd'
-      endif
-# else
-         WRITE(*,'(A50)')'Friction_Matrix Default:  constant Cd'
-         WRITE(3,'(A50)')'Friction_Matrix Default:  constant Cd'
-# endif
-       ENDIF
+      CALL logbuff % FLUSH2OUTPUT()
 
-    IF(IN_Cd)THEN
-        CALL READ_STRING(CD_FILE,FILE_NAME,'FRICTION_FILE',ierr) 
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'FRICTION_FILE NOT FOUND, Please specify Cd_file in input.txt'
-         WRITE(3,'(A80)')'FRICTION_FILE NOT FOUND, Please specify Cd_file in input.txt'
-      endif
-       call MPI_FINALIZE ( ier )
-# else
-         WRITE(*,'(A80)')'FRICTION_FILE NOT FOUND, Please specify Cd_file in input.txt'
-         WRITE(3,'(A80)')'FRICTION_FILE NOT FOUND, Please specify Cd_file in input.txt'
-# endif
-        STOP
-      ELSE
-# if defined (PARALLEL)
-       if (myid.eq.0) WRITE(3,'(A15,A50)')'CD_FILE:', CD_FILE
-# else
-       WRITE(3,'(A15,A50)')'CD_FILE:', CD_FILE
-# endif
-      ENDIF
+! -----------------------------------------------------------------------------
 
-    ENDIF ! endif IN_Cd
+      CALL WRITE_BANNER('NUMERICS INFO')
 
+      CALL READ_PARAMETER(Time_Scheme, 'Time_Scheme', 'Runge_Kutta')
+
+      IF ((Time_Scheme.NE.'Predictor_Corrector').AND.&
+          (Time_Scheme.NE.'Runge_Kutta') THEN
+         CALL WRITE_STOP('INVALID TIME SCHEME OPTION. STOP!!!')
+      END IF
+
+
+      CALL READ_PARAMETER(CONSTR, 'CONSTRUCTION', 'HLLC')
+
+      ! Check options, seems second/third order was deprecated + other options
+      CALL READ_PARAMETER(HIGH_ORDER, 'HIGH_ORDER', 'FOURTH')
+
+      !IF ((HIGH_ORDER.NE.'FOURTH').AND.&
+      !    (HIGH_ORDER.NE.'THIRD').AND.&
+      !    (HIGH_ORDER.NE.'SECOND')) THEN
+      !   CALL WRITE_STOP('INVALID SCHEME ORDER OPTION. STOP!!!')
+      !END IF
+
+      CALL READ_PARAMETER(CFL, 'CFL', 0.5_SP)
+
+      read_check=.FALSE.
+      CALL READ_PARAMETER(DT_fixed, 'DT_fixed', check=read_check)
+      FIXED_DT = read_check
+      IF (FIXED_DT) THEN 
+         CALL logbuf % ADD('FIXED_DT', FORMAT_FLOAT(FIXED_DT))
+         CALL WRITE_ALL('Used fixed DT, but judged by CFL. IF not satisfy CLF, DT/2...')
+      END IF       
  
-      CALL READ_FLOAT(Cd_fixed,FILE_NAME,'Cd',ierr)
-      IF(ierr==1)THEN
-        Cd_fixed = 0.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Cd_fixed Default:  0.0, possibly you used FRICTION_MATRIX'
-         WRITE(3,'(A40)')'Cd_fixed Default:  0.0, possibly you used FRICTION_MATRIX'
-      endif
-# else
-         WRITE(*,'(A40)')'Cd_fixed Default:  0.0, possibly you used FRICTION_MATRIX'
-         WRITE(3,'(A40)')'Cd_fixed Default:  0.0, possibly you used FRICTION_MATRIX'
-# endif
-       ENDIF
-     
-# if defined (PARALLEL)
-       if (myid.eq.0) WRITE(3,'(A35,F12.2)')'Cd_fixed (if you used fixed Cd) =', Cd_fixed
-# else
-       WRITE(3,'(A35,F12.2)')'Cd_fixed (if you used fixed Cd) =', Cd_fixed
-# endif
+      CALL READ_PARAMETER(FroudeCap  , 'FroudeCap'  , 3.0_SP)
+      CALL READ_PARAMETER(MinDepth   , 'MinDepth'   , 0.1_SP, 'm')  
+      CALL READ_PARAMETER(MinDepthFrc,' MinDepthFrc', 0.1_SP, 'm')
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- NUMERICS -----------------'
-# else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- NUMERICS -----------------'   
-# endif
-
-! numerics schemes
-      CALL READ_STRING(Time_Scheme,FILE_NAME,'Time_Scheme',ierr)
-      IF(ierr==1)THEN
-        Time_Scheme = 'Runge_Kutta'
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'Time_Scheme Default:  Runge_Kutta'
-         WRITE(3,'(A40)')'Time_Scheme Default:  Runge_Kutta'
-      endif
-# else
-         WRITE(*,'(A40)')'Time_Scheme Default:  Runge_Kutta'
-         WRITE(3,'(A40)')'Time_Scheme Default:  Runge_Kutta'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A13,A50)')'TIME_SCHEME:', TIME_SCHEME
-# else
-      WRITE(3,'(A13,A50)')'TIME_SCHEME:', TIME_SCHEME
-# endif
-
-      CALL READ_STRING(CONSTR,FILE_NAME,'CONSTRUCTION',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A14,A50)')'CONSTRUCTION', 'NOT DEFINED, USE HLL'
-# else
-      WRITE(3,'(A14,A50)')'CONSTRUCTION', 'NOT DEFINED, USE HLL'
-# endif
-        CONSTR='HLLC'
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A14,A50)')'CONSTRUCTION:', CONSTR
-# else
-      WRITE(3,'(A14,A50)')'CONSTRUCTION:', CONSTR
-# endif
-
-      CALL READ_STRING(HIGH_ORDER,FILE_NAME,'HIGH_ORDER',ierr)
-      IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0)then
-        WRITE(*,'(A12,A50)')'HIGH_ORDER', 'NOT DEFINED, USE FOURTH-ORDER'
-        WRITE(3,'(A12,A50)')'HIGH_ORDER', 'NOT DEFINED, USE FOURTH-ORDER'
-      endif
-# else
-      WRITE(*,'(A12,A50)')'HIGH_ORDER', 'NOT DEFINED, USE FOURTH-ORDER'
-      WRITE(3,'(A12,A50)')'HIGH_ORDER', 'NOT DEFINED, USE FOURTH-ORDER'
-# endif
-        HIGH_ORDER='FOURTH'        
-      ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,A50)')'HIGH_ORDER:', HIGH_ORDER
-# else
-      WRITE(3,'(A12,A50)')'HIGH_ORDER:', HIGH_ORDER
-# endif
-! CFL
-      CALL READ_FLOAT(CFL,FILE_NAME,'CFL',ierr)
-      IF(ierr==1)THEN
-        CFL = 0.5_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'CFL Default:  0.5'
-         WRITE(3,'(A40)')'CFL Default:  0.5'
-      endif
-# else
-         WRITE(*,'(A40)')'CFL Default:  0.5'
-         WRITE(3,'(A40)')'CFL Default:  0.5'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A5,F12.2)')'CFL=', CFL
-# else
-      WRITE(3,'(A5,F12.2)')'CFL=', CFL
-# endif
-
-! DT_fixed
-      CALL READ_FLOAT(DT_fixed,FILE_NAME,'DT_fixed',ierr)
-      IF (ierr.ne.1) THEN
-      FIXED_DT = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) then
-           WRITE(3,'(A80)') 'use fixed DT, but judged by CFL. IF not satisfy CLF, DT/2...'
-           WRITE(3,'(A12,F12.2)')'DT_fixed= ', DT_fixed
-      endif
-# else
-      WRITE(3,'(A80)') 'use fixed DT, but judged by CFL. IF not satisfy CLF, DT/2...'
-      WRITE(3,'(A12,F12.2)')'DT_fixed= ', DT_fixed
-# endif
-      ENDIF ! ierr\=1
-  
-! Froude Number Cap
-      CALL READ_FLOAT(FroudeCap,FILE_NAME,'FroudeCap',ierr)
-      IF(ierr==1)THEN
-        FroudeCap = 3.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'FroudeCap Default:  3.0'
-         WRITE(3,'(A40)')'FroudeCap Default:  3.0'
-      endif
-# else
-         WRITE(*,'(A40)')'FroudeCap Default:  3.0'
-         WRITE(3,'(A40)')'FroudeCap Default:  3.0'
-# endif
-       ENDIF
-
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,F12.2)')'FroudeCap=', FroudeCap
-# else
-      WRITE(3,'(A12,F12.2)')'FroudeCap=', FroudeCap
-# endif
-
-! MinDepth etc
-      CALL READ_FLOAT(MinDepth,FILE_NAME,'MinDepth',ierr)
-      IF(ierr==1)THEN
-        MinDepth = 0.1_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'MinDepth Default:  0.1 m'
-         WRITE(3,'(A40)')'MinDepth Default:  0.1 m'
-      endif
-# else
-         WRITE(*,'(A40)')'MinDepth Default:  0.1 m'
-         WRITE(3,'(A40)')'MinDepth Default:  0.1 m'
-# endif
-       ENDIF
 
       CALL READ_FLOAT(MinDepthFrc,FILE_NAME,'MinDepthFrc',ierr)
       IF(ierr==1)THEN
