@@ -740,7 +740,7 @@ SUBROUTINE READ_INPUT
        ENDIF
 
 !  merge two parameters into the minimum one
-       MinDepthFrc=MAX(MinDepthFrc,MinDepth)
+       MinDepthFrc=MIN(MinDepthFrc,MinDepth)
        MinDepth=MinDepthFrc
 
 # if defined (PARALLEL)
