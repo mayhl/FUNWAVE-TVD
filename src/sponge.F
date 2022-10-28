@@ -81,9 +81,10 @@ SUBROUTINE ABSORBING_GENERATING_BC
                        Segma_Ser,Stokes_Drift_Ser,Cm_eta,Sm_eta,&
                        Cm_u,Sm_u,Cm_v,Sm_v,SPONGE,tmp4preview, &
                        HU, HV,Depth
+     USE TIDE_MODULE
 
      IMPLICIT NONE
-     INTEGER :: KK,K
+     INTEGER :: KK_sponge
      real(SP),DIMENSION(Mloc,Nloc) :: Ein2D,Din2D
      real(SP),DIMENSION(Mloc,Nloc) :: Uin2D,Vin2D
      
@@ -107,29 +108,37 @@ SUBROUTINE ABSORBING_GENERATING_BC
 ! Eliminate redundant operations to speed up!
 
     ! eliminate sine and cosine from redundant calculations
-    DO KK = 1, NumFreq
-        BB(KK) = COS(pi/2.0_SP+Segma_Ser(KK)*TIME+Phase_Ser(KK))
-        CC(KK) = SIN(pi/2.0_SP+Segma_Ser(KK)*TIME+Phase_Ser(KK))
+    DO KK_sponge= 1, NumFreq
+        BB(KK_sponge) = COS(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
+        CC(KK_sponge) = SIN(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
     ENDDO
     ! use constant values to speed up
     DO J = 1,Nloc
         DO I = 1,Mloc
-            DO KK = 1, NumFreq
-                Ein2D(I,J)=Ein2D(I,J)+Cm_eta(I,J,KK)*BB(KK)+Sm_eta(I,J,KK)*&
-                CC(KK)
-                Uin2D(I,J)=Uin2D(I,J)+Cm_u(I,J,KK)*BB(KK)+Sm_u(I,J,KK)*CC(KK)
-                Vin2D(I,J)=Vin2D(I,J)+Cm_v(I,J,KK)*BB(KK)+Sm_v(I,J,KK)*CC(KK)
+            DO KK_sponge= 1, NumFreq
+                Ein2D(I,J)=Ein2D(I,J)+Cm_eta(I,J,KK_sponge)*BB(KK_sponge)+Sm_eta(I,J,KK_sponge)*&
+                CC(KK_sponge)
+                Uin2D(I,J)=Uin2D(I,J)+Cm_u(I,J,KK_sponge)*BB(KK_sponge)+ &
+                           Sm_u(I,J,KK_sponge)*CC(KK_sponge)
+                Vin2D(I,J)=Vin2D(I,J)+Cm_v(I,J,KK_sponge)*BB(KK_sponge)+ &
+                           Sm_v(I,J,KK_sponge)*CC(KK_sponge)
             ENDDO
-            !Ein2D(I,J)=Ein2D(I,J)/SPONGE(I,J)**4
-            !Uin2D(I,J)=Uin2D(I,J)/SPONGE(I,J)**4
-            !Vin2D(I,J)=Vin2D(I,J)/SPONGE(I,J)**4
-            Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))/SpongeMaker(I,J)
+   ! add tidal information at boundary
+           IF(TIDAL_BC_GEN_ABS) THEN
+            Ein2D(I,J)=Ein2D(I,J) + TideWEST_ETA
+            Uin2D(I,J)=Uin2D(I,J)+ TideWEST_U
+            Vin2D(I,J)=Vin2D(I,J)+ TideWEST_V
+           ENDIF
+
+!            Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))/SpongeMaker(I,J)
+            Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))*SPONGE_TIDE_WEST(I,J)
             !U(I,J) = Uin2D(I,J)+(U(I,J)-Uin2D(I,J))/SpongeMaker(I,J)
             !V(I,J) = Vin2D(I,J)+(V(I,J)-Vin2D(I,J))/SpongeMaker(I,J)
             HU(I,J)=(Depth(I,J)+ETA(I,J))*U(I,J)
             HV(I,J)=(Depth(I,J)+ETA(I,J))*V(I,J)
         ENDDO
     ENDDO
+
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!

@@ -42,7 +42,7 @@ RESULT_FOLDER = output/
    ! -----------------GRID---------------------------------- 
    ! if use spherical grid, in decimal degrees 
  DX = 2.0 
- DY = 2.0 
+ DY = 1.0 
    ! ----------------WAVEMAKER------------------------------ 
    !  wave maker 
    ! LEF_SOL- left boundary solitary, need AMP,DEP, LAGTIME 
@@ -67,7 +67,7 @@ AMP_WK = 0.5
 Theta_WK = 0.0 
 Delta_WK = 3.0
   ! ---------------- TIDE BOUNDARY ----------------------
-TIDAL_BC = T
+TIDAL_BC_ABS = T
 TideBcType = CONSTANT
 TideWest_ETA = 1.0
 TideEast_ETA = 1.0

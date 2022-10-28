@@ -51,6 +51,7 @@
 !-------------------------------------------------------------------------------------
 SUBROUTINE STATISTICS
      USE GLOBAL
+     USE TIDE_MODULE
      IMPLICIT NONE
 
      REAL(SP)::MassVolume=ZERO,Energy=ZERO,MaxEta=ZERO,MinEta=ZERO, &
@@ -144,7 +145,11 @@ SUBROUTINE STATISTICS
      WRITE(*,*) ' MassVolume  Energy      MaxEta      MinEta      Max U       Max V '
      WRITE(*,101)  MassVolume,Energy,MaxEta,MinEta,MaxU,MaxV
      WRITE(*,*) ' MaxTotalU   PhaseS      Froude      WetDryMass'
-     WRITE(*,101) UTotalMax, Fr, UTotalMax/Fr, Dmass
+     WRITE(*,101) UTotalMax, Fr, UTotalMax/Fr, Dmass           
+     IF(TideWest.OR.TideEast.OR.TideSouth.OR.TideNorth)THEN
+       WRITE(*,*) ' TideWest    TideEast      TideSouth    TideNorth'
+       WRITE(*,101) TideWEST_ETA, TideEAST_ETA, TideSOUTH_ETA, TideNORTH_ETA 
+     ENDIF
 ! print log file
      WRITE(3,*) '----------------- STATISTICS ----------------'
      WRITE(3,*) ' TIME        DT'
@@ -153,6 +158,10 @@ SUBROUTINE STATISTICS
      WRITE(3,101)  MassVolume,Energy,MaxEta,MinEta,MaxU,MaxV
      WRITE(3,*) ' MaxTotalU   PhaseS      Froude      WetDryMass'
      WRITE(3,101)  UTotalMax, Fr, UTotalMax/Fr, Dmass
+     IF(TideWest.OR.TideEast.OR.TideSouth.OR.TideNorth)THEN
+       WRITE(3,*) ' TideWest    TideEast      TideSouth    TideNorth'
+       WRITE(3,101) TideWEST_ETA, TideEAST_ETA, TideSOUTH_ETA, TideNORTH_ETA 
+     ENDIF
 # if defined (PARALLEL)
      endif
 # endif
