@@ -52,7 +52,8 @@
 
 MODULE INPUT_READ
 
-USE PARAM,ONLY : SP
+  USE PARAM,ONLY : SP
+  USE LOG_IO
 #if defined (PARALLEL)
   USE GLOBAL,ONLY : myid,ier
   USE MPI
@@ -62,17 +63,379 @@ USE PARAM,ONLY : SP
   CHARACTER(LEN=80) :: VAL_TYPE 
   CHARACTER(LEN=80) :: VAL_READ 
 
-INTERFACE READ_FOUR_TYPE_VALUES
-  Module Procedure READ_FLOAT
-  Module Procedure READ_STRING
-  Module Procedure READ_LOGICAL
-  Module Procedure READ_INTEGER
-END INTERFACE
+  INTERFACE READ_FOUR_TYPE_VALUES
+    Module Procedure READ_FLOAT
+    Module Procedure READ_STRING
+    Module Procedure READ_LOGICAL
+    Module Procedure READ_INTEGER
+  END INTERFACE
+
+  INTERFACE READ_PARAMETER
+    MODULE PROCEDURE READ_INTEGER2
+    MODULE PROCEDURE READ_FLOAT2
+    MODULE PROCEDURE READ_STRING2
+    MODULE PROCEDURE READ_LOGICAL2
+  END INTERFACE
+
+  CHARACTER(:), TARGET, ALLOCATABLE :: input_file_path
+  TYPE(LOG_BUFFER), POINTER :: logbuf
 
 CONTAINS
-  
-! INTEGER
+ 
+  SUBROUTINE SET_INPUT_LOGGER(fpath, logbuff)
 
+    IMPLICIT NONE
+    CHARACTER(*)            , INTENT(IN) :: fpath
+    TYPE(LOG_BUFFER), TARGET, INTENT(IN) :: logbuff
+
+    INTEGER :: path_len
+
+    CALL CLEAR_INPUT_LOGGER()
+
+    path_len=LEN_TRIM(ADJUSTL(fpath))
+
+    ALLOCATE(CHARACTER(path_len) :: input_file_path)
+    input_file_path = TRIM(ADJUSTL(fpath))
+
+    logbuf => logbuff
+
+  END SUBROUTINE
+
+  SUBROUTINE CLEAR_INPUT_LOGGER()
+
+    IMPLICIT NONE
+
+    IF (ALLOCATED(input_file_path)) DEALLOCATE(input_file_path)
+    IF (ASSOCIATED(logbuf)) THEN
+      CALL logbuf % CLEAR()
+      logbuf => NULL()
+    END IF
+  END SUBROUTINE
+
+! --------------------------
+! VALUE FORMATTING FUNCTIONS 
+! --------------------------
+  PURE FUNCTION FORMAT_INTEGER(val) RESULT (str)
+
+    IMPLICIT NONE
+    INTEGER, INTENT(IN) :: val
+    CHARACTER(80) :: str
+    WRITE(str, '(I)') val
+
+  END FUNCTION
+
+
+  PURE FUNCTION FORMAT_FLOAT(val) RESULT(str)
+
+    IMPLICIT NONE
+    REAL(SP), INTENT(IN) :: val
+
+    CHARACTER(80) :: str
+    CHARACTER(20) :: coeff
+    INTEGER :: expon
+    INTEGER :: i !, ns, ne
+
+    str = ""
+    !IF(myid.NE.0) RETURN
+
+    ! Using scientific notation for larger or small numbers 
+    IF (ABS(val).GT.1.0E6_SP.OR.ABS(val).LT.1.0E-6_SP) THEN
+      WRITE(str,'(E20.10)') val
+      i = INDEX(str,"+")
+      IF (i.EQ.0) i = INDEX(str,'-')
+      coeff = str(:i-2)
+      READ(str(i:), *) expon
+    ELSE
+      WRITE(coeff,'(F20.10)') val
+      expon = 0
+    END IF
+
+    ! Removing trailing zeros
+    ! Setting stop index to 2nd decimal place to leave 
+    ! tailing zero in 1st decimal place, i.e., 2.0 vs 2.
+    coeff = ADJUSTL(coeff)
+    DO i = LEN_TRIM(coeff), INDEX(coeff,'.')+2, -1
+      IF (coeff(i:i).NE."0") EXIT
+    ENDDO
+    str = coeff(:i)
+
+    !str = ADJUSTL(coeff)
+    ! Attaching exponent 
+    IF (expon.NE.0) THEN
+      WRITE(coeff,*) expon
+      str = TRIM(str)//'E'//TRIM(ADJUSTL(coeff))
+    END IF
+
+  END FUNCTION
+
+
+  PURE FUNCTION FORMAT_LOGICAL(val) RESULT(str)
+
+    IMPLICIT NONE
+    LOGICAL, INTENT(IN) :: val
+    CHARACTER(80) :: str
+
+    IF (val) THEN
+      str = 'T'
+    ELSE
+      str = 'F'
+    END IF
+
+  END FUNCTION
+
+! -------------------------------
+! Routines for reading parameters
+! -------------------------------
+
+
+  SUBROUTINE READ_VALUE2(val_name, is_required, val_type, default_str, val_read, is_default, found)
+
+    USE LOG_IO
+     IMPLICIT NONE
+
+     CHARACTER(*)     , INTENT(IN)    :: val_name
+     LOGICAL          , INTENT(IN)    :: is_required
+     CHARACTER(*)     , INTENT(IN)    :: val_type
+     CHARACTER(*)     , INTENT(IN)    :: default_str
+     CHARACTER(*)     , INTENT(OUT)   :: val_read
+     LOGICAL          , INTENT(OUT)   :: is_default
+     LOGICAL, OPTIONAL, INTENT(INOUT) :: found
+
+     CHARACTER(80) :: type_detected
+     LOGICAL :: file_exists 
+     INTEGER :: err 
+     CHARACTER(:), POINTER :: fname
+
+     IF (.NOT.ASSOCIATED(logbuf)) CALL SWRITE('LOGGER NOT SET.')
+     IF (.NOT.ALLOCATED(input_file_path)) CALL SWRITE( 'INPUT FILE PATH NOT SET.')
+
+     fname => input_file_path
+
+     INQUIRE(FILE=fname,EXIST=file_exists)
+     IF ( .NOT.file_exists ) CALL SWRITE( 'FILE '//TRIM(fname)//' CAN NOT BE FOUND.' )
+
+     CALL READ_VALUE(fname, val_name, val_read, err)
+
+    ! Checking value type is as expected
+    IF (err.EQ.0) THEN 
+       CALL CHECK_CONSISTENCY_TYPE(val_read, type_detected)
+
+      IF ( type_detected.NE.val_type) &
+          CALL SWRITE( 'VALUE '//TRIM(val_name)//' IS NOT A/AN '//TRIM(val_type)//'.')
+
+      ! If found define, marking flag variable as found
+      IF (PRESENT(found)) found=.TRUE.  
+      is_default=.FALSE.
+      RETURN
+    ENDIF 
+
+    ! Use default value if parameter not found
+    IF (.NOT.is_required) THEN
+      is_default = .TRUE.
+      CALL LWRITE( "Value '"//TRIM(ADJUSTL(val_name))// &
+                  "' not specified, using default value '"//TRIM(ADJUSTL(default_str))//"'.")
+      IF (PRESENT(found)) found=.FALSE.
+      RETURN 
+    ENDIF
+
+    ! Bypassing error if found is defined and marking flag as not found
+    IF (PRESENT(found)) THEN
+      is_default=.FALSE.
+      found=.FALSE.
+      RETURN
+    ENDIF 
+
+    ! Call error as value is required 
+    CALL SWRITE('REQUIRED VALUE '//TRIM(val_name)//' CAN NOT BE FOUND.')
+
+  END SUBROUTINE
+
+
+  SUBROUTINE READ_INTEGER2(val, val_name, default_val, found)
+
+    USE LOG_IO
+    IMPLICIT NONE
+    INTEGER          , INTENT(OUT)   :: val
+    CHARACTER(*)     , INTENT(IN)    :: val_name
+    INTEGER, OPTIONAL, INTENT(IN)    :: default_val
+    LOGICAL, OPTIONAL, INTENT(INOUT) :: found
+
+    LOGICAL :: is_required, file_exists, is_default
+    CHARACTER(80) :: fmt_val
+    INTEGER :: err
+   !CHARACTER(*) :: val_read
+
+    ! Is required if no default value 
+    is_required=.NOT.PRESENT(default_val)
+    ! Formatting value for READ_VALUE output 
+    IF (.NOT.is_required) fmt_val = FORMAT_INTEGER(default_val)
+
+    ! Calling correct version of READ_VALUE if found is not defined
+    IF (PRESENT(found)) THEN
+      CALL READ_VALUE2(val_name, is_required, 'INTEGER', fmt_val, val_read, is_default, found)
+    ELSE
+      CALL READ_VALUE2(val_name, is_required, 'INTEGER', fmt_val, val_read, is_default)
+    END IF
+
+    ! Setting default value or formatting read value 
+    IF ( is_default ) THEN
+      val = default_val
+    ELSE
+      READ(val_read, *) val
+      fmt_val = FORMAT_INTEGER(val)
+    END IF
+
+    IF (PRESENT(found)) THEN
+      IF (found) CALL logbuf % ADD(val_name, fmt_val)
+    ELSE
+      CALL logbuf % ADD(val_name, fmt_val)
+    ENDIF
+  END SUBROUTINE
+
+  SUBROUTINE READ_FLOAT2(val, val_name, default_val, units, found)
+
+    USE LOG_IO
+    IMPLICIT NONE
+    REAL(SP)              , INTENT(OUT)   :: val
+    CHARACTER(*)          , INTENT(IN)    :: val_name
+    REAL(SP)    , OPTIONAL, INTENT(IN)    :: default_val
+    CHARACTER(*), OPTIONAL, INTENT(IN)    :: units
+    LOGICAL     , OPTIONAL, INTENT(INOUT) :: found
+
+    LOGICAL :: is_required, file_exists, is_default
+    CHARACTER(80) :: fmt_val
+    INTEGER :: err
+
+    ! Is required if no default value 
+    is_required=.NOT.PRESENT(default_val)
+    ! Formatting value for READ_VALUE output 
+    IF (.NOT.is_required) THEN
+      fmt_val = FORMAT_FLOAT(default_val)
+      IF(PRESENT(units)) fmt_val = TRIM(ADJUSTL(fmt_val))//' '//TRIM(ADJUSTL(units))
+    ENDIF
+
+    ! Calling correct version of READ_VALUE if found is not defined
+    IF (PRESENT(found)) THEN
+      CALL READ_VALUE2(val_name, is_required, 'float', fmt_val, val_read, is_default, found)
+    ELSE
+      CALL READ_VALUE2(val_name, is_required, 'float', fmt_val, val_read, is_default)
+    END IF
+
+    ! Setting default value or formatting read value 
+    IF (is_default) THEN
+      val = default_val
+    ELSE
+      READ(val_read, *) val
+    END IF
+
+    fmt_val = FORMAT_FLOAT(val)
+
+    IF (PRESENT(found)) THEN
+      IF (found) CALL logbuf % ADD(val_name, fmt_val)
+    ELSE
+      CALL logbuf % ADD(val_name, fmt_val)
+    ENDIF
+
+  END SUBROUTINE
+
+
+  SUBROUTINE READ_STRING2(val, val_name, default_val, is_file, found)
+
+    USE LOG_IO
+    IMPLICIT NONE
+    CHARACTER(*)          , INTENT(OUT) :: val
+    CHARACTER(*)          , INTENT(IN)  :: val_name
+    CHARACTER(*), OPTIONAL, INTENT(IN)  :: default_val
+    LOGICAL     , OPTIONAL, INTENT(IN)  :: is_file
+    LOGICAL     , OPTIONAL, INTENT(INOUT) :: found
+
+    LOGICAL :: is_required, file_exists, is_default
+    INTEGER :: err
+   !CHARACTER(*) :: val_read
+
+    ! Is required if no default value 
+    is_required=.NOT.PRESENT(default_val)
+
+    ! Calling correct version of READ_VALUE if found is not defined
+    IF (PRESENT(found)) THEN
+      CALL READ_VALUE2(val_name, is_required, 'string', default_val, val_read, is_default, found)
+    ELSE
+      CALL READ_VALUE2(val_name, is_required, 'string', default_val, val_read, is_default)
+    END IF
+
+    IF ( is_default ) THEN
+      val = ADJUSTL(TRIM(default_val))
+    ELSE
+      val = ADJUSTL(TRIM(val_read))
+    END IF
+
+    ! Checking if file exists if string is a file path
+    IF (PRESENT(is_file)) THEN
+      IF (is_file) THEN
+        INQUIRE(FILE=val, EXIST=file_exists)
+        IF (.NOT.file_exists) THEN
+          CALL SWRITE('VALUE '//TRIM(val_name)//' IS NOT A VALID FILE PATH.')
+        ENDIF
+      ENDIF 
+    ENDIF
+
+    IF (PRESENT(found)) THEN
+      IF (found) CALL logbuf % ADD(val_name, val)
+    ELSE
+      CALL logbuf % ADD(val_name, val)
+    ENDIF
+
+  END SUBROUTINE
+
+
+  SUBROUTINE READ_LOGICAL2(val, val_name, default_val, found)
+
+    USE LOG_IO
+    IMPLICIT NONE
+    LOGICAL          , INTENT(OUT) :: val
+    CHARACTER(*)     , INTENT(IN)  :: val_name
+    LOGICAL, OPTIONAL, INTENT(IN)  :: default_val
+    LOGICAL, OPTIONAL, INTENT(INOUT) :: found
+
+    LOGICAL :: is_required, file_exists, is_default
+    CHARACTER(80) :: fmt_val
+    INTEGER :: err
+    !CHARACTER(*) :: val_read
+
+    ! Is required if no default value 
+    is_required=.NOT.PRESENT(default_val)
+    ! Formatting value for READ_VALUE output 
+    IF (.NOT.is_required) fmt_val = FORMAT_LOGICAL(default_val)
+
+    ! Calling correct version of READ_VALUE if found is not defined
+    IF (PRESENT(found)) THEN
+      CALL READ_VALUE2(val_name, is_required, 'logical', fmt_val, val_read, is_default, found)
+    ELSE
+      CALL READ_VALUE2(val_name, is_required, 'logical', fmt_val, val_read, is_default)
+    END IF
+
+    IF ( is_default ) THEN
+      val = default_val
+    ELSE
+      IF (val_read(1:1) == 'T') THEN
+        val = .TRUE.
+      ELSE
+        val = .FALSE.
+      ENDIF
+      fmt_val = FORMAT_LOGICAL(val)
+    END IF
+
+    IF (PRESENT(found)) THEN
+      IF (found) CALL logbuf % ADD(val_name, fmt_val)
+    ELSE
+      CALL logbuf % ADD(val_name, fmt_val)
+    ENDIF
+
+  END SUBROUTINE
+
+
+
+! INTEGER
 SUBROUTINE READ_INTEGER(INTEGER_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
   IMPLICIT NONE
   INTEGER,          INTENT(OUT) :: INTEGER_VAL 

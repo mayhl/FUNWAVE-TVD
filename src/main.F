@@ -133,404 +133,281 @@ Program FUNWAVE_TVD
 ! 
 !
 !-------------------------------------------------------------------------------------
-     USE GLOBAL
+  USE GLOBAL
+
+  USE LOG_IO
 # if defined (VESSEL)
-     USE VESSEL_MODULE
+  USE VESSEL_MODULE
 # endif
 # if defined (SEDIMENT)
-     USE SEDIMENT_MODULE
+  USE SEDIMENT_MODULE
 # endif
-
 # if defined (FOAM)
-     USE MOD_FOAM
+  USE MOD_FOAM
 # endif
-
 # if defined (METEO)
-     USE METEO_MODULE
+  USE METEO_MODULE
 # endif
 # if defined (TRACKING)
-     USE TRACER
+   USE TRACER
 # endif
+  USE TIDE_MODULE
 
-     USE TIDE_MODULE
-
-     IMPLICIT NONE
+  IMPLICIT NONE
 
 !     INTEGER::ISTAGE ! moved to mod_global 09/12/2017
 !     REAL(SP) :: tbegin,tend  ! moved to mod_global 07/29/2016
 
 # if defined (PARALLEL)
-     CALL MPI_INIT ( ier )
+  CALL MPI_INIT ( ier )
+  CALL MPI_Comm_rank(MPI_COMM_WORLD, myid, ier)
+  CALL DWRITE('MPI_INIT')
 # endif
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'MPI_INIT'     
-#    endif
-# endif
+  CALL READ_INPUT
+  CALL DWRITE('READ_INPUT')
 
-     CALL READ_INPUT
+  ![ykchoi(14.12.24.)
+  IF (INI_UVZ) THEN
+    TIME=HotStartTime
+    CALL DWRITE('Set HotStartTime')
+  ENDIF
+  !ykchoi(14.12.24.)]
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'READ_INPUT'     
-#    else   
-       WRITE(*,*) 'READ_INPUT'
-#    endif
-# endif
-
-	![ykchoi(14.12.24.)
-	IF(INI_UVZ)THEN
-        TIME=HotStartTime
-      ENDIF
-	!ykchoi(14.12.24.)]
-
-     CALL INDEX
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'INDEX'     
-#    else   
-       WRITE(*,*) 'INDEX'
-#    endif
-# endif
+  CALL INDEX
+  CALL DWRITE('INDEX')
 
 ! allocate variables
-     CALL ALLOCATE_VARIABLES
+  CALL ALLOCATE_VARIABLES
+  CALL DWRITE('ALLOCATE_VARIABLES')
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ALLOCATION'     
-#    else   
-       WRITE(*,*) 'ALLOCATION'
-#    endif
-# endif
+  CALL INITIALIZATION
+  CALL DWRITE('INITIALIZATION')
 
-     CALL INITIALIZATION
-
-     CALL TIDE_INITIAL
-      
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'INITIALIZATION'     
-#    else   
-       WRITE(*,*) 'INITIALIZATION'
-#    endif
-# endif
+  CALL TIDE_INITIAL
+  CALL DWRITE('TIDE_INITIAL')
 
 # if defined (COUPLING)
-     TIME=TIME_COUPLING_1
+  TIME=TIME_COUPLING_1
+  CALL DWRITE('Set TIME_COUPLING_1')
 # endif
 
 # if defined (VESSEL)
-     CALL VESSEL_INITIAL
+  CALL VESSEL_INITIAL
+  CALL DWRITE('VESSEL_INITIAL')
 # endif
 
 # if defined (METEO)
-     CALL METEO_INITIAL
+  CALL METEO_INITIAL
+  CALL DWRITE('METEO_INITIAL')
 # endif
 
 # if defined (SEDIMENT)
-     CALL SEDIMENT_INITIAL
+  CALL SEDIMENT_INITIAL
+  CALL DWRITE('SEDIMENT_INITIAL')
 # endif
 
 # if defined (FOAM)
-     CALL ALLOCATE_FOAM
-     CALL INITIALIZATION_FOAM
+  CALL ALLOCATE_FOAM
+  CALL DWRITE('ALLOCATE_FOAM')
+  CALL INITIALIZATION_FOAM
+  CALL DWRITE('INITIALIZATION_FOAM')
 # endif
 
 #if defined (TRACKING)
-     CALL TRACER_INITIAL
+  CALL TRACER_INITIAL
+  CALL DWRITE('TRACER_INITIAL')
 # endif
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'INITIAL VESSEL, METEO, OR SEDIMENT if included'     
-#    else   
-       WRITE(*,*) 'INITIAL VESSEL, METEO, OR SEDIMENT if included'
-#    endif
-# endif
+  CALL GET_TIME(tbegin)
 
 ! time integration
 
-     ! record wall time
-# if defined (PARALLEL)
-     if(myid == 0) tbegin = MPI_Wtime( )
-# else
-     CALL CPU_TIME(tbegin)
-# endif
-
-
-   DO WHILE (TIME<TOTAL_TIME)
+  DO WHILE (TIME<TOTAL_TIME)
 
 !     move output here to get the initial condition 11/27/2018
 
-      CALL OUTPUT
+    CALL OUTPUT
+    CALL DWRITE('OUTPUT')
 
-     IF(WaveMaker(1:7)=='LEF_SOL')THEN
-       CALL SOLITARY_WAVE_LEFT_BOUNDARY
-     ENDIF   
+    IF  (WaveMaker(1:7)=='LEF_SOL') THEN
+      CALL SOLITARY_WAVE_LEFT_BOUNDARY
+      CALL DWRITE('SOLITARY_WAVE_LEFT_BOUNDARY')
+    ENDIF   
 
 ! update three variables
-     Eta0=Eta
-     Ubar0=Ubar
-     Vbar0=Vbar  
+    Eta0=Eta
+    Ubar0=Ubar
+    Vbar0=Vbar
+    ! previous update_mask
+    CALL DWRITE('UPDATE Eta, Ubar, & Vbar')
+
 # if defined (SEDIMENT)
-     CHH0=CHH
+    CHH0=CHH
+    CALL DWRITE('UPDATE CHH') 
 # endif
 
-! previous update_mask
-   
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'UPDATE Eta Ubar Vbar, MASK'     
-#    else   
-       WRITE(*,*) 'UPDATE Eta Ubar Vbar, MASK'
-#    endif
-# endif
-
-     CALL EXCHANGE
+    CALL EXCHANGE
+    CALL DWRITE('EXCHANGE')
 
 # if defined (COUPLING)
-         CALL OneWayCoupling
+    CALL OneWayCoupling
+    CALL DWRITE('OneWayCoupling')
 # endif
 
- 
-     CALL ESTIMATE_DT(Mloc,Nloc,DX,DY,U,V,H,MinDepthFrc,DT,CFL,TIME)
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ESTIMATE_DT'     
-#    else   
-       WRITE(*,*) 'ESTIMATE_DT'
-#    endif
-# endif
+    CALL ESTIMATE_DT(Mloc,Nloc,DX,DY,U,V,H,MinDepthFrc,DT,CFL,TIME)
+    CALL DWRITE('ESTIMATE_DT')
   
 ! U0, V0 are moved to following part due to computation of Ut, Vt.
-	U0=U   !ykchoi(15. 08. 06.)
-	V0=V   !ykchoi
+    U0=U   !ykchoi(15. 08. 06.)
+    V0=V   !ykchoi
 
 # if defined (VESSEL)
-       CALL VESSEL_FORCING
+    CALL VESSEL_FORCING
+    CALL DWRITE('VESSEL_FORCING')
 # endif
 
 # if defined (METEO)
-       CALL METEO_FORCING
+    CALL METEO_FORCING
+    CALL DWRITE('METEO_FORCING')
 # endif
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'vessel, meteo forcing, if included'     
-#    else   
-       WRITE(*,*) 'vessel, meteo forcing, if included'
-#    endif
-# endif
-
-       IF(TideBcType(1:4)=='DATA')THEN
-         CALL TIDE_DATA
-       ENDIF
+    IF (TideBcType(1:4)=='DATA') THEN
+      CALL TIDE_DATA
+      CALL DWRITE('TIDE_DATA')
+    END IF
 
      ! 3-ORDER RUNGE-KUTTA TIME STEPPING
-     DO ISTAGE=1,3
+    DO ISTAGE=1,3
 
-       IF(DISPERSION)THEN
-         CALL Cal_Dispersion
-       ENDIF 
+      IF (DISPERSION) THEN
+        CALL Cal_Dispersion
+        CALL DWRITE('Cal_Dispersion')
+      ENDIF 
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'Cal_Dispersion'     
-#    else   
-       WRITE(*,*) 'Cal_Dispersion'
-#    endif
-# endif
+      CALL FLUXES
+      CALL DWRITE('FLUXES')
 
-       CALL FLUXES
+      ! put sourceterms after fluxes in order to get eta_t
+      CALL SourceTerms   
+      CALL DWRITE('SourceTerms')
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'FLUXES'     
-#    else   
-       WRITE(*,*) 'FLUXES'
-#    endif
-# endif
+      CALL ESTIMATE_HUV(ISTAGE) 
+      CALL DWRITE('ESTIMATE_HUV')
 
-       CALL SourceTerms   ! put sourceterms after fluxes in order to get eta_t
+      ! etascreen was added, update_mask was moved here from outside RK 
+      CALL UPDATE_MASK
+      CALL DWRITE('UPDATE_MASK')
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'SourceTerms'     
-#    else   
-       WRITE(*,*) 'SourceTerms'
-#    endif
-# endif
-
-       CALL ESTIMATE_HUV(ISTAGE) 
-
-! etascreen was added, update_mask was moved here from outside RK 
-       CALL UPDATE_MASK
-
-       IF(TIDAL_BC_ABS)THEN
+      IF (TIDAL_BC_ABS) THEN
          CALL TIDE_BC
-       ENDIF
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ESTIMATE_HUV'     
-#    else   
-       WRITE(*,*) 'ESTIMATE_HUV'
-#    endif
-# endif   
+         CALL DWRITE('TIDE_BC')
+      END IF
 
 # if defined (SEDIMENT)
-     CALL SEDIMENT_ADVECTION_DIFFUSION(ISTAGE) 
+      CALL SEDIMENT_ADVECTION_DIFFUSION(ISTAGE) 
+      CALL DWRITE('SEDIMENT_ADVECTION_DIFFUSION')
 # endif
 
-       CALL WAVE_BREAKING
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'WAVE_BREAKING'     
-#    else   
-       WRITE(*,*) 'WAVE_BREAKING'
-#    endif
-# endif
+      CALL WAVE_BREAKING
+      CALL DWRITE('WAVE_BREAKING')
 
 # if defined (FOAM)
-       CALL FOAM_FLUX
-       CALL FOAM_UPDATE
-       CALL FOAM_BC
+      CALL FOAM_FLUX
+      CALL DWRITE('FOAM_FLUX')       
+      CALL FOAM_UPDATE
+      CALL DWRITE('FOAM_UPDATE')
+      CALL FOAM_BC
+      CALL DWRITE('FOAM_BC')
 # endif
        
-       CALL EXCHANGE
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'EXCHANGE'     
-#    else   
-       WRITE(*,*) 'EXCHANGE'
-#    endif
-# endif
+      CALL EXCHANGE
+      CALL DWRITE('EXCHANGE')
        
 # if defined (COUPLING)
-       CALL OneWayCoupling
-# endif
-         
+      CALL OneWayCoupling
+      CALL DWRITE('OneWayCoupling')
+# endif         
 
-       IF(WaveMaker(1:3)=='ABS') THEN
-         CALL ABSORBING_GENERATING_BC
+      IF (WaveMaker(1:3)=='ABS') THEN
+        CALL ABSORBING_GENERATING_BC
+        CALL DWRITE('ABSORBING_GENERATING_BC')
+      ENDIF
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ABS wavemaker'     
-#    else   
-       WRITE(*,*) 'ABS wavemaker'
-#    endif
-# endif
+      IF (WaveMaker(1:11)=='LEFT_BC_IRR') THEN
+        CALL IRREGULAR_LEFT_BC
+        CALL DWRITE('IRREGULAR_LEFT_BC')
+      ENDIF
 
-       ENDIF
+      IF (DIRECT_SPONGE) THEN
+        CALL SPONGE_DAMPING
+        CALL DWRITE('SPONGE_DAMPING')
+      ENDIF
 
-       IF(WaveMaker(1:11)=='LEFT_BC_IRR') THEN
-         CALL IRREGULAR_LEFT_BC
-       ENDIF
-
-       IF(DIRECT_SPONGE)THEN
-           CALL SPONGE_DAMPING
-       ENDIF
-
-     ENDDO
+    ! End RK Loop
+    END DO
 
 # if defined (SEDIMENT)
-!   moved out of the RK loop 07/02/2019
-     IF(Bed_Change)THEN
-       CALL MORPHOLOGICAL_CHANGE
-     ENDIF
+    ! moved out of the RK loop 07/02/2019
+    IF (Bed_Change) THEN
+      CALL MORPHOLOGICAL_CHANGE
+      CALL DWRITE('MORPHOLOGICAL_CHANGE')
+    END IF
 # endif
 
-     CALL MIXING_STUFF
+    CALL MIXING_STUFF
+    CALL DWRITE('MIXING_STUFF')
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'MIXING_STUFF'     
-#    else   
-       WRITE(*,*) 'MIXING_STUFF'
-#    endif
-# endif
 
 # if defined (TRACKING)
-     CALL TRACK_XY
+    CALL TRACK_XY
+    CALL DWRITE('TRACK_XY')
 # endif
 
+    ! find maximum eta velocity
+    IF (OUT_Hmax.OR.OUT_Hmin.OR.OUT_Umax.OR.OUT_MFmax.OR.OUT_VORmax.OR.OUT_Time)THEN
+      CALL MAX_MIN_PROPERTY
+      CALL DWRITE('MAX_MIN_PROPERTY')
+    ENDIF        
 
-!  find maximum eta velocity 
+    CALL CHECK_BLOWUP 
+    CALL DWRITE('CHECK_BLOWUP')
 
-      IF (OUT_Hmax.OR.OUT_Hmin.OR.OUT_Umax.OR.OUT_MFmax.OR.OUT_VORmax.OR.OUT_Time)THEN
-        CALL MAX_MIN_PROPERTY
-      ENDIF        
+  ! End Time Loop
+  END DO
 
-      CALL CHECK_BLOWUP
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'CHECK_BLOWUP'     
-#    else   
-       WRITE(*,*) 'CHECK_BLOWUP'
-#    endif
-# endif
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'CHECK_BLOWUP'     
-#    else   
-       WRITE(*,*) 'CHECK_BLOWUP'
-#    endif
-# endif
-  
-   END DO
-
-   IF(NumberStations>0)THEN
+  IF (NumberStations>0 ) THEN
 # if defined (SPHERICAL_IJ_STATION)
-       ! use IJ for coupling purpose
-       CALL STATIONS_SPHERICAL_IJ
+    ! use IJ for coupling purpose
+    CALL STATIONS_SPHERICAL_IJ
+    CALL DWRITE('STATIONS_SPHERICAL_IJ')
 # else
-       CALL STATIONS
+    CALL STATIONS
+    CALL DWRITE('STATIONS')
 # endif
-   ENDIF
-
+  END IF
 
 # if defined (COUPLING)
-     CLOSE(11)
+  CLOSE(11)
+  DWRITE('CLOSE COUPLING FILE')
 # endif
 
 # if defined (VESSEL)
-
-DO Kves = 201,200+NumVessel
+  DO Kves = 201,200+NumVessel
     CLOSE(Kves)
-ENDDO
+  ENDDO
+  CALL DWRITE('CLOSE Vessel files')
 # endif
 
-     ! record wall time at the end
-# if defined (PARALLEL)
-     if(myid.eq.0) tend = MPI_Wtime( )
-# else
-     CALL CPU_TIME (tend)
-# endif
+  ! record wall time at the end
+  CALL GET_TIME(tend)
+
+  CALL FORMAT_ELAPSED(tend-tbegin, msg_buff)
+  CALL LWRITE('Simulation took '//TRIM(msg_buff))
+  CALL LWRITE('Normal Termination!')
 
 # if defined (PARALLEL)
-     if(myid.eq.0) write(*,*) 'Simulation takes',tend-tbegin,'seconds'
-     if(myid.eq.0) write(3,*) 'Simulation takes',tend-tbegin,'seconds'
-     if (myid.eq.0) WRITE(*,*)'Normal Termination!'
-     if (myid.eq.0) WRITE(3,*)'Normal Termination!'
-# else
-     write(*,*) 'Simulation takes',tend-tbegin,'seconds'
-     write(3,*) 'Simulation takes',tend-tbegin,'seconds'
-     WRITE(*,*)'Normal Termination!'
-     WRITE(3,*)'Normal Termination!'
-# endif
-
-# if defined (PARALLEL)
-     call MPI_FINALIZE ( ier )
+  CALL MPI_FINALIZE(ier)
 # endif
 
 END PROGRAM FUNWAVE_TVD
@@ -601,8 +478,3 @@ END PROGRAM FUNWAVE_TVD
 ! GxR = HxR*UxR*VxR
 ! GyL = HVyL*VyL + 1/2*g*(EtaRyL^2 + 2*EtaRyL*Depthy)
 ! GyR = HVyR*VyR + 1/2*g*(EtaRyR^2 + 2*EtaRyR*Depthy) 
-
-
-
-
-
