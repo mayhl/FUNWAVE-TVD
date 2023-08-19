@@ -1170,7 +1170,7 @@ SUBROUTINE SEDIMENT_ADVECTION_DIFFUSION(ISTEP)
             ELSE
               reduction= 1.0_SP
             ENDIF
-            c_a=reduction*c_b*D50/(MAX(0.01_SP*Hpo(I,J),0.01+SP*MinDepthPickup))
+            c_a=reduction*c_b*D50/(MAX(0.01_SP*Hpo(I,J),0.01_SP*MinDepthPickup))
             Pickup(I,J)=MAX(0.0_SP,c_a*WS)
 
 ! satuation this doesnt make sense, remove it
