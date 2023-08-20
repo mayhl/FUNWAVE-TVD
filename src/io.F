@@ -150,6 +150,7 @@ SUBROUTINE READ_INPUT
   USE GLOBAL
   USE INPUT_READ
   USE LOG_IO
+  
 ![jychoi added this for intel compiler 14.12.23    
 # if defined(INTEL)
   USE IFPORT
@@ -166,8 +167,9 @@ SUBROUTINE READ_INPUT
   TYPE(LOG_BUFFER), TARGET :: logbuff
   ! Flag for bypassing error when input value is not
   ! found and returns if input value is found 
-  LOGICAL :: found
-
+  LOGICAL :: found, found2
+  ! Dummy variable for storing default float value
+  REAL(SP) :: def_flt
     !>by Zhouteng Ye
   CHARACTER(LEN=80)::INPUT_NAME=''
 
@@ -760,13 +762,36 @@ SUBROUTINE READ_INPUT
   END IF
 
   CALL READ_PARAMETER(FroudeCap  , 'FroudeCap'  , 3.0_SP)
- 
-  CALL READ_PARAMETER(MinDepth   , 'MinDepth'   , 0.1_SP, 'm')
-  CALL READ_PARAMETER(MinDepthFrc,' MinDepthFrc', 0.1_SP, 'm')
-  MinDepthFrc=MIN(MinDepthFrc,MinDepth)
-  MinDepth=MinDepthFrc
-  ! mayhl: MinDepthFrc and MinDepth not updated in log_buff after MIN call
-  CALL LWRITE('Used MIN(MinDepthFrc, MinDepth).')
+
+
+  ! mayhl: Some what of a hacking solution. First check if
+  !        parameters are in input file 
+  CALL READ_PARAMETER(MinDepth   , 'MinDepth'   , found=found)
+  CALL READ_PARAMETER(MinDepthFrc, 'MinDepthFrc', found=found2)
+
+  IF (found.AND.found2) THEN
+    ! If both are in input file check if values are the same 
+    IF (.NOT.ALMOST_EQUAL(MinDepthFrc, MinDepth)) THEN
+      MinDepthFrc=MIN(MinDepthFrc,MinDepth)
+      MinDepth=MinDepthFrc
+      CALL LWRITE('MinDepth and MinDepthFrc are not the same, using minimum of two values.')
+      ! Cleaning up log buffer 
+      CALL logbuff % DPOP(2)
+      CALL logbuff % ADD('MinDepth'   , FORMAT_FLOAT(MinDepth))
+      CALL logbuff % ADD('MinDepthFrc', FORMAT_FLOAT(MinDepthFrc)) 
+    END IF
+
+  ELSEIF (found) THEN
+    ! If MinDepth is found, use value as default value for MinDepthFrc
+    CALL READ_PARAMETER(MinDepthFrc, 'MinDepthFrc', MinDepth   , 'm')
+  ELSEIF (found2) THEN
+    ! If MinDepthFrc is found, use value as default value for MinDepth
+    CALL READ_PARAMETER(MinDepth   , 'MinDepth'   , MinDepthFrc, 'm')
+  ELSE
+    ! If neither is found, use default value 
+    CALL READ_PARAMETER(MinDepth   , 'MinDepth'   , 0.1_SP, 'm')
+    CALL READ_PARAMETER(MinDepthFrc,' MinDepthFrc', 0.1_SP, 'm')
+  END IF
 
   CALL logbuff % FLUSH2OUTPUT()
 

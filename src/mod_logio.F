@@ -68,12 +68,40 @@ MODULE LOG_IO
     TYPE(LOG_ITEM), POINTER :: head => NULL()
     TYPE(LOG_ITEM), POINTER :: tail => NULL()
   CONTAINS
-     PROCEDURE :: ADD          => ADD_LOG_LINE
+    PROCEDURE :: ADD          => ADD_LOG_LINE
     PROCEDURE :: CLEAR        => CLEAR_LOG_BUFFER
     PROCEDURE :: FLUSH2OUTPUT => WRITE_LOG_BUFFER
+    PROCEDURE :: DPOP         => DELETE_POP
   END TYPE
 
 CONTAINS
+
+
+  ! AMLOST_EQUAL is a subroutine for checking if floats of 'equal' enough
+  PURE FUNCTION ALMOST_EQUAL( a, b ) RESULT( are_equal )
+
+    USE PARAM, ONLY : SP
+    IMPLICIT NONE
+    REAL(SP), INTENT(IN)  :: a, b
+    LOGICAL :: are_equal
+
+
+    IF ( a == 0.0_SP .OR. b == 0.0_SP ) THEN
+      IF ( ABS(a-b) <= EPSILON(1.0_SP) ) THEN
+        are_equal = .TRUE.
+      ELSE
+        are_equal = .FALSE.
+      ENDIF
+    ELSE
+      IF( (abs(a-b) <= EPSILON(1.0_SP)*abs(a)) .OR. &
+          (abs(a-b) <= EPSILON(1.0_SP)*abs(b)) ) THEN
+        are_equal = .TRUE.
+      ELSE
+        are_equal = .FALSE.
+      ENDIF
+    ENDIF
+  END FUNCTION
+
 
   SUBROUTINE FORMAT_ELAPSED(secs, fmt_elap)
   
@@ -126,7 +154,7 @@ CONTAINS
 
 #if defined (DEBUG)
 #if defined (PARALLEL)
-     IF(myid.EQ.0) PRINT *, myid, msg
+     IF(myid.EQ.0) PRINT *, TRIM(msg)
 #else
     PRINT *, msg 
 #endif
@@ -141,8 +169,8 @@ CONTAINS
     CHARACTER(LEN=*), INTENT(IN) :: msg
 
 #if defined (PARALLEL)
-    IF (myid.EQ.0) WRITE(3,*) msg
-    IF (myid.EQ.0) PRINT *, msg 
+    IF (myid.EQ.0) WRITE(3,*) TRIM(msg)
+    IF (myid.EQ.0) PRINT *, TRIM(msg) 
 #else
     WRITE(3,*) msg
     PRINT *, msg
@@ -160,7 +188,7 @@ CONTAINS
     CHARACTER(*), INTENT(IN) :: msg 
     INTEGER :: ier
 
-    CALL LWRITE("FATAL ERROR: "//msg//" STOP!!!") 
+    CALL LWRITE("FATAL ERROR: "//TRIM(msg)//" STOP!!!") 
 # if defined (PARALLEL)
     !CALL MPI_BARRIER(MPI_COMM_WORLD, ier)
     CALL MPI_FINALIZE(ier)
@@ -240,6 +268,29 @@ CONTAINS
 
   END SUBROUTINE
 
+  SUBROUTINE DELETE_POP(this, n)
+
+    IMPLICIT NONE
+    CLASS(LOG_BUFFER), INTENT(INOUT) :: this
+    INTEGER          , INTENT(IN   ) :: n
+
+    TYPE(LOG_ITEM), POINTER :: current, tmp
+    INTEGER                 :: i
+
+    current => this % tail
+
+    DO I = 1,n
+      tmp => current % prev
+      NULLIFY(current % prev)
+      NULLIFY(current % next)
+      DEALLOCATE(current)
+      current => tmp
+    END DO
+
+    NULLIFY(current % next)
+    this % tail => current 
+
+  END SUBROUTINE
 
   SUBROUTINE CLEAR_LOG_BUFFER(this)
 

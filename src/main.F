@@ -401,8 +401,9 @@ Program FUNWAVE_TVD
 
   ! record wall time at the end
   CALL GET_TIME(tend)
-
   CALL FORMAT_ELAPSED(tend-tbegin, msg_buff)
+  CALL LWRITE("")
+  CALL BWRITE('SUMMARY')
   CALL LWRITE('Simulation took '//TRIM(msg_buff))
   CALL LWRITE('Normal Termination!')
 
