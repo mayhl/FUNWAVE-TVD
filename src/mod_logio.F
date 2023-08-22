@@ -43,6 +43,12 @@
 !  
 !-------------------------------------------------------------------------------------
 
+# if defined (PARALLEL)
+# define PWRITE IF (myid.EQ.0) WRITE
+# else
+# define PWRITE WRITE
+# endif
+
 
 MODULE LOG_IO
 
@@ -52,9 +58,12 @@ MODULE LOG_IO
 # endif
   USE PARAM
 
+  IMPLICIT NONE
   CHARACTER(LEN=100) :: msg_buff
-  !IMPLICIT NONE
+  INTEGER, PARAMETER :: LU = 3
 
+  !IMPLICIT NONE
+  
 
   ! Doubly Linked list for buffer log file lines  before writing 
   TYPE LOG_ITEM
@@ -152,13 +161,9 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: msg
 
-#if defined (DEBUG)
-#if defined (PARALLEL)
-     IF(myid.EQ.0) PRINT *, TRIM(msg)
-#else
-    PRINT *, msg 
-#endif
-#endif
+# if defined (DEBUG)
+     PWRITE(*,*) TRIM(msg)
+# endif
 
   END SUBROUTINE
 
@@ -168,13 +173,18 @@ CONTAINS
     IMPLICIT NONE
     CHARACTER(LEN=*), INTENT(IN) :: msg
 
-#if defined (PARALLEL)
-    IF (myid.EQ.0) WRITE(3,*) TRIM(msg)
-    IF (myid.EQ.0) PRINT *, TRIM(msg) 
-#else
-    WRITE(3,*) msg
-    PRINT *, msg
-#endif 
+    PWRITE(LU,*) TRIM(msg)
+    PWRITE(* ,*) TRIM(msg)
+
+  END SUBROUTINE 
+
+  SUBROUTINE UWRITE(unit, msg)
+
+    IMPLICIT NONE
+    CHARACTER(*), INTENT(IN) :: msg
+    INTEGER     , INTENT(IN) :: unit
+
+    PWRITE(unit, *) TRIM(msg)
 
   END SUBROUTINE 
 
@@ -198,7 +208,7 @@ CONTAINS
   END SUBROUTINE
 
   ! Wrapper routine for writing a title wrapped in banners
-  SUBROUTINE BWRITE( title )
+  SUBROUTINE BWRITE(title)
 
     IMPLICIT NONE
 
@@ -222,10 +232,10 @@ CONTAINS
              REPEAT(BannerChar, RightLength)
 
 #if defined (PARALLEL)
-    IF (myid.EQ.0) WRITE(3,*) banner
+    IF (myid.EQ.0) WRITE(LU,*) banner
     IF (myid.EQ.0) PRINT *, banner 
 #else
-    WRITE(3,*) banner
+    WRITE(LU,*) banner
     PRINT *, banner
 #endif 
 
@@ -335,14 +345,14 @@ CONTAINS
     !IF (myid.NE.0 ) RETURN
 # endif
 
-     ALLOCATE(current)
+    ALLOCATE(current)
     current % val_name = ADJUSTL(val_name)
     current % val_str  = ADJUSTL(val_str)
 
-    current % next => NULL()
+    !current % next => NULL()
     IF (.NOT.ASSOCIATED(this % head)) THEN
-      current % prev => NULL()
-      current % next => NULL()
+      !current % prev => NULL()
+      !current % next => NULL()
       this % head => current
       this % tail => current
     ELSE
