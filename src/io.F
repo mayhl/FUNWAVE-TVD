@@ -1643,7 +1643,7 @@ SUBROUTINE PREVIEW
     END IF
 
     IF (MeteoGausian) CALL PutOutputNum('Pstorm', FILE_NUM, StormPressureTotal)
-    IF (SlideModel) CALL PutOutputNum('Pstorm', FILE_NUM, StormPressureTotal)
+    IF (SlideModel)   CALL PutOutputNum('Pstorm', FILE_NUM, StormPressureTotal)
 
   END IF
 # endif
@@ -1660,16 +1660,30 @@ SUBROUTINE PREVIEW
 
 ! sediment
 # if defined (SEDIMENT)
-  !TMP_NAME = TRIM(FDIR)//'C_'//TRIM(FILE_NUM)
-  CALL PutOutputNum('C'  , FILE_NUM, CH*Sdensity*RHO_WATER)
-  CALL PutOutputNum('Pick'  , FILE_NUM, Pickup)
-  CALL PutOutputNum('Depo'  , FILE_NUM, D)
-  CALL PutOutputNum('DchgS' , FILE_NUM, TotalSuspendLoad)
-  CALL PutOutputNum('DchgB' , FILE_NUM, TotalBedLoad)
-  CALL PutOutputNum('BedFx' , FILE_NUM, BedFluxX)
-  CALL PutOutputNum('BedFy' , FILE_NUM, BedFluxY)
-  CALL PutOutputNum('dep'   , FILE_NUM, Depth)
-  CALL PutOutputNum('BedStr', FILE_NUM, Tau_xy)
+
+  ! change to non-dimensional 
+  !CALL PutOutputNum('C'     , FILE_NUM, CH*Sdensity*RHO_WATER)
+  CALL PutOutputNum('C'     , FILE_NUM, CH                                  )
+  CALL PutOutputNum('Pick'  , FILE_NUM, Pickup                              )
+  CALL PutOutputNum('Depo'  , FILE_NUM, D                                   )
+  CALL PutOutputNum('P_avg' , FILE_NUM, P_ave                               )
+  CALL PutOutputNum('D_avg' , FILE_NUM, D_ave                               )
+  CALL PutOutputNum('DchgS' , FILE_NUM, TotalSuspendLoad/(1.0_SP-n_porosity))
+  CALL PutOutputNum('DchgB' , FILE_NUM, TotalBedLoad/(1.0_SP-n_porosity)    )
+  CALL PutOutputNum('BedFx' , FILE_NUM, BedFluxX                            )
+  CALL PutOutputNum('BedFy' , FILE_NUM, BedFluxY                            )
+  CALL PutOutputNum('dep'   , FILE_NUM, Depth                               )
+  CALL PutOutputNum('BedStr', FILE_NUM, Tau_xy                              )
+  CALL PutOutputNum('Aval'  , FILE_NUM, Zb_avalanching                      )
+  CALL PutOutputNum('AvalAc', FILE_NUM, Aval_accum                          )
+
+#if defined (SEDIMENT_DEBUG)
+  CALL PutOutputNum('Cb'   , FILE_NUM, Cb_debug    )
+  CALL PutOutputNum('Ca'   , FILE_NUM, Ca_debug    )
+  CALL PutOutputNum('Redu' , FILE_NUM, Reduct_debug)
+  CALL PutOutputNum('TauEx', FILE_NUM, Tau_extra   )
+  CALL PutOutputNum('Hpo'  , FILE_NUM, Hpo         )
+# endif 
 # endif
 ! end sediment
 

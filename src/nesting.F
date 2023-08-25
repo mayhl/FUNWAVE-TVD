@@ -357,6 +357,8 @@ END SUBROUTINE COUPLING_INITIAL
 SUBROUTINE OneWayCoupling
     USE GLOBAL
     IMPLICIT NONE
+!  due to some syntax changes, we use iostat rather than end=
+    INTEGER :: IOstatus
 
 119      FORMAT(5E16.6)  ! this is a fixed format for I/O
  
@@ -365,64 +367,114 @@ SUBROUTINE OneWayCoupling
     IF(TIME>TIME_COUPLING_1.AND.TIME>TIME_COUPLING_2) THEN
          TIME_COUPLING_1=TIME_COUPLING_2
 
-         READ(11,*,END=120) TIME_COUPLING_2 
+!         READ(11,*,END=120) TIME_COUPLING_2 
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120
 ! east
          IF(N_COUPLING_EAST.GT.0)THEN
-             READ(11,*,END=120)   ! east
+!             READ(11,*,END=120)   ! east
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120
 
              U_COUPLING_EAST(:,1)=U_COUPLING_EAST(:,2)
              V_COUPLING_EAST(:,1)=V_COUPLING_EAST(:,2)
              Z_COUPLING_EAST(:,1)=Z_COUPLING_EAST(:,2)
 
-             READ(11,119,END=120)(U_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
-             READ(11,119,END=120)(V_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
-             READ(11,119,END=120)(Z_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+!             READ(11,119,END=120)(U_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+             READ(11,119,IOSTAT=IOstatus)(U_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+             IF (IOstatus < 0) GOTO 120
+!             READ(11,119,END=120)(V_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+             READ(11,119,IOSTAT=IOstatus)(V_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+             IF (IOstatus < 0) GOTO 120
+!             READ(11,119,END=120)(Z_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+            READ(11,119,IOSTAT=IOstatus)(Z_COUPLING_EAST(I,2),I=1,N_COUPLING_EAST)
+             IF (IOstatus < 0) GOTO 120
+
          ELSE
-             READ(11,*,END=120)   ! east            
+!             READ(11,*,END=120)   ! east   
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120         
          ENDIF
 ! west
          IF(N_COUPLING_WEST.GT.0)THEN
-             READ(11,*,END=120)   ! west
+!             READ(11,*,END=120)   ! west
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120
 
              U_COUPLING_WEST(:,1)=U_COUPLING_WEST(:,2)
              V_COUPLING_WEST(:,1)=V_COUPLING_WEST(:,2)
              Z_COUPLING_WEST(:,1)=Z_COUPLING_WEST(:,2)
 
 
-             READ(11,119,END=120)(U_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
-             READ(11,119,END=120)(V_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
-             READ(11,119,END=120)(Z_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+!             READ(11,119,END=120)(U_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+!             READ(11,119,END=120)(V_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+!             READ(11,119,END=120)(Z_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+
+             READ(11,119,IOSTAT=IOstatus)(U_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+             IF (IOstatus < 0) GOTO 120
+             READ(11,119,IOSTAT=IOstatus)(V_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+             IF (IOstatus < 0) GOTO 120
+            READ(11,119,IOSTAT=IOstatus)(Z_COUPLING_WEST(I,2),I=1,N_COUPLING_WEST)
+             IF (IOstatus < 0) GOTO 120
+
          ELSE
-             READ(11,*,END=120)   ! west            
+!             READ(11,*,END=120)   ! west    
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120        
          ENDIF
 ! south
          IF(N_COUPLING_SOUTH.GT.0)THEN
-             READ(11,*,END=120)   ! south
+!             READ(11,*,END=120)   ! south
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120
 
              U_COUPLING_SOUTH(:,1)=U_COUPLING_SOUTH(:,2)
              V_COUPLING_SOUTH(:,1)=V_COUPLING_SOUTH(:,2)
              Z_COUPLING_SOUTH(:,1)=Z_COUPLING_SOUTH(:,2)
 
 
-             READ(11,119,END=120)(U_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
-             READ(11,119,END=120)(V_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
-             READ(11,119,END=120)(Z_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+!             READ(11,119,END=120)(U_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+!             READ(11,119,END=120)(V_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+!             READ(11,119,END=120)(Z_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+
+             READ(11,119,IOSTAT=IOstatus)(U_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+             IF (IOstatus < 0) GOTO 120
+             READ(11,119,IOSTAT=IOstatus)(V_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+             IF (IOstatus < 0) GOTO 120
+            READ(11,119,IOSTAT=IOstatus)(Z_COUPLING_SOUTH(I,2),I=1,N_COUPLING_SOUTH)
+             IF (IOstatus < 0) GOTO 120
+
          ELSE
-             READ(11,*,END=120)   ! south            
+!             READ(11,*,END=120)   ! south   
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120         
          ENDIF
 ! north
          IF(N_COUPLING_NORTH.GT.0)THEN
-             READ(11,*,END=120)   ! north
+!             READ(11,*,END=120)   ! north
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120
 
              U_COUPLING_NORTH(:,1)=U_COUPLING_NORTH(:,2)
              V_COUPLING_NORTH(:,1)=V_COUPLING_NORTH(:,2)
              Z_COUPLING_NORTH(:,1)=Z_COUPLING_NORTH(:,2)
 
-             READ(11,119,END=120)(U_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
-             READ(11,119,END=120)(V_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
-             READ(11,119,END=120)(Z_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+!             READ(11,119,END=120)(U_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+!             READ(11,119,END=120)(V_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+!             READ(11,119,END=120)(Z_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+
+             READ(11,119,IOSTAT=IOstatus)(U_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+             IF (IOstatus < 0) GOTO 120
+             READ(11,119,IOSTAT=IOstatus)(V_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+             IF (IOstatus < 0) GOTO 120
+            READ(11,119,IOSTAT=IOstatus)(Z_COUPLING_NORTH(I,2),I=1,N_COUPLING_NORTH)
+             IF (IOstatus < 0) GOTO 120
+
+
          ELSE
-             READ(11,*,END=120)   ! north            
+!             READ(11,*,END=120)   ! north  
+          READ(11,*,IOSTAT=IOstatus) TIME_COUPLING_2 
+          IF (IOstatus < 0) GOTO 120          
          ENDIF
 
 

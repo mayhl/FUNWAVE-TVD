@@ -101,6 +101,8 @@ SUBROUTINE SourceTerms
 ! Only WK_NEW_IRR and WK_NEW_DATA2D are from the above reference
 ! other wavemakers are only optimized!
 
+
+
 IF(WAVEMAKER(1:6)=='WK_REG')THEN
     AA = TANH(PI/(Time_ramp*Tperiod)*TIME)*D_gen
     DO J=jlo,jhi

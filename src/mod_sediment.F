@@ -70,42 +70,57 @@ MODULE SEDIMENT_MODULE
   CHARACTER(LEN=80) Mask_s_FILE
   CHARACTER(LEN=80) Sed_Scheme
 
-  LOGICAL :: Bed_Change = .FALSE.
-  LOGICAL :: Avalanche = .FALSE.
-  LOGICAL :: IN_Mask_s = .FALSE.
+  LOGICAL :: Bed_Change= .FALSE.
+  LOGICAL :: Avalanche= .FALSE.
+  LOGICAL :: IN_Mask_s= .FALSE.
   LOGICAL :: BedLoad = .FALSE.
   LOGICAL :: PickupReduction = .TRUE.
+  LOGICAL :: WS_formula = .FALSE.
 
-  INTEGER :: Counter_s = 0, Counter_ava = 0
-  INTEGER :: Morph_step, c_dum, Morph_factor
+  LOGICAL :: SedimentMassSource = .FALSE.
+  LOGICAL :: SedimentMomentDC = .FALSE.
+  LOGICAL :: SedimentMomentEXG = .FALSE.
 
-  REAL(SP):: PLOT_INTV_SEDIMENT, PLOT_COUNT_SEDIMENT
+  INTEGER :: Counter_s=0, Counter_ava=0
+  INTEGER :: c_dum,Morph_factor
+
+  REAL(SP):: PLOT_INTV_SEDIMENT,PLOT_COUNT_SEDIMENT
+  REAL(SP):: T_sum_sediment
 
   REAL(SP) :: D50, Sdensity, n_porosity, DT1, Counter, WS, Kappa1, Kappa2, &
               MinDepthPickup, ReductionParameter, C_limiter
 ! cohesive
-  REAL(SP) :: a_coh, b_coh, n_coh, m_coh, alpha_coh, E_coh, k_coh, Tau_crd_coh, &
+  REAL(SP) :: a_coh,b_coh,n_coh,m_coh,alpha_coh,E_coh,k_coh,Tau_crd_coh,&
               Tau_cr_coh
   LOGICAL :: SoftBed = .TRUE.
   LOGICAL :: CohesiveSediment = .FALSE.
   LOGICAL :: USE_CLIMITER = .FALSE.
+  
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Zb,P_ave,D_ave,Mask_s,D,Pickup,Delta_c
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::P_sum,D_sum
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::C_sum,C_ave
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::DcX,DcY,ExgX,ExgY,MassSed
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Zb_avalanching
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::CH,CHX,CHY,CHH,CHHxR,CHHxL,CHXxL,CHXxR
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::CHHyR,CHHyL,CHYyL,CHYyR,ZbOld,dZb
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::FsL,FsR,GsL,GsR,Fs,Gs,CH0,Zs,ava
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::BedFluxX,BedFluxY
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Hpo,CHH0,TotalSuspendLoad,TotalBedLoad
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Depth_ini
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Tau_xy
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Aval_accum 
 
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::Zb, P_ave, D_ave, Mask_s, D, Pickup, Delta_c
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::Zb_avalanching
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::CH, CHX, CHY, CHH, CHHxR, CHHxL, CHXxL, CHXxR
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::CHHyR, CHHyL, CHYyL, CHYyR, ZbOld, dZb
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::FsL, FsR, GsL, GsR, Fs, Gs, CH0, Zs, ava
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::BedFluxX, BedFluxY
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::Hpo, CHH0, TotalSuspendLoad, TotalBedLoad
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::Depth_ini
-  REAL(SP), DIMENSION(:, :), ALLOCATABLE::Tau_xy
-
-  REAL(SP) :: Shields_cr, A_sed, Tau_cr, D_sed, htt, k_s, u_c, ustar_c, ec_max
-  REAL(SP) :: Shields_cr_bedload, Tau_cr_bedload
-  REAL(SP) :: beta_d, reduction, c_a, c_b, ec_max_w, ec_max_c
-  REAL(SP) :: u_c1, u_c2, u_c3, u_c4, ustar_c1, ustar_c2, ustar_c3, ustar_c4
-  REAL(SP) :: k1, k2, k3, k4, F1, F2, F3, F4, tan_phi, Dstar, viscosity
+  REAL(SP) :: Shields_cr,A_sed,Tau_cr,D_sed,htt,k_s,u_c,ustar_c,ec_max
+  REAL(SP) :: Shields_cr_bedload,Tau_cr_bedload
+  REAL(SP) :: beta_d,reduction,c_a,c_b,ec_max_w,ec_max_c
+  REAL(SP) :: u_c1,u_c2,u_c3,u_c4,ustar_c1,ustar_c2,ustar_c3,ustar_c4
+  REAL(SP) :: k1,k2,k3,k4,F1,F2,F3,F4,tan_phi,Dstar,viscosity
   REAL(SP) :: Satuation
+  REAL(SP) :: Morph_interval,Aval_interval,T_aval
+#if defined (SEDIMENT_DEBUG)
+  REAL(SP),DIMENSION(:,:),ALLOCATABLE::Cb_debug,Ca_debug,Reduct_debug, &
+                                        Tau_extra
+# endif 
 
 #if defined (PARALLEL)
   REAL(SP) :: myvar
@@ -142,20 +157,23 @@ CONTAINS
       CALL SWRITE("INVALID VALUE FOR 'Sed_Scheme'.")
     ENDIF
 
-    CALL READ_PARAMETER(CohesiveSediment, 'CohesiveSediment', .FALSE.)
+    CALL READ_PARAMETER(SedimentMomentEXG , 'SedimentMomentEXG' , .FALSE.)
+    CALL READ_PARAMETER(SedimentMomentDC  , 'SedimentMomentDC'  , .FALSE.)
+    CALL READ_PARAMETER(SedimentMassSource, 'SedimentMassSource', .FALSE.)
+    CALL READ_PARAMETER(CohesiveSediment  , 'CohesiveSediment'  , .FALSE.)
 
     IF (CohesiveSediment) THEN
 
-      CALL READ_PARAMETER(SoftBed    , 'SoftBed'    , .TRUE.)
-      CALL READ_PARAMETER(Tau_crd_coh, 'Tau_crd_coh', 0.001_SP)
-      CALL READ_PARAMETER(Tau_cr_coh , 'Tau_cr_coh' , 0.001_SP)
+      CALL READ_PARAMETER(SoftBed    , 'SoftBed'    , .TRUE.     )
+      CALL READ_PARAMETER(Tau_crd_coh, 'Tau_crd_coh', 0.001_SP   )
+      CALL READ_PARAMETER(Tau_cr_coh , 'Tau_cr_coh' , 0.001_SP   )
       CALL READ_PARAMETER(k_coh      , 'k_coh'      , 0.000001_SP)
-      CALL READ_PARAMETER(a_coh      , 'a_coh'      , 0.1_SP)
-      CALL READ_PARAMETER(b_coh      , 'b_coh'      , 2.0_SP)
-      CALL READ_PARAMETER(n_coh      , 'n_coh'      , 0.5_SP)
-      CALL READ_PARAMETER(m_coh      , 'm_coh'      , 1.5_SP)
-      CALL READ_PARAMETER(E_coh      , 'E_coh'      , 0.0001_SP)
-      CALL READ_PARAMETER(alpha_coh  , 'alpha_coh'  , 1.0_SP)
+      CALL READ_PARAMETER(a_coh      , 'a_coh'      , 0.1_SP     )
+      CALL READ_PARAMETER(b_coh      , 'b_coh'      , 2.0_SP     )
+      CALL READ_PARAMETER(n_coh      , 'n_coh'      , 0.5_SP     )
+      CALL READ_PARAMETER(m_coh      , 'm_coh'      , 1.5_SP     )
+      CALL READ_PARAMETER(E_coh      , 'E_coh'      , 0.0001_SP  )
+      CALL READ_PARAMETER(alpha_coh  , 'alpha_coh'  , 1.0_SP     )
 
     END IF
   
@@ -169,8 +187,11 @@ CONTAINS
     CALL READ_PARAMETER(n_porosity, 'n_porosity', 0.47_SP)
 
     IF (.NOT.CohesiveSediment) THEN
-      CALL READ_PARAMETER(WS                , 'WS'                , 0.0125_SP, "m/s")
-      CALL READ_PARAMETER(Shields_cr        , 'Shields_cr'        , 0.055_SP)
+      CALL READ_PARAMETER(WS, 'WS', found=found)
+      WS_formula = .NOT.found
+      IF (WS_formula) CALL LWRITE('Parameter WS not specified, using formula.')
+
+      CALL READ_PARAMETER(Shields_cr        , 'Shields_cr'        , 0.055_SP  )
       CALL READ_PARAMETER(Shields_cr_bedload, 'Shields_cr_bedload', Shields_cr)
     END IF
 
@@ -181,8 +202,8 @@ CONTAINS
       CALL READ_PARAMETER(BedLoad, 'BedLoad', .FALSE.)
     END IF 
 
-    CALL READ_PARAMETER(MinDepthPickup , 'MinDepthPickup' , 0.1_SP, 'm')
-    CALL READ_PARAMETER(PickupReduction, 'PickupReduction', .TRUE.)
+    CALL READ_PARAMETER(MinDepthPickup , 'MinDepthPickup' , 0.1_SP , 'm')
+    CALL READ_PARAMETER(PickupReduction, 'PickupReduction', .TRUE.      )
     IF (PickupReduction) THEN
       CALL READ_PARAMETER(ReductionParameter, 'ReductionParameter', 0.65_SP)
     ELSE
@@ -197,15 +218,15 @@ CONTAINS
     CALL BWRITE("MORPHOLOGICAL INFO")
     ! -----------------------------------------------------------
 
-    CALL READ_PARAMETER(Morph_step  , 'Morph_step'  , 25)
-    CALL READ_PARAMETER(Morph_factor, 'Morph_factor', 1)
-    CALL READ_PARAMETER(Avalanche   , 'Avalanche'   , .FALSE.)
-    CALL READ_PARAMETER(tan_phi     , 'Tan_phi'     , 0.7_SP)
-    CALL READ_PARAMETER(BED_CHANGE  , 'Bed_Change'  , .FALSE.)
-    CALL READ_PARAMETER(IN_Mask_s   , 'Hard_bottom' , .FALSE.)
-    IF (IN_Mask_s) THEN
-      CALL READ_PARAMETER(Mask_s_File, 'Hard_bottom_file', is_file=.TRUE.)
-    ENDIF
+    CALL READ_PARAMETER(Morph_interval, 'Morph_interval', SMALL  )
+    CALL READ_PARAMETER(Morph_step    , 'Morph_step'    , 25     )
+    CALL READ_PARAMETER(Morph_factor  , 'Morph_factor'  , 1      )
+    CALL READ_PARAMETER(Avalanche     , 'Avalanche'     , .FALSE.)
+    CALL READ_PARAMETER(Aval_interval , 'Aval_interval' , SMALL  )
+    CALL READ_PARAMETER(tan_phi       , 'Tan_phi'       , 0.7_SP )
+    CALL READ_PARAMETER(BED_CHANGE    , 'Bed_Change'    , .FALSE.)
+    CALL READ_PARAMETER(IN_Mask_s     , 'Hard_bottom'   , .FALSE.)
+    IF (IN_Mask_s) CALL READ_PARAMETER(Mask_s_File, 'Hard_bottom_file', is_file=.TRUE.)
 
     CALL logbuff % FLUSH2OUTPUT
 
@@ -213,105 +234,121 @@ CONTAINS
     CALL BWRITE("SED/MORPH NUMERICS INFO")
     ! -----------------------------------------------------------
 
-    CALL READ_PARAMETER(Kappa1    , 'Kappa1'      , 0.3333_SP)
-    CALL READ_PARAMETER(Kappa2    , 'Kappa2'      , 1.0_SP)
+    CALL READ_PARAMETER(Kappa1, 'Kappa1', 0.3333_SP)
+    CALL READ_PARAMETER(Kappa2, 'Kappa2', 1.0_SP   )
 ! plot sediment intitial
+<<<<<<< HEAD
     PLOT_COUNT_SEDIMENT = 0
     CALL READ_PARAMETER(PLOT_INTV_SEDIMENT, 'PLOT_INTV_SEDIMENT', SMALL)
 
     CALL logbuff % FLUSH2OUTPUT
     CALL CLEAR_INPUT_LOGGER
 
+
 ! ALLOCATION
 
-    ALLOCATE (Zb(Mloc, Nloc), Zb_avalanching(Mloc, Nloc))
-    ALLOCATE (CHH(Mloc, Nloc), CHH0(Mloc, Nloc))
-    ALLOCATE (CHHxR(Mloc1, Nloc), CHHxL(Mloc1, Nloc), &
-              CHHyR(Mloc, Nloc1), CHHyL(Mloc, Nloc1))
-    ALLOCATE (CHY(Mloc, Nloc), CH(Mloc, Nloc), &
-              CHXxL(Mloc1, Nloc), CHXxR(Mloc1, Nloc))
-    ALLOCATE (CHX(Mloc, Nloc), CHYyL(Mloc, Nloc1), CHYyR(Mloc, Nloc1))
-    ALLOCATE (Mask_s(Mloc, Nloc))
-    ALLOCATE (D(Mloc, Nloc), Pickup(Mloc, Nloc))
-    ALLOCATE (Delta_c(Mloc, Nloc), D_ave(Mloc, Nloc), P_ave(Mloc, Nloc))
-    ALLOCATE (FsL(Mloc1, Nloc), FsR(Mloc1, Nloc), &
-              GsL(Mloc, Nloc1), GsR(Mloc, Nloc1))
-    ALLOCATE (Gs(Mloc, Nloc1), Fs(Mloc1, Nloc), CH0(Mloc, Nloc))
-    ALLOCATE (ZbOld(Mloc, Nloc), dZb(Mloc, Nloc), &
-              Zs(Mloc, Nloc), ava(Mloc, Nloc), Hpo(Mloc, Nloc), &
-              TotalSuspendLoad(Mloc, Nloc), TotalBedLoad(Mloc, Nloc))
-    ALLOCATE (BedFluxX(Mloc, Nloc), BedFluxY(Mloc, Nloc), Depth_ini(Mloc, Nloc))
-    ALLOCATE (Tau_xy(Mloc, Nloc))
+        ALLOCATE(Zb(Mloc,Nloc),Zb_avalanching(Mloc,Nloc))
+        ALLOCATE(CHH(Mloc,Nloc),CHH0(Mloc,Nloc))
+        ALLOCATE(CHHxR(Mloc1,Nloc),CHHxL(Mloc1,Nloc),  &
+                 CHHyR(Mloc,Nloc1),CHHyL(Mloc,Nloc1))
+        ALLOCATE(CHY(Mloc,Nloc),CH(Mloc,Nloc), &
+                 CHXxL(Mloc1,Nloc),CHXxR(Mloc1,Nloc))
+        ALLOCATE(CHX(Mloc,Nloc),CHYyL(Mloc,Nloc1),CHYyR(Mloc,Nloc1)) 
+        ALLOCATE(Mask_s(Mloc,Nloc))
+        ALLOCATE(D(Mloc,Nloc),Pickup(Mloc,Nloc))
+        ALLOCATE(Delta_c(Mloc,Nloc),D_ave(Mloc,Nloc),P_ave(Mloc,Nloc))
+        ALLOCATE(D_sum(Mloc,Nloc),P_sum(Mloc,Nloc))
+        ALLOCATE(C_sum(Mloc,Nloc),C_ave(Mloc,Nloc))
+        ALLOCATE(DcX(Mloc,Nloc),DcY(Mloc,Nloc),ExgX(Mloc,Nloc), &
+                 ExgY(Mloc,Nloc),MassSed(Mloc,Nloc))
 
-    Depth_ini = Depth
-    ava = ZERO
-    Zs = LARGE
-    ZbOld = ZERO
-    dZb = ZERO
-    CH0 = ZERO
-    CHXxR = ZERO
-    CHXxL = ZERO
-    CH = ZERO
-    CHX = ZERO
-    CHXxR = ZERO
-    CHXxL = ZERO
-    CHYyR = ZERO
-    CHYyL = ZERO
-    CHY = ZERO
-    CHH = ZERO
-    CHHxR = ZERO
-    CHHxL = ZERO
-    CHHyR = ZERO
-    CHHyL = ZERO
-    FsL = ZERO
-    FsR = ZERO
-    GsL = ZERO
-    GsR = ZERO
-    Fs = ZERO
-    Gs = ZERO
+        ALLOCATE(FsL(Mloc1,Nloc),FsR(Mloc1,Nloc), &
+                 GsL(Mloc,Nloc1),GsR(Mloc,Nloc1))
+        ALLOCATE(Gs(Mloc,Nloc1),Fs(Mloc1,Nloc),CH0(Mloc,Nloc))
+        ALLOCATE(ZbOld(Mloc,Nloc),dZb(Mloc,Nloc), &
+                 Zs(Mloc,Nloc),ava(Mloc,Nloc),Hpo(Mloc,Nloc), &
+                 TotalSuspendLoad(Mloc,Nloc),TotalBedLoad(Mloc,Nloc))
+        ALLOCATE(BedFluxX(Mloc,Nloc),BedFluxY(Mloc,Nloc),Depth_ini(Mloc,Nloc))
+        ALLOCATE(Tau_xy(Mloc,Nloc))
+        ALLOCATE(Aval_accum(Mloc,Nloc))
+#if defined (SEDIMENT_DEBUG)
+        ALLOCATE(Cb_debug(Mloc,Nloc),Ca_debug(Mloc,Nloc),Reduct_debug(Mloc,Nloc), &
+                 Tau_extra(Mloc,Nloc))
+# endif 
 
-    D = ZERO
-    Pickup = ZERO
-    D_ave = ZERO
-    P_ave = ZERO
-    Delta_c = ZERO
-    Mask_s = ZERO
-    Zb = ZERO
-    Zb_avalanching = ZERO
-    TotalSuspendLoad = ZERO
-    TotalBedLoad = ZERO
-    BedFluxX = ZERO
-    BedFluxY = ZERO
 
-! sediment parameters
-    IF (CohesiveSediment) THEN
-      viscosity = k_coh
-    ELSE
-      viscosity = 0.000001_SP
-    END IF  ! end cohesive
+        T_sum_sediment = ZERO
+        Depth_ini = Depth
+        ava=ZERO
+        Zs=LARGE		
+        ZbOld=ZERO
+        dZb=ZERO
+        CH0=ZERO
+        CHXxR=ZERO
+        CHXxL=ZERO
+        CH=ZERO
+        CHX=ZERO
+        CHXxR=ZERO
+        CHXxL=ZERO
+        CHYyR=ZERO
+        CHYyL=ZERO   
+        CHY=ZERO
+        CHH=ZERO
+        CHHxR=ZERO
+        CHHxL=ZERO
+        CHHyR=ZERO
+        CHHyL=ZERO
+        FsL=ZERO
+        FsR=ZERO
+        GsL=ZERO
+        GsR=ZERO
+        Fs=ZERO
+        Gs=ZERO
+
+        D=ZERO
+        Pickup=ZERO
+        D_ave=ZERO
+        P_ave=ZERO
+        D_sum=ZERO
+        P_sum=ZERO
+        C_sum=ZERO
+        C_ave=ZERO
+        DcX = ZERO
+        DcY = ZERO
+        ExgX = ZERO
+        ExgY = ZERO
+        MassSed = ZERO
+        Delta_c=ZERO
+        Mask_s=ZERO
+        Zb=ZERO	
+        Zb_avalanching = ZERO
+        TotalSuspendLoad = ZERO
+        TotalBedLoad = ZERO	
+        BedFluxX = ZERO
+        BedFluxY = ZERO
+        Aval_accum = ZERO
+        T_aval = ZERO
+
+! sediment parameters 
+     IF (CohesiveSediment) THEN
+      viscosity=k_coh
+     ELSE
+      viscosity=0.000001_SP
+     ENDIF  ! end cohesive
 
 ! the following parameters are for non-cohesive
-    Dstar = D50*((Sdensity - 1.0_SP)*grav/viscosity**2.0_SP)**(1.0_SP/3.0_SP)
-    Tau_cr = (Sdensity - 1.0_SP)*grav*D50*Shields_cr
-    Tau_cr_bedload = (Sdensity - 1.0_SP)*grav*D50*Shields_cr_bedload
-    k_s = 2.5_SP*D50
-    Satuation = 0.001
+      Dstar = D50*((Sdensity-1.0_SP)*grav/viscosity**2.0_SP)**(1.0_SP/3.0_SP)
+      Tau_cr=(Sdensity-1.0_SP)*grav*D50*Shields_cr
+      Tau_cr_bedload=(Sdensity-1.0_SP)*grav*D50*Shields_cr_bedload
+      k_s = 2.5_SP*D50 
+      
+      IF(WS_formula) THEN
+        WS = SQRT((Sdensity-1.0_SP)*grav*D50)* &
+             SQRT(2.0_SP/3.0_SP + 36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3)) * &
+             SQRT(36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3))
 
-    IF (IN_Mask_s) THEN
-! check existing
 
-      INQUIRE (FILE=TRIM(Mask_s_File), EXIST=FILE_EXIST)
-      IF (.NOT. FILE_EXIST) THEN
-# if defined (PARALLEL)
-        IF (MYID == 0) &
-          WRITE (*, *) TRIM(Mask_s_File), 'CANNOT BE FOUND. STOP'
-        CALL MPI_FINALIZE(ier)
-        STOP
-# else
-        WRITE (*, *) TRIM(Mask_s_File), 'CANNOT BE FOUND. STOP'
-        STOP
-# endif
-      END IF  ! exist
+      CALL LWRITE('Calculated Settling Velocity WD: '//TRIM(FORMAT_FLOAT(WS))//'.')
 
 # if defined (PARALLEL)
       call GetFile(Mask_s_File, Zs)
@@ -554,13 +591,9 @@ CONTAINS
     IF (MASK(I, J) .GT. 0 .AND. H(I, J) > MinDepthPickup) THEN
       u_c = SQRT(U(I, J)*U(I, J) + V(I, J)*V(I, J))
 
-! avoid sheet flow condition
-      fr = SQRT(H(I, J)*grav)*0.5
-      IF (u_c > fr) u_c = fr
+    ! note rho_w is removed, also removed in tau_cr
 
-      ! note rho_w is removed, also removed in tau_cr,
-
-      Tau_xy(I, J) = 0.16_SP/(1.0 + log(k_s/(30.0_SP*Hpo(I + 1, J))))**2*(u_c**2.)
+          Tau_xy(I,J)= 0.16_SP/(1.0+log(k_s/(30.0_SP*Hpo(I,J))))**2*(u_c**2.)	
 
       IF (CohesiveSediment) THEN
 
@@ -577,20 +610,32 @@ CONTAINS
       ELSE ! non-cohesive
 
 !  suspended load, Babak set a reduction here, I made it optional fyshi 07/07/2023
-        IF (Tau_xy(I, J) .GT. Tau_cr) THEN
-          c_b = 0.015_SP*(((Tau_xy(I, J) - Tau_cr)/Tau_cr)**1.5_SP)*Dstar**(-0.3_SP)
-          IF (PickupReduction) THEN
-            ! default ReductionParameter = 0.65
-            reduction = MIN(1.0_SP, ReductionParameter/c_b)
-          ELSE
-            reduction = 1.0_SP
-          END IF
-          c_a = reduction*c_b*D50/(MAX(0.01_SP*Hpo(I, J), 0.01_SP*MinDepthPickup))
-          Pickup(I, J) = MAX(0.0_SP, c_a*WS)
 
-! satuation this doesnt make sense, remove it
-!            IF(Pickup(I,J)*DT*0.3333_SP/Hpo(I,J)>=Satuation)  &
-!               Pickup(I,J)=Satuation*Hpo(I,J)*3.0_SP/DT
+#if defined (SEDIMENT_DEBUG)
+            Tau_extra(I,J)=0.0_SP
+# endif
+          IF (Tau_xy(I,J).GT.Tau_cr) THEN
+
+#if defined (SEDIMENT_DEBUG)
+            Tau_extra(I,J)=Tau_xy(I,J)-Tau_cr
+# endif
+
+            c_b=0.015_SP*(((Tau_xy(I,J)-Tau_cr)/Tau_cr)**1.5_SP)*Dstar**(-0.3_SP)
+            IF(PickupReduction)THEN
+              ! default ReductionParameter = 0.65
+              reduction=MIN(1.0_SP,ReductionParameter/c_b)
+            ELSE
+              reduction= 1.0_SP
+            ENDIF
+            c_a=reduction*c_b*D50/(MAX(0.01_SP*Hpo(I,J),0.01_SP*MinDepthPickup))
+            Pickup(I,J)=MAX(0.0_SP,c_a*WS)
+
+#if defined (SEDIMENT_DEBUG)
+             Cb_debug(I,J) = c_b
+             Ca_debug(I,J) = reduction*c_b
+             Reduct_debug(I,J) = reduction
+# endif 
+
 
         ELSE
           Pickup(I, J) = 0.0_SP
@@ -662,7 +707,63 @@ CONTAINS
     END DO
     END DO
 
-    DEALLOCATE (Scalx, Scaly)
+! calculate average
+
+      T_sum_sediment = T_sum_sediment +DT
+      IF(T_sum_sediment.GE.Morph_interval)THEN
+        C_sum = C_sum + CH*DT
+        P_sum = P_sum + Pickup*DT
+        D_sum = D_sum + D*DT    
+        P_ave = P_sum / T_sum_sediment
+        D_ave = D_sum / T_sum_sediment
+        C_ave = C_sum / T_sum_sediment
+        T_sum_sediment = 0.0
+        C_sum = 0.0
+        P_sum = 0.0
+        D_sum = 0.0
+      ELSE
+        C_sum = C_sum + CH*DT
+        P_sum = P_sum + Pickup*DT
+        D_sum = D_sum + D*DT     
+      ENDIF
+
+# if defined (PARALLEL)
+    CALL PHI_COLL(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,Nghost,C_ave,1,PERIODIC)
+# endif
+
+! calculate extra terms in mass and momentum equations
+
+    IF(SedimentMassSource.OR.SedimentMomentDC.OR.SedimentMomentEXG) THEN
+
+      DO J=Jbeg,Jend
+      DO I=Ibeg,Iend
+
+       IF(MASK(I,J).GT.0)THEN
+# if defined (CARTESIAN)
+         DcX(I,J)=(C_ave(I+1,J)-C_ave(I-1,J))/2.0_SP/DX
+         DcY(I,J)=(C_ave(I,J+1)-C_ave(I,J-1))/2.0_SP/DY
+# else
+         DcX(I,J)=(C_ave(I+1,J)-C_ave(I-1,J))/2.0_SP/DX(I,J)
+         DcY(I,J)=(C_ave(I,J+1)-C_ave(I,J-1))/2.0_SP/DY(I,J)
+# endif
+         csc=1.0_SP + C_ave(I,J)*(Sdensity - 1.0_SP)
+
+       ! note 1-n-c should larger than 0
+         snc=(Sdensity-1.0_SP)*MAX(1.0_SP-n_porosity-C_ave(I,J),0.0_SP) 
+
+         p_d=Pickup(I,J) - D(I,J)
+
+         DcX(I,J)=-(Sdensity-1.0_SP)*grav*Hpo(I,J)**2 /csc *DcX(I,J)
+         DcY(I,J)=-(Sdensity-1.0_SP)*grav*Hpo(I,J)**2 /csc *DcY(I,J)
+         ExgX(I,J) = -snc/csc/(1.0_SP-n_porosity)*p_d*U(I,J)
+         ExgY(I,J) = -snc/csc/(1.0_SP-n_porosity)*p_d*V(I,J)
+         MassSed(I,J) = p_d/(1.0_SP-n_porosity)
+       ENDIF
+      ENDDO
+      ENDDO      
+     ENDIF ! source term true
+
+      DEALLOCATE(Scalx,Scaly)
 
   END SUBROUTINE SEDIMENT_ADVECTION_DIFFUSION
 
@@ -755,7 +856,9 @@ CONTAINS
 
     DO J = Jbeg, Jend
     DO I = Ibeg, Iend
-      TotalSuspendLoad(I, J) = TotalSuspendLoad(I, J) + (-Pickup(I, J) + D(I, J))*DT
+!      TotalSuspendLoad(I,J) = TotalSuspendLoad(I,J)+(-Pickup(I,J)+D(I,J))*DT
+! use averaged value
+      TotalSuspendLoad(I,J) = TotalSuspendLoad(I,J)+(-P_ave(I,J)+D_ave(I,J))*DT
 # if defined (CARTESIAN)
       TotalBedLoad(I, J) = TotalBedLoad(I, J) &
                            - (BedFluxX(I + 1, J) - BedFluxX(I - 1, J))/2.0_SP/DX*DT &
@@ -775,9 +878,17 @@ CONTAINS
     END DO
 
 ! avalanching
-    IF (Avalanche) THEN
-    DO J = Jbeg, Jend
-    DO I = Ibeg, Iend
+  IF(Avalanche)THEN
+    T_aval = T_aval + DT
+    IF(T_aval.GE.Aval_interval)THEN
+    T_aval = ZERO
+
+    Zb_avalanching = ZERO
+    DO J=Jbeg,Jend
+    DO I=Ibeg,Iend
+    ! only take care positive slope, lower point, assume the only on point reaches 
+    ! the avalanche condition to avoid dead-loop
+
 # if defined(CARTESIAN)
       slope4(1) = (Depth(I, J) - Depth(I - 1, J))/DX
       slope4(2) = (Depth(I, J) - Depth(I + 1, J))/DX
@@ -806,48 +917,51 @@ CONTAINS
 # else
             dh = 0.5_SP*(Depth(I, J) - Depth(I - 1, J)) - 0.5_SP*Tan_phi*DX(I, J)
 # endif
-            Zb_avalanching(I, J) = Zb_avalanching(I, J) + dh
-            Zb_avalanching(I - 1, J) = Zb_avalanching(I - 1, J) - dh
-          END IF
-        END IF
-        IF (i4_record .EQ. 2) THEN
-          IF (Zb(I, J) < Zs(I, J)) THEN
+              Zb_avalanching(I,J)=dh
+              Zb_avalanching(I-1,J)=-dh
+            ENDIF
+          ENDIF
+          IF(i4_record.EQ.2) THEN
+            IF(Zb(I,J)<Zs(I,J))THEN
 # if defined(CARTESIAN)
             dh = 0.5_SP*(Depth(I, J) - Depth(I + 1, J)) - 0.5_SP*Tan_phi*DX
 # else
             dh = 0.5_SP*(Depth(I, J) - Depth(I + 1, J)) - 0.5_SP*Tan_phi*DX(I, J)
 # endif
-            Zb_avalanching(I, J) = Zb_avalanching(I, J) + dh
-            Zb_avalanching(I + 1, J) = Zb_avalanching(I + 1, J) - dh
-          END IF
-        END IF
-        IF (i4_record .EQ. 3) THEN
-          IF (Zb(I, J) < Zs(I, J)) THEN
+              Zb_avalanching(I,J)=dh
+              Zb_avalanching(I+1,J)=-dh
+            ENDIF
+          ENDIF
+          IF(i4_record.EQ.3) THEN
+            IF(Zb(I,J)<Zs(I,J))THEN
 # if defined(CARTESIAN)
             dh = 0.5_SP*(Depth(I, J) - Depth(I, J - 1)) - 0.5_SP*Tan_phi*DY
 # else
             dh = 0.5_SP*(Depth(I, J) - Depth(I, J - 1)) - 0.5_SP*Tan_phi*DY(I, J)
 # endif
-            Zb_avalanching(I, J) = Zb_avalanching(I, J) + dh
-            Zb_avalanching(I, J) = Zb_avalanching(I, J - 1) - dh
-          END IF
-        END IF
-        IF (i4_record .EQ. 4) THEN
-          IF (Zb(I, J) < Zs(I, J)) THEN
+              Zb_avalanching(I,J)=dh
+              Zb_avalanching(I,J-1)=-dh
+            ENDIF
+          ENDIF
+          IF(i4_record.EQ.4) THEN
+            IF(Zb(I,J)<Zs(I,J))THEN
 # if defined(CARTESIAN)
-            dh = 0.5_SP*(Depth(I, J) - Depth(I, J + 1)) - 0.5_SP*Tan_phi*DY
+              dh=0.5_SP*(Depth(I,J)-Depth(I,J+1))-0.5_SP*Tan_phi*DY
 # else
-            dh = 0.5_SP*(Depth(I, J) - Depth(I, J + 1)) - 0.5_SP*Tan_phi*DY(I, J)
+              dh=0.5_SP*(Depth(I,J)-Depth(I,J+1))-0.5_SP*Tan_phi*DY(I,J)
 # endif
-            Zb_avalanching(I, J) = Zb_avalanching(I, J) + dh
-            Zb_avalanching(I, J) = Zb_avalanching(I, J + 1) - dh
-          END IF
-        END IF
-      END IF ! > tan_phi
-    END DO
-    END DO
-    Zb = Zb + Zb_avalanching
-    END IF
+              Zb_avalanching(I,J)=dh
+              Zb_avalanching(I,J+1)=-dh
+            ENDIF
+          ENDIF 
+        ENDIF ! > tan_phi
+    ENDDO
+    ENDDO
+      Zb = Zb - Zb_avalanching
+      Aval_accum = Aval_accum + Zb_avalanching
+
+    ENDIF  ! end aval_interval
+  ENDIF 
 ! end avalanche
 
 ! update depth
@@ -880,6 +994,8 @@ CONTAINS
     END DO
 
   END SUBROUTINE MORPHOLOGICAL_CHANGE
+
+
 
 END MODULE SEDIMENT_MODULE
 

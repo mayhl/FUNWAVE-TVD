@@ -58,6 +58,10 @@ SUBROUTINE ESTIMATE_HUV(ISTEP)
 # if defined (SUBGRID)
      USE SUBGRID_MODULE
 # endif
+# if defined (SEDIMENT)
+     USE SEDIMENT_MODULE
+# endif
+
      IMPLICIT NONE
      INTEGER,INTENT(IN)::ISTEP
      REAL(SP),PARAMETER::n_left=-1.0_SP,n_right=1.0_SP,n_bottom=-1.0_SP,n_top=1.0_SP
@@ -247,6 +251,12 @@ SUBROUTINE ESTIMATE_HUV(ISTEP)
      ENDIF
 # endif
 
+# if defined (SEDIMENT)
+      IF(SedimentMassSource)THEN
+        R1(I,J)=R1(I,J)+ MassSed(I,J)
+      ENDIF
+# endif
+
 # if defined (ITERATION)
       Eta(I,J)=ALPHA(ISTEP)*Eta0(I,J)+BETA(ISTEP)*(EtaOld(I,J)+DT*R1(I,J))
 # else
@@ -278,6 +288,15 @@ SUBROUTINE ESTIMATE_HUV(ISTEP)
                        -1.0_SP/DY(I,J)*(F_top*n_top+F_bottom*n_bottom) &
                         +SourceX(I,J)
 # endif
+# if defined (SEDIMENT)
+     IF(SedimentMomentDC)THEN
+       R2(I,J)= R2(I,J) + DcX(I,J)
+     ENDIF
+     IF(SedimentMomentEXG)THEN
+       R2(I,J)= R2(I,J) + ExgX(I,J)
+     ENDIF
+# endif
+
 # if defined (ITERATION)
       Ubar(I,J)=ALPHA(ISTEP)*Ubar0(I,J)+BETA(ISTEP)*(UbarOld(I,J)+DT*R2(I,J))
 # else
@@ -302,6 +321,15 @@ SUBROUTINE ESTIMATE_HUV(ISTEP)
                        -1.0_SP/DY(I,J)*(F_top*n_top+F_bottom*n_bottom) &
                        +SourceY(I,J)
 # endif
+# if defined (SEDIMENT)
+     IF(SedimentMomentDC)THEN
+       R3(I,J)= R3(I,J) + DcY(I,J)
+     ENDIF
+     IF(SedimentMomentEXG)THEN
+       R3(I,J)= R3(I,J) + ExgY(I,J)
+     ENDIF
+# endif
+
 # if defined (ITERATION)
       Vbar(I,J)=ALPHA(ISTEP)*Vbar0(I,J)+BETA(ISTEP)*(VbarOld(I,J)+DT*R3(I,J))
 # else
