@@ -377,14 +377,16 @@ Program FUNWAVE_TVD
   END DO
 
   IF (NumberStations>0 ) THEN
-# if defined (SPHERICAL_IJ_STATION)
-    ! use IJ for coupling purpose
-    CALL STATIONS_SPHERICAL_IJ
-    CALL DWRITE('STATIONS_SPHERICAL_IJ')
-# else
-    CALL STATIONS
-    CALL DWRITE('STATIONS')
-# endif
+    CALL STATIONS_V2
+    CALL DWRITE('STATIONS_V2')
+!# if defined (SPHERICAL_IJ_STATION)
+!    ! use IJ for coupling purpose
+!    CALL STATIONS_SPHERICAL_IJ
+!    CALL DWRITE('STATIONS_SPHERICAL_IJ')
+!# else
+!    CALL STATIONS
+!    CALL DWRITE('STATIONS')
+!# endif
   END IF
 
 # if defined (COUPLING)

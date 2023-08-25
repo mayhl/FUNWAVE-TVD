@@ -70,6 +70,8 @@ MODULE INPUT_READ
     Module Procedure READ_INTEGER
   END INTERFACE
 
+  ! Interface for call datatype specific subroutine and
+  ! handling optional inputs. 
   INTERFACE READ_PARAMETER
     MODULE PROCEDURE READ_INTEGER2
     MODULE PROCEDURE READ_FLOAT2
@@ -81,7 +83,15 @@ MODULE INPUT_READ
   TYPE(LOG_BUFFER), POINTER :: logbuf
 
 CONTAINS
- 
+  
+  ! -----------------------------------------------------------------------------------------
+  ! SET_INPUT_LOGGER is a subroutine for initializing LOG_BUFFER class and setting input
+  !                  file path as to avoid repeatedly passing file path to READ_PARAMETER. 
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE SET_INPUT_LOGGER(fpath, logbuff)
 
     IMPLICIT NONE
@@ -101,6 +111,13 @@ CONTAINS
 
   END SUBROUTINE
 
+  ! -----------------------------------------------------------------------------------------
+  ! CLEAR_INPUT_LOGGER is a subroutine for cleaning up LOG_BUFFER class
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE CLEAR_INPUT_LOGGER()
 
     IMPLICIT NONE
@@ -112,9 +129,15 @@ CONTAINS
     END IF
   END SUBROUTINE
 
-! --------------------------
-! VALUE FORMATTING FUNCTIONS 
-! --------------------------
+
+
+  ! -----------------------------------------------------------------------------------------
+  ! FORMAT_DATATYPE are subroutines to provided standard formatting of datatype to string 
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   PURE FUNCTION FORMAT_INTEGER(val) RESULT (str)
 
     IMPLICIT NONE
@@ -183,11 +206,29 @@ CONTAINS
 
   END FUNCTION
 
-! -------------------------------
-! Routines for reading parameters
-! -------------------------------
 
-
+  ! -----------------------------------------------------------------------------------------
+  !
+  ! READ_VALUE2 is a subroutine for handling the common logic for reading parameter 
+  !             of all datatypes. Called from wrapper functions, e.g., READ_INTEGER2.
+  !             Wrapper functions handle string to datatype conversion and datatype 
+  !             specific logic. 
+  ! NOTE: '2' suffix are temporary until orginal read commands are phased out
+  !
+  ! Inputs: val_name    - Name of value in input file
+  !         is_required - Flag if parameter is required, i.e., has not default value
+  !         val_type    - Value type string to compare against CHECK_CONSISTENCY_TYPE
+  !         default_str - Formatted string of default value, if specified 
+  !         val_read    - String of value of parameter read from fle
+  !         is_default  - Flag if parameter used default value
+  !         found       - (Optional) Bypasses error state if required value is 
+  !                       not found in input file. Use if additional parameter specfic 
+  !                       logic is needed.
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE READ_VALUE2(val_name, is_required, val_type, default_str, val_read, is_default, found)
 
     USE LOG_IO
@@ -251,6 +292,24 @@ CONTAINS
   END SUBROUTINE
 
 
+  ! -----------------------------------------------------------------------------------------
+  !
+  ! READ_INTEGER2 - Wrapper subroutine around READ_VALUE2 subroutine for integer values.
+  !                 Should not be called directly, but called from READ_PARAMETER interface.
+  ! NOTE: '2' suffix are temporary until orginal read commands are phased out
+  ! 
+  ! Inputs: val         - Integer value to read parameter value from input file into.
+  !         val_name    - Name of value in input file.
+  !         default_val - (Optional) Default value if parameter not found in input file.
+  !                       If not specificed, error is thrown if parameter not found unless
+  !                       found is specfied.
+  !         found       - (Optional) Bypasses error state and returns if value is specified 
+  !                       in input file. Use if additional processing logic is required.
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE READ_INTEGER2(val, val_name, default_val, found)
 
     USE LOG_IO
@@ -277,8 +336,11 @@ CONTAINS
       CALL READ_VALUE2(val_name, is_required, 'INTEGER', fmt_val, val_read, is_default)
     END IF
 
+    ! Case when no read value to parse
+    IF (is_required.AND.PRESENT(found).AND..NOT.found) RETURN
+
     ! Setting default value or formatting read value 
-    IF ( is_default ) THEN
+    IF (is_default) THEN
       val = default_val
     ELSE
       READ(val_read, *) val
@@ -292,6 +354,25 @@ CONTAINS
     ENDIF
   END SUBROUTINE
 
+
+  ! -----------------------------------------------------------------------------------------
+  !
+  ! READ_FLOAT2 - Wrapper subroutine around READ_VALUE2 subroutine for float values.
+  !               Should not be called directly, but called from READ_PARAMETER interface.
+  ! NOTE: '2' suffix are temporary until orginal read commands are phased out
+  ! 
+  ! Inputs: val         - Float value to read parameter value from input file into.
+  !         val_name    - Name of value in input file.
+  !         default_val - (Optional) Default value if parameter not found in input file.
+  !                       If not specificed, error is thrown if parameter not found unless
+  !                       found is specfied.
+  !         found       - (Optional) Bypasses error state and returns if value is specified 
+  !                       in input file. Use if additional processing logic is required.
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE READ_FLOAT2(val, val_name, default_val, units, found)
 
     USE LOG_IO
@@ -321,6 +402,9 @@ CONTAINS
       CALL READ_VALUE2(val_name, is_required, 'float', fmt_val, val_read, is_default)
     END IF
 
+    ! Case when no read value to parse
+    IF (is_required.AND.PRESENT(found).AND..NOT.found) RETURN
+
     ! Setting default value or formatting read value 
     IF (is_default) THEN
       val = default_val
@@ -339,6 +423,26 @@ CONTAINS
   END SUBROUTINE
 
 
+  ! -----------------------------------------------------------------------------------------
+  !
+  ! READ_STRING2 - Wrapper subroutine around READ_VALUE2 subroutine for string values.
+  !                Should not be called directly, but called from READ_PARAMETER interface.
+  ! NOTE: '2' suffix are temporary until orginal read commands are phased out
+  ! 
+  ! Inputs: val         - String value to read parameter value from input file into.
+  !         val_name    - Name of value in input file.
+  !         default_val - (Optional) Default value if parameter not found in input file.
+  !                       If not specificed, error is thrown if parameter not found unless
+  !                       found is specfied.
+  !         found       - (Optional) Bypasses error state and returns if value is specified 
+  !                       in input file. Use if additional processing logic is required.
+  !         is_file     - (Optional) Flag is string is a file path. Adds additional check
+  !                       if file path is valid. 
+  ! 
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE READ_STRING2(val, val_name, default_val, is_file, found)
 
     USE LOG_IO
@@ -362,6 +466,9 @@ CONTAINS
     ELSE
       CALL READ_VALUE2(val_name, is_required, 'string', default_val, val_read, is_default)
     END IF
+
+    ! Case when no read value to parse
+    IF (is_required.AND.PRESENT(found).AND..NOT.found) RETURN
 
     IF ( is_default ) THEN
       val = ADJUSTL(TRIM(default_val))
@@ -388,6 +495,24 @@ CONTAINS
   END SUBROUTINE
 
 
+  ! -----------------------------------------------------------------------------------------
+  !
+  ! READ_LOGICAL2 - Wrapper subroutine around READ_VALUE2 subroutine for logical values.
+  !                 Should not be called directly, but called from READ_PARAMETER interface.
+  ! NOTE: '2' suffix are temporary until orginal read commands are phased out
+  ! 
+  ! Inputs: val         - Logical value to read parameter value from input file into.
+  !         val_name    - Name of value in input file.
+  !         default_val - (Optional) Default value if parameter not found in input file.
+  !                       If not specificed, error is thrown if parameter not found unless
+  !                       found is specfied.
+  !         found       - (Optional) Bypasses error state and returns if value is specified 
+  !                       in input file. Use if additional processing logic is required.
+  !
+  ! HISTORY:
+  !   08/19/2023 - mayhl
+  !
+  ! -----------------------------------------------------------------------------------------
   SUBROUTINE READ_LOGICAL2(val, val_name, default_val, found)
 
     USE LOG_IO
@@ -414,14 +539,13 @@ CONTAINS
       CALL READ_VALUE2(val_name, is_required, 'logical', fmt_val, val_read, is_default)
     END IF
 
+    ! Case when no read value to parse
+    IF (is_required.AND.PRESENT(found).AND..NOT.found) RETURN
+
     IF ( is_default ) THEN
       val = default_val
     ELSE
-      IF (val_read(1:1) == 'T') THEN
-        val = .TRUE.
-      ELSE
-        val = .FALSE.
-      ENDIF
+      val = val_read(1:1).EQ.'T'
       fmt_val = FORMAT_LOGICAL(val)
     END IF
 
@@ -657,8 +781,10 @@ SUBROUTINE READ_INTEGER(INTEGER_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)
     TEXT_LENGTH = len_trim(TEXT)
     FRONT = index(TEXT,"=")
     TMPV_NEXT = TEXT(1:FRONT-1)
-    IF(ADJUSTL(TRIM(TMPV_NEXT)) == TRIM(MatchCharacter))THEN
-      VAL  = ADJUSTL(TEXT(FRONT+1:TEXT_LENGTH))
+    !mayhl added ADJUSTL to MatchCharacter to avoid possible errors
+    IF(TRIM(ADJUSTL(TMPV_NEXT)) == TRIM(ADJUSTL(MatchCharacter))) THEN
+      VAL  = TRIM(ADJUSTL(TEXT(FRONT+1:TEXT_LENGTH)))
+      CLOSE(10)
       RETURN
     ENDIF
 
