@@ -141,7 +141,7 @@ CONTAINS
     CHARACTER(LEN=80)::TMP_NAME = ' '
     INTEGER :: Ifile, ierr
     TYPE(LOG_BUFFER), TARGET :: logbuff
-
+    LOGICAL :: found
 
 ! read  from input.txt
     FILE_NAME = INPUT_FILE_NAME
@@ -219,7 +219,7 @@ CONTAINS
     ! -----------------------------------------------------------
 
     CALL READ_PARAMETER(Morph_interval, 'Morph_interval', SMALL  )
-    CALL READ_PARAMETER(Morph_step    , 'Morph_step'    , 25     )
+    !CALL READ_PARAMETER(Morph_step    , 'Morph_step'    , 25     )
     CALL READ_PARAMETER(Morph_factor  , 'Morph_factor'  , 1      )
     CALL READ_PARAMETER(Avalanche     , 'Avalanche'     , .FALSE.)
     CALL READ_PARAMETER(Aval_interval , 'Aval_interval' , SMALL  )
@@ -237,7 +237,6 @@ CONTAINS
     CALL READ_PARAMETER(Kappa1, 'Kappa1', 0.3333_SP)
     CALL READ_PARAMETER(Kappa2, 'Kappa2', 1.0_SP   )
 ! plot sediment intitial
-<<<<<<< HEAD
     PLOT_COUNT_SEDIMENT = 0
     CALL READ_PARAMETER(PLOT_INTV_SEDIMENT, 'PLOT_INTV_SEDIMENT', SMALL)
 
@@ -348,7 +347,7 @@ CONTAINS
              SQRT(36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3))
 
 
-      CALL LWRITE('Calculated Settling Velocity WD: '//TRIM(FORMAT_FLOAT(WS))//'.')
+      CALL LWRITE('Calculated Settling Velocity WS: '//TRIM(FORMAT_FLOAT(WS))//'.')
 
 # if defined (PARALLEL)
       call GetFile(Mask_s_File, Zs)
@@ -378,7 +377,7 @@ CONTAINS
     REAL(SP), DIMENSION(:, :), ALLOCATABLE :: Scalx, Scaly
     REAL(SP), DIMENSION(Ibeg:Iend, Jbeg:Jend)::R1, R2, R3
     REAL(SP) :: Weight0 = 0.9_SP, Weight1 = 0.1_SP
-    REAL(SP) :: Angle_cur, bedf, fr, Pd, Cb
+    REAL(SP) :: Angle_cur,bedf,fr,Pd,Cb,csc,snc,p_d
 
     ALLOCATE (Scalx(Mloc1, Nloc), Scaly(Mloc, Nloc1))
 
