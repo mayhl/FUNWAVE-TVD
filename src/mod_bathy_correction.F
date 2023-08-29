@@ -260,27 +260,22 @@ SUBROUTINE CORRECTION
 END SUBROUTINE CORRECTION
 
 SUBROUTINE OUTPUT_CORRECTION
-     USE GLOBAL, ONLY : RESULT_FOLDER
-
+     !USE GLOBAL, ONLY : RESULT_FOLDER
+     USE FIELD_IO
      IMPLICIT NONE
 
-     CHARACTER(LEN=80)::TMP_NAME=' '
-     CHARACTER(LEN=80)::FDIR=' '
+     !CHARACTER(LEN=80)::TMP_NAME=' '
+     !CHARACTER(LEN=80)::FDIR=' '
 
-     FDIR=TRIM(RESULT_FOLDER)
+     !FDIR=TRIM(RESULT_FOLDER)
 
-        TMP_NAME = TRIM(FDIR)//'depth_org.txt'
-        call PutFile(TMP_NAME,Depth_org)
-        TMP_NAME = TRIM(FDIR)//'depth_change.txt'
-        call PutFile(TMP_NAME,Depth_org-Depth0)
-        TMP_NAME = TRIM(FDIR)//'gradx0.txt'
-        call PutFile(TMP_NAME,Gradx0)
-        TMP_NAME = TRIM(FDIR)//'grady0.txt'
-        call PutFile(TMP_NAME,Grady0)
-        TMP_NAME = TRIM(FDIR)//'gradx.txt'
-        call PutFile(TMP_NAME,Gradx)
-        TMP_NAME = TRIM(FDIR)//'grady.txt'
-        call PutFile(TMP_NAME,Grady)
+     CALL PutOutput('depth_org.txt'   , Depth_org       )
+     CALL PutOutput('depth_change.txt', Depth_org-Depth0)
+     CALL PutOutput('gradx0.txt'      , Gradx0          )
+     CALL PutOutput('grady0.txt'      , Grady0          )
+     CALL PutOutput('gradx.txt'       , Gradx           )
+     CALL PutOutput('grady.txt'       , Grady           )
+
 
 END SUBROUTINE OUTPUT_CORRECTION
 
@@ -288,7 +283,3 @@ END MODULE BATHY_CORRECTION_MODULE
 
 
 
-
-
-
-  

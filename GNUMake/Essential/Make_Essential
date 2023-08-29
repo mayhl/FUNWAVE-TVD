@@ -68,8 +68,6 @@ else
          $(warning WARNING: Bdynamic flag detected in CLIB, Onyx executables do not work correctly with dynamic linking of shared libaries. Removing -Bdynamic from CLIB. )
          CLIB := $(filter-out -Bdynamic, $(CLIB))
       endif
-
-
    # koehr and gaffney
    else ifeq ($(COMPILER),$(filter $(COMPILER), koehr gaffney))
       USE_MOD = -module $(MOD_DIR)
@@ -201,14 +199,15 @@ endif
 FCFLAGS := $(shell echo $(FCFLAGS) | sed 's~ \+~ ~g')
 
 #----------------FUNWAVE souce code-------------------
-MODS  = mod_param.F mod_global.F mod_logio.F mod_funits.F mod_input.F mod_vessel.F mod_bathy_correction.F \
-        mod_meteo.F mod_parallel_field_io.F mod_sediment.F mod_tide.F mod_foam.F \
-        mod_tracer.F mod_subgrid.F
+MODS  = mod_param.F    mod_global.F     mod_logio.F    mod_funits.F           \
+        mod_input.F    mod_field_io.F   mod_vessel.F   mod_bathy_correction.F \
+        mod_meteo.F    mod_sediment.F   mod_tide.F     mod_foam.F             \
+        mod_tracer.F   mod_subgrid.F
 
-MAIN  = main.F bc.F fluxes.F init.F io.F tridiagnal.F       \
-        breaker.F derivatives.F dispersion.F etauv_solver.F \
-        sponge.F sources.F masks.F parallel.F statistics.F \
-        wavemaker.F mixing.F nesting.F misc.F samples.F\
+MAIN  = main.F         bc.F        fluxes.F        init.F         io.F             \
+        tridiagnal.F   breaker.F   derivatives.F   dispersion.F   etauv_solver.F   \
+        sponge.F       sources.F   masks.F         parallel.F     statistics.F     \
+        wavemaker.F    mixing.F    nesting.F       misc.F         samples.F
 
 #-----------------Compile process---------------------
 SRC_DIR   = $(FUNWAVE_DIR)/src
@@ -228,14 +227,14 @@ OBJS := $(patsubst $(PRE_DIR)/%.f90,$(OBJ_DIR)/%.o,$(PRES))
 $(PRE_DIR)/%.f90 : $(SRC_DIR)/%.F
 	$(CPP) $(CPPARGS) $< $@
 
-# compile objective files
+# compile objective file
 $(OBJ_DIR)/%.o : $(PRE_DIR)/%.f90
 	$(FC) $(FCFLAGS) -c $< -o $@ $(USE_MOD)
 
 # link and generate the exec file
 $(EXEC): $(OBJS)
 	$(FC) $(FCFLAGS) -o $(EXEC) $(OBJS) $(LIBS)
-
+ 
 $(PRES): | $(PRE_DIR)
 
 $(PRE_DIR):

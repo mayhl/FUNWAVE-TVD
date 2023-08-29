@@ -897,7 +897,7 @@ SUBROUTINE READ_INPUT
 
   CALL CLEAR_INPUT_LOGGER
 
-END SUBROUTINE READ_INPUT
+ENDSUBROUTINE READ_INPUT
 
 SUBROUTINE READ_ABS_OR_LEFT_BC_COMPFILE(INPUT_PHASE)
 
@@ -966,7 +966,7 @@ SUBROUTINE READ_ABS_OR_LEFT_BC_COMPFILE(INPUT_PHASE)
     Theta_Ser(I) = Theta_Ser(I)*DEG2RAD
   END DO
 
-END SUBROUTINE
+ENDSUBROUTINE
 
 # if defined (CARTESIAN)
 !-------------------------------------------------------------------------------------
@@ -1110,7 +1110,7 @@ SUBROUTINE STATIONS
     end do
   end if
 
-END SUBROUTINE STATIONS
+ENDSUBROUTINE STATIONS
 
 # else
 
@@ -1539,6 +1539,7 @@ END SUBROUTINE
 SUBROUTINE PREVIEW
   USE GLOBAL
   USE LOG_IO
+  USE FIELD_IO
   USE MOD_FUNITS, ONLY: fhandle
 # if defined (VESSEL) 
  USE VESSEL_MODULE
@@ -1572,10 +1573,8 @@ SUBROUTINE PREVIEW
     END IF
   END IF
 
-  IF(myid.eq.0) WRITE(*,*) 'tunit', tunit 
   IF (tunit.LT.0 ) THEN
     tunit = fhandle%ADD('time_dt')
-    if(myid.eq.0) WRITE(*,*) 'tunit', tunit
     OPEN(tunit, FILE='time_dt.out', STATUS='UNKNOWN')
   ENDIF
 ![ykchoi
@@ -1589,13 +1588,13 @@ SUBROUTINE PREVIEW
   IF (OUT_ETAscreen) CALL PutOutputNum('etasrn', FILE_NUM, EtaScreen)
 # endif
 
-  IF (OUT_Hmax  ) CALL PutOutputNum('hmax'  , FILE_NUM, HeightMax)
-  IF (OUT_Hmin  ) CALL PutOutputNum('hmin'  , FILE_NUM, HeightMin)
-  IF (OUT_Umax  ) CALL PutOutputNum('umax'  , FILE_NUM, VelocityMax)
+  IF (OUT_Hmax  ) CALL PutOutputNum('hmax'  , FILE_NUM, HeightMax      )
+  IF (OUT_Hmin  ) CALL PutOutputNum('hmin'  , FILE_NUM, HeightMin      )
+  IF (OUT_Umax  ) CALL PutOutputNum('umax'  , FILE_NUM, VelocityMax    )
   IF (OUT_MFmax ) CALL PutOutputNum('MFmax' , FILE_NUM, MomentumFluxMax)
-  IF (OUT_VORmax) CALL PutOutputNum('VORmax', FILE_NUM, VorticityMax)
-  IF (OUT_U     ) CALL PutOutputNum('u'  , FILE_NUM, U)
-  IF (OUT_V     ) CALL PutOutputNum('v'  , FILE_NUM, V)
+  IF (OUT_VORmax) CALL PutOutputNum('VORmax', FILE_NUM, VorticityMax   )
+  IF (OUT_U     ) CALL PutOutputNum('u'     , FILE_NUM, U              )
+  IF (OUT_V     ) CALL PutOutputNum('v'     , FILE_NUM, V              )
 
   IF (OUT_MASK) THEN
     Int2Flo = MASK
@@ -1707,6 +1706,7 @@ END SUBROUTINE PREVIEW
 SUBROUTINE PREVIEW_MEAN
   USE GLOBAL
   USE LOG_IO
+  USE FIELD_IO
   IMPLICIT NONE
   REAL(SP), DIMENSION(Mloc, Nloc) :: tmpout
   CHARACTER(LEN=5)::FILE_NUM = ' '
@@ -1769,220 +1769,220 @@ SUBROUTINE PREVIEW_MEAN
 
 END SUBROUTINE PREVIEW_MEAN
 
-# if defined (PARALLEL)
-!-------------------------------------------------------------------------------------
+! # if defined (PARALLEL)
+! !-------------------------------------------------------------------------------------
+! !
+! !    GetFile is subroutine for reading field data
+! !
+! !    HISTORY:
+! !    05/01/2010  Fengyan Shi
+! !    05/08/2017  Young-Kwang Choi
+! !-------------------------------------------------------------------------------------
 !
-!    GetFile is subroutine for reading field data
+!       SUBROUTINE GetFile(FILE, PHI)
+!         USE GLOBAL
+!         IMPLICIT NONE
 !
-!    HISTORY:
-!    05/01/2010  Fengyan Shi
-!    05/08/2017  Young-Kwang Choi
-!-------------------------------------------------------------------------------------
-
-      SUBROUTINE GetFile(FILE, PHI)
-        USE GLOBAL
-        IMPLICIT NONE
-
-        REAL(SP), DIMENSION(MGlob + 2*Nghost, NGlob + 2*Nghost) :: PHIGLOB
-        CHARACTER(LEN=80) FILE
-        REAL(SP), DIMENSION(Mloc, Nloc), INTENT(OUT) :: PHI
-
-![-------ykchoi (08/May/2017)
-        INTEGER :: irank, lenx, leny, lenxy, ireq
-        INTEGER :: Nista, Niend, Njsta, Njend
-        INTEGER :: istanum, iendnum, jstanum, jendnum
-        INTEGER, ALLOCATABLE :: Nistas(:), Niends(:), Njstas(:), Njends(:)
-        INTEGER :: istatus(mpi_status_size)
-        REAL(SP), ALLOCATABLE :: xx(:, :)
-! -------ykchoi (08/May/2017) ]
-
-! TEMP
-
-        if (myid .eq. 0) then
-          OPEN (1, FILE=TRIM(FILE))
-          DO J = Nghost + 1, NGlob + NGhost
-            READ (1, *) (PHIGLOB(I, J), I=Nghost + 1, MGlob + Nghost)
-          END DO
-          CLOSE (1)
-! ghost cells
-          DO I = Nghost + 1, MGlob + Nghost
-            DO J = 1, Nghost
-              PHIGLOB(I, J) = PHIGLOB(I, Nghost + 1)
-            END DO
-            DO J = NGlob + Nghost + 1, NGlob + 2*Nghost
-              PHIGLOB(I, J) = PHIGLOB(I, NGlob + Nghost)
-            END DO
-          END DO
-          DO J = 1, NGlob + 2*Nghost
-            DO I = 1, Nghost
-              PHIGLOB(I, J) = PHIGLOB(Nghost + 1, J)
-            END DO
-            DO I = MGlob + Nghost + 1, MGlob + 2*Nghost
-              PHIGLOB(I, J) = PHIGLOB(MGlob + Nghost, J)
-            END DO
-          END DO
-        end if
-
-![-------ykchoi (08/May/2017)
-        Nista = iista + Nghost; 
-        Niend = iiend + Nghost; 
-        Njsta = jjsta + Nghost; 
-        Njend = jjend + Nghost; 
-        allocate (Nistas(nprocs), Niends(nprocs), Njstas(nprocs), Njends(nprocs))
-
-        call MPI_Gather(Nista, 1, MPI_INTEGER, Nistas, 1, MPI_INTEGER, &
-                        0, MPI_COMM_WORLD, ier)
-        call MPI_Gather(Niend, 1, MPI_INTEGER, Niends, 1, MPI_INTEGER, &
-                        0, MPI_COMM_WORLD, ier)
-        call MPI_Gather(Njsta, 1, MPI_INTEGER, Njstas, 1, MPI_INTEGER, &
-                        0, MPI_COMM_WORLD, ier)
-        call MPI_Gather(Njend, 1, MPI_INTEGER, Njends, 1, MPI_INTEGER, &
-                        0, MPI_COMM_WORLD, ier)
-
-        if (myid == 0) then
-          PHI = PHIGLOB(1:Mloc, 1:Nloc)
-        end if
-
-        do irank = 1, px*py - 1
-          if (myid == 0) then
-            istanum = Nistas(irank + 1) - Nghost
-            iendnum = Niends(irank + 1) + Nghost
-            jstanum = Njstas(irank + 1) - Nghost
-            jendnum = Njends(irank + 1) + Nghost
-
-            lenx = iendnum - istanum + 1
-            leny = jendnum - jstanum + 1
-            lenxy = lenx*leny
-            allocate (xx(lenx, leny))
-
-            xx = PHIGLOB(istanum:iendnum, jstanum:jendnum)
-            call mpi_isend(xx, lenxy, mpi_sp, irank, 1, mpi_comm_world, ireq, ier)
-            call mpi_wait(ireq, istatus, ier)
-            deallocate (xx)
-
-          elseif (myid == irank) then
-
-            lenx = Niend - Nista + 1 + 2*Nghost
-            leny = Njend - Njsta + 1 + 2*Nghost
-            lenxy = lenx*leny
-
-            call mpi_irecv(PHI, lenxy, mpi_sp, 0, 1, mpi_comm_world, ireq, ier)
-            call mpi_wait(ireq, istatus, ier)
-
-          end if
-        end do
-
-        deallocate (Nistas, Niends, Njstas, Njends)
-
-! -------ykchoi (08/May/2017) ]
-
-      END SUBROUTINE Getfile
-
-# endif
-
-SUBROUTINE PutOutput(name, phi)
-
-  USE GLOBAL
-  IMPLICIT NONE
-  
-  CHARACTER(LEN=*)               , INTENT(IN) :: name
-  REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: phi
-  CHARACTER(LEN=100)             :: fpath          
-
-  fpath = TRIM(RESULT_FOLDER)//TRIM(ADJUSTL(name))
-  CALL PutFile(fpath, phi)
-
-END SUBROUTINE
-
-SUBROUTINE PutOutputNum(name, num, phi)
-
-  USE GLOBAL
-  IMPLICIT NONE
-  
-  CHARACTER(LEN=*)               , INTENT(IN) :: name, num
-  REAL(SP), DIMENSION(Mloc ,Nloc), INTENT(IN) :: phi
-  CHARACTER(LEN=100)             :: fpath          
-
-  fpath = TRIM(RESULT_FOLDER)//TRIM(ADJUSTL(name))//"_"//TRIM(num)
-  CALL PutFile(fpath, phi)
-
-END SUBROUTINE 
-
-
-# if defined (PARALLEL)
-!-------------------------------------------------------------------------------------
+!         REAL(SP), DIMENSION(MGlob + 2*Nghost, NGlob + 2*Nghost) :: PHIGLOB
+!         CHARACTER(LEN=80) FILE
+!         REAL(SP), DIMENSION(Mloc, Nloc), INTENT(OUT) :: PHI
 !
-!    PutFile is subroutine for print-out of field data
+! ![-------ykchoi (08/May/2017)
+!         INTEGER :: irank, lenx, leny, lenxy, ireq
+!         INTEGER :: Nista, Niend, Njsta, Njend
+!         INTEGER :: istanum, iendnum, jstanum, jendnum
+!         INTEGER, ALLOCATABLE :: Nistas(:), Niends(:), Njstas(:), Njends(:)
+!         INTEGER :: istatus(mpi_status_size)
+!         REAL(SP), ALLOCATABLE :: xx(:, :)
+! ! -------ykchoi (08/May/2017) ]
 !
-!    HISTORY:
-!      05/01/2010  Fengyan Shi
-!      05/06/2017  Young-Kwang Choi
-!-------------------------------------------------------------------------------------
-
-SUBROUTINE PutFile(FILE_NAME, PHI)
-  USE GLOBAL
-  USE PARALLEL_FIELD_IO
-  IMPLICIT NONE
-
-  CHARACTER(LEN=80) FILE_NAME
-  REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: PHI
-
-  SELECT CASE (TRIM(FIELD_IO_TYPE))
-  CASE ('ASCII', 'ascii')
-    CALL PutFileASCII(FILE_NAME, PHI)
-  CASE ('BINARY', 'binary')
-    Call PutFileBinary(FILE_NAME, PHI)
-  CASE DEFAULT
-    !Defaults to ASCII case for non-valid input
-    CALL PutFileASCII(FILE_NAME, PHI)
-  END SELECT
-
-END SUBROUTINE Putfile
-
-# else
-!-------------------------------------------------------------------------------------
+! ! TEMP
 !
-!    PutFile is subroutine for print-out of field data
+!         if (myid .eq. 0) then
+!           OPEN (1, FILE=TRIM(FILE))
+!           DO J = Nghost + 1, NGlob + NGhost
+!             READ (1, *) (PHIGLOB(I, J), I=Nghost + 1, MGlob + Nghost)
+!           END DO
+!           CLOSE (1)
+! ! ghost cells
+!           DO I = Nghost + 1, MGlob + Nghost
+!             DO J = 1, Nghost
+!               PHIGLOB(I, J) = PHIGLOB(I, Nghost + 1)
+!             END DO
+!             DO J = NGlob + Nghost + 1, NGlob + 2*Nghost
+!               PHIGLOB(I, J) = PHIGLOB(I, NGlob + Nghost)
+!             END DO
+!           END DO
+!           DO J = 1, NGlob + 2*Nghost
+!             DO I = 1, Nghost
+!               PHIGLOB(I, J) = PHIGLOB(Nghost + 1, J)
+!             END DO
+!             DO I = MGlob + Nghost + 1, MGlob + 2*Nghost
+!               PHIGLOB(I, J) = PHIGLOB(MGlob + Nghost, J)
+!             END DO
+!           END DO
+!         end if
 !
-!    HISTORY:
-!      05/01/2010  Fengyan Shi
+! ![-------ykchoi (08/May/2017)
+!         Nista = iista + Nghost; 
+!         Niend = iiend + Nghost; 
+!         Njsta = jjsta + Nghost; 
+!         Njend = jjend + Nghost; 
+!         allocate (Nistas(nprocs), Niends(nprocs), Njstas(nprocs), Njends(nprocs))
 !
-!-------------------------------------------------------------------------------------
-      SUBROUTINE PutFile(FILE, PHI)
-        USE PARAM
-        USE GLOBAL
-        IMPLICIT NONE
-        REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: PHI
-        CHARACTER(LEN=80) FILE
-        LOGICAL :: FirstCallPutFile = .TRUE.
-        SAVE FirstCallPutFile
-
-! first time call
-        IF (FirstCallPutFile) THEN
-          FirstCallPutFile = .FALSE.
-! format length
-          write (FORMAT_LEN(1:1), '(A1)') '('
-          write (FORMAT_LEN(2:8), '(I7)') Mglob
-          write (FORMAT_LEN(9:15), '(A7)') 'E16.6E4'
-          write (FORMAT_LEN(16:16), '(A1)') ')'
-        END IF
-
-        OPEN (1, FILE=TRIM(FILE))
-# if defined(DEBUG)
-        DO J = 1, Nloc
-          WRITE (1, 100) (real(PHI(I, J)), I=1, Mloc)
-        END DO
-# else
-        DO J = Nghost + 1, Nloc - Nghost, OUTPUT_RES
-          WRITE (1, FORMAT_LEN) (real(PHI(I, J)), I=Nghost + 1, Mloc - Nghost, OUTPUT_RES)
-        END DO
-# endif
-100     FORMAT(5000E16.6)
-!100   FORMAT(FORMAT_LEN)
-        CLOSE (1)
-      END SUBROUTINE PutFile
-
-# endif
+!         call MPI_Gather(Nista, 1, MPI_INTEGER, Nistas, 1, MPI_INTEGER, &
+!                         0, MPI_COMM_WORLD, ier)
+!         call MPI_Gather(Niend, 1, MPI_INTEGER, Niends, 1, MPI_INTEGER, &
+!                         0, MPI_COMM_WORLD, ier)
+!         call MPI_Gather(Njsta, 1, MPI_INTEGER, Njstas, 1, MPI_INTEGER, &
+!                         0, MPI_COMM_WORLD, ier)
+!         call MPI_Gather(Njend, 1, MPI_INTEGER, Njends, 1, MPI_INTEGER, &
+!                         0, MPI_COMM_WORLD, ier)
+!
+!         if (myid == 0) then
+!           PHI = PHIGLOB(1:Mloc, 1:Nloc)
+!         end if
+!
+!         do irank = 1, px*py - 1
+!           if (myid == 0) then
+!             istanum = Nistas(irank + 1) - Nghost
+!             iendnum = Niends(irank + 1) + Nghost
+!             jstanum = Njstas(irank + 1) - Nghost
+!             jendnum = Njends(irank + 1) + Nghost
+!
+!             lenx = iendnum - istanum + 1
+!             leny = jendnum - jstanum + 1
+!             lenxy = lenx*leny
+!             allocate (xx(lenx, leny))
+!
+!             xx = PHIGLOB(istanum:iendnum, jstanum:jendnum)
+!             call mpi_isend(xx, lenxy, mpi_sp, irank, 1, mpi_comm_world, ireq, ier)
+!             call mpi_wait(ireq, istatus, ier)
+!             deallocate (xx)
+!
+!           elseif (myid == irank) then
+!
+!             lenx = Niend - Nista + 1 + 2*Nghost
+!             leny = Njend - Njsta + 1 + 2*Nghost
+!             lenxy = lenx*leny
+!
+!             call mpi_irecv(PHI, lenxy, mpi_sp, 0, 1, mpi_comm_world, ireq, ier)
+!             call mpi_wait(ireq, istatus, ier)
+!
+!           end if
+!         end do
+!
+!         deallocate (Nistas, Niends, Njstas, Njends)
+!
+! ! -------ykchoi (08/May/2017) ]
+!
+!       END SUBROUTINE Getfile
+!
+! # endif
+!
+! SUBROUTINE PutOutput(name, phi)
+!
+!   USE GLOBAL
+!   IMPLICIT NONE
+!   
+!   CHARACTER(LEN=*)               , INTENT(IN) :: name
+!   REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: phi
+!   CHARACTER(LEN=100)             :: fpath          
+!
+!   fpath = TRIM(RESULT_FOLDER)//TRIM(ADJUSTL(name))
+!   CALL PutFile(fpath, phi)
+!
+! END SUBROUTINE
+!
+! SUBROUTINE PutOutputNum(name, num, phi)
+!
+!   USE GLOBAL
+!   IMPLICIT NONE
+!   
+!   CHARACTER(LEN=*)               , INTENT(IN) :: name, num
+!   REAL(SP), DIMENSION(Mloc ,Nloc), INTENT(IN) :: phi
+!   CHARACTER(LEN=100)             :: fpath          
+!
+!   fpath = TRIM(RESULT_FOLDER)//TRIM(ADJUSTL(name))//"_"//TRIM(num)
+!   CALL PutFile(fpath, phi)
+!
+! END SUBROUTINE 
+!
+!
+! # if defined (PARALLEL)
+! !-------------------------------------------------------------------------------------
+! !
+! !    PutFile is subroutine for print-out of field data
+! !
+! !    HISTORY:
+! !      05/01/2010  Fengyan Shi
+! !      05/06/2017  Young-Kwang Choi
+! !-------------------------------------------------------------------------------------
+!
+! SUBROUTINE PutFile(FILE_NAME, PHI)
+!   USE GLOBAL
+!   USE PARALLEL_FIELD_IO
+!   IMPLICIT NONE
+!
+!   CHARACTER(LEN=80) FILE_NAME
+!   REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: PHI
+!
+!   SELECT CASE (TRIM(FIELD_IO_TYPE))
+!   CASE ('ASCII', 'ascii')
+!     CALL PutFileASCII(FILE_NAME, PHI)
+!   CASE ('BINARY', 'binary')
+!     Call PutFileBinary(FILE_NAME, PHI)
+!   CASE DEFAULT
+!     !Defaults to ASCII case for non-valid input
+!     CALL PutFileASCII(FILE_NAME, PHI)
+!   END SELECT
+!
+! END SUBROUTINE Putfile
+!
+! # else
+! !-------------------------------------------------------------------------------------
+! !
+! !    PutFile is subroutine for print-out of field data
+! !
+! !    HISTORY:
+! !      05/01/2010  Fengyan Shi
+! !
+! !-------------------------------------------------------------------------------------
+!       SUBROUTINE PutFile(FILE, PHI)
+!         USE PARAM
+!         USE GLOBAL
+!         IMPLICIT NONE
+!         REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: PHI
+!         CHARACTER(LEN=80) FILE
+!         LOGICAL :: FirstCallPutFile = .TRUE.
+!         SAVE FirstCallPutFile
+!
+! ! first time call
+!         IF (FirstCallPutFile) THEN
+!           FirstCallPutFile = .FALSE.
+! ! format length
+!           write (FORMAT_LEN(1:1), '(A1)') '('
+!           write (FORMAT_LEN(2:8), '(I7)') Mglob
+!           write (FORMAT_LEN(9:15), '(A7)') 'E16.6E4'
+!           write (FORMAT_LEN(16:16), '(A1)') ')'
+!         END IF
+!
+!         OPEN (1, FILE=TRIM(FILE))
+! # if defined(DEBUG)
+!         DO J = 1, Nloc
+!           WRITE (1, 100) (real(PHI(I, J)), I=1, Mloc)
+!         END DO
+! # else
+!         DO J = Nghost + 1, Nloc - Nghost, OUTPUT_RES
+!           WRITE (1, FORMAT_LEN) (real(PHI(I, J)), I=Nghost + 1, Mloc - Nghost, OUTPUT_RES)
+!         END DO
+! # endif
+! 100     FORMAT(5000E16.6)
+! !100   FORMAT(FORMAT_LEN)
+!         CLOSE (1)
+!       END SUBROUTINE PutFile
+!
+! # endif
 
 # if defined (VESSEL)
 !-------------------------------------------------------------------------------------

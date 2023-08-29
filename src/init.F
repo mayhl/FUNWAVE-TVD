@@ -268,6 +268,7 @@ END SUBROUTINE ALLOCATE_VARIABLES
 SUBROUTINE INITIALIZATION
      USE GLOBAL
      USE INPUT_READ
+     USE FIELD_IO
      USE BATHY_CORRECTION_MODULE
 # if defined (SUBGRID)
      USE SUBGRID_MODULE
@@ -293,58 +294,10 @@ SUBROUTINE INITIALIZATION
 
 ! for spherical coordinates and Coriolis parameter
 
-   IF(StretchGrid) THEN
-# if defined (PARALLEL)
-       CALL GetFile(DX_FILE,Dx)
-       CALL GetFile(DY_FILE,Dy)
-       CALL GetFile(Coriolis_FILE,Coriolis)
-# else
-      OPEN(1,FILE=TRIM(DX_FILE))
-       DO J=Jbeg,Jend
-         READ(1,*)(Dx(I,J),I=Ibeg,Iend)
-       ENDDO
-      CLOSE(1)
-
-      OPEN(1,FILE=TRIM(DY_FILE))
-       DO J=Jbeg,Jend
-         READ(1,*)(Dy(I,J),I=Ibeg,Iend)
-       ENDDO
-      CLOSE(1)
-
-      OPEN(1,FILE=TRIM(Coriolis_FILE))
-       DO J=Jbeg,Jend
-         READ(1,*)(Coriolis(I,J),I=Ibeg,Iend)
-       ENDDO
-      CLOSE(1)
-
-! ghost cells
-     DO I=Ibeg,Iend
-       DO J=1,Nghost
-        Dx(I,J)=Dx(I,Jbeg)
-        Dy(I,J)=Dy(I,Jbeg)
-        Coriolis(I,J)=Coriolis(I,Jbeg)
-       ENDDO
-       DO J=Jend+1,Nloc
-        Dx(I,J)=Dx(I,Jend)
-        Dy(I,J)=Dy(I,Jend)
-        Coriolis(I,J)=Coriolis(I,Jend)
-       ENDDO
-     ENDDO
-
-     DO J=1,Nloc
-       DO I=1,Nghost
-        Dx(I,J)=Dx(Ibeg,J)
-        Dy(I,J)=Dy(Ibeg,J)
-        Coriolis(I,J)=Coriolis(Ibeg,J)
-       ENDDO
-       DO I=Iend+1,Mloc
-        Dx(I,J)=Dx(Iend,J)
-        Dy(I,J)=Dy(Iend,J)
-        Coriolis(I,J)=Coriolis(Iend,J)
-       ENDDO
-     ENDDO  
-
-# endif
+    IF (StretchGrid) THEN
+      CALL GetFile(DX_FILE      , Dx      )
+      CALL GetFile(DY_FILE      , Dy      )
+      CALL GetFile(Coriolis_FILE, Coriolis)
 
     ELSE ! for stretch grid
 
@@ -672,31 +625,19 @@ SUBROUTINE INITIALIZATION
   IF(DEPTH_TYPE(1:3)=='DAT')THEN
 
 ! check existing
+! mayhl: removed files checking. Done inside READ_PARAMETER
 
- INQUIRE(FILE=TRIM(DEPTH_FILE),EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
-# if defined (PARALLEL)
-   IF(MYID==0)  &
-   WRITE(*,*) TRIM(DEPTH_FILE), 'CANNOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
-# else
-    WRITE(*,*) TRIM(DEPTH_FILE), 'CANNOT BE FOUND. STOP'
-    STOP
-# endif
-  ENDIF  ! exist
-
-# if defined (PARALLEL)
+!# if defined (PARALLEL)
      call GetFile (DEPTH_FILE,Depth)
-# else
-     OPEN(1,FILE=TRIM(DEPTH_FILE))
-
-       DO J=Jbeg,Jend
-        READ(1,*)(Depth(I,J),I=Ibeg,Iend)
-       ENDDO
-
-     CLOSE(1)
-# endif
+! # else
+!      OPEN(1,FILE=TRIM(DEPTH_FILE))
+!
+!        DO J=Jbeg,Jend
+!         READ(1,*)(Depth(I,J),I=Ibeg,Iend)
+!        ENDDO
+!
+!      CLOSE(1)
+! # endif
   ENDIF
 
   IF(DEPTH_TYPE(1:3)=='FLA') THEN
@@ -840,40 +781,40 @@ SUBROUTINE INITIALIZATION
  
 !friction
      IF(IN_Cd) THEN
-# if defined (PARALLEL)
+!# if defined (PARALLEL)
       call GetFile(CD_FILE,Cd)
-# else
-      OPEN(1,FILE=TRIM(CD_FILE))
-       DO J=Jbeg,Jend
-        READ(1,*)(Cd(I,J),I=Ibeg,Iend)
-       ENDDO
-      CLOSE(1)
-! ghost cells
-     DO I=Ibeg,Iend
-       DO J=1,Nghost
-        Cd(I,J)=Cd(I,Jbeg)
-       ENDDO
-       DO J=Jend+1,Nloc
-        Cd(I,J)=Cd(I,Jend)
-       ENDDO
-     ENDDO
-
-     DO J=1,Nloc
-       DO I=1,Nghost
-        Cd(I,J)=Cd(Ibeg,J)
-       ENDDO
-       DO I=Iend+1,Mloc
-        Cd(I,J)=Cd(Iend,J)
-       ENDDO
-     ENDDO  
-
-
-# endif
+!# else
+!       OPEN(1,FILE=TRIM(CD_FILE))
+!        DO J=Jbeg,Jend
+!         READ(1,*)(Cd(I,J),I=Ibeg,Iend)
+!        ENDDO
+!       CLOSE(1)
+! ! ghost cells
+!      DO I=Ibeg,Iend
+!        DO J=1,Nghost
+!         Cd(I,J)=Cd(I,Jbeg)
+!        ENDDO
+!        DO J=Jend+1,Nloc
+!         Cd(I,J)=Cd(I,Jend)
+!        ENDDO
+!      ENDDO
+!
+!      DO J=1,Nloc
+!        DO I=1,Nghost
+!         Cd(I,J)=Cd(Ibeg,J)
+!        ENDDO
+!        DO I=Iend+1,Mloc
+!         Cd(I,J)=Cd(Iend,J)
+!        ENDDO
+!      ENDDO  
+!
+!
+! # endif
       ELSE
           DO J=1,Nloc
             DO I=1,Mloc
               Cd(I,J) = Cd_fixed
-          ENDDO
+            ENDDO
           ENDDO
       ENDIF
 
@@ -1016,18 +957,18 @@ SUBROUTINE INITIALIZATION
 ! read obstacle structures 
      IF(OBSTACLE)THEN
 
-  INQUIRE(FILE=TRIM(OBSTACLE_FILE),EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
-# if defined (PARALLEL)
-   IF(MYID==0)  &
-   WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
-# else
-    WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-    STOP
-# endif
-  ENDIF
+!   INQUIRE(FILE=TRIM(OBSTACLE_FILE),EXIST=FILE_EXIST)
+!   IF(.NOT.FILE_EXIST)THEN
+! # if defined (PARALLEL)
+!    IF(MYID==0)  &
+!    WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+!    CALL MPI_FINALIZE (ier)
+!    STOP
+! # else
+!     WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+!     STOP
+! # endif
+!   ENDIF
      
 # if defined (PARALLEL)
      IF(.NOT.ALLOCATED(VarGlob)) ALLOCATE (VarGlob(Mloc,Nloc)) ! use local here 
@@ -1048,18 +989,18 @@ SUBROUTINE INITIALIZATION
 ! read breakwater 
      IF(BREAKWATER)THEN
 
-  INQUIRE(FILE=TRIM(BREAKWATER_FILE),EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
-# if defined (PARALLEL)
-   IF(MYID==0)  &
-   WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
-# else
-    WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-    STOP
-# endif
-  ENDIF
+!   INQUIRE(FILE=TRIM(BREAKWATER_FILE),EXIST=FILE_EXIST)
+!   IF(.NOT.FILE_EXIST)THEN
+! # if defined (PARALLEL)
+!    IF(MYID==0)  &
+!    WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+!    CALL MPI_FINALIZE (ier)
+!    STOP
+! # else
+!     WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+!     STOP
+! # endif
+!   ENDIF
 
 ! we have to use global for width 
      ALLOCATE(BreakWaterWidth(Mglob+2*Nghost,Nglob+2*Nghost))
@@ -1270,6 +1211,7 @@ END SUBROUTINE INITIALIZATION
 !-------------------------------------------------------------------------------------
 SUBROUTINE INITIAL_UVZ
       USE GLOBAL
+      USE FIELD_IO
       IMPLICIT NONE
       REAL(SP),DIMENSION(Mloc,Nloc) :: rMASK
       LOGICAL :: FILE_EXIST
