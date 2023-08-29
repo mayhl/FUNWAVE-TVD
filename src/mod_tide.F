@@ -658,10 +658,9 @@ SUBROUTINE Tide_READ_DATA_INIT
 
 ! west -----------
        CALL READ_STRING(TideWestFileName,FILE_NAME,'TideWestFileName',ierr)
-       TMP_NAME = TRIM(TideWestFileName)
 
-        INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
-        IF(.NOT.FILE_EXIST)THEN
+! intel compiler does not work well with inquire, so change to ierr==1
+        IF(ierr==1)THEN
 # if defined (PARALLEL)
         IF(MYID==0)  &
          WRITE(*,*) TRIM(TMP_NAME), ' No west tidal bc'
@@ -669,6 +668,8 @@ SUBROUTINE Tide_READ_DATA_INIT
          WRITE(*,*) TRIM(TMP_NAME), ' No west tidal bc'
 # endif
         TideWest = .False.
+        ELSE
+          TMP_NAME = TRIM(TideWestFileName)
         ENDIF
       
       IF(TideWest) THEN
@@ -701,10 +702,7 @@ SUBROUTINE Tide_READ_DATA_INIT
 
 ! east -----------
        CALL READ_STRING(TideEastFileName,FILE_NAME,'TideEastFileName',ierr)
-       TMP_NAME = TRIM(TideEastFileName)
-
-        INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
-        IF(.NOT.FILE_EXIST)THEN
+        IF(ierr==1)THEN
 # if defined (PARALLEL)
         IF(MYID==0)  &
          WRITE(*,*) TRIM(TMP_NAME), ' No east tidal bc'
@@ -712,6 +710,8 @@ SUBROUTINE Tide_READ_DATA_INIT
          WRITE(*,*) TRIM(TMP_NAME), ' No east tidal bc'
 # endif
         TideEast = .False.
+        ELSE
+          TMP_NAME = TRIM(TideEastFileName)
         ENDIF
       
       IF(TideEast) THEN
@@ -743,10 +743,7 @@ SUBROUTINE Tide_READ_DATA_INIT
 
 ! south -----------
        CALL READ_STRING(TideSouthFileName,FILE_NAME,'TideSouthFileName',ierr)
-       TMP_NAME = TRIM(TideSouthFileName)
-
-        INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
-        IF(.NOT.FILE_EXIST)THEN
+        IF(ierr==1)THEN
 # if defined (PARALLEL)
         IF(MYID==0)  &
          WRITE(*,*) TRIM(TMP_NAME), ' No south tidal bc'
@@ -754,6 +751,8 @@ SUBROUTINE Tide_READ_DATA_INIT
          WRITE(*,*) TRIM(TMP_NAME), ' No south tidal bc'
 # endif
         TideSouth = .False.
+        ELSE
+          TMP_NAME = TRIM(TideSouthFileName)
         ENDIF
       
       IF(TideSouth) THEN
@@ -785,10 +784,7 @@ SUBROUTINE Tide_READ_DATA_INIT
 
 ! north -----------
        CALL READ_STRING(TideNorthFileName,FILE_NAME,'TideNorthFileName',ierr)
-       TMP_NAME = TRIM(TideNorthFileName)
-
-        INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
-        IF(.NOT.FILE_EXIST)THEN
+        IF(ierr==1)THEN
 # if defined (PARALLEL)
         IF(MYID==0)  &
          WRITE(*,*) TRIM(TMP_NAME), ' No north tidal bc'
@@ -796,6 +792,8 @@ SUBROUTINE Tide_READ_DATA_INIT
          WRITE(*,*) TRIM(TMP_NAME), ' No north tidal bc'
 # endif
         TideNorth = .False.
+        ELSE
+          TMP_NAME = TRIM(TideNorthFileName)
         ENDIF
       
       IF(TideNorth) THEN
