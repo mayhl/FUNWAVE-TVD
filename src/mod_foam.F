@@ -56,126 +56,29 @@ SUBROUTINE INITIALIZATION_FOAM
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
-                    
+
+  USE LOG_IO
   USE INPUT_READ
 
-     IMPLICIT NONE
-     INTEGER :: I,J,K
-
-  CHARACTER(LEN=80)::FILE_NAME=' '
-  CHARACTER(LEN=80)::TMP_NAME=' '
-  INTEGER :: Ifile,ierr
-
+  IMPLICIT NONE
+  TYPE(LOG_BUFFER), TARGET :: logbuff
 ! read  from input.txt
-      FILE_NAME=INPUT_FILE_NAME
 
-     PLOT_COUNT_FOAM = 0
-     CALL READ_FLOAT(PLOT_INTV_FOAM,FILE_NAME,'PLOT_INTV_FOAM',ierr)
-     IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A80)')'PLOT_INTV_FOAM not specified, use SAME'
-# else
-      WRITE(3,'(A50)')'PLOT_INTV_FOAM not specified, use SAME'
-# endif
-       PLOT_INTV_FOAM = PLOT_INTV
-     ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,F12.6)')'PLOT_INTV_FOAM =', PLOT_INTV_FOAM
-# else
-      WRITE(3,'(A20,F12.2)')'PLOT_INTV_FOAM =', PLOT_INTV_FOAM
-# endif
-     ENDIF
+  PLOT_COUNT_FOAM = 0
 
-!!!!     REAL(SP),PARAMETER :: BurstRate=0.01_SP
+  CALL SET_INPUT_LOGGER(INPUT_FILE_NAME, logbuff)
 
-      CALL READ_FLOAT(BurstRate,FILE_NAME,'BurstRate',ierr)
-      IF(ierr==1)THEN
-        BurstRate = 0.01_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Foam BurstRate not specified, use Default:  0.01'
-         WRITE(3,'(A80)')'Foam BurstRate not specified, use Default:  0.01'
-      endif
-# else
-         WRITE(*,'(A80)')'Foam BurstRate not specified, use Default:  0.01'
-         WRITE(3,'(A80)')'Foam BurstRate not specified, use Default:  0.01'
-# endif
-     ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,F12.6)')'Foam BurstRate =', BurstRate
-# else
-      WRITE(3,'(A20,F12.2)')'Foam BurstRate =', BurstRate
-# endif
-       ENDIF
+  CALL BWRITE("FOAM INFO")
 
-!!!!     REAL(SP),PARAMETER :: MinThick=0.01_SP
+  CALL READ_PARAMETER(PLOT_INTV_FOAM, 'PLOT_INTV_FOAM', PLOT_INTV)
+  CALL READ_PARAMETER(BurstRate     , 'BurstRate'     , 0.01_SP  )
+  CALL READ_PARAMETER(MinThick      , 'MinThick'      , 0.01_SP  )
+  CALL READ_PARAMETER(TransferRate  , 'TransferRate'  , 0.1_SP   )
+  CALL READ_PARAMETER(CdFoam        , 'CdFoam'        , 0.5_SP   )
 
-      CALL READ_FLOAT(MinThick,FILE_NAME,'MinThick',ierr)
-      IF(ierr==1)THEN
-        MinThick = 0.01_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Foam MinThick not specified, use Default:  0.01'
-         WRITE(3,'(A80)')'Foam MinThick not specified, use Default:  0.01'
-      endif
-# else
-         WRITE(*,'(A80)')'Foam MinThick not specified, use Default:  0.01'
-         WRITE(3,'(A80)')'Foam MinThick not specified, use Default:  0.01'
-# endif
-     ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,F12.6)')'Foam MinThick =', MinThick
-# else
-      WRITE(3,'(A20,F12.2)')'Foam MinThick =', MinThick
-# endif
-       ENDIF
+  CALL logbuff % FLUSH2OUTPUT
 
-
-!!!!     REAL(SP),PARAMETER :: TransferRate=0.1_SP
-
-      CALL READ_FLOAT(TransferRate,FILE_NAME,'TransferRate',ierr)
-      IF(ierr==1)THEN
-        TransferRate = 0.1_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Foam TransferRate not specified, use Default:  0.1'
-         WRITE(3,'(A80)')'Foam TransferRate not specified, use Default:  0.1'
-      endif
-# else
-         WRITE(*,'(A80)')'Foam TransferRate not specified, use Default:  0.1'
-         WRITE(3,'(A80)')'Foam TransferRate not specified, use Default:  0.1'
-# endif
-     ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,F12.6)')'Foam TransferRate =', TransferRate
-# else
-      WRITE(3,'(A20,F12.2)')'Foam TransferRate =', TransferRate
-# endif
-       ENDIF
-
-
-!!!!     REAL(SP),PARAMETER :: CdFoam=0.5
-
-      CALL READ_FLOAT(CdFoam,FILE_NAME,'CdFoam',ierr)
-      IF(ierr==1)THEN
-        CdFoam = 0.5_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'Foam CdFoam not specified, use Default:  0.5'
-         WRITE(3,'(A80)')'Foam CdFoam not specified, use Default:  0.5'
-      endif
-# else
-         WRITE(*,'(A80)')'Foam CdFoam not specified, use Default:  0.5'
-         WRITE(3,'(A80)')'Foam CdFoam not specified, use Default:  0.5'
-# endif
-     ELSE
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A20,F12.6)')'Foam CdFoam =', CdFoam
-# else
-      WRITE(3,'(A20,F12.2)')'Foam CdFoam =', CdFoam
-# endif
-       ENDIF
-
+  CALL CLEAR_INPUT_LOGGER
 
 ! all other variables used for foam
      EtaFoam=ZERO

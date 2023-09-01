@@ -58,6 +58,7 @@ MODULE TIDE_MODULE
                     TIME,Sponge_west_width,Sponge_east_width,Sponge_south_width, &
                     Sponge_north_width
   USE INPUT_READ
+  USE LOG_IO
 #if defined (PARALLEL)
   USE GLOBAL,ONLY : myid,ier, npx,npy,PX,PY
   USE MPI
@@ -91,6 +92,11 @@ MODULE TIDE_MODULE
               Time_tide_north_1,Eta_tide_north_1,U_tide_north_1,V_tide_north_1, &
               Time_tide_north_2,Eta_tide_north_2,U_tide_north_2,V_tide_north_2  
 
+  INTEGER :: tdunit 
+  TYPE(LOG_BUFFER), TARGET :: logbuff
+  ! Flag for bypassing error when input value is not
+  ! found and returns if input value is found
+  LOGICAL :: found
 
 CONTAINS
   
@@ -99,7 +105,7 @@ SUBROUTINE TIDE_INITIAL
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   
 # endif
-                    
+
   USE INPUT_READ
   IMPLICIT NONE
 
@@ -107,112 +113,44 @@ SUBROUTINE TIDE_INITIAL
   CHARACTER(LEN=80)::TMP_NAME=' '
   INTEGER :: Ifile,ierr
 
+  ! read  from input.txt
+  FILE_NAME=INPUT_FILE_NAME
+  CALL SET_INPUT_LOGGER(FILE_NAME, logbuff)
 
-! read  from input.txt
-      FILE_NAME=INPUT_FILE_NAME
+  CALL BWRITE('TIDAL INFO')
 
- ! absorb only
+  CALL READ_PARAMETER(TIDAL_BC_ABS    , 'TIDAL_BC_ABS'    , .FALSE.)
+  CALL READ_PARAMETER(TIDAL_BC_GEN_ABS, 'TIDAL_BC_GEN_ABS', .FALSE.)
+  CALL READ_PARAMETER(TideBcType      , 'TideBcType'      , 'CONSTANT')
 
-      CALL READ_LOGICAL(TIDAL_BC_ABS,FILE_NAME,'TIDAL_BC_ABS',ierr)
-      IF(ierr == 1)THEN
-       TIDAL_BC_ABS = .FALSE. 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A80)')'TIDAL_BC_ABS not defined, Default: False'
-       WRITE(*,'(A80)')'TIDAL_BC_ABS not defined, Default: False'
-      endif
-# else
-      WRITE(3,'(A80)')'TIDAL_BC_ABS not defined, Default: False'
-      WRITE(*,'(A80)')'TIDAL_BC_ABS not defined, Default: False'
-# endif 
-      ENDIF
+  IF(TideBcType(1:4)=='CONS')THEN
+ 
+    CALL LWRITE("Using CONSTANT Tidal BC.")
+    CALL Tide_READ_CONSTANT
 
- ! generating and absorbing
+  ELSEIF(TideBcType(1:4)=='DATA')THEN
+    
+    CALL LWRITE("Using DATA Tidal BC.")
+    CALL Tide_READ_DATA_INIT
 
-      CALL READ_LOGICAL(TIDAL_BC_GEN_ABS,FILE_NAME,'TIDAL_BC_GEN_ABS',ierr)
-      IF(ierr == 1)THEN
-       TIDAL_BC_GEN_ABS = .FALSE. 
-      ELSE
-        IF(TIDAL_BC_GEN_ABS)THEN
-# if defined (PARALLEL) 
-        if (myid.eq.0)then
-         WRITE(3,'(A80)')'TIDAL_BC_GEN_ABS is TRUE'
-         WRITE(*,'(A80)')'TIDAL_BC_GEN_ABS is TRUE'
-        endif
-# else
-        WRITE(3,'(A80)')'TIDAL_BC_GEN_ABS is TRUE'
-        WRITE(*,'(A80)')'TIDAL_BC_GEN_ABS is TRUE'
-# endif 
-       ENDIF ! true
-      ENDIF
+  ELSE
+    CALL SWRITE("INVALID VALUE FOR 'TideBcType'.")
+  ENDIF
 
-! input tide details
-      CALL READ_STRING(TideBcType,FILE_NAME,'TideBcType',ierr)
-      IF(ierr==1)THEN
-        TideBcType = 'CONSTANT'
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-         WRITE(3,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-      endif
-# else
-         WRITE(*,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-         WRITE(3,'(A50)')'You dont specify TideBcType, use CONSTANT.'
-# endif
-      ENDIF
-
-    IF(TideBcType(1:4)=='CONS')THEN
-
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'You use CONSTANT TIDAL BC -----------------------'
-         WRITE(3,'(A50)')'You use CONSTANT TIDAL BC -----------------------'
-      endif
-# else
-         WRITE(*,'(A50)')'You use CONSTANT TIDAL BC -----------------------'
-         WRITE(3,'(A50)')'You use CONSTANT TIDAL BC -----------------------'
-# endif
-
-      CALL Tide_READ_CONSTANT
-    ENDIF
-
-    IF(TideBcType(1:4)=='DATA')THEN
-
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A50)')'You use TIDAL BC DATA ---------------------------'
-         WRITE(3,'(A50)')'You use TIDAL BC DATA ---------------------------'
-      endif
-# else
-         WRITE(*,'(A50)')'You use TIDAL BC DATA ---------------------------'
-         WRITE(3,'(A50)')'You use TIDAL BC DATA ---------------------------'
-# endif
-
-      CALL Tide_READ_DATA_INIT
-    ENDIF
-
-      ALLOCATE(SPONGE_TIDE_WEST(Mloc,Nloc),SPONGE_TIDE_EAST(Mloc,Nloc), &
-                SPONGE_TIDE_SOUTH(Mloc,Nloc),SPONGE_TIDE_NORTH(Mloc,Nloc))
+  ALLOCATE(SPONGE_TIDE_WEST(Mloc,Nloc) ,SPONGE_TIDE_EAST(Mloc,Nloc), &
+           SPONGE_TIDE_SOUTH(Mloc,Nloc),SPONGE_TIDE_NORTH(Mloc,Nloc))
 
 
-      CALL TIDE_SPONGE
+  CALL TIDE_SPONGE
 
-    IF (TIDAL_BC_ABS) THEN
+  IF (TIDAL_BC_ABS) THEN
+    CALL LWRITE("TIDAL_BC_ABS is defined.")
+    CALL REMOVE_SPONGE
+  ENDIF ! end tide abs
 
-# if defined (PARALLEL) 
-      if (myid.eq.0)then
-       WRITE(3,'(A80)')'TIDAL_BC_ABS is defined'
-       WRITE(*,'(A80)')'TIDAL_BC_ABS is defined'
-      endif
-# else
-      WRITE(3,'(A80)')'TIDAL_BC_ABS is defined'
-      WRITE(*,'(A80)')'TIDAL_BC_ABS is defined'
-# endif 
+  CALL logbuff % FLUSH2OUTPUT
 
-
-      CALL REMOVE_SPONGE
-
-    ENDIF ! end tide abs
+  CALL CLEAR_INPUT_LOGGER
 
 END SUBROUTINE TIDE_INITIAL
 
@@ -349,210 +287,51 @@ SUBROUTINE TIDE_BC
 END SUBROUTINE TIDE_BC
 
 SUBROUTINE Tide_READ_CONSTANT
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,itmp5,SMALL,INPUT_FILE_NAME,WaveMaker
-# if defined (PARALLEL)
-  USE GLOBAL,ONLY : iista,jjsta   
-# endif
                     
   USE INPUT_READ
+  USE LOG_IO
   IMPLICIT NONE
 
-  CHARACTER(LEN=80)::FILE_NAME=' '
-  CHARACTER(LEN=80)::TMP_NAME=' '
-  INTEGER :: Ifile,ierr
-! read  from input.txt
-      FILE_NAME=INPUT_FILE_NAME
 
-!  west ---
+  CALL READ_PARAMETER(TideWest_ETA, 'TideWest_ETA', found=TideWest)
+  IF (.NOT.TideWest) THEN
+    CALL LWRITE("TideWest_ETA not specified, no West boundary tide.")
+    TideWest_U = 0.0_SP
+    TideWest_V = 0.0_SP
+  ELSE
+    CALL READ_PARAMETER(TideWest_U  , 'TideWest_U'  , 0.0_SP)
+    CALL READ_PARAMETER(TideWest_V  , 'TideWest_V'  , 0.0_SP)
+  ENDIF
 
-      CALL READ_Float(TideWest_ETA,FILE_NAME,'TideWest_ETA',ierr)
+  CALL READ_PARAMETER(TideEast_ETA, 'TideEast_ETA', found=TideEast)
+  IF (.NOT.TideEast) THEN
+    CALL LWRITE("TideEast_ETA not specified, no East boundary tide.")
+    TideEast_U = 0.0_SP
+    TideEast_V = 0.0_SP
+  ELSE
+    CALL READ_PARAMETER(TideEast_U  , 'TideEast_U'  , 0.0_SP)
+    CALL READ_PARAMETER(TideEast_V  , 'TideEast_V'  , 0.0_SP)
+  ENDIF
 
-      IF(ierr==1)THEN
-        TideWest = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideWest_ETA, use default: FALSE'
-# endif
-      ENDIF
+  CALL READ_PARAMETER(TideSouth_ETA, 'TideSouth_ETA', found=TideSouth)
+  IF (.NOT.TideSouth) THEN
+    CALL LWRITE("TideSouth_ETA not specified, no South boundary tide.")
+    TideSouth_U = 0.0_SP
+    TideSouth_V = 0.0_SP
+  ELSE
+    CALL READ_PARAMETER(TideSouth_U  , 'TideSouth_U'  , 0.0_SP)
+    CALL READ_PARAMETER(TideSouth_V  , 'TideSouth_V'  , 0.0_SP)
+  ENDIF
 
-      CALL READ_Float(TideWest_U,FILE_NAME,'TideWest_U',ierr)
-
-      IF(ierr==1)THEN
-        TideWest_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideWest_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideWest_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideWest_V,FILE_NAME,'TideWest_V',ierr)
-
-      IF(ierr==1)THEN
-        TideWest_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideWest_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideWest_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideWest_V, use default: 0'
-# endif
-      ENDIF
-
-
-!  east ---
-
-      CALL READ_Float(TideEast_ETA,FILE_NAME,'TideEast_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideEast = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideEast_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideEast_U,FILE_NAME,'TideEast_U',ierr)
-
-      IF(ierr==1)THEN
-        TideEast_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideEast_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideEast_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideEast_V,FILE_NAME,'TideEast_V',ierr)
-
-      IF(ierr==1)THEN
-        TideEast_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideEast_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideEast_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideEast_V, use default: 0'
-# endif
-      ENDIF
-
-
-!  south ---
-
-      CALL READ_Float(TideSouth_ETA,FILE_NAME,'TideSouth_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideSouth = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideSouth_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideSouth_U,FILE_NAME,'TideSouth_U',ierr)
-
-      IF(ierr==1)THEN
-        TideSouth_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideSouth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideSouth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideSouth_V,FILE_NAME,'TideSouth_V',ierr)
-
-      IF(ierr==1)THEN
-        TideSouth_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideSouth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideSouth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideSouth_V, use default: 0'
-# endif
-      ENDIF
-
-!  north ---
-
-      CALL READ_Float(TideNorth_ETA,FILE_NAME,'TideNorth_ETA',ierr)
-
-      IF(ierr==1)THEN
-        TideNorth = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-         WRITE(3,'(A80)')'You dont specify TideNorth_ETA, use default: FALSE'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideNorth_U,FILE_NAME,'TideNorth_U',ierr)
-
-      IF(ierr==1)THEN
-        TideNorth_U = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideNorth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_U, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideNorth_U, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_U, use default: 0'
-# endif
-      ENDIF
-
-      CALL READ_Float(TideNorth_V,FILE_NAME,'TideNorth_V',ierr)
-
-      IF(ierr==1)THEN
-        TideNorth_V = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You dont specify TideNorth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You dont specify TideNorth_V, use default: 0'
-         WRITE(3,'(A80)')'You dont specify TideNorth_V, use default: 0'
-# endif
-      ENDIF
-
+  CALL READ_PARAMETER(TideNorth_ETA, 'TideNorth_ETA', found=TideNorth)
+  IF (.NOT.TideNorth) THEN
+    CALL LWRITE("TideNorth_ETA not specified, no North boundary tide.")
+    TideNorth_U = 0.0_SP
+    TideNorth_V = 0.0_SP
+  ELSE
+    CALL READ_PARAMETER(TideNorth_U  , 'TideNorth_U'  , 0.0_SP)
+    CALL READ_PARAMETER(TideNorth_V  , 'TideNorth_V'  , 0.0_SP)
+  ENDIF
 
 END SUBROUTINE Tide_READ_CONSTANT
 
@@ -565,78 +344,33 @@ SUBROUTINE REMOVE_SPONGE
  
   IMPLICIT NONE
 
-      IF(TideWest)THEN
+  IF (TideWest.AND..NOT.ALMOST_EQUAL(Sponge_west_width, 0.0_SP)) THEN
+    CALL LWRITE("Both west boundary tide and sponge layer set. Removing sponge layer.")
+    Sponge_west_width = 0.0_SP
+  ENDIF 
 
-        Sponge_west_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You set TideWest BC,  Sponge_west is removed '
-         WRITE(3,'(A80)')'You set TideWest BC,  Sponge_west is removed '
-      endif
-# else
-         WRITE(*,'(A80)')'You set TideWest BC,  Sponge_west is removed '
-         WRITE(3,'(A80)')'You set TideWest BC,  Sponge_west is removed '
-# endif         
-      ENDIF
+  IF (TideEast.AND..NOT.ALMOST_EQUAL(Sponge_east_width, 0.0_SP)) THEN
+    CALL LWRITE("Both east boundary tide and sponge layer set. Removing sponge layer.")
+    Sponge_east_width = 0.0_SP
+  ENDIF
 
-      IF(TideEast)THEN
+  IF (TideSouth.AND..NOT.ALMOST_EQUAL(Sponge_south_width, 0.0_SP)) THEN
+    CALL LWRITE("Both south boundary tide and sponge layer set. Removing sponge layer.")
+    Sponge_south_width = 0.0_SP
+  ENDIF 
 
-        Sponge_east_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You set TideEast BC,  Sponge_east is removed '
-         WRITE(3,'(A80)')'You set TideEast BC,  Sponge_east is removed '
-      endif
-# else
-         WRITE(*,'(A80)')'You set TideEast BC,  Sponge_east is removed '
-         WRITE(3,'(A80)')'You set TideEast BC,  Sponge_east is removed '
-# endif         
-      ENDIF
+  IF (TideNorth.AND..NOT.ALMOST_EQUAL(Sponge_north_width, 0.0_SP)) THEN
+    CALL LWRITE("Both north boundary tide and sponge layer set. Removing sponge layer.")
+    Sponge_north_width = 0.0_SP
+  ENDIF 
 
-      IF(TideSouth)THEN
+  IF (.NOT.TideWest.AND. & !.NOT.TideNorth.AND. &
+      .NOT.TideEast) THEN !.AND..NOT.TideSouth ) THEN
 
-        Sponge_south_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You set TideSouth BC,  Sponge_south is removed '
-         WRITE(3,'(A80)')'You set TideSouth BC,  Sponge_south is removed '
-      endif
-# else
-         WRITE(*,'(A80)')'You set TideSouth BC,  Sponge_south is removed '
-         WRITE(3,'(A80)')'You set TideSouth BC,  Sponge_south is removed '
-# endif         
-      ENDIF
+    TIDAL_BC_ABS = .FALSE.
+    CALL LWRITE('Tides specified, but not BCs, setting tides as false.')
 
-      IF(TideNorth)THEN
-
-        Sponge_North_width = ZERO
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You set TideNorth BC,  Sponge_North is removed '
-         WRITE(3,'(A80)')'You set TideNorth BC,  Sponge_North is removed '
-      endif
-# else
-         WRITE(*,'(A80)')'You set TideNorth BC,  Sponge_North is removed '
-         WRITE(3,'(A80)')'You set TideNorth BC,  Sponge_North is removed '
-# endif         
-      ENDIF
-
-
-      IF((.NOT.TideWest).AND.(.NOT.TideEast)  &
-                        .AND.(.NOT.TideEast).AND.(.NOT.TideEast)) THEN
-        TIDAL_BC_ABS = .FALSE.
-
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)')'You specify Tide but no BCs, set tide as false'
-         WRITE(3,'(A80)')'You dont specify TideNorth_V, use default: 0'
-      endif
-# else
-         WRITE(*,'(A80)')'You specify Tide but no BCs, set tide as false'
-         WRITE(3,'(A80)')'You specify Tide but no BCs, set tide as false'
-# endif      
-
-      ENDIF ! end all false
+  END IF
 
 END SUBROUTINE REMOVE_SPONGE
 
@@ -647,288 +381,217 @@ SUBROUTINE Tide_READ_DATA_INIT
 # endif
                     
   USE INPUT_READ
+  USE LOG_IO
+  USE MOD_FUNITS, ONLY: fhandle 
   IMPLICIT NONE
 
-  CHARACTER(LEN=80)::FILE_NAME=' '
-  CHARACTER(LEN=80)::TMP_NAME=' '
-  INTEGER :: Ifile,ierr
-! read  from input.txt
-      FILE_NAME=INPUT_FILE_NAME
+  INTEGER :: Ifile
 
+  tdunit = fhandle % ADD_RANGE('tide_data', 4)
 
-! west -----------
-       CALL READ_STRING(TideWestFileName,FILE_NAME,'TideWestFileName',ierr)
+  ! -------------------------------------
+  !        West Tide
+  ! -------------------------------------
+  CALL READ_PARAMETER(TideWestFileName, 'TideWestFileName', is_file=.TRUE., found=TideWest)
 
-! intel compiler does not work well with inquire, so change to ierr==1
-        IF(ierr==1)THEN
-# if defined (PARALLEL)
-        IF(MYID==0)  &
-         WRITE(*,*) TRIM(TMP_NAME), ' No west tidal bc'
-# else
-         WRITE(*,*) TRIM(TMP_NAME), ' No west tidal bc'
-# endif
-        TideWest = .False.
-        ELSE
-          TMP_NAME = TRIM(TideWestFileName)
-        ENDIF
-      
-      IF(TideWest) THEN
-        Ifile = 201
-        OPEN(Ifile,FILE=TRIM(TMP_NAME))   !!! here
-        READ(Ifile,'(A80)')  tmp_name 
-        READ(Ifile,*) Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
+  IF (TideWest) THEN
+    
+    Ifile = tdunit
+    OPEN(Ifile, FILE=TideWestFileName)
 
-        Time_tide_west_1 = Time_tide_west_2 
-        Eta_tide_west_1 = Eta_tide_west_2 
-        U_tide_west_1 = U_tide_west_2 
-        V_tide_west_1 = V_tide_west_2
+    READ(Ifile,'(A80)')  tmp_name 
+    READ(Ifile,*) Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read tide west ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-   ENDIF
-# else
-     WRITE(*,*)'Read tide west ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-# endif
+    Time_tide_west_1 = Time_tide_west_2 
+    Eta_tide_west_1 = Eta_tide_west_2 
+    U_tide_west_1 = U_tide_west_2 
+    V_tide_west_1 = V_tide_west_2
 
-     ENDIF ! tidewest
+    CALL LWRITE('Read West tide ------')
+    CALL LWRITE('Time, Eta, U, V = '//&
+                 FORMAT_FLOAT(Time_tide_west_2)//", "//&
+                 FORMAT_FLOAT(Eta_tide_west_2)//", "//&
+                 FORMAT_FLOAT(U_tide_west_2)//", "//&
+                 FORMAT_FLOAT(V_tide_west_2))
 
+  END IF
 
-! east -----------
-       CALL READ_STRING(TideEastFileName,FILE_NAME,'TideEastFileName',ierr)
-        IF(ierr==1)THEN
-# if defined (PARALLEL)
-        IF(MYID==0)  &
-         WRITE(*,*) TRIM(TMP_NAME), ' No east tidal bc'
-# else
-         WRITE(*,*) TRIM(TMP_NAME), ' No east tidal bc'
-# endif
-        TideEast = .False.
-        ELSE
-          TMP_NAME = TRIM(TideEastFileName)
-        ENDIF
-      
-      IF(TideEast) THEN
-        Ifile = 202
-        OPEN(Ifile,FILE=TRIM(TMP_NAME))   !!! here
-        READ(Ifile,'(A80)')  tmp_name 
-        READ(Ifile,*) Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
+  ! -------------------------------------
+  !        East Tide
+  ! -------------------------------------
+  CALL READ_PARAMETER(TideEastFileName, 'TideEastFileName', is_file=.TRUE., found=TideEast)
 
-        Time_tide_east_1 = Time_tide_east_2 
-        Eta_tide_east_1 = Eta_tide_east_2 
-        U_tide_east_1 = U_tide_east_2 
-        V_tide_east_1 = V_tide_east_2
+  IF (TideEast) THEN
+    
+    Ifile = tdunit + 1
+    OPEN(Ifile, FILE=TideEastFileName)
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read tide east ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-   ENDIF
-# else
-     WRITE(*,*)'Read tide east ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-# endif
+    READ(Ifile,'(A80)')  tmp_name 
+    READ(Ifile,*) Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
 
-     ENDIF ! tideeast
+    Time_tide_east_1 = Time_tide_east_2 
+    Eta_tide_east_1 = Eta_tide_east_2 
+    U_tide_east_1 = U_tide_east_2 
+    V_tide_east_1 = V_tide_east_2
 
-! south -----------
-       CALL READ_STRING(TideSouthFileName,FILE_NAME,'TideSouthFileName',ierr)
-        IF(ierr==1)THEN
-# if defined (PARALLEL)
-        IF(MYID==0)  &
-         WRITE(*,*) TRIM(TMP_NAME), ' No south tidal bc'
-# else
-         WRITE(*,*) TRIM(TMP_NAME), ' No south tidal bc'
-# endif
-        TideSouth = .False.
-        ELSE
-          TMP_NAME = TRIM(TideSouthFileName)
-        ENDIF
-      
-      IF(TideSouth) THEN
-        Ifile = 203
-        OPEN(Ifile,FILE=TRIM(TMP_NAME))   !!! here
-        READ(Ifile,'(A80)')  tmp_name 
-        READ(Ifile,*) Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
+    CALL LWRITE('Read East tide ------')
+    CALL LWRITE('Time, Eta, U, V = '//&
+                 FORMAT_FLOAT(Time_tide_east_2)//", "//&
+                 FORMAT_FLOAT(Eta_tide_east_2)//", "//&
+                 FORMAT_FLOAT(U_tide_east_2)//", "//&
+                 FORMAT_FLOAT(V_tide_east_2))
 
-        Time_tide_south_1 = Time_tide_south_2 
-        Eta_tide_south_1 = Eta_tide_south_2 
-        U_tide_south_1 = U_tide_south_2 
-        V_tide_south_1 = V_tide_south_2
+  ENDIF
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read tide south ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-   ENDIF
-# else
-     WRITE(*,*)'Read tide south ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-# endif
+  ! -------------------------------------
+  !        South Tide
+  ! -------------------------------------
+  CALL READ_PARAMETER(TideSouthFileName, 'TideSouthFileName', is_file=.TRUE., found=TideSouth)
 
-     ENDIF ! tidesouth
+  IF (TideSouth) THEN
+    
+    Ifile = tdunit + 2
+    OPEN(Ifile, FILE=TideSouthFileName)
 
-! north -----------
-       CALL READ_STRING(TideNorthFileName,FILE_NAME,'TideNorthFileName',ierr)
-        IF(ierr==1)THEN
-# if defined (PARALLEL)
-        IF(MYID==0)  &
-         WRITE(*,*) TRIM(TMP_NAME), ' No north tidal bc'
-# else
-         WRITE(*,*) TRIM(TMP_NAME), ' No north tidal bc'
-# endif
-        TideNorth = .False.
-        ELSE
-          TMP_NAME = TRIM(TideNorthFileName)
-        ENDIF
-      
-      IF(TideNorth) THEN
-        Ifile = 204
-        OPEN(Ifile,FILE=TRIM(TMP_NAME))   !!! here
-        READ(Ifile,'(A80)')  tmp_name 
-        READ(Ifile,*) Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
+    READ(Ifile,'(A80)')  tmp_name 
+    READ(Ifile,*) Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
 
-        Time_tide_north_1 = Time_tide_north_2 
-        Eta_tide_north_1 = Eta_tide_north_2 
-        U_tide_north_1 = U_tide_north_2 
-        V_tide_north_1 = V_tide_north_2
+    Time_tide_south_1 = Time_tide_south_2 
+    Eta_tide_south_1 = Eta_tide_south_2 
+    U_tide_south_1 = U_tide_south_2 
+    V_tide_south_1 = V_tide_south_2
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read tide north ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-   ENDIF
-# else
-     WRITE(*,*)'Read tide north ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-# endif
+    CALL LWRITE('Read South tide ------')
+    CALL LWRITE('Time, Eta, U, V = '//&
+                 FORMAT_FLOAT(Time_tide_south_2)//", "//&
+                 FORMAT_FLOAT(Eta_tide_south_2)//", "//&
+                 FORMAT_FLOAT(U_tide_south_2)//", "//&
+                 FORMAT_FLOAT(V_tide_south_2))
 
-     ENDIF ! tidenorth
+  ENDIF
 
+  ! -------------------------------------
+  !        North Tide
+  ! -------------------------------------
+  CALL READ_PARAMETER(TideNorthFileName, 'TideNorthFileName', is_file=.TRUE., found=TideNorth)
+
+  IF (TideNorth) THEN
+    
+    Ifile = tdunit + 3
+    OPEN(Ifile, FILE=TideNorthFileName)
+
+    READ(Ifile,'(A80)')  tmp_name 
+    READ(Ifile,*) Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
+
+    Time_tide_north_1 = Time_tide_north_2 
+    Eta_tide_north_1 = Eta_tide_north_2 
+    U_tide_north_1 = U_tide_north_2 
+    V_tide_north_1 = V_tide_north_2
+
+    CALL LWRITE('Read North tide ------')
+    CALL LWRITE('Time, Eta, U, V = '//&
+                 FORMAT_FLOAT(Time_tide_north_2)//", "//&
+                 FORMAT_FLOAT(Eta_tide_north_2)//", "//&
+                 FORMAT_FLOAT(U_tide_north_2)//", "//&
+                 FORMAT_FLOAT(V_tide_north_2))
+
+  ENDIF
 
 END SUBROUTINE Tide_READ_DATA_INIT
 
 SUBROUTINE TIDE_DATA
-    USE GLOBAL,ONLY : tmp1,tmp2,SMALL,TIME,ZERO,DT
-        INTEGER :: Ifile
+  USE GLOBAL,ONLY : tmp1,tmp2,SMALL,TIME,ZERO,DT
+  INTEGER :: Ifile
+ 
+  ! -------------------------------------
+  !        West Tide
+  ! -------------------------------------
+  IF (TideWest) THEN
+  
+    Ifile = tdunit
 
+    IF (TIME.GT.Time_tide_west_1.AND.&
+        TIME.GT.Time_tide_west_2) THEN
 
-! west ------------------
-      IF(TideWest) THEN
-        Ifile = 201  ! west
+      Time_tide_west_1 = Time_tide_west_2 
+      Eta_tide_west_1 = Eta_tide_west_2 
+      U_tide_west_1 = U_tide_west_2 
+      V_tide_west_1 = V_tide_west_2
 
-        IF(TIME>Time_tide_west_1.AND.TIME>Time_tide_west_2) THEN
+      DO WHILE (Time_tide_west_2.LT.TIME+DT)
+        READ(Ifile,*,END=120)  Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
+      END DO
 
-        Time_tide_west_1 = Time_tide_west_2 
-        Eta_tide_west_1 = Eta_tide_west_2 
-        U_tide_west_1 = U_tide_west_2 
-        V_tide_west_1 = V_tide_west_2
+      CALL LWRITE('Time, Eta, U, V = '//&
+                   FORMAT_FLOAT(Time_tide_west_2)//", "//&
+                   FORMAT_FLOAT(Eta_tide_west_2)//", "//&
+                   FORMAT_FLOAT(U_tide_west_2)//", "//&
+                   FORMAT_FLOAT(V_tide_west_2))
 
-        DO WHILE (Time_tide_west_2.LT.TIME+DT)
-          READ(Ifile,*,END=120)  Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-        END DO
-
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read west ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-   ENDIF
-# else
-     WRITE(*,*)'Read west ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_west_2, Eta_tide_west_2, U_tide_west_2, V_tide_west_2
-# endif
-
-     ENDIF ! end read time
+    ENDIF ! end read time
 
 ! interpolate
     tmp2=ZERO
     tmp1=ZERO
 
-    IF(TIME>Time_tide_west_1)THEN
+    IF (TIME.GT.Time_tide_west_1) THEN
       IF(Time_tide_west_1.EQ.Time_tide_west_2)THEN
         ! no more data
         tmp2=ZERO
         tmp1=ZERO
       ELSE
-      tmp2=(Time_tide_west_2-TIME) &
+        tmp2=(Time_tide_west_2-TIME) &
             /MAX(SMALL, ABS(Time_tide_west_2-Time_tide_west_1))
-      tmp1=1.0_SP - tmp2
+        tmp1=1.0_SP - tmp2
       ENDIF  ! no more data?
     ENDIF ! time>time_1
-
 
     TideWEST_U = U_tide_west_2*tmp1 +U_tide_west_1*tmp2
     TideWEST_V = V_tide_west_2*tmp1 +V_tide_west_1*tmp2
     TideWEST_ETA = ETA_tide_west_2*tmp1 +ETA_tide_west_1*tmp2
 
-      ENDIF  ! west
+  ENDIF
 
-! east ------------------
-      IF(TideEast) THEN
-        Ifile = 202  ! east
+  ! -------------------------------------
+  !        East Tide
+  ! -------------------------------------
+  IF (TideEast) THEN
+  
+    Ifile = tdunit + 1
 
-        IF(TIME>Time_tide_east_1.AND.TIME>Time_tide_east_2) THEN
+    IF (TIME.GT.Time_tide_east_1.AND.&
+        TIME.GT.Time_tide_east_2) THEN
 
-        Time_tide_east_1 = Time_tide_east_2 
-        Eta_tide_east_1 = Eta_tide_east_2 
-        U_tide_east_1 = U_tide_east_2 
-        V_tide_east_1 = V_tide_east_2
+      Time_tide_east_1 = Time_tide_east_2 
+      Eta_tide_east_1 = Eta_tide_east_2 
+      U_tide_east_1 = U_tide_east_2 
+      V_tide_east_1 = V_tide_east_2
 
-        DO WHILE (Time_tide_east_2.LT.TIME+DT)
-          READ(Ifile,*,END=120)  Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-        END DO
+      DO WHILE (Time_tide_east_2.LT.TIME+DT)
+        READ(Ifile,*,END=120)  Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
+      END DO
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read east ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-   ENDIF
-# else
-     WRITE(*,*)'Read east ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_east_2, Eta_tide_east_2, U_tide_east_2, V_tide_east_2
-# endif
+      CALL LWRITE('Time, Eta, U, V = '//&
+                   FORMAT_FLOAT(Time_tide_east_2)//", "//&
+                   FORMAT_FLOAT(Eta_tide_east_2)//", "//&
+                   FORMAT_FLOAT(U_tide_east_2)//", "//&
+                   FORMAT_FLOAT(V_tide_east_2))
 
-     ENDIF ! end read time
+    ENDIF ! end read time
 
 ! interpolate
     tmp2=ZERO
     tmp1=ZERO
 
-    IF(TIME>Time_tide_east_1)THEN
+    IF (TIME.GT.Time_tide_east_1) THEN
       IF(Time_tide_east_1.EQ.Time_tide_east_2)THEN
         ! no more data
         tmp2=ZERO
         tmp1=ZERO
       ELSE
-      tmp2=(Time_tide_east_2-TIME) &
+        tmp2=(Time_tide_east_2-TIME) &
             /MAX(SMALL, ABS(Time_tide_east_2-Time_tide_east_1))
-      tmp1=1.0_SP - tmp2
+        tmp1=1.0_SP - tmp2
       ENDIF  ! no more data?
     ENDIF ! time>time_1
 
@@ -936,52 +599,48 @@ SUBROUTINE TIDE_DATA
     TideEAST_V = V_tide_east_2*tmp1 +V_tide_east_1*tmp2
     TideEAST_ETA = ETA_tide_east_2*tmp1 +ETA_tide_east_1*tmp2
 
-      ENDIF  ! east
+  ENDIF
 
-! south ------------------
-      IF(TideSouth) THEN
-        Ifile = 203  ! east
+  ! -------------------------------------
+  !        South Tide
+  ! -------------------------------------
+  IF (TideSouth) THEN
+  
+    Ifile = tdunit + 2
 
-        IF(TIME>Time_tide_south_1.AND.TIME>Time_tide_south_2) THEN
+    IF (TIME.GT.Time_tide_south_1.AND.&
+        TIME.GT.Time_tide_south_2) THEN
 
-        Time_tide_south_1 = Time_tide_south_2 
-        Eta_tide_south_1 = Eta_tide_south_2 
-        U_tide_south_1 = U_tide_south_2 
-        V_tide_south_1 = V_tide_south_2
+      Time_tide_south_1 = Time_tide_south_2 
+      Eta_tide_south_1 = Eta_tide_south_2 
+      U_tide_south_1 = U_tide_south_2 
+      V_tide_south_1 = V_tide_south_2
 
-        DO WHILE (Time_tide_south_2.LT.TIME+DT)
-          READ(Ifile,*,END=120)  Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-        END DO
+      DO WHILE (Time_tide_south_2.LT.TIME+DT)
+        READ(Ifile,*,END=120)  Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
+      END DO
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read south ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-   ENDIF
-# else
-     WRITE(*,*)'Read south ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_south_2, Eta_tide_south_2, U_tide_south_2, V_tide_south_2
-# endif
+      CALL LWRITE('Time, Eta, U, V = '//&
+                   FORMAT_FLOAT(Time_tide_south_2)//", "//&
+                   FORMAT_FLOAT(Eta_tide_south_2)//", "//&
+                   FORMAT_FLOAT(U_tide_south_2)//", "//&
+                   FORMAT_FLOAT(V_tide_south_2))
 
-     ENDIF ! end read time
+    ENDIF ! end read time
 
 ! interpolate
     tmp2=ZERO
     tmp1=ZERO
 
-    IF(TIME>Time_tide_south_1)THEN
+    IF (TIME.GT.Time_tide_south_1) THEN
       IF(Time_tide_south_1.EQ.Time_tide_south_2)THEN
         ! no more data
         tmp2=ZERO
         tmp1=ZERO
       ELSE
-      tmp2=(Time_tide_south_2-TIME) &
+        tmp2=(Time_tide_south_2-TIME) &
             /MAX(SMALL, ABS(Time_tide_south_2-Time_tide_south_1))
-      tmp1=1.0_SP - tmp2
+        tmp1=1.0_SP - tmp2
       ENDIF  ! no more data?
     ENDIF ! time>time_1
 
@@ -989,52 +648,48 @@ SUBROUTINE TIDE_DATA
     TideSOUTH_V = V_tide_south_2*tmp1 +V_tide_south_1*tmp2
     TideSOUTH_ETA = ETA_tide_south_2*tmp1 +ETA_tide_south_1*tmp2
 
-      ENDIF  ! south
+  ENDIF
 
-! north ------------------
-      IF(TideNorth) THEN
-        Ifile = 204  ! north
+  ! -------------------------------------
+  !        North Tide
+  ! -------------------------------------
+  IF (TideNorth) THEN
+  
+    Ifile = tdunit + 3
 
-        IF(TIME>Time_tide_north_1.AND.TIME>Time_tide_north_2) THEN
+    IF (TIME.GT.Time_tide_north_1.AND. &
+        TIME.GT.Time_tide_north_2) THEN
 
-        Time_tide_north_1 = Time_tide_north_2 
-        Eta_tide_north_1 = Eta_tide_north_2 
-        U_tide_north_1 = U_tide_north_2 
-        V_tide_north_1 = V_tide_north_2
+      Time_tide_north_1 = Time_tide_north_2 
+      Eta_tide_north_1 = Eta_tide_north_2 
+      U_tide_north_1 = U_tide_north_2 
+      V_tide_north_1 = V_tide_north_2
 
-        DO WHILE (Time_tide_north_2.LT.TIME+DT)
-          READ(Ifile,*,END=120)  Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-        END DO
+      DO WHILE (Time_tide_north_2.LT.TIME+DT)
+        READ(Ifile,*,END=120)  Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
+      END DO
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(*,*)'Read north ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-   ENDIF
-# else
-     WRITE(*,*)'Read north ------'
-     WRITE(*,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-     WRITE(3,*)'Read tide ------'
-     WRITE(3,*)'Time,Eta,U,V = ', Time_tide_north_2, Eta_tide_north_2, U_tide_north_2, V_tide_north_2
-# endif
+      CALL LWRITE('Time, Eta, U, V = '//&
+                   FORMAT_FLOAT(Time_tide_north_2)//", "//&
+                   FORMAT_FLOAT(Eta_tide_north_2)//", "//&
+                   FORMAT_FLOAT(U_tide_north_2)//", "//&
+                   FORMAT_FLOAT(V_tide_north_2))
 
-     ENDIF ! end read time
+    ENDIF ! end read time
 
 ! interpolate
     tmp2=ZERO
     tmp1=ZERO
 
-    IF(TIME>Time_tide_north_1)THEN
+    IF (TIME.GT.Time_tide_north_1) THEN
       IF(Time_tide_north_1.EQ.Time_tide_north_2)THEN
         ! no more data
         tmp2=ZERO
         tmp1=ZERO
       ELSE
-      tmp2=(Time_tide_north_2-TIME) &
+        tmp2=(Time_tide_north_2-TIME) &
             /MAX(SMALL, ABS(Time_tide_north_2-Time_tide_north_1))
-      tmp1=1.0_SP - tmp2
+        tmp1=1.0_SP - tmp2
       ENDIF  ! no more data?
     ENDIF ! time>time_1
 
@@ -1042,8 +697,7 @@ SUBROUTINE TIDE_DATA
     TideNORTH_V = V_tide_north_2*tmp1 +V_tide_north_1*tmp2
     TideNORTH_ETA = ETA_tide_north_2*tmp1 +ETA_tide_north_1*tmp2
 
-      ENDIF  ! north
-
+  ENDIF
 
 120 CONTINUE  ! no more data 
 
