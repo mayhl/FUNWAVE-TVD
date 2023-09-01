@@ -144,6 +144,7 @@ CONTAINS
     INTEGER, INTENT(IN) :: val
     CHARACTER(80) :: str
     WRITE(str, '(I)') val
+    str = ADJUSTL(str)
 
   END FUNCTION
 
@@ -188,6 +189,8 @@ CONTAINS
       WRITE(coeff,*) expon
       str = TRIM(str)//'E'//TRIM(ADJUSTL(coeff))
     END IF
+
+    str = ADJUSTL(str)
 
   END FUNCTION
 

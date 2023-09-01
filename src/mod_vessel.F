@@ -100,6 +100,8 @@ MODULE VESSEL_MODULE
   
     LOGICAL :: MakeVesselDraft = .TRUE.
 
+    INTEGER :: vunit 
+
 
 !INTERFACE READ_FOUR_TYPE_VALUES
 !  Module Procedure VESSEL_INITIAL
@@ -115,8 +117,9 @@ SUBROUTINE VESSEL_INITIAL
 # if defined (PARALLEL)
   USE GLOBAL,ONLY : iista,jjsta   !ykchoi Jan/23/2018
 # endif
-                    
+  USE LOG_IO                  
   USE INPUT_READ
+  USE MOD_FUNITS, ONLY: fhandle 
   IMPLICIT NONE
   CHARACTER(LEN=80)::FILE_NAME=' '
   CHARACTER(LEN=80)::FILE_VESSEL=' '
@@ -124,132 +127,45 @@ SUBROUTINE VESSEL_INITIAL
   CHARACTER(LEN=80)::TMP_NAME=' '
   CHARACTER(LEN=80)::VesselName = ' '
   INTEGER :: Ifile,ierr
-
+  TYPE(LOG_BUFFER), TARGET :: logbuff
 
 ! read vessel number and folder from input.txt
-      FILE_NAME=INPUT_FILE_NAME
+  FILE_NAME=INPUT_FILE_NAME
+  CALL SET_INPUT_LOGGER(FILE_NAME, logbuff)
 
-! vessel folder
-      CALL READ_STRING(VESSEL_FOLDER,FILE_NAME,'VESSEL_FOLDER',ierr)
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A50)')'VESSEL_FOLDER:', VESSEL_FOLDER
-# else
-      WRITE(3,'(A15,A50)')'VESSEL_FOLDER:', VESSEL_FOLDER
-# endif
+  CALL BWRITE('VESSEL INFO')
 
-      CALL READ_INTEGER(NumVessel,FILE_NAME,'NumVessel',ierr)
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A12,I3)') 'NumVessel = ',NumVessel
-# else
-      WRITE(3,'(A12,I3)') 'NumVessel = ',NumVessel
-# endif
+  CALL READ_PARAMETER(VESSEL_FOLDER, 'VESSEL_FOLDER', './')
+  CALL READ_PARAMETER(NumVessel    , 'NumVessel'    , 0   )
 
-      CALL READ_LOGICAL(OUT_VESSEL,FILE_NAME,'OUT_VESSEL',ierr)
+  CALL READ_PARAMETER(PLOT_INTV_VESSEL, 'PLOT_INTV_VESSEL', SMALL)
+
+  IF (NumVessel.GT.0 ) THEN
+    CALL READ_PARAMETER(OUT_VESSEL, 'OUT_VESSEL', .TRUE.)
+  ENDIF
+
+  CALL logbuff % FLUSH2OUTPUT
 
 ! deep draft vessel
-
-
 # if defined (DEEP_DRAFT_VESSEL)
   ! ---------
-      CALL READ_LOGICAL(MaskMethod,FILE_NAME,'MaskMethod',ierr)      
-      IF(ierr==1)THEN
-        MaskMethod = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)') 'Deep draft, Mask method is used.'
-         WRITE(3,'(A80)') 'Deep draft, Mask method is used.'
-      endif
-# else
-         WRITE(*,'(A80)') 'Deep draft, Mask method is used.'
-         WRITE(3,'(A80)') 'Deep draft, Mask method is used.'
-# endif
-      ENDIF
 
-! clearance
-      CALL READ_FLOAT(CLEARANCE,FILE_NAME,'CLEARANCE',ierr) 
+  CALL BWRITE("DEEP DRAFT INFO")
+
+  CALL READ_PARAMETER(MaskMethod, 'MaskMethod', .TRUE.      )
+  CALL READ_PARAMETER(CLEARANCE , 'CLEARANCE' , 1.0    , 'm')
       
-      IF(ierr==1)THEN
-        CLEARANCE = 1.0_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify CLEARANCE, use 1.0 m'
-         WRITE(3,'(A40)')'You dont specify CLEARANCE, use 1.0 m'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify CLEARANCE, use 1.0 m'
-         WRITE(3,'(A40)')'You dont specify CLEARANCE, use 1.0 m'
-# endif
-      ENDIF     
+  CALL READ_PARAMETER(FrictionMethod, 'FrictionMethod', .TRUE.)      
+  IF (FrictionMethod) CALL READ_PARAMETER(CdDeepDraft, 'CdDeepDraft', 0.1_SP) 
 
-  ! frction ---
-      CALL READ_LOGICAL(FrictionMethod,FILE_NAME,'FrictionMethod',ierr)      
-      IF(ierr==1)THEN
-        FrictionMethod = .TRUE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)') 'Deep draft, Friction method used.'
-         WRITE(3,'(A80)') 'Deep draft, Friction method used.'
-      endif
-# else
-         WRITE(*,'(A80)') 'Deep draft, Friction method used.'
-         WRITE(3,'(A80)') 'Deep draft, Friction method used.'
-# endif
-      ENDIF
+  CALL READ_PARAMETER(ViscosityMethod, 'ViscosityMethod', .FALSE.)      
+  IF (ViscosityMethod) CALL READ_PARAMETER(VisDeepDraft, 'VisDeepDraft',  0.1_SP)     
 
-      IF (FrictionMethod) THEN
-      CALL READ_FLOAT(CdDeepDraft,FILE_NAME,'CdDeepDraft',ierr) 
-      
-      IF(ierr==1)THEN
-        CdDeepDraft = 0.1_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify CdDeepDraft, use 0.1'
-         WRITE(3,'(A40)')'You dont specify CdDeepDraft, use 0.1'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify CdDeepDraft, use 0.1'
-         WRITE(3,'(A40)')'You dont specify CdDeepDraft, use 0.1'
-# endif
-      ENDIF      
-
-      ENDIF  ! end friction method
-
-  ! viscosity ---
-      CALL READ_LOGICAL(ViscosityMethod,FILE_NAME,'ViscosityMethod',ierr)      
-      IF(ierr==1)THEN
-        ViscosityMethod = .FALSE.
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A80)') 'Deep draft, Viscosity method NOT used.'
-         WRITE(3,'(A80)') 'Deep draft, Viscosity method NOT used.'
-      endif
-# else
-         WRITE(*,'(A80)') 'Deep draft, Viscosity method NOT used.'
-         WRITE(3,'(A80)') 'Deep draft, Viscosity method NOT used.'
-# endif
-      ENDIF
-
-      IF (ViscosityMethod) THEN
-      CALL READ_FLOAT(VisDeepDraft,FILE_NAME,'VisDeepDraft',ierr) 
-      
-      IF(ierr==1)THEN
-        VisDeepDraft = 0.1_SP
-# if defined (PARALLEL)
-      if (myid.eq.0) THEN
-         WRITE(*,'(A40)')'You dont specify VisDeepDraft, use 0.1'
-         WRITE(3,'(A40)')'You dont specify VisDeepDraft, use 0.1'
-      endif
-# else
-         WRITE(*,'(A40)')'You dont specify VisDeepDraft, use 0.1'
-         WRITE(3,'(A40)')'You dont specify VisDeepDraft, use 0.1'
-# endif
-      ENDIF      
-
-      ENDIF  ! end viscosity method
-
+  CALL logbuff % FLUSH2OUTPUT
   ! -----------
 # endif
 ! end deep draft vessel
+
 
       ALLOCATE (Xvessel1(NumVessel),Yvessel1(NumVessel),  &
                 Xvessel2(NumVessel),Yvessel2(NumVessel),  &
@@ -280,62 +196,36 @@ SUBROUTINE VESSEL_INITIAL
      ALLOCATE (CdVessel_2D(Mloc,Nloc),VisVessel_2D(Mloc,Nloc),MaskVessel(Mloc,Nloc))
 # endif
 
-! plot vessel intitial
-     PLOT_COUNT_VESSEL = 0
-     CALL READ_FLOAT(PLOT_INTV_VESSEL,FILE_NAME,'PLOT_INTV_VESSEL',ierr)
-     IF(ierr==1)THEN
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A50)')'PLOT_INTV_VESSEL not specified, use SMALL'
-# else
-      WRITE(3,'(A50)')'PLOT_INTV_VESSEL not specified, use SMALL'
-# endif
-       PLOT_INTV_VESSEL = SMALL
-     ENDIF
-      
+  IF (NumVessel.GT.0) vunit = fhandle % ADD_RANGE('vessels', NumVessel+1)
+
   DO Kves = 1, NumVessel
 
 !  file name
-    itmp1=mod(Kves/10000,10)
-    itmp2=mod(Kves/1000,10)
-    itmp3=mod(Kves/100,10)
-    itmp4=mod(Kves/10,10)
-    itmp5=mod(Kves,10)
-    write(FILE_VESSEL(1:1),'(I1)')itmp1
-    write(FILE_VESSEL(2:2),'(I1)')itmp2
-    write(FILE_VESSEL(3:3),'(I1)')itmp3
-    write(FILE_VESSEL(4:4),'(I1)')itmp4
-    write(FILE_VESSEL(5:5),'(I1)')itmp5
-
+    WRITE(FILE_VESSEL(1:5), '(I0.5)') Kves
     TMP_NAME = TRIM(VESSEL_FOLDER)//'vessel_'//TRIM(FILE_VESSEL)
 
 ! check existing
 
- INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
-# if defined (PARALLEL)
-   IF(MYID==0)  &
-   WRITE(*,*) TRIM(TMP_NAME), ' specified in ', TRIM(VESSEL_FOLDER), ' but CANNOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
-# else
-    WRITE(*,*) TRIM(TMP_NAME), ' specified in ', TRIM(VESSEL_FOLDER), ' but CANNOT BE FOUND. STOP'
-    STOP
-# endif
-  ENDIF
+    INQUIRE(FILE=TRIM(TMP_NAME),EXIST=FILE_EXIST)
+
+    IF (.NOT.FILE_EXIST) THEN
+      CALL SWRITE("VESSEL FILE 'vessel_"//TRIM(FILE_VESSEL)//"' EXPECTED IN FOLDER'"//\
+                  TRIM(VESSEL_FOLDER)//"', BUT CANNOT BE FOUND.")
+    ENDIF
 
 ! open file
-  Ifile=Kves+2000
-  OPEN(Ifile,FILE=TRIM(TMP_NAME))
+    Ifile=Kves+vunit
+    OPEN(Ifile,FILE=TRIM(TMP_NAME))
 
 ! read file
-         READ(Ifile,'(A80)')  VesselName 
-         READ(Ifile,*)  SourceType(Kves), VesselType(Kves)
+    READ(Ifile,'(A80)')  VesselName 
+    READ(Ifile,*)  SourceType(Kves), VesselType(Kves)
 
-         READ(Ifile,*)  ! length, width, etc
-        IF(SourceType(Kves)(1:2)=='PR')THEN
-         READ(Ifile,*)  LengthVessel(Kves), WidthVessel(Kves), &
-                      AlphaVessel1(Kves),AlphaVessel2(Kves), &
-                      BetaVessel(Kves),Pvessel(Kves)
+    READ(Ifile,*)  ! length, width, etc
+    IF (SourceType(Kves)(1:2)=='PR') THEN
+      READ(Ifile,*) LengthVessel(Kves), WidthVessel(Kves) , &
+                    AlphaVessel1(Kves), AlphaVessel2(Kves), &
+                    BetaVessel(Kves)  , Pvessel(Kves)
 !                for type 2 divid and volker 2017, alpha1 is cl,alpha2 is cb
 !                beta is a
 
@@ -347,103 +237,129 @@ SUBROUTINE VESSEL_INITIAL
 !            IF(BetaVessel(Kves)<16.0_SP)BetaVessel(Kves) = 16.0_SP
 !          ENDIF
 
-         IF(VesselType(Kves)==1)THEN
-            AlphaVessel1(Kves) = Max(SMALL, AlphaVessel1(Kves))
-            BetaVessel(Kves) = Max(SMALL, BetaVessel(Kves))
-            AlphaVessel1(Kves) = Min(1.0_SP, AlphaVessel1(Kves))
-            BetaVessel(Kves) = Min(1.0_SP, BetaVessel(Kves))
-         ENDIF
-
-        ENDIF ! end pressure source
-
-        IF(SourceType(Kves)(1:2)=='SL')THEN
-         READ(Ifile,*)  LengthVessel(Kves), WidthVessel(Kves), &
-                      AlphaVessel1(Kves),AlphaVessel2(Kves), &
-                      BetaVessel(Kves),Pvessel(Kves)
-
-        ENDIF
-         READ(Ifile,*)  ! t, x, y
-         READ(Ifile,*)  TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
-
-         TimeVessel1(Kves) = TimeVessel2(Kves)
-         Xvessel1(Kves) = Xvessel2(Kves)
-         Yvessel1(Kves) = Yvessel2(Kves)
+      IF(VesselType(Kves)==1)THEN
+        AlphaVessel1(Kves) = Max(SMALL, AlphaVessel1(Kves))
+        BetaVessel(Kves) = Max(SMALL, BetaVessel(Kves))
+        AlphaVessel1(Kves) = Min(1.0_SP, AlphaVessel1(Kves))
+        BetaVessel(Kves) = Min(1.0_SP, BetaVessel(Kves))
+      ENDIF
 
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-   WRITE(3,*) '----- Vessel Name : ',  TRIM(VesselName)
-   WRITE(3,*) 'Vessel Source Type: ',  TRIM(SourceType(Kves))
-   WRITE(3,*) 'Vessel Type: ',  VesselType(Kves)
-   WRITE(3,*) 'Vessel Length', LengthVessel(Kves)
-   WRITE(3,*) 'Vessel Width', WidthVessel(Kves)
-   WRITE(3,*) 'Vessel Alpha_1', AlphaVessel1(Kves)
-   WRITE(3,*) 'Vessel Alpha_2', AlphaVessel2(Kves)
-   WRITE(3,*) 'Vessel Beta', BetaVessel(Kves)
-   WRITE(3,*) 'Vessel P', PVessel(Kves)
-   WRITE(3,*) 'Initial Time, X, Y', TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
-   ENDIF
-# else
-   WRITE(3,*) 'Vessel Source Type: ',  TRIM(SourceType(Kves))
-   WRITE(3,*) 'Vessel Type: ',  VesselType(Kves)
-   WRITE(3,*) 'Vessel Length', LengthVessel(Kves)
-   WRITE(3,*) 'Vessel Width', WidthVessel(Kves)
-   WRITE(3,*) 'Vessel Alpha_1', AlphaVessel1(Kves)
-   WRITE(3,*) 'Vessel Alpha_2', AlphaVessel2(Kves)
-   WRITE(3,*) 'Vessel Beta', BetaVessel(Kves)
-   WRITE(3,*) 'Vessel P', PVessel(Kves)
-   WRITE(3,*) 'Initial Time, X, Y', TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
-# endif
+      IF ((VesselType(Kves).NE.1).AND.\
+          (VesselType(Kves).NE.2)) THEN
+
+        CALL SWRITE("UKNOWN VESSEL TYPE '"//TRIM(FORMAT_INTEGER(VesselType(Kves)))//\
+                    "' FOR SOURCE TYPE '"//TRIM(SourceType(Kves))//"' IN '"//\
+                    "vessel_"//TRIM(FILE_VESSEL)//"'.")
+      ENDIF 
+
+    ELSEIF (SourceType(Kves)(1:2)=='SL') THEN
+      READ(Ifile,*) LengthVessel(Kves), WidthVessel(Kves), &
+                    AlphaVessel1(Kves), AlphaVessel2(Kves), &
+                    BetaVessel(Kves)  , Pvessel(Kves)
+
+      IF ((VesselType(Kves).NE.1).AND.\
+          (VesselType(Kves).NE.2)) THEN
+
+        CALL SWRITE("UKNOWN VESSEL TYPE '"//TRIM(FORMAT_INTEGER(VesselType(Kves)))//\
+                    "' FOR SOURCE TYPE '"//TRIM(SourceType(Kves))//"' IN '"//\
+                    "vessel_"//TRIM(FILE_VESSEL)//"'.")
+      ENDIF 
+
+    ELSE
+      CALL SWRITE("UKNOWN VESSEL SOURCE TYPE '"//TRIM(SourceType(Kves))//"' IN '"//\
+                  "vessel_"//TRIM(FILE_VESSEL)//"'.")
+    ENDIF
+
+
+    READ(Ifile,*)  ! t, x, y
+    READ(Ifile,*)  TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
+
+    TimeVessel1(Kves) = TimeVessel2(Kves)
+    Xvessel1(Kves) = Xvessel2(Kves)
+    Yvessel1(Kves) = Yvessel2(Kves)
+
+    CALL BWRITE("VESSEL "//TRIM(FILE_VESSEL))
+
+    CALL logbuff % ADD("Name"       , TRIM(VesselName)                )
+    CALL logbuff % ADD("Source Type", TRIM(SourceType(Kves))          )
+    CALL logbuff % ADD("Type"       , FORMAT_INTEGER(VesselType(Kves)))
+    CALL logbuff % ADD("Length"     , FORMAT_FLOAT(LengthVessel(Kves)))
+    CALL logbuff % ADD("Width"      , FORMAT_FLOAT(WidthVessel(Kves)) )
+
+    IF (SourceType(Kves)(1:2).EQ."PR") THEN
+      IF (VesselType(Kves).EQ.1) THEN
+        CALL logbuff % ADD("Alpha 1", FORMAT_FLOAT(AlphaVessel1(Kves)))
+        CALL logbuff % ADD("Alpha 2", FORMAT_FLOAT(AlphaVessel2(Kves)))
+        CALL logbuff % ADD("Beta"   , FORMAT_FLOAT(BetaVessel(Kves))  )
+      ELSEIF (VesselType(Kves).EQ.2) THEN
+        CALL logbuff % ADD("a", FORMAT_FLOAT(AlphaVessel1(Kves)))
+        CALL logbuff % ADD("b", FORMAT_FLOAT(AlphaVessel2(Kves)))
+        CALL logbuff % ADD("c", FORMAT_FLOAT(BetaVessel(Kves))  )
+      ENDIF
+    ELSEIF (SourceType(Kves)(1:2).EQ."SL") THEN
+      IF (VesselType(Kves).EQ.1) THEN
+        ! No additional parameters to read
+      ELSEIF (VesselType(Kves).EQ.2) THEN
+        CALL logbuff % ADD("Alpha 1", FORMAT_FLOAT(AlphaVessel1(Kves)))
+        CALL logbuff % ADD("Alpha 2", FORMAT_FLOAT(AlphaVessel2(Kves)))
+      ENDIF
+    ENDIF 
+
+    CALL logbuff % ADD("P"           , FORMAT_FLOAT(PVessel(Kves))    )
+    CALL logbuff % ADD("Initial Time", FORMAT_FLOAT(TimeVessel2(Kves)))
+    CALL logbuff % ADD("Initial X"   , FORMAT_FLOAT(XVessel2(Kves))   )
+    CALL logbuff % ADD("Initial Y"   , FORMAT_FLOAT(YVessel2(Kves))   )
+
+    CALL logbuff % FLUSH2OUTPUT
 
   ENDDO  ! end Kves
 
-End SUBROUTINE VESSEL_INITIAL
+  CALL CLEAR_INPUT_LOGGER
+
+ENDSUBROUTINE VESSEL_INITIAL
 
 SUBROUTINE VESSEL_FORCING
   USE GLOBAL,ONLY : Mloc,Nloc,tmp1,tmp2,SMALL,TIME,ZERO,DT,DEPTH
-  USE INPUT_READ
+  USE LOG_IO, ONLY : LWRITE
+  USE INPUT_READ, ONLY: FORMAT_INTEGER, FORMAT_FLOAT
   IMPLICIT NONE
+
   INTEGER :: Ifile,ierr,I,J
 
-
   VesselFluxGradient = ZERO
-
   VesselPressureTotal = ZERO
 
   DO Kves = 1,NumVessel
 
     IF(TIME>TimeVessel1(Kves).AND.TIME>TimeVessel2(Kves)) THEN
 
-         TimeVessel1(Kves)=TimeVessel2(Kves)
-         Xvessel1(Kves) = Xvessel2(Kves)
-         Yvessel1(Kves) = Yvessel2(Kves)
+      TimeVessel1(Kves)=TimeVessel2(Kves)
+      Xvessel1(Kves) = Xvessel2(Kves)
+      Yvessel1(Kves) = Yvessel2(Kves)
 
-    Ifile = 2000 + Kves
+      Ifile = vunit + Kves
 
 ! I add while to avoid dt is smaller than the time interval of vessel path 08/05/2019
-    DO WHILE (TimeVessel2(Kves).LT.TIME+DT)
-      READ(Ifile,*,END=120)  TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
-    END DO
+      DO WHILE (TimeVessel2(Kves).LT.TIME+DT)
+        READ(Ifile,*,END=120)  TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
+      END DO
 
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-     WRITE(3,*)'Read Vessel # ', Kves
-     WRITE(3,*)'T,X,Y = ', TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
-   ENDIF
-# else
-     WRITE(3,*)'Read Vessel # ', Kves
-     WRITE(3,*)'T,X,Y = ', TimeVessel2(Kves),Xvessel2(Kves),Yvessel2(Kves)
-# endif
+      CALL LWRITE("Read Vessel # "//TRIM(FORMAT_INTEGER(Kves)))
+      CALL LWRITE("T, X, T = "//\
+                  TRIM(FORMAT_FLOAT(TimeVessel2(Kves)))//", "//\
+                  TRIM(FORMAT_FLOAT(Xvessel2(Kves)))//", "//\
+                  TRIM(FORMAT_FLOAT(Yvessel2(Kves))))
 
-    ThetaVessel(Kves) = ATAN2(Yvessel2(Kves)-Yvessel1(Kves),  &
-                              Xvessel2(Kves)-Xvessel1(Kves))
+      ThetaVessel(Kves) = ATAN2(Yvessel2(Kves)-Yvessel1(Kves),  &
+                                Xvessel2(Kves)-Xvessel1(Kves))
 
 
 ! for panel source
-    IF((TimeVessel2(Kves)-TimeVessel1(Kves))> ZERO)THEN
-     Uvel(Kves) = (Xvessel2(Kves)-Xvessel1(Kves))/(TimeVessel2(Kves)-TimeVessel1(Kves))
-     Vvel(Kves) = (Yvessel2(Kves)-Yvessel1(Kves))/(TimeVessel2(Kves)-TimeVessel1(Kves))
-    ENDIF
+      IF((TimeVessel2(Kves)-TimeVessel1(Kves))> ZERO)THEN
+        Uvel(Kves) = (Xvessel2(Kves)-Xvessel1(Kves))/(TimeVessel2(Kves)-TimeVessel1(Kves))
+        Vvel(Kves) = (Yvessel2(Kves)-Yvessel1(Kves))/(TimeVessel2(Kves)-TimeVessel1(Kves))
+      ENDIF
 ! end panel source
 
     ENDIF ! end time > timevessel2

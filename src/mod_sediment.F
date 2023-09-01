@@ -254,10 +254,11 @@ CONTAINS
         ALLOCATE(CHY(Mloc,Nloc),CH(Mloc,Nloc), &
                  CHXxL(Mloc1,Nloc),CHXxR(Mloc1,Nloc))
         ALLOCATE(CHX(Mloc,Nloc),CHYyL(Mloc,Nloc1),CHYyR(Mloc,Nloc1)) 
+
         ALLOCATE(Mask_s(Mloc,Nloc))
         ALLOCATE(D(Mloc,Nloc),Pickup(Mloc,Nloc))
         ALLOCATE(Delta_c(Mloc,Nloc),D_ave(Mloc,Nloc),P_ave(Mloc,Nloc))
-        ALLOCATE(D_sum(Mloc,Nloc),P_sum(Mloc,Nloc))
+        ALLOCATE(D_sum(Mloc,Nloc), P_sum(Mloc,Nloc))
         ALLOCATE(C_sum(Mloc,Nloc),C_ave(Mloc,Nloc))
         ALLOCATE(DcX(Mloc,Nloc),DcY(Mloc,Nloc),ExgX(Mloc,Nloc), &
                  ExgY(Mloc,Nloc),MassSed(Mloc,Nloc))

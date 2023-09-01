@@ -237,7 +237,7 @@ SUBROUTINE READ_INPUT
 
   ELSE
 
-    CALL LWRITE('Spherical Grid Mode'
+    CALL LWRITE('Spherical Grid Mode')
     CALL READ_PARAMETER(Lon_West , 'Lon_West' )
     CALL READ_PARAMETER(Lat_South, 'Lat_South')
     CALL READ_PARAMETER(Dphi     , 'Dphi'     )
@@ -442,7 +442,10 @@ SUBROUTINE READ_INPUT
     END IF
 
     CALL READ_PARAMETER(Ywidth_WK  , 'Ywidth_WK'  , LARGE  )
+    !mayhl: Flag not used in Spherical model in wavemaker.F
+#if defined(CARTESIAN)
     CALL READ_PARAMETER(EqualEnergy, 'EqualEnergy', .FALSE.)
+#endif
 
   ELSE IF (WaveMaker(1:13) == 'WK_NEW_DATA2D' .OR. &
            WaveMaker(1:9) == 'WK_DATA2D') THEN
@@ -453,7 +456,7 @@ SUBROUTINE READ_INPUT
 !Oct, 2021
 !Salatin, R., Chen, Q., Bak, A. S., Shi, F., & Brandt, S. R. (2021). Effects of
 !wave coherence on longshore variability of nearshore wave processes. Journal
-!of Geophysical Research: Oceans,126, e2021JC017641.
+!of Geophysical Research: Oceans,126, e2021JC017641.:
 !https://doi.org/10.1029/2021JC017641
 
     CALL READ_PARAMETER(Xc_WK       , 'Xc_WK'                             )
@@ -463,7 +466,8 @@ SUBROUTINE READ_INPUT
     CALL READ_PARAMETER(Delta_WK    , 'Delta_WK'    , 0.5_SP              )
     CALL READ_PARAMETER(WaveCompFile, 'WaveCompFile', is_file=.TRUE.      )
     CALL READ_PARAMETER(Ywidth_WK   , 'Ywidth_WK'   , LARGE               )
-    CALL READ_PARAMETER(EqualEnergy , 'EqualEnergy' , .FALSE.             )
+    ! mayhl: Parameter used in wavemaker.F for either WK_DATA2D or WK_NEW_DATA2D
+    !CALL READ_PARAMETER(EqualEnergy , 'EqualEnergy' , .FALSE.             )
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -485,6 +489,7 @@ SUBROUTINE READ_INPUT
 
     IF (WAVE_DATA_TYPE(1:3) == 'ABS') THEN
 
+      ! mayhl: Check, wavemaker.F calls subroutines dependent on TMA parameters
       CALL READ_PARAMETER(WidthWaveMaker    , 'WidthWaveMaker'    )
       CALL READ_PARAMETER(R_sponge_wavemaker, 'R_sponge_wavemaker')
       CALL READ_PARAMETER(A_sponge_wavemaker, 'A_sponge_wavemaker')
@@ -515,6 +520,8 @@ SUBROUTINE READ_INPUT
         CALL READ_PARAMETER(ThetaPeak  , 'ThetaPeak'  , 0.0_SP )
         CALL READ_PARAMETER(Sigma_Theta, 'Sigma_Theta', 10.0_SP)
       END IF
+
+      CALL READ_PARAMETER(EqualEnergy, 'EqualEnergy' , .FALSE.)
 
     ELSE
       ! Added explicit else case to avoid invalid input
@@ -558,17 +565,17 @@ SUBROUTINE READ_INPUT
   END IF
 
   ! mayhl: Fengyan mention values are no longer relevant 
-  ! IF (.NOT. (WaveMaker(1:7) .EQ. 'nothing')) THEN
+   IF (.NOT. (WaveMaker(1:7) .EQ. 'nothing')) THEN
   !
-  !   CALL READ_PARAMETER(ETA_LIMITER, 'ETA_LIMITER', .FALSE.)
-  !   IF (ETA_LIMITER) THEN
-  !     CALL READ_PARAMETER(CrestLimit, 'CrestLimit')
-  !     CALL READ_PARAMETER(TroughLimit, 'TroughLimit')
-  !   END IF
+     CALL READ_PARAMETER(ETA_LIMITER, 'ETA_LIMITER', .FALSE.)
+     IF (ETA_LIMITER) THEN
+       CALL READ_PARAMETER(CrestLimit, 'CrestLimit')
+       CALL READ_PARAMETER(TroughLimit, 'TroughLimit')
+     END IF
   !
-  !   CALL READ_PARAMETER(WaveMakerCD, 'WaveMakerCd', found=WaveMakerCurrentBalance)
+     CALL READ_PARAMETER(WaveMakerCD, 'WaveMakerCd', found=WaveMakerCurrentBalance)
   !
-  ! END IF
+   END IF
 
   CALL logbuff%FLUSH2OUTPUT()
 
@@ -640,14 +647,12 @@ SUBROUTINE READ_INPUT
 # if defined (CARTESIAN)
   CALL READ_PARAMETER(Gamma2  , 'Gamma2'  , 1.0_SP   )
   CALL READ_PARAMETER(Beta_ref, 'Beta_ref', -0.531_SP)
-  CALL READ_PARAMETER(Gamma3  , 'Gamma3'  , 1.0_SP   )
-# else
-# if define (ZALPHA)
+# endif
+# if defined (ZALPHA)
   ! mayhl: Is ZAPLPHA a dead preprocessor flag?
   CALL READ_PARAMETER(Beta_ref, 'Beta_ref', -0.531_SP)
 # endif
-# endif
-
+  CALL READ_PARAMETER(Gamma3  , 'Gamma3'  , 1.0_SP   )
   CALL logbuff%FLUSH2OUTPUT()
 
 ! ----------------------------------------------------------------
@@ -663,7 +668,6 @@ SUBROUTINE READ_INPUT
     ROLLER_SWITCH = 1.0_SP
     VISCOSITY_BREAKING = .TRUE.
     CALL logbuf%ADD('VISCOSITY_BREAKING', FORMAT_LOGICAL(VISCOSITY_BREAKING))
-
   ELSE
     ROLLER_SWITCH = 0.0_SP
     CALL LWRITE('Roller effects not included.')
@@ -699,7 +703,7 @@ SUBROUTINE READ_INPUT
 
   !  suggest dont use wavemaker_vis 04/30
   IF (WAVEMAKER_VIS) THEN
-    CALL READ_PARAMETER(visbrk, 'visbrk')
+    CALL READ_PARAMETER(visbrk          , 'visbrk'          )
     CALL READ_PARAMETER(WAVEMAKER_visbrk, 'WAVEMAKER_visbrk')
   END IF
 
@@ -967,422 +971,6 @@ SUBROUTINE READ_ABS_OR_LEFT_BC_COMPFILE(INPUT_PHASE)
   END DO
 
 ENDSUBROUTINE
-
-# if defined (CARTESIAN)
-!-------------------------------------------------------------------------------------
-!
-!    STATIONS is a subroutine to write station data
-! Fengyan Shi modified based on Jeff Harris for Spherical
-! here simply specify grid number i and j instead of x and y
-!
-! HISTORY:
-!    09/16/2011  Fengyan Shi
-!
-!-------------------------------------------------------------------------------------
-SUBROUTINE STATIONS
-  USE GLOBAL
-  USE INPUT_READ
-  IMPLICIT NONE
-
-  INTEGER :: iunit
-  INTEGER, DIMENSION(:), ALLOCATABLE :: BufferCount
-  REAL(SP), DIMENSION(:, :, :), ALLOCATABLE :: ZUV_Buffer
-  REAL(SP) :: dum1, dum2
-  REAL(SP) :: eta_sta, u_sta, v_sta
-  CHARACTER(LEN=80)::FILE_NAME = ' '
-  CHARACTER(LEN=80)::TMP_NAME = ' '
-  CHARACTER(LEN=80)::FDIR = ' '
-  LOGICAL :: FirstCallStation = .TRUE.
-  SAVE FirstCallStation, BufferCount, ZUV_Buffer
-
-! initialize stations
-  FDIR = TRIM(RESULT_FOLDER)
-  if (FirstCallStation) then
-    FirstCallStation = .FALSE.
-    ALLOCATE (ista(NumberStations), &
-              jsta(NumberStations), &
-              nsta(NumberStations))
-    ALLOCATE (BufferCount(NumberStations), &
-              ZUV_Buffer(StationOutputBuffer, NumberStations, 4))
-    BufferCount = 0
-! calculate how many output components
-
-! check existing
-
-    INQUIRE (FILE=TRIM(STATIONS_FILE), EXIST=FILE_EXIST)
-    IF (.NOT. FILE_EXIST) THEN
-# if defined (PARALLEL)
-      IF (MYID == 0) &
-        WRITE (*, *) TRIM(STATIONS_FILE), ' THE STATION FILE CANNOT BE FOUND. STOP'
-      CALL MPI_FINALIZE(ier)
-      STOP
-# else
-      WRITE (*, *) TRIM(STATIONS_FILE), ' THE STATION FILE CANNOT BE FOUND. STOP'
-      STOP
-# endif
-    END IF  ! exist
-
-    open (100, FILE=TRIM(STATIONS_FILE))
-    do i = 1, NumberStations
-      read (100, *) dum1, dum2
-# if defined (PARALLEL)
-![---ykchoi Jan/23/2018
-      !ista(i) = Nghost+dum1-npx*Mglob/px
-      !jsta(i) = Nghost+dum2-npy*Nglob/py
-      ista(i) = Nghost + dum1 - (iista - 1)
-      jsta(i) = Nghost + dum2 - (jjsta - 1)
-!---ykchoi Jan/23/2018]
-      if ((ista(i) .ge. Ibeg) .and. (ista(i) .le. Iend) .and. &
-          (jsta(i) .ge. Jbeg) .and. (jsta(i) .le. Jend)) then
-        nsta(i) = 1
-        write (file_name(1:4), '(I4.4)') i
-        TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-        iunit = 100 + i
-        open (iunit, FILE=TMP_NAME)
-      else
-        nsta(i) = 0
-      end if
-
-# else
-      ista(i) = Nghost + dum1
-      jsta(i) = Nghost + dum2
-      if ((ista(i) .ge. Ibeg) .and. (ista(i) .le. Iend) .and. &
-          (jsta(i) .ge. Jbeg) .and. (jsta(i) .le. Jend)) then
-        nsta(i) = 1
-        write (file_name(1:4), '(I4.4)') i
-        TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-        iunit = 100 + i
-        open (iunit, FILE=TMP_NAME)
-      else
-        nsta(i) = 0
-      end if
-# endif
-    end do
-  end if
-
-! write to stations
-
-  do i = 1, NumberStations
-    if (nsta(i) .eq. 1) then
-      iunit = 100 + i
-      IF (mask(ista(i), jsta(i)) < 1) THEN
-        eta_sta = ZERO
-        u_sta = ZERO
-        v_sta = ZERO
-      ELSE  ! to avoid topography on nested water surface
-        eta_sta = eta(ista(i), jsta(i))
-        u_sta = u(ista(i), jsta(i))
-        v_sta = v(ista(i), jsta(i))
-      END IF
-
-      IF (BufferCount(i) < StationOutputBuffer .AND. TIME < TOTAL_TIME) THEN
-        BufferCount(i) = BufferCount(i) + 1
-        ZUV_BUFFER(BufferCount(i), i, 1) = time
-        ZUV_BUFFER(BufferCount(i), i, 2) = eta_sta
-        ZUV_BUFFER(BufferCount(i), i, 3) = u_sta
-        ZUV_BUFFER(BufferCount(i), i, 4) = v_sta
-      ELSE
-        DO j = 1, StationOutputBuffer
-          write (iunit, '(4E16.5E4)') (ZUV_BUFFER(j, i, k), k=1, 4)
-        END DO
-        BufferCount(i) = 0
-        ZUV_BUFFER(:, i, 1) = TOTAL_TIME
-        ZUV_BUFFER(:, i, 2:4) = ZERO
-
-# if defined (PARALLEL)
-        if (myid .eq. 0) WRITE (*, *) 'WRITE OUT STATAION ...'
-# else
-        WRITE (*, *) 'WRITE OUT STATIONS ...'
-# endif
-
-      END IF ! end buffer
-
-    end if
-  end do
-
-! close station files
-  if (TIME .ge. TOTAL_TIME) then
-    do i = 1, NumberStations
-      if (nsta(i) .eq. 1) then
-        iunit = 100 + i
-        close (iunit)
-      end if
-    end do
-  end if
-
-ENDSUBROUTINE STATIONS
-
-# else
-
-!-------------------------------------------------------------------------------------
-!
-!    STATIONS_SPHERICAL_IJ is a subroutine to write station data
-!       Fengyan Shi modified based on Jeff Harris for Spherical
-!       here simply specify grid number i and j instead of x and y
-!
-! HISTORY:
-!    09/16/2011  Fengyan Shi
-!
-!-------------------------------------------------------------------------------------
-
-SUBROUTINE STATIONS_SPHERICAL_IJ
-  USE GLOBAL
-  IMPLICIT NONE
-
-  INTEGER :: iunit
-  INTEGER, DIMENSION(:), ALLOCATABLE :: BufferCount
-  REAL(SP), DIMENSION(:, :, :), ALLOCATABLE :: ZUV_Buffer
-  REAL(SP) :: dum1, dum2
-  REAL(SP) :: eta_sta, u_sta, v_sta
-  CHARACTER(LEN=80)::FILE_NAME = ' '
-  CHARACTER(LEN=80)::TMP_NAME = ' '
-  CHARACTER(LEN=80)::FDIR = ' '
-  LOGICAL :: FirstCallStation = .TRUE.
-  SAVE FirstCallStation, BufferCount, ZUV_Buffer
-
-! initialize stations
-  FDIR = TRIM(RESULT_FOLDER)
-  if (FirstCallStation) then
-    FirstCallStation = .FALSE.
-    ALLOCATE (ista(NumberStations), &
-              jsta(NumberStations), &
-              nsta(NumberStations))
-    ALLOCATE (BufferCount(NumberStations), &
-              ZUV_Buffer(StationOutputBuffer, NumberStations, 4))
-    BufferCount = 0
-
-! calculate how many output components
-
-    open (100, FILE=TRIM(STATIONS_FILE))
-    do i = 1, NumberStations
-      read (100, *) dum1, dum2
-# if defined (PARALLEL)
-![---ykchoi Jan/23/2018
-      !ista(i) = Nghost+dum1-npx*Mglob/px
-      !jsta(i) = Nghost+dum2-npy*Nglob/py
-      ista(i) = Nghost + dum1 - (iista - 1)
-      jsta(i) = Nghost + dum2 - (jjsta - 1)
-!---ykchoi Jan/23/2018]
-      if ((ista(i) .ge. Ibeg) .and. (ista(i) .le. Iend) .and. &
-          (jsta(i) .ge. Jbeg) .and. (jsta(i) .le. Jend)) then
-        nsta(i) = 1
-        write (file_name(1:4), '(I4.4)') i
-        TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-        iunit = 100 + i
-        open (iunit, FILE=TMP_NAME)
-      else
-        nsta(i) = 0
-      end if
-
-# else
-      ista(i) = Nghost + dum1
-      jsta(i) = Nghost + dum2
-      if ((ista(i) .ge. Ibeg) .and. (ista(i) .le. Iend) .and. &
-          (jsta(i) .ge. Jbeg) .and. (jsta(i) .le. Jend)) then
-        nsta(i) = 1
-        write (file_name(1:4), '(I4.4)') i
-        TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-        iunit = 100 + i
-        open (iunit, FILE=TMP_NAME)
-      else
-        nsta(i) = 0
-      end if
-# endif
-    end do
-  end if
-
-! write to stations
-
-  do i = 1, NumberStations
-    if (nsta(i) .eq. 1) then
-      iunit = 100 + i
-      IF (mask(ista(i), jsta(i)) < 1) THEN
-        eta_sta = ZERO
-        u_sta = ZERO
-        v_sta = ZERO
-      ELSE  ! to avoid topography on nested water surface
-        eta_sta = eta(ista(i), jsta(i))
-        u_sta = u(ista(i), jsta(i))
-        v_sta = v(ista(i), jsta(i))
-      END IF
-
-      IF (BufferCount(i) < StationOutputBuffer .AND. TIME < TOTAL_TIME) THEN
-        BufferCount(i) = BufferCount(i) + 1
-        ZUV_BUFFER(BufferCount(i), i, 1) = time
-        ZUV_BUFFER(BufferCount(i), i, 2) = eta_sta
-        ZUV_BUFFER(BufferCount(i), i, 3) = u_sta
-        ZUV_BUFFER(BufferCount(i), i, 4) = v_sta
-      ELSE
-        DO j = 1, StationOutputBuffer
-          write (iunit, '(4E16.5E4)') (ZUV_BUFFER(j, i, k), k=1, 4)
-        END DO
-        BufferCount(i) = 0
-        ZUV_BUFFER(:, i, 1) = TOTAL_TIME
-        ZUV_BUFFER(:, i, 2:4) = ZERO
-
-# if defined (PARALLEL)
-        if (myid .eq. 0) WRITE (*, *) 'WRITE OUT STATAION ...'
-# else
-        WRITE (*, *) 'WRITE OUT STATIONS ...'
-# endif
-
-      END IF ! end buffer
-
-!          write (iunit,'(20E16.5E4)') time, eta_sta,&
-!                          u_sta,v_sta
-    end if
-  end do
-
-! close station files
-  if (TIME .ge. TOTAL_TIME) then
-    do i = 1, NumberStations
-      if (nsta(i) .eq. 1) then
-        iunit = 100 + i
-        close (iunit)
-      end if
-    end do
-  end if
-
-END SUBROUTINE STATIONS_SPHERICAL_IJ
-
-!-------------------------------------------------------------------------------------
-!
-!    STATIONS is a subroutine to write station data,  works in spherical
-!
-!    HISTORY:
-!   04/05/2011  Jeff Harris
-!
-!-------------------------------------------------------------------------------------
-SUBROUTINE STATIONS
-  USE GLOBAL
-  IMPLICIT NONE
-
-  INTEGER :: iunit
-  INTEGER, DIMENSION(:), ALLOCATABLE :: BufferCount
-  REAL(SP), DIMENSION(:, :, :), ALLOCATABLE :: ZUV_Buffer
-  REAL(SP) :: dum1, dum2
-  REAL(SP) :: eta_sta, u_sta, v_sta
-  CHARACTER(LEN=80)::FILE_NAME = ' '
-  CHARACTER(LEN=80)::TMP_NAME = ' '
-  CHARACTER(LEN=80)::FDIR = ' '
-  LOGICAL :: FirstCallStationSP = .TRUE.
-  SAVE FirstCallStationSP, BufferCount, ZUV_Buffer
-
-! initialize stations
-  FDIR = TRIM(RESULT_FOLDER)
-  if (FirstCallStationSP) then
-    FirstCallStationSP = .FALSE.
-    ALLOCATE (ista(NumberStations), &
-              jsta(NumberStations), &
-              nsta(NumberStations))
-    ALLOCATE (BufferCount(NumberStations), &
-              ZUV_Buffer(StationOutputBuffer, NumberStations, 4))
-    BufferCount = 0
-
-!       ALLOCATE(envelope(Mloc,Nloc))
-!       envelope = 0.d0
-    open (sunit, FILE=TRIM(STATIONS_FILE))
-    do i = 1, NumberStations
-      read (100, *) dum1, dum2
-# if defined (PARALLEL)
-![---ykchoi Jan/23/2018
-!          ista(i) = Nghost+1+nint((dum2-Lon_West)/Dphi) &
-!                     -npx*Mglob/px
-!          jsta(i) = Nghost+1+nint((dum1-Lat_South)/Dtheta) &
-!                     -npy*Nglob/py
-      ista(i) = Nghost + 1 + nint((dum2 - Lon_West)/Dphi) &
-                - (iista - 1)
-      jsta(i) = Nghost + 1 + nint((dum1 - Lat_South)/Dtheta) &
-                - (jjsta - 1)
-!---ykchoi Jan/23/2018]
-      if ((ista(i) .ge. Ibeg) .and. (ista(i) .le. Iend) .and. &
-          (jsta(i) .ge. Jbeg) .and. (jsta(i) .le. Jend)) then
-        nsta(i) = 1
-        write (file_name(1:4), '(I4.4)') i
-        TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-        iunit = sunit + i
-        open (iunit, FILE=TMP_NAME)
-      else
-        nsta(i) = 0
-      end if
-# else
-      ista(i) = Nghost + 1 + nint((dum2 - Lon_West)/Dphi)
-      jsta(i) = Nghost + 1 + nint((dum1 - Lat_South)/Dtheta)
-      if ((ista(i) .ge. Ibeg) .and. (ista(i) .le. Iend) .and. &
-          (jsta(i) .ge. Jbeg) .and. (jsta(i) .le. Jend)) then
-        nsta(i) = 1
-        write (file_name(1:4), '(I4.4)') i
-        TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
-        iunit = sunit + i
-        open (iunit, FILE=TMP_NAME)
-      else
-        nsta(i) = 0
-      end if
-# endif
-    end do
-  end if
-
-! write to stations
-
-  sunit = fhandle%GET('stations')
-
-  do i = 1, NumberStations
-    if (nsta(i) .eq. 1) then
-      iunit = 100 + i
-
-! for coupling, make sure dry point
-      IF (mask(ista(i), jsta(i)) < 1) THEN
-        eta_sta = ZERO
-        u_sta = ZERO
-        v_sta = ZERO
-      ELSE  ! to avoid topography on nested water surface
-        eta_sta = eta(ista(i), jsta(i))
-        u_sta = u(ista(i), jsta(i))
-        v_sta = v(ista(i), jsta(i))
-      END IF
-
-      IF (BufferCount(i) < StationOutputBuffer .AND. TIME < TOTAL_TIME) THEN
-        BufferCount(i) = BufferCount(i) + 1
-        ZUV_BUFFER(BufferCount(i), i, 1) = time
-        ZUV_BUFFER(BufferCount(i), i, 2) = eta_sta
-        ZUV_BUFFER(BufferCount(i), i, 3) = u_sta
-        ZUV_BUFFER(BufferCount(i), i, 4) = v_sta
-      ELSE
-        DO j = 1, StationOutputBuffer
-          write (iunit, '(4E16.5E4)') (ZUV_BUFFER(j, i, k), k=1, 4)
-        END DO
-        BufferCount(i) = 0
-        ZUV_BUFFER(:, i, 1) = TOTAL_TIME
-        ZUV_BUFFER(:, i, 2:4) = ZERO
-
-        CALL LWRITE('WRITE OUT STATIONS ...')
-
-      END IF ! end buffer
-
-!          write (iunit,'(20E16.5E4)') time, eta_sta,&
-!                          u_sta,v_sta
-
-!          write (iunit,*) time, eta(ista(i),jsta(i)),u(ista(i),jsta(i)),&
-!                                v(ista(i),jsta(i))
-
-    end if
-  end do
-
-! close station files
-  if (TIME .ge. TOTAL_TIME) then
-
-    do i = 1, NumberStations
-      if (nsta(i) .eq. 1) then
-        iunit = 100 + i
-        close (iunit)
-      end if
-    end do
-  end if
-
-END SUBROUTINE STATIONS
-
-# endif
-
 
 !-------------------------------------------------------------------------------------
 !
@@ -1665,8 +1253,8 @@ SUBROUTINE PREVIEW
   CALL PutOutputNum('C'     , FILE_NUM, CH                                  )
   CALL PutOutputNum('Pick'  , FILE_NUM, Pickup                              )
   CALL PutOutputNum('Depo'  , FILE_NUM, D                                   )
-  CALL PutOutputNum('P_avg' , FILE_NUM, P_ave                               )
-  CALL PutOutputNum('D_avg' , FILE_NUM, D_ave                               )
+  CALL PutOutputNum('Pavg'  , FILE_NUM, P_ave                               )
+  CALL PutOutputNum('Davg'  , FILE_NUM, D_ave                               )
   CALL PutOutputNum('DchgS' , FILE_NUM, TotalSuspendLoad/(1.0_SP-n_porosity))
   CALL PutOutputNum('DchgB' , FILE_NUM, TotalBedLoad/(1.0_SP-n_porosity)    )
   CALL PutOutputNum('BedFx' , FILE_NUM, BedFluxX                            )
@@ -2003,7 +1591,7 @@ SUBROUTINE OUTPUT_VESSEL
   CHARACTER (LEN=80) :: FDIR = ' '
   INTEGER, SAVE      :: runit = -1
   LOGICAL, SAVE     :: FirstCallVessel = .TRUE.
-  SAVE FirstCallVessel, runit
+  ! SAVE FirstCallVessel, runit
 
   ! mayhl: Outside myid.EQ.0 to ensure all threads 
   !        have the same units 

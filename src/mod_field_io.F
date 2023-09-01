@@ -53,8 +53,17 @@
 
 
 MODULE FIELD_IO
-  USE GLOBAL
 
+  USE PARAM
+  ! mayhl: Explicitly imported variables to avoid name conflict
+  !        in mixing and sediment with variable P_sum
+  USE GLOBAL, ONLY: nprocs, PX, PY, Mglob, Nglob, Nghost, &
+                    Mloc, Nloc, ier, FIELD_IO_TYPE, I, J, &
+                    Ibeg, Iend, Jbeg, Jend, OUTPUT_RES, myid, &
+                    iista, iiend, jjsta, jjend, FORMAT_LEN, ndims
+#if defined(PARALLEL)
+  USE MPI
+#endif
 CONTAINS
 
 # if defined (PARALLEL)
@@ -68,7 +77,6 @@ CONTAINS
 !-------------------------------------------------------------------------------------
 
   SUBROUTINE GetFile(FILE, PHI)
-    USE GLOBAL
     IMPLICIT NONE
 
     REAL(SP), DIMENSION(MGlob + 2*Nghost, NGlob + 2*Nghost) :: PHIGLOB
@@ -169,7 +177,6 @@ CONTAINS
 # else
 
   SUBROUTINE GetFile(FILE, PHI)
-    USE GLOBAL
     IMPLICIT NONE
 
     CHARACTER(LEN=*), INTENT(IN) :: FILE
@@ -234,7 +241,6 @@ CONTAINS
 # if defined (PARALLEL)
 
   SUBROUTINE PutFile(FILE_NAME, PHI)
-    USE GLOBAL
     IMPLICIT NONE
 
     CHARACTER(LEN=80) FILE_NAME
@@ -260,8 +266,7 @@ CONTAINS
 !
 !-------------------------------------------------------------------------------------
   SUBROUTINE PutFile(FILE, PHI)
-    USE PARAM
-    USE GLOBAL
+
     IMPLICIT NONE
     REAL(SP), DIMENSION(Mloc, Nloc), INTENT(IN) :: PHI
     CHARACTER(LEN=80) FILE

@@ -395,7 +395,7 @@ Program FUNWAVE_TVD
 # endif
 
 # if defined (VESSEL)
-  DO Kves = 201,200+NumVessel
+  DO Kves = vunit+1,vunit+NumVessel
     CLOSE(Kves)
   ENDDO
   CALL DWRITE('CLOSE Vessel files')
