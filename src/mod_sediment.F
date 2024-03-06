@@ -64,6 +64,9 @@ MODULE SEDIMENT_MODULE
   USE GLOBAL, ONLY: myid, ier, npx, npy, PX, PY
   USE MPI
 # endif
+# if defined (VESSEL) && defined (PROPELLER)
+  USE VESSEL_MODULE, ONLY : UpcTotal,UpTotal,VpTotal
+# endif
   IMPLICIT NONE
   SAVE
 
@@ -342,14 +345,17 @@ CONTAINS
       Tau_cr=(Sdensity-1.0_SP)*grav*D50*Shields_cr
       Tau_cr_bedload=(Sdensity-1.0_SP)*grav*D50*Shields_cr_bedload
       k_s = 2.5_SP*D50 
+
+! a correction for Babaks formula. replace multiply with minus 11/08/2023
       
       IF(WS_formula) THEN
         WS = SQRT((Sdensity-1.0_SP)*grav*D50)* &
-             SQRT(2.0_SP/3.0_SP + 36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3)) * &
-             SQRT(36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3))
+             (SQRT(2.0_SP/3.0_SP + 36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3)) - &
+             SQRT(36.0_SP*viscosity**2/((Sdensity-1.0_SP)*grav*D50**3)))
+        CALL LWRITE('Calculated Settling Velocity WS: '//TRIM(FORMAT_FLOAT(WS))//'.')
+      ENDIF
 
 
-      CALL LWRITE('Calculated Settling Velocity WS: '//TRIM(FORMAT_FLOAT(WS))//'.')
 
 # if defined (PARALLEL)
       call GetFile(Mask_s_File, Zs)
@@ -498,18 +504,32 @@ CONTAINS
     END IF
 
 ! diffusion (roller effect is not included in diffusion)
+    DO J=Jbeg,Jend
+    DO I=Ibeg,Iend+1
 
-    DO J = Jbeg, Jend
-    DO I = Ibeg, Iend
+       IF(MASK(I,J).GT.0)THEN
+            u_c =SQRT(U(I,J)*U(I,J)+V(I,J)*V(I,J))
+# if defined (PROPELLER) && defined (VESSEL)
+            ustar_c = 0.4_SP*u_c/(-1.0_SP+log(30.0_SP*Hpo(I,J)/k_s)) &
+             + UpcTotal(I,J)
+# else
+            ustar_c = 0.4_SP*u_c/(-1.0_SP+log(30.0_SP*Hpo(I,J)/k_s))
+# endif
 
-      IF (MASK(I, J) .GT. 0) THEN
-        u_c = SQRT(U(I, J)*U(I, J) + V(I, J)*V(I, J))
-        ustar_c = 0.4_SP*u_c/(-1.0_SP + log(30.0_SP*Hpo(I, J)/k_s))
 ! diffusion x
-        IF (MASK(I - 1, J) .GT. 0) THEN
-          u_c2 = SQRT(U(I - 1, J)*U(I - 1, J) + V(I - 1, J)*V(I - 1, J))
-          ustar_c2 = 0.4_SP*u_c2/(-1.0_SP + log(30.0_SP*Hpo(I - 1, J)/k_s))
-          k2 = 5.93_SP*(ustar_c2 + ustar_c)*(Hpo(I - 1, J) + Hpo(I, J))/4.0_SP
+         IF(MASK(I-1,J).GT.0)THEN
+            u_c2=SQRT(U(I-1,J)*U(I-1,J)+V(I-1,J)*V(I-1,J))	
+
+# if defined (PROPELLER) && defined (VESSEL)
+            ustar_c2= 0.4_SP*u_c2/(-1.0_SP+log(30.0_SP*Hpo(I-1,J)/k_s)) &
+            + UpcTotal(I-1,J)
+# else			
+            ustar_c2= 0.4_SP*u_c2/(-1.0_SP+log(30.0_SP*Hpo(I-1,J)/k_s))	
+
+# endif		              
+            k2=5.93_SP*(ustar_c2+ustar_c)*(Hpo(I-1,J)+Hpo(I,J))/4.0_SP
+
+
 # if defined (CARTESIAN)
           Scalx(I, J) = Scalx(I, J) &
                         - k2*(Hpo(I - 1, J) + Hpo(I, J))*(CH(I, J) - CH(I - 1, J))/2.0_SP/DX
@@ -517,13 +537,29 @@ CONTAINS
           Scalx(I, J) = Scalx(I, J) &
                         - k2*(Hpo(I - 1, J) + Hpo(I, J))*(CH(I, J) - CH(I - 1, J))/2.0_SP/DX(I, J)
 # endif
+         ENDIF ! mask x
+        ENDIF ! mask
 
-        END IF ! mask x
+    ENDDO
+    ENDDO
 
-        IF (MASK(I, J - 1) .GT. 0) THEN
-          u_c4 = SQRT(U(I, J - 1)*U(I, J - 1) + V(I, J - 1)*V(I, J - 1))
-          ustar_c4 = 0.4_SP*u_c4/(-1.0_SP + log(30.0_SP*Hpo(I, J - 1)/k_s))
-          k4 = 5.93_SP*(ustar_c4 + ustar_c)*(Hpo(I, J) + Hpo(I, J - 1))/4.0_SP
+    DO J=Jbeg,Jend+1
+    DO I=Ibeg,Iend
+
+       IF(MASK(I,J).GT.0)THEN
+         IF(MASK(I,J-1).GT.0)THEN
+            u_c4=SQRT(U(I,J-1)*U(I,J-1)+V(I,J-1)*V(I,J-1))
+
+# if defined (PROPELLER) && defined (VESSEL)
+            ustar_c4= 0.4_SP*u_c4/(-1.0_SP+log(30.0_SP*Hpo(I,J-1)/k_s)) &
+              + UpcTotal(I,J-1)
+# else
+            ustar_c4= 0.4_SP*u_c4/(-1.0_SP+log(30.0_SP*Hpo(I,J-1)/k_s))
+
+# endif
+            k4=5.93_SP*(ustar_c4+ustar_c)*(Hpo(I,J)+Hpo(I,J-1))/4.0_SP
+
+
 # if defined (CARTESIAN)
           Scaly(I, J) = Scaly(I, J) &
                         - k4*(Hpo(I, J - 1) + Hpo(I, J))*(CH(I, J) - CH(I, J - 1))/2.0_SP/DY
@@ -594,7 +630,12 @@ CONTAINS
 
     ! note rho_w is removed, also removed in tau_cr
 
+# if defined (PROPELLER) && defined (VESSEL)
+          Tau_xy(I,J)= 0.16_SP/(1.0+log(k_s/(30.0_SP*Hpo(I,J))))**2*(u_c**2.) &
+           + UpcTotal(I,J)**2.0_SP
+# else
           Tau_xy(I,J)= 0.16_SP/(1.0+log(k_s/(30.0_SP*Hpo(I,J))))**2*(u_c**2.)	
+# endif
 
       IF (CohesiveSediment) THEN
 
@@ -615,7 +656,11 @@ CONTAINS
 #if defined (SEDIMENT_DEBUG)
             Tau_extra(I,J)=0.0_SP
 # endif
-          IF (Tau_xy(I,J).GT.Tau_cr) THEN
+
+! Jim suggested changing the if statement to make it logical, it wont affect result
+!          IF (Tau_xy(I,J).GT.Tau_cr) THEN
+
+          IF (Tau_xy(I,J).GT.Tau_cr.AND.Hpo(I,J).GE.MinDepthPickup) THEN
 
 #if defined (SEDIMENT_DEBUG)
             Tau_extra(I,J)=Tau_xy(I,J)-Tau_cr
@@ -628,7 +673,9 @@ CONTAINS
             ELSE
               reduction= 1.0_SP
             ENDIF
-            c_a=reduction*c_b*D50/(MAX(0.01_SP*Hpo(I,J),0.01_SP*MinDepthPickup))
+!   corresponding change for Jim suggestion
+!            c_a=reduction*c_b*D50/(MAX(0.01_SP*Hpo(I,J),0.01_SP*MinDepthPickup))
+            c_a=reduction*c_b*D50/(0.01_SP*Hpo(I,J))
             Pickup(I,J)=MAX(0.0_SP,c_a*WS)
 
 #if defined (SEDIMENT_DEBUG)
@@ -645,11 +692,17 @@ CONTAINS
         IF (BedLoad) THEN
 !  bedload
 
-          IF (Tau_xy(I, J) .GT. Tau_cr_bedload) THEN
-            Angle_cur = ATAN2(V(I, J), U(I, J))
-            bedf = 8.0_SP*(Tau_xy(I, J) - tau_cr_bedload)**1.5/grav/(Sdensity - 1.0_SP)
-            BedFluxX(I, J) = bedf*COS(Angle_cur)
-            BedFluxY(I, J) = bedf*SIN(Angle_cur)
+          IF (Tau_xy(I,J).GT.Tau_cr_bedload) THEN
+
+# if defined (PROPELLER) && defined (VESSEL)
+             Angle_cur = ATAN2(V(I,J)+VpTotal(I,J),U(I,J)+UpTotal(I,J))
+# else
+             Angle_cur = ATAN2(V(I,J),U(I,J))
+# endif
+
+             bedf = 8.0_SP*(Tau_xy(I,J)-tau_cr_bedload)**1.5/grav/(Sdensity-1.0_SP)
+             BedFluxX(I,J) = bedf*COS(Angle_cur)
+             BedFluxY(I,J) = bedf*SIN(Angle_cur)
           ELSE
             BedFluxX(I, J) = ZERO
             BedFluxY(I, J) = ZERO

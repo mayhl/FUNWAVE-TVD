@@ -199,10 +199,10 @@ endif
 FCFLAGS := $(shell echo $(FCFLAGS) | sed 's~ \+~ ~g')
 
 #----------------FUNWAVE souce code-------------------
-MODS  = mod_param.F    mod_global.F     mod_logio.F    mod_funits.F           \
-        mod_input.F    mod_field_io.F   mod_vessel.F   mod_bathy_correction.F \
-        mod_meteo.F    mod_sediment.F   mod_tide.F     mod_foam.F             \
-        mod_tracer.F   mod_subgrid.F
+MODS  = mod_param.F    mod_global.F     mod_logio.F         mod_funits.F           \
+        mod_input.F    mod_field_io.F   mod_vessel.F        mod_bathy_correction.F \
+        mod_meteo.F    mod_sediment.F   mod_tide.F          mod_foam.F             \
+        mod_tracer.F   mod_subgrid.F    mod_precipitation.F mod_time_spectra.F
 
 MAIN  = main.F         bc.F        fluxes.F        init.F         io.F             \
         tridiagnal.F   breaker.F   derivatives.F   dispersion.F   etauv_solver.F   \

@@ -1,0 +1,7 @@
+dimensions m x n which should cover the entire area of domain
+2 2
+following are time (s) and file names, unit in file is mm/hr
+0.0
+rain_01.txt
+10000.0
+rain_02.txt

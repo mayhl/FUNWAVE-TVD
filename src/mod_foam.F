@@ -1,7 +1,8 @@
 # if defined (FOAM)
 Module MOD_FOAM
      USE GLOBAL, ONLY : SP,ZERO,Mloc,Mloc1,Nloc,Nloc1,DX,DY,DT,Nghost,pi,TIME, &
-                        PLOT_INTV, U,V,AGE_breaking,Ibeg,Iend,Jbeg,Jend
+                        PLOT_INTV, U,V,AGE_breaking,Ibeg,Iend,Jbeg,Jend,nu_break, &
+                        LARGE
                         
 # if defined (PARALLEL)
      USE GLOBAL, ONLY : n_west,n_east,n_suth,n_nrth,MPI_PROC_NULL
@@ -15,7 +16,7 @@ Module MOD_FOAM
      REAL(SP) :: TransferRate=0.1_SP
      REAL(SP) :: CdFoam=0.5
 
-     REAL(SP),DIMENSION(:,:),ALLOCATABLE :: EtaFoam,UFoam,VFoam
+     REAL(SP),DIMENSION(:,:),ALLOCATABLE :: EtaFoam,EtaFoamMax,UFoam,VFoam
      REAL(SP),DIMENSION(:,:),ALLOCATABLE :: Usurf1,Vsurf1,VFsurf1, &
                                             Usurf2,Vsurf2,VFsurf2, &
                                             Usurf,Vsurf,VFsurf,&
@@ -25,6 +26,9 @@ Module MOD_FOAM
      REAL(SP),DIMENSION(:,:),ALLOCATABLE ::MxFoam,MyFoam,&
                          FxFoam,FyFoam,GxFoam,GyFoam
      REAL(SP),DIMENSION(:,:),ALLOCATABLE :: SinkM,SourceM
+     REAL(SP) :: f_source = 0.05 ! default 
+     REAL(SP) :: FoamTimeScale = 3.8  ! default 
+     REAL(SP) :: BurstTimeNonBreaking = 1.0 ! default
 
      LOGICAL :: OUT_FOAM = .FALSE.
 
@@ -37,7 +41,7 @@ SUBROUTINE ALLOCATE_FOAM
      IMPLICIT NONE
      
      ALLOCATE ( EtaFoam(Mloc,Nloc),UFoam(Mloc,Nloc),VFoam(Mloc,Nloc),&
-                MaskFoam(Mloc,Nloc) )
+                MaskFoam(Mloc,Nloc),EtaFoamMax(Mloc,Nloc))
      ALLOCATE ( MxFoam(Mloc1,Nloc),MyFoam(Mloc,Nloc1), &
                 FxFoam(Mloc1,Nloc),FyFoam(Mloc,Nloc1), &
                 GxFoam(Mloc1,Nloc),GyFoam(Mloc,Nloc1) )
@@ -71,17 +75,25 @@ SUBROUTINE INITIALIZATION_FOAM
   CALL BWRITE("FOAM INFO")
 
   CALL READ_PARAMETER(PLOT_INTV_FOAM, 'PLOT_INTV_FOAM', PLOT_INTV)
-  CALL READ_PARAMETER(BurstRate     , 'BurstRate'     , 0.01_SP  )
-  CALL READ_PARAMETER(MinThick      , 'MinThick'      , 0.01_SP  )
-  CALL READ_PARAMETER(TransferRate  , 'TransferRate'  , 0.1_SP   )
-  CALL READ_PARAMETER(CdFoam        , 'CdFoam'        , 0.5_SP   )
+#if define (USE_BURSTRATE)
+  CALL READ_PARAMETER(BurstRate            , 'BurstRate'           , 0.01_SP  )
+#endif
+  CALL READ_PARAMETER(f_source             , 'f_source'            , 0.05_SP  )
+  CALL READ_PARAMETER(FoamTimeScale        , 'FoamTimeScale'       , 3.8_SP  )
+  CALL READ_PARAMETER(BurstTimeNonBreaking , 'BurstTimeNonBreaking', 1.0_SP  )
+#if define (USE_BURSTRATE)
+  CALL READ_PARAMETER(TransferRate         , 'TransferRate'     , 0.01_SP  )
+#endif
+  CALL READ_PARAMETER(MinThick             , 'MinThick'      , 0.01_SP  )
+  CALL READ_PARAMETER(TransferRate         , 'TransferRate'  , 0.1_SP   )
+  CALL READ_PARAMETER(CdFoam               , 'CdFoam'        , 0.5_SP   )
 
   CALL logbuff % FLUSH2OUTPUT
-
   CALL CLEAR_INPUT_LOGGER
 
 ! all other variables used for foam
      EtaFoam=ZERO
+     EtaFoamMax=ZERO
      UFoam=ZERO
      VFoam=ZERO
      MaskFoam=1
@@ -115,6 +127,9 @@ SUBROUTINE FOAM_UPDATE
      Vsurf=V
      VFsurf=AGE_breaking
 
+
+# if defined (USE_BURSTRATE)
+      ! this is the old approach 
         DO J=1,Nloc
          DO I=1,Mloc
           IF(VFsurf(I,J)<0.1)VFsurf(I,J)=1000.0_SP
@@ -123,6 +138,26 @@ SUBROUTINE FOAM_UPDATE
           SourceM(I,J)=VFsurf(I,J)*TransferRate*MaskFoam(I,J)
          ENDDO
         ENDDO
+# else
+     ! new approach using Reul and Chapron 2003
+        DO J=1,Nloc
+         DO I=1,Mloc
+          ! set breaking init time
+          IF(VFsurf(I,J)<2.0*DT) THEN
+            VFsurf(I,J)=LARGE
+            EtaFoamMax(I,J)=0.0
+          ENDIF
+          ! set age for nonbreaking zone
+          IF (nu_break(I,J) == ZERO) THEN
+            VFsurf(I,J)=BurstTimeNonBreaking
+          ENDIF
+          IF (EtaFoam(I,J) > EtaFoamMax(I,J)) EtaFoamMax(I,J)=EtaFoam(I,J)
+          SinkM(I,J)=EtaFoam(I,J)/FoamTimeScale*EXP(-VFsurf(I,J)/FoamTimeScale)
+          SourceM(I,J)=f_source*nu_break(I,J)*MaskFoam(I,J)
+         ENDDO
+        ENDDO
+
+# endif
 
 ! EtaFoam
 

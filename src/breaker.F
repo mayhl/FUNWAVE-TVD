@@ -328,7 +328,6 @@ SUBROUTINE BREAKING(M,N,ETAx,ETAy,ETAT,Cbrk1,Cbrk2,H,MinDepthFrc,&
 ! I made a protection by moving tmp4 calculation outside continuting breaking 08/04/2019
 
          R=ABS(0.45*ETAt(I,J)/MAX(C1,SMALL))
-!         tmp4preview(I,J) = ETAt(I,J)
          R=MIN(R,0.1638_SP)  
 
          ROLLER_FLUX(I,J) = ABS(C1-SQRT(U(I,J)*U(I,J)+V(I,J)*V(I,J)))  &

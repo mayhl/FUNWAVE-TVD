@@ -196,6 +196,22 @@ SUBROUTINE ALLOCATE_VARIABLES
         ALLOCATE(WAVE_COMP(NumWaveComp,3),Beta_genS(NumWaveComp),D_genS(NumWaveComp) )
       ENDIF
 
+! moved the wavemaker stuff from wavemaker.F 
+!       ALLOCATE(Cm_eta(Mloc,Nloc,Numfreq),Sm_eta(Mloc,Nloc,Numfreq), &
+!                Cm_u(Mloc,Nloc,Numfreq),Sm_u(Mloc,Nloc,Numfreq),&
+!                Cm_v(Mloc,Nloc,Numfreq),Sm_v(Mloc,Nloc,Numfreq) )
+
+
+! define breaking related variables for all options,remove viscosity breaking only
+! fyshi 01/15/2024
+
+!      IF(VISCOSITY_BREAKING.OR.SHOW_BREAKING)THEN
+       ALLOCATE(AGE_BREAKING(Mloc,Nloc))
+       ALLOCATE(nu_break(Mloc,Nloc))
+       nu_break=nu_bkg
+       ALLOCATE(BreakSourceX(Mloc,Nloc),BreakSourceY(Mloc,Nloc))
+!      ENDIF
+
       IF(VISCOSITY_BREAKING.OR.SHOW_BREAKING)THEN
        ALLOCATE(AGE_BREAKING(Mloc,Nloc))
        ALLOCATE(nu_break(Mloc,Nloc))
@@ -781,40 +797,40 @@ SUBROUTINE INITIALIZATION
  
 !friction
      IF(IN_Cd) THEN
-!# if defined (PARALLEL)
+# if defined (PARALLEL)
       call GetFile(CD_FILE,Cd)
-!# else
-!       OPEN(1,FILE=TRIM(CD_FILE))
-!        DO J=Jbeg,Jend
-!         READ(1,*)(Cd(I,J),I=Ibeg,Iend)
-!        ENDDO
-!       CLOSE(1)
-! ! ghost cells
-!      DO I=Ibeg,Iend
-!        DO J=1,Nghost
-!         Cd(I,J)=Cd(I,Jbeg)
-!        ENDDO
-!        DO J=Jend+1,Nloc
-!         Cd(I,J)=Cd(I,Jend)
-!        ENDDO
-!      ENDDO
-!
-!      DO J=1,Nloc
-!        DO I=1,Nghost
-!         Cd(I,J)=Cd(Ibeg,J)
-!        ENDDO
-!        DO I=Iend+1,Mloc
-!         Cd(I,J)=Cd(Iend,J)
-!        ENDDO
-!      ENDDO  
-!
-!
-! # endif
+# else
+      OPEN(1,FILE=TRIM(CD_FILE))
+       DO J=Jbeg,Jend
+        READ(1,*)(Cd(I,J),I=Ibeg,Iend)
+       ENDDO
+      CLOSE(1)
+! ghost cells
+     DO I=Ibeg,Iend
+       DO J=1,Nghost
+        Cd(I,J)=Cd(I,Jbeg)
+       ENDDO
+       DO J=Jend+1,Nloc
+        Cd(I,J)=Cd(I,Jend)
+       ENDDO
+     ENDDO
+
+     DO J=1,Nloc
+       DO I=1,Nghost
+        Cd(I,J)=Cd(Ibeg,J)
+       ENDDO
+       DO I=Iend+1,Mloc
+        Cd(I,J)=Cd(Iend,J)
+       ENDDO
+     ENDDO  
+
+
+# endif
       ELSE
           DO J=1,Nloc
             DO I=1,Mloc
               Cd(I,J) = Cd_fixed
-            ENDDO
+          ENDDO
           ENDDO
       ENDIF
 
@@ -931,7 +947,7 @@ SUBROUTINE INITIALIZATION
      DO I=1,Mloc
       IF(Eta(I,J)<-DEPTH(I,J))THEN
        MASK(I,J)=0
-       Eta(I,J)=MinDepth-Depth(I,J)
+       Eta(I,J)=-MinDepth-Depth(I,J)
 # if defined(UseEtaScreen)
        EtaScreen(I,J)=Eta(I,J)
 # endif
@@ -957,18 +973,18 @@ SUBROUTINE INITIALIZATION
 ! read obstacle structures 
      IF(OBSTACLE)THEN
 
-!   INQUIRE(FILE=TRIM(OBSTACLE_FILE),EXIST=FILE_EXIST)
-!   IF(.NOT.FILE_EXIST)THEN
-! # if defined (PARALLEL)
-!    IF(MYID==0)  &
-!    WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-!    CALL MPI_FINALIZE (ier)
-!    STOP
-! # else
-!     WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-!     STOP
-! # endif
-!   ENDIF
+  INQUIRE(FILE=TRIM(OBSTACLE_FILE),EXIST=FILE_EXIST)
+  IF(.NOT.FILE_EXIST)THEN
+# if defined (PARALLEL)
+   IF(MYID==0)  &
+   WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+   CALL MPI_FINALIZE (ier)
+   STOP
+# else
+    WRITE(*,*) TRIM(OBSTACLE_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+    STOP
+# endif
+  ENDIF
      
 # if defined (PARALLEL)
      IF(.NOT.ALLOCATED(VarGlob)) ALLOCATE (VarGlob(Mloc,Nloc)) ! use local here 
@@ -989,18 +1005,18 @@ SUBROUTINE INITIALIZATION
 ! read breakwater 
      IF(BREAKWATER)THEN
 
-!   INQUIRE(FILE=TRIM(BREAKWATER_FILE),EXIST=FILE_EXIST)
-!   IF(.NOT.FILE_EXIST)THEN
-! # if defined (PARALLEL)
-!    IF(MYID==0)  &
-!    WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-!    CALL MPI_FINALIZE (ier)
-!    STOP
-! # else
-!     WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
-!     STOP
-! # endif
-!   ENDIF
+  INQUIRE(FILE=TRIM(BREAKWATER_FILE),EXIST=FILE_EXIST)
+  IF(.NOT.FILE_EXIST)THEN
+# if defined (PARALLEL)
+   IF(MYID==0)  &
+   WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+   CALL MPI_FINALIZE (ier)
+   STOP
+# else
+    WRITE(*,*) TRIM(BREAKWATER_FILE), ' specified in input.txt but CANNOT BE FOUND. STOP'
+    STOP
+# endif
+  ENDIF
 
 ! we have to use global for width 
      ALLOCATE(BreakWaterWidth(Mglob+2*Nghost,Nglob+2*Nghost))
@@ -1211,7 +1227,7 @@ END SUBROUTINE INITIALIZATION
 !-------------------------------------------------------------------------------------
 SUBROUTINE INITIAL_UVZ
       USE GLOBAL
-      USE FIELD_IO
+      USE FIELD_IO, ONLY : GetFile
       IMPLICIT NONE
       REAL(SP),DIMENSION(Mloc,Nloc) :: rMASK
       LOGICAL :: FILE_EXIST
@@ -1314,7 +1330,3 @@ ENDIF
      ENDIF
 
 END SUBROUTINE INITIAL_UVZ
-
-
-
-

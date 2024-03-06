@@ -920,6 +920,7 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm
      REAL(SP) :: Theta_Per
 
 
+! can we move this to init.F?
        ALLOCATE(Cm_eta(Mloc,Nloc,Numfreq),Sm_eta(Mloc,Nloc,Numfreq), &
                 Cm_u(Mloc,Nloc,Numfreq),Sm_u(Mloc,Nloc,Numfreq),&
                 Cm_v(Mloc,Nloc,Numfreq),Sm_v(Mloc,Nloc,Numfreq) )

@@ -82,7 +82,7 @@ MODULE TIDE_MODULE
   REAL(SP) :: TideSouth_U,TideSouth_V,TideSouth_ETA
   REAL(SP),DIMENSION(:,:),ALLOCATABLE :: SPONGE_TIDE_WEST, &
               SPONGE_TIDE_EAST,SPONGE_TIDE_SOUTH,SPONGE_TIDE_NORTH
-  INTEGER :: Iwidth,Ifile
+  INTEGER :: Iwidth,Ifile,Iwidth_tide
   REAL(SP) :: Time_tide_west_1,Eta_tide_west_1,U_tide_west_1,V_tide_west_1, &
               Time_tide_west_2,Eta_tide_west_2,U_tide_west_2,V_tide_west_2, &
               Time_tide_east_1,Eta_tide_east_1,U_tide_east_1,V_tide_east_1, &
@@ -119,29 +119,36 @@ SUBROUTINE TIDE_INITIAL
 
   CALL BWRITE('TIDAL INFO')
 
+
+! width of sponge
+  CALL READ_PARAMETER(Iwidth_tide, 'WaveMakerPointNum', 30, 'points')
+
   CALL READ_PARAMETER(TIDAL_BC_ABS    , 'TIDAL_BC_ABS'    , .FALSE.)
   CALL READ_PARAMETER(TIDAL_BC_GEN_ABS, 'TIDAL_BC_GEN_ABS', .FALSE.)
-  CALL READ_PARAMETER(TideBcType      , 'TideBcType'      , 'CONSTANT')
+!   tidal bc ---------
+   IF(TIDAL_BC_GEN_ABS.OR.TIDAL_BC_ABS)THEN
+  
+    CALL READ_PARAMETER(TideBcType      , 'TideBcType'      , 'CONSTANT')
 
-  IF(TideBcType(1:4)=='CONS')THEN
+    IF(TideBcType(1:4)=='CONS')THEN
  
-    CALL LWRITE("Using CONSTANT Tidal BC.")
-    CALL Tide_READ_CONSTANT
+      CALL LWRITE("Using CONSTANT Tidal BC.")
+      CALL Tide_READ_CONSTANT
 
-  ELSEIF(TideBcType(1:4)=='DATA')THEN
+    ELSEIF(TideBcType(1:4)=='DATA')THEN
     
-    CALL LWRITE("Using DATA Tidal BC.")
-    CALL Tide_READ_DATA_INIT
+      CALL LWRITE("Using DATA Tidal BC.")
+      CALL Tide_READ_DATA_INIT
 
-  ELSE
-    CALL SWRITE("INVALID VALUE FOR 'TideBcType'.")
+    ELSE
+      CALL SWRITE("INVALID VALUE FOR 'TideBcType'.")
+    ENDIF
+
+    ALLOCATE(SPONGE_TIDE_WEST(Mloc,Nloc) ,SPONGE_TIDE_EAST(Mloc,Nloc), &
+             SPONGE_TIDE_SOUTH(Mloc,Nloc),SPONGE_TIDE_NORTH(Mloc,Nloc))
+
+    CALL TIDE_SPONGE
   ENDIF
-
-  ALLOCATE(SPONGE_TIDE_WEST(Mloc,Nloc) ,SPONGE_TIDE_EAST(Mloc,Nloc), &
-           SPONGE_TIDE_SOUTH(Mloc,Nloc),SPONGE_TIDE_NORTH(Mloc,Nloc))
-
-
-  CALL TIDE_SPONGE
 
   IF (TIDAL_BC_ABS) THEN
     CALL LWRITE("TIDAL_BC_ABS is defined.")
@@ -164,7 +171,7 @@ SUBROUTINE TIDE_SPONGE
   IMPLICIT NONE
   REAL(SP) :: ri,lim,Lstart,Lend,R_sp,A_sp
   
-  Iwidth = 30
+  Iwidth = Iwidth_tide ! specified in read or default = 30
   lim = 1.0_SP
   R_sp = 0.85_SP
   A_sp = 10.0_SP

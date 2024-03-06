@@ -61,6 +61,9 @@ SUBROUTINE ESTIMATE_HUV(ISTEP)
 # if defined (SEDIMENT)
      USE SEDIMENT_MODULE
 # endif
+# if defined (PRECIPITATION)
+     USE PRECIPITATION_MODULE
+# endif
 
      IMPLICIT NONE
      INTEGER,INTENT(IN)::ISTEP
@@ -255,6 +258,10 @@ SUBROUTINE ESTIMATE_HUV(ISTEP)
       IF(SedimentMassSource)THEN
         R1(I,J)=R1(I,J)+ MassSed(I,J)
       ENDIF
+# endif
+
+# if defined (PRECIPITATION)
+     R1(I,J)=R1(I,J)+ PrecRateModel(I,J)
 # endif
 
 # if defined (ITERATION)

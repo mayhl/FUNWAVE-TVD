@@ -379,6 +379,7 @@ SUBROUTINE EXCHANGE_DISPERSION
       CALL PHI_COLL(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,Nghost,ETAy,VTYPE,PERIODIC)   
 
     ENDIF
+
 # else
     VTYPE=2
     CALL PHI_COLL(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,Nghost,Uxx,VTYPE)
@@ -409,7 +410,6 @@ SUBROUTINE EXCHANGE_DISPERSION
       VTYPE=3  ! like v
       CALL PHI_COLL(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,Nghost,ETAy,VTYPE)   
 # endif
-   
     
 END SUBROUTINE EXCHANGE_DISPERSION
 

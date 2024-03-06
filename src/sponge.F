@@ -107,11 +107,16 @@ SUBROUTINE ABSORBING_GENERATING_BC
 
 ! Eliminate redundant operations to speed up!
 
+
     ! eliminate sine and cosine from redundant calculations
     DO KK_sponge= 1, NumFreq
-        BB(KK_sponge) = COS(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
-        CC(KK_sponge) = SIN(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
+!        BB(KK_sponge) = COS(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
+!        CC(KK_sponge) = SIN(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
+        BB(KK_sponge) = COS(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME)
+        CC(KK_sponge) = SIN(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME)
     ENDDO
+
+
     ! use constant values to speed up
     DO J = 1,Nloc
         DO I = 1,Mloc
@@ -131,9 +136,12 @@ SUBROUTINE ABSORBING_GENERATING_BC
            ENDIF
 
 !            Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))/SpongeMaker(I,J)
+
             Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))*SPONGE_TIDE_WEST(I,J)
-            !U(I,J) = Uin2D(I,J)+(U(I,J)-Uin2D(I,J))/SpongeMaker(I,J)
-            !V(I,J) = Vin2D(I,J)+(V(I,J)-Vin2D(I,J))/SpongeMaker(I,J)
+
+!            U(I,J) = Uin2D(I,J)+(U(I,J)-Uin2D(I,J))*SPONGE_TIDE_WEST(I,J)
+!            V(I,J) = Vin2D(I,J)+(V(I,J)-Vin2D(I,J))*SPONGE_TIDE_WEST(I,J)
+
             HU(I,J)=(Depth(I,J)+ETA(I,J))*U(I,J)
             HV(I,J)=(Depth(I,J)+ETA(I,J))*V(I,J)
         ENDDO
@@ -143,7 +151,7 @@ SUBROUTINE ABSORBING_GENERATING_BC
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-       tmp4preview = Uin2D
+       tmp4preview = Ein2D
 
 END SUBROUTINE ABSORBING_GENERATING_BC
 

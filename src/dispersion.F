@@ -156,6 +156,7 @@ SUBROUTINE CAL_DISPERSION
     CALL DERIVATIVE_XY(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,MASK9,DX,DY,DV,DVxy)
 ! DVyy
     CALL DERIVATIVE_YY(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,MASK9,DY,DV,DVyy)
+
       
 # if defined (CARTESIAN)
     IF(Gamma2>ZERO)THEN
@@ -180,7 +181,7 @@ SUBROUTINE CAL_DISPERSION
      CALL DERIVATIVE_XY(Mloc,Nloc,Ibeg,Iend,Jbeg,Jend,MASK9,DX,DY,DVt,DVtxy)
     ENDIF
 # endif
-      
+
 ! this may affect parallel version
 ! I added coupling boundary 10/14/2012
 !  add left_bc wavemaker 09/12/2017
@@ -209,7 +210,8 @@ SUBROUTINE CAL_DISPERSION
 # if defined(COUPLING)  
    ENDIF 
 # endif
-  
+
+
 # if defined (PARALLEL)
     endif  
 # endif
@@ -283,7 +285,9 @@ SUBROUTINE CAL_DISPERSION
     endif  
 # endif
      
+
     CALL EXCHANGE_DISPERSION
+
      
 ! calculate V1p  without nonlinear dispersion
      DO J=1,Nloc
@@ -378,6 +382,7 @@ SUBROUTINE CAL_DISPERSION
 
      ENDDO
      ENDDO
+
 
 # if defined (CARTESIAN)
      IF(gamma2>ZERO)THEN

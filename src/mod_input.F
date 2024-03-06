@@ -313,13 +313,14 @@ CONTAINS
   !   08/19/2023 - mayhl
   !
   ! -----------------------------------------------------------------------------------------
-  SUBROUTINE READ_INTEGER2(val, val_name, default_val, found)
+  SUBROUTINE READ_INTEGER2(val, val_name, default_val, units, found)
 
     USE LOG_IO
     IMPLICIT NONE
     INTEGER          , INTENT(OUT)   :: val
     CHARACTER(*)     , INTENT(IN)    :: val_name
     INTEGER, OPTIONAL, INTENT(IN)    :: default_val
+    CHARACTER(*), OPTIONAL, INTENT(IN)    :: units
     LOGICAL, OPTIONAL, INTENT(INOUT) :: found
 
     LOGICAL :: is_required, file_exists, is_default
@@ -330,7 +331,11 @@ CONTAINS
     ! Is required if no default value 
     is_required=.NOT.PRESENT(default_val)
     ! Formatting value for READ_VALUE output 
-    IF (.NOT.is_required) fmt_val = FORMAT_INTEGER(default_val)
+    ! IF (.NOT.is_required) fmt_val = FORMAT_INTEGER(default_val)
+    IF (.NOT.is_required) THEN
+      fmt_val = FORMAT_INTEGER(default_val)
+      IF(PRESENT(units)) fmt_val = TRIM(ADJUSTL(fmt_val))//' '//TRIM(ADJUSTL(units))
+    ENDIF
 
     ! Calling correct version of READ_VALUE if found is not defined
     IF (PRESENT(found)) THEN

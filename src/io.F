@@ -187,10 +187,10 @@ SUBROUTINE READ_INPUT
 
 ! read everything from input.txt
 
-  !>by Zhouteng Ye
-  !> Get the argument from the command.
-  !> If no input in command, file name is 'input.txt' (same as before)
-  !> If the input comes with other name, read the correponding file
+!>by Zhouteng Ye
+!> Get the argument from the command.
+!> If no input in command, file name is 'input.txt' (same as before)
+!> If the input comes with other name, read the correponding file
   CALL GETARG(1, INPUT_NAME)
   IF (INPUT_NAME .EQ. '') THEN
     FILE_NAME = 'input.txt'
@@ -1000,6 +1000,10 @@ SUBROUTINE STATIONS_V2
   CHARACTER(LEN=80)                         :: FDIR = ' '
   LOGICAL                                   :: FirstCallStation2 = .TRUE.
   LOGICAL                                   :: BufferWrote
+ 
+# if defined (FOAM)
+  REAL(SP)                                  :: eddy_sta, EtaFoam_sta, EtaFoamMax_sta
+# endif
   SAVE FirstCallStation2, BufferCount, ZUV_Buffer, sunit
 
 
@@ -1011,8 +1015,14 @@ SUBROUTINE STATIONS_V2
     ALLOCATE (ista(NumberStations), &
               jsta(NumberStations), &
               nsta(NumberStations))
+
+# if defined (FOAM)
+    ALLOCATE (BufferCount(NumberStations), &
+              ZUV_Buffer(StationOutputBuffer, NumberStations, 7))
+# else
     ALLOCATE (BufferCount(NumberStations), &
               ZUV_Buffer(StationOutputBuffer, NumberStations, 4))
+# endif
     BufferCount = 0
 
     ! Reserving file units for stations + stations file
@@ -1069,10 +1079,20 @@ SUBROUTINE STATIONS_V2
       eta_sta = ZERO
       u_sta = ZERO
       v_sta = ZERO
+# if defined (FOAM)
+      eddy_sta = ZERO
+      EtaFoam_sta = ZERO
+      EtaForamMax_sta = ZERO
+# endif
     ELSE  ! to avoid topography on nested water surface
       eta_sta = eta(ista(i), jsta(i))
       u_sta = u(ista(i), jsta(i))
       v_sta = v(ista(i), jsta(i))
+# if defined (FOAM)
+      eddy_sta = nu(ista(i), jsta(i))
+      EtaFoam_sta = EtaFoam(ista(i), jsta(i))
+      EtaForamMax_sta = EtaFoamMax(ista(i), jsta(i))
+# endif
     END IF
 
     IF (BufferCount(i) < StationOutputBuffer .AND. TIME < TOTAL_TIME) THEN
@@ -1082,6 +1102,11 @@ SUBROUTINE STATIONS_V2
       ZUV_BUFFER(BufferCount(i), i, 2) = eta_sta
       ZUV_BUFFER(BufferCount(i), i, 3) = u_sta
       ZUV_BUFFER(BufferCount(i), i, 4) = v_sta
+# if defined (FOAM)
+      ZUV_BUFFER(BufferCount(i), i, 5) = eddy_sta
+      ZUV_BUFFER(BufferCount(i), i, 6) = EtaFoam_sta 
+      ZUV_BUFFER(BufferCount(i), i, 7) = EtaForamMax_sta
+# endif
     ELSE
 
       DO j = 1, BufferCount(i)
@@ -1090,8 +1115,11 @@ SUBROUTINE STATIONS_V2
 
       BufferCount(i) = 0
       ZUV_BUFFER(:, i, 1) = TOTAL_TIME
+# if defined (FOAM)
+      ZUV_BUFFER(:, i, 2:7) = ZERO
+# else
       ZUV_BUFFER(:, i, 2:4) = ZERO
-
+# endif
       !IF (.NOT.BufferWrote) BufferWrote = .TRUE.
 
     END IF ! end buffer    
@@ -1243,6 +1271,11 @@ SUBROUTINE PREVIEW
     CALL PutOutputNum('Pves', FILE_NUM, VesselPressureTotal)
 # endif
   ENDIF
+# endif
+
+# if defined (PROPELLER)
+    CALL PutOutputNum('VesUp', FILE_NUM, UpTotal)
+    CALL PutOutputNum('VesVp', FILE_NUM, VpTotal)
 # endif
 
 ! sediment

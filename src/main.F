@@ -134,7 +134,6 @@ Program FUNWAVE_TVD
 !
 !-------------------------------------------------------------------------------------
   USE GLOBAL
-
   USE LOG_IO
 # if defined (VESSEL)
   USE VESSEL_MODULE
@@ -151,9 +150,14 @@ Program FUNWAVE_TVD
 # if defined (TRACKING)
    USE TRACER
 # endif
-  USE TIDE_MODULE
+# if defined (PRECIPITATION)
+     USE PRECIPITATION_MODULE
+# endif
 
-  IMPLICIT NONE
+     USE TIDE_MODULE
+     USE TIME_SPECTRA_MODULE
+
+     IMPLICIT NONE
 
 !     INTEGER::ISTAGE ! moved to mod_global 09/12/2017
 !     REAL(SP) :: tbegin,tend  ! moved to mod_global 07/29/2016
@@ -184,9 +188,15 @@ Program FUNWAVE_TVD
   CALL INITIALIZATION
   CALL DWRITE('INITIALIZATION')
 
+   !CALL TIME_SPECTRA_PROTECTION
+  IF(WaveMaker(1:12)=='TIME_SPECTRA') THEN
+    CALL TIME_SPECTRA_INITIAL
+    CALL DWRITE('TIME_SPECTRA_INITIAL')
+  ENDIF
+
   CALL TIDE_INITIAL
   CALL DWRITE('TIDE_INITIAL')
-
+  
 # if defined (COUPLING)
   TIME=TIME_COUPLING_1
   CALL DWRITE('Set TIME_COUPLING_1')
@@ -212,6 +222,10 @@ Program FUNWAVE_TVD
   CALL DWRITE('ALLOCATE_FOAM')
   CALL INITIALIZATION_FOAM
   CALL DWRITE('INITIALIZATION_FOAM')
+# endif
+
+#if defined (PRECIPITATION)
+     CALL PRECIPITATION_INITIAL
 # endif
 
 #if defined (TRACKING)
@@ -277,6 +291,31 @@ Program FUNWAVE_TVD
       CALL DWRITE('TIDE_DATA')
     END IF
 
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+       IF(myid==0) WRITE(*,*) 'PASS CALL TIDE_DATA'     
+#    else   
+       WRITE(*,*) 'PASS CALL TIDE_DATA'
+#    endif
+# endif
+
+       IF(WaveMaker(1:12) == 'TIME_SPECTRA') THEN
+         CALL TIME_SPECTRA_INTERPOLATION
+       ENDIF
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+       IF(myid==0) WRITE(*,*) 'PASS CALL TIME_SPECTRA_INTERPOLATION'     
+#    else   
+       WRITE(*,*) 'PASS CALL TIME_SPECTRA_INTERPOLATION'
+#    endif
+# endif
+
+
+#if defined (PRECIPITATION)
+     CALL PRECIPITATION_DISTRIBUTION
+# endif
+
      ! 3-ORDER RUNGE-KUTTA TIME STEPPING
     DO ISTAGE=1,3
 
@@ -329,14 +368,18 @@ Program FUNWAVE_TVD
       CALL DWRITE('OneWayCoupling')
 # endif         
 
-      IF (WaveMaker(1:3)=='ABS') THEN
+      !IF (WaveMaker(1:3)=='ABS') THEN
+      !  CALL ABSORBING_GENERATING_BC
+      !  CALL DWRITE('ABSORBING_GENERATING_BC')
+      !ENDIF
+
+      !IF (WaveMaker(1:11)=='LEFT_BC_IRR') THEN
+      !  CALL IRREGULAR_LEFT_BC
+      !  CALL DWRITE('IRREGULAR_LEFT_BC')
+      !ENDIF
+      IF(WaveMaker(1:3)=='ABS' .OR. WaveMaker(1:12)=='TIME_SPECTRA') THEN
         CALL ABSORBING_GENERATING_BC
         CALL DWRITE('ABSORBING_GENERATING_BC')
-      ENDIF
-
-      IF (WaveMaker(1:11)=='LEFT_BC_IRR') THEN
-        CALL IRREGULAR_LEFT_BC
-        CALL DWRITE('IRREGULAR_LEFT_BC')
       ENDIF
 
       IF (DIRECT_SPONGE) THEN

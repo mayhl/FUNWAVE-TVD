@@ -61,6 +61,9 @@ SUBROUTINE SourceTerms
 # if defined (METEO)
      USE METEO_MODULE
 # endif
+# if defined (PRECIPITATION)
+     USE PRECIPITATION_MODULE
+# endif
 
      IMPLICIT NONE
      REAL,DIMENSION(Mloc,Nloc) :: nu_vis
