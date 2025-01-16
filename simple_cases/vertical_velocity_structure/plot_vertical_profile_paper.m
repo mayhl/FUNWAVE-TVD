@@ -11,7 +11,7 @@ set(fig,'units','inches','paperunits','inches','papersize', [wid len],'position'
 for kk=1:length(period)
 
 cases=['T' num2str(period(kk)) 's'];
-fdir = ['/Users/fyshi/OUTSIDE_Google/GITHUB_M3/FUNWAVE-TVD/simple_cases/vertical_velocity_structure/results/' cases '/'];
+fdir = ['/Volumes/Solid/Vertical_structures/FUNWAVE/results/' cases '/'];
 
 if period(kk)==2.5
 m0=645;
