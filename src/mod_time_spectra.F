@@ -199,6 +199,7 @@ SUBROUTINE TIME_SPECTRA_INITIAL
 # endif
        DO I=1,NumDir
           READ(Ifile,*)Theta_Ser(I)
+          Theta_Ser(I) = Theta_Ser(I)*PI/180.0_SP
        ENDDO
          READ(Ifile,'(A80)')  WHAT ! phases, the following can be empty 
 # if defined (PARALLEL)
@@ -481,34 +482,34 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
 
           Cm_eta(I,J,KK)=Cm_eta(I,J,KK)+Amp_Ser(KK,KKK)*COS( &
                    Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker + Phase_LEFT(KK,KKK) )
           Sm_eta(I,J,KK)=Sm_eta(I,J,KK)+Amp_Ser(KK,KKK)*SIN( &
                    Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker + Phase_LEFT(KK,KKK))
           Cm_u(I,J,KK)=Cm_u(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
                    *COS(Theta_Per)*COS( &
                    Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker + Phase_LEFT(KK,KKK))
           Cm_v(I,J,KK)=Cm_v(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
                    *SIN(Theta_Per)*COS( &
                    Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )                   
+                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker + Phase_LEFT(KK,KKK))                   
           Sm_u(I,J,KK)=Sm_u(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
                    *COS(Theta_Per)*SIN( &
                    Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker + Phase_LEFT(KK,KKK))
           Sm_v(I,J,KK)=Sm_v(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
                    *SIN(Theta_Per)*SIN( &
                    Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker + Phase_LEFT(KK,KKK))
 
          ENDDO
 
@@ -516,6 +517,7 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
        ENDDO
       ENDDO
 
+!      tmp4preview = Cm_eta(:,:,36)
 
 END SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
 
