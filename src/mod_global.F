@@ -65,7 +65,11 @@ MODULE GLOBAL
        INTEGER,DIMENSION(:,:),ALLOCATABLE :: ProcessorID 
        INTEGER, DIMENSION(2) :: dims, coords
        LOGICAL, DIMENSION(2) :: periods
+# if defined (NO_REORDER)
+       LOGICAL :: reorder = .false.
+# else
        LOGICAL :: reorder = .true.
+# endif
        INTEGER :: nprocs                 !ykchoi(04/May/2017)
        INTEGER :: iista, iiend, jjsta, jjend !ykchoi(04/May/2017)
 # endif
