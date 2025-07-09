@@ -2,7 +2,7 @@
 FUNWAVE_DIR = .
 WORK_DIR    = funwave-work
 COMPILER    = gnu
-PARALLEL    = true
+PARALLEL    = false
 EXEC        = funwave
 PRECISION   = single
 

@@ -74,7 +74,7 @@ MODULE TIME_SPECTRA_MODULE
                     WidthWaveMaker,R_sponge_wavemaker,A_sponge_wavemaker, &
                     WaveCompFile,NumFreq,NumDir,&
                     Per_Ser,Theta_Ser,Phase_LEFT, Amp_Ser, &
-                    Phase_Ser,&
+                    Phase_Ser,Theta_2D, &
                     Dep_Ser,Depth, INPUT_FILE_NAME,MASK,I,J,DX,DY,ZERO,SP, &
                     Grav,PI,TIME,Wave_Number_Ser,Stokes_Drift_Ser,Segma_Ser, &
                     Cm_eta,Sm_eta,Cm_u,Sm_u,Cm_v,Sm_v,PERIODIC,Beta_ref
@@ -176,7 +176,8 @@ SUBROUTINE TIME_SPECTRA_INITIAL
            ALLOCATE (Amp_Ser(NumFreq,NumDir), AmpData1(NumFreq,NumDir),&
                      AmpData2(NumFreq,NumDir), &
                      Per_Ser(NumFreq),Theta_Ser(NumDir),Phase_LEFT(NumFreq,NumDir), &
-                     Segma_Ser(NumFreq),Wave_Number_Ser(NumFreq))
+                     Segma_Ser(NumFreq),Wave_Number_Ser(NumFreq), &
+                     Theta_2D(NumFreq,NumDir))
            ALLOCATE(Cm_eta(Mloc,Nloc,Numfreq),Sm_eta(Mloc,Nloc,Numfreq), &
                     Cm_u(Mloc,Nloc,Numfreq),Sm_u(Mloc,Nloc,Numfreq),&
                     Cm_v(Mloc,Nloc,Numfreq),Sm_v(Mloc,Nloc,Numfreq) )
@@ -199,6 +200,7 @@ SUBROUTINE TIME_SPECTRA_INITIAL
 # endif
        DO I=1,NumDir
           READ(Ifile,*)Theta_Ser(I)
+          Theta_Ser(I) = Theta_Ser(I)*PI/180.0_SP
        ENDDO
          READ(Ifile,'(A80)')  WHAT ! phases, the following can be empty 
 # if defined (PARALLEL)
@@ -411,9 +413,12 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
 !     real(SP),DIMENSION(Mloc,Nloc) :: Uin2D,Vin2D
      REAL(SP) :: tmp_eta,tmp_u,tmp_v
      REAL(SP) :: Theta_Per
+     LOGICAL :: Not_done_wavenumber = .TRUE., Not_done_periodic = .TRUE.
 
 ! wave_number
 
+  IF (Not_done_wavenumber) THEN
+   Not_done_wavenumber = .FALSE.
    DO I=1,NumFreq
      Segma_Ser(I) = 2.0*pi/Per_Ser(I)
      Celerity = sqrt(Grav*Dep_Ser)
@@ -432,6 +437,21 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
      Wave_Length = 2.0*pi/Wave_Number_Ser(I)
 
     ENDDO ! end NumCompSer  
+  ENDIF  ! if not done
+
+  IF(Not_done_periodic) THEN
+   Not_done_periodic = .FALSE.
+   DO KK=1,NumFreq
+      DO KKK=1,NumDir      
+        IF(PERIODIC)THEN
+            CALL CalcPeriodicTheta(Wave_Number_Ser(KK),Theta_Ser(KKK),Theta_Per)
+            Theta_2D(I,KKK)=Theta_Per
+        ELSE
+           Theta_2D(I,KKK)=Theta_Ser(KKK)
+        ENDIF 
+      ENDDO ! numdir
+   ENDDO  ! numfreq
+  ENDIF
 
      Stokes_Drift_Ser = ZERO
      Fact = 1.0 
@@ -445,16 +465,11 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
      Sm_v = ZERO
 
      Zlev = ABS(1.0_SP+Beta_ref)*Dep_Ser
-!     Zlev = Dep_Ser
 
      DO KK=1,NumFreq
 
+
          DO KKK=1,NumDir
-          IF(PERIODIC)THEN
-            CALL CalcPeriodicTheta(Wave_Number_Ser(KK),Theta_Ser(KKK),Theta_Per)
-          ELSE
-            Theta_Per = Theta_Ser(KKK)
-          ENDIF 
 
        DO J=1,Nloc
        DO I=1,Mloc
@@ -480,35 +495,35 @@ SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
 # endif
 
           Cm_eta(I,J,KK)=Cm_eta(I,J,KK)+Amp_Ser(KK,KKK)*COS( &
-                   Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
+                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK) )
           Sm_eta(I,J,KK)=Sm_eta(I,J,KK)+Amp_Ser(KK,KKK)*SIN( &
-                   Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
+                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
           Cm_u(I,J,KK)=Cm_u(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *COS(Theta_Per)*COS( &
-                   Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                   *COS(Theta_2D(KK,KKK))*COS( &
+                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
+                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
           Cm_v(I,J,KK)=Cm_v(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *SIN(Theta_Per)*COS( &
-                   Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )                   
+                   *SIN(Theta_2D(KK,KKK))*COS( &
+                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
+                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))                   
           Sm_u(I,J,KK)=Sm_u(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *COS(Theta_Per)*SIN( &
-                   Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                   *COS(Theta_2D(KK,KKK))*SIN( &
+                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
+                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
           Sm_v(I,J,KK)=Sm_v(I,J,KK)+Amp_Ser(KK,KKK) &
                        *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
                        /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *SIN(Theta_Per)*SIN( &
-                   Wave_Number_Ser(KK)*SIN(Theta_Per)*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_Per)*X_maker )
+                   *SIN(Theta_2D(KK,KKK))*SIN( &
+                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
+                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
 
          ENDDO
 
