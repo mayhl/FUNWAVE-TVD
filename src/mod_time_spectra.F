@@ -5,7 +5,7 @@
 !      This file is part of the FUNWAVE-TVD program under the Simplified BSD license
 !
 !-------------------------------------------------------------------------------------
-! 
+!
 !    Copyright (c) 2016, FUNWAVE Development Team
 !
 !    (See http://www.udel.edu/kirby/programs/funwave/funwave.html
@@ -36,14 +36,14 @@
 !    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 !    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 !    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-!  
+!
 !    The views and conclusions contained in the software and documentation are those
 !    of the authors and should not be interpreted as representing official policies,
 !    either expressed or implied, of the FreeBSD Project.
-!  
+!
 !-------------------------------------------------------------------------------------
 !
-!  mod_time_spectra.F is a wavemaker module for time-dependent spectra   
+!  mod_time_spectra.F is a wavemaker module for time-dependent spectra
 !
 !  HISTORY :
 !    01/10/2024  Fengyan Shi
@@ -54,7 +54,7 @@
 !      * mainF, CALL READ_INPUT
 !      * io.F, read WaveMaker = 'TIME_SPECTRA'
 !      * main.F, CALL TIME_SPECTRA_INITIAL (mod_time_spectra.F)
-!      * main.F, CALL TIDE_INITIAL (mod_tide.F), 
+!      * main.F, CALL TIDE_INITIAL (mod_tide.F),
 !                CALL TIME_SPECTRA_PROTECTION(mod_time_spectra.F)
 !      * mod_time_spectra.F,  read spectra file and read first spectra data
 !      * main.F, CALL TIDE_INITIAL (mod_tide.F)
@@ -67,321 +67,313 @@
 !
 !-------------------------------------------------------------------------------------
 
-
 MODULE TIME_SPECTRA_MODULE
-  USE PARAM
-  USE GLOBAL,ONLY : Mloc,Nloc,Nghost,Ibeg,Iend,Jbeg,Jend,Mglob,Nglob, &
-                    WidthWaveMaker,R_sponge_wavemaker,A_sponge_wavemaker, &
-                    WaveCompFile,NumFreq,NumDir,&
-                    Per_Ser,Theta_Ser,Phase_LEFT, Amp_Ser, &
-                    Phase_Ser,Theta_2D, &
-                    Dep_Ser,Depth, INPUT_FILE_NAME,MASK,I,J,DX,DY,ZERO,SP, &
-                    Grav,PI,TIME,Wave_Number_Ser,Stokes_Drift_Ser,Segma_Ser, &
-                    Cm_eta,Sm_eta,Cm_u,Sm_u,Cm_v,Sm_v,PERIODIC,Beta_ref
-  USE TIDE_MODULE
-                     
-  USE INPUT_READ
+   USE PARAM
+   USE GLOBAL, ONLY: Mloc, Nloc, Nghost, Ibeg, Iend, Jbeg, Jend, Mglob, Nglob, &
+                     WidthWaveMaker, R_sponge_wavemaker, A_sponge_wavemaker, &
+                     WaveCompFile, NumFreq, NumDir, &
+                     Per_Ser, Theta_Ser, Phase_LEFT, Amp_Ser, &
+                     Phase_Ser, Theta_2D, &
+                     Dep_Ser, Depth, INPUT_FILE_NAME, MASK, I, J, DX, DY, ZERO, SP, &
+                     Grav, PI, TIME, Wave_Number_Ser, Stokes_Drift_Ser, Segma_Ser, &
+                     Cm_eta, Sm_eta, Cm_u, Sm_u, Cm_v, Sm_v, PERIODIC, Beta_ref
+   USE TIDE_MODULE
+
+   USE INPUT_READ
 #if defined (PARALLEL)
-  USE GLOBAL,ONLY : myid,ier, npx,npy,PX,PY,iista,jjsta
-  USE MPI
+   USE GLOBAL, ONLY: myid, ier, npx, npy, PX, PY, iista, jjsta
+   USE MPI
 # endif
-  IMPLICIT NONE
-  SAVE
-       REAL(SP), DIMENSION(:,:),ALLOCATABLE :: AmpData1,AmpData2
+   IMPLICIT NONE
+   SAVE
+   REAL(SP), DIMENSION(:, :), ALLOCATABLE :: AmpData1, AmpData2
 
-    REAL(SP) :: TimeSpectra1,TimeSpectra2
-    CHARACTER (LEN=80) :: NameSpectra1,NameSpectra2
-    CHARACTER(LEN=80)::FILE_NAME=' '
-    CHARACTER(LEN=80)::SPECTRA_FILE =' ' 
-    INTEGER :: PHASE_DATA     
-       
-
+   REAL(SP) :: TimeSpectra1, TimeSpectra2
+   CHARACTER(LEN=80) :: NameSpectra1, NameSpectra2
+   CHARACTER(LEN=80)::FILE_NAME = ' '
+   CHARACTER(LEN=80)::SPECTRA_FILE = ' '
+   INTEGER :: PHASE_DATA
 
 #if defined (PARALLEL)
-    REAL(SP) :: myvar
-# endif    
+   REAL(SP) :: myvar
+# endif
 
 CONTAINS
-  
+
 ! READ Spectra
 
-SUBROUTINE TIME_SPECTRA_INITIAL
-  USE GLOBAL,ONLY : itmp1,itmp2,itmp3,itmp4,SMALL,LARGE,INPUT_FILE_NAME
-                    
-# if  defined(INTEL)
-  USE IFPORT
-# endif
-  USE INPUT_READ
-  IMPLICIT NONE
+   SUBROUTINE TIME_SPECTRA_INITIAL
+      USE GLOBAL, ONLY: itmp1, itmp2, itmp3, itmp4, SMALL, LARGE, INPUT_FILE_NAME
 
-  INTEGER :: Ifile,ierr
-  CHARACTER(LEN=80):: SpectraName
-  CHARACTER(LEN=80) :: WHAT
+# if  defined(INTEL)
+      USE IFPORT
+# endif
+      USE INPUT_READ
+      IMPLICIT NONE
+
+      INTEGER :: Ifile, ierr
+      CHARACTER(LEN=80):: SpectraName
+      CHARACTER(LEN=80) :: WHAT
 
 ! read precipitation from input.txt
-      FILE_NAME=INPUT_FILE_NAME
+      FILE_NAME = INPUT_FILE_NAME
 
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,*)'                                         '
-      if (myid.eq.0) WRITE(3,*)'-------------- Time-dependent spectra INFO ----------'
+      if (myid .eq. 0) WRITE (3, *) '                                         '
+      if (myid .eq. 0) WRITE (3, *) '-------------- Time-dependent spectra INFO ----------'
 # else
-      WRITE(3,*)'                                         '
-      WRITE(3,*)'-------------- Time-dependent spectra INFO ----------'   
+      WRITE (3, *) '                                         '
+      WRITE (3, *) '-------------- Time-dependent spectra INFO ----------'
 # endif
 
 ! -------------------------
 
 ! spectra file
-      CALL READ_STRING(SPECTRA_FILE,FILE_NAME,'SPECTRA_FILE',ierr)
+      CALL READ_STRING(SPECTRA_FILE, FILE_NAME, 'SPECTRA_FILE', ierr)
 
-      IF(ierr==1)THEN
+      IF (ierr == 1) THEN
 # if defined (PARALLEL)
-        IF(MYID==0)  &
-       WRITE(*,*) 'SPECTRA_FILE CANNOT BE FOUND. STOP'
-       CALL MPI_FINALIZE (ier)
-       STOP
+         IF (MYID == 0) &
+            WRITE (*, *) 'SPECTRA_FILE CANNOT BE FOUND. STOP'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-        WRITE(*,*) 'SPECTRA_FILE CANNOT BE FOUND. STOP'
-        STOP
+         WRITE (*, *) 'SPECTRA_FILE CANNOT BE FOUND. STOP'
+         STOP
 # endif
 
       ELSE
 
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(3,'(A15,A50)')'SPECTRA_FILE:', SPECTRA_FILE
+         if (myid .eq. 0) WRITE (3, '(A15,A50)') 'SPECTRA_FILE:', SPECTRA_FILE
 # else
-      WRITE(3,'(A15,A50)')'SPECTRA_FILE:', SPECTRA_FILE
+         WRITE (3, '(A15,A50)') 'SPECTRA_FILE:', SPECTRA_FILE
 # endif
 
-      ENDIF
+      END IF
 
 ! open file
-  Ifile=400
-  OPEN(Ifile,FILE=TRIM(SPECTRA_FILE))
+      Ifile = 400
+      OPEN (Ifile, FILE=TRIM(SPECTRA_FILE))
 
 ! read file
-         READ(Ifile,'(A80)')  WHAT ! title
+      READ (Ifile, '(A80)') WHAT ! title
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) WHAT
+      if (myid .eq. 0) WRITE (*, *) WHAT
 # else
-         WRITE(*,*) WHAT
+      WRITE (*, *) WHAT
 # endif
-         READ(Ifile,'(A80)')  WHAT ! number of freq  and direction bins
+      READ (Ifile, '(A80)') WHAT ! number of freq  and direction bins
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) WHAT
+      if (myid .eq. 0) WRITE (*, *) WHAT
 # else
-         WRITE(*,*) WHAT
+      WRITE (*, *) WHAT
 # endif
-         READ(Ifile,*)  NumFreq,NumDir
-           ALLOCATE (Amp_Ser(NumFreq,NumDir), AmpData1(NumFreq,NumDir),&
-                     AmpData2(NumFreq,NumDir), &
-                     Per_Ser(NumFreq),Theta_Ser(NumDir),Phase_LEFT(NumFreq,NumDir), &
-                     Segma_Ser(NumFreq),Wave_Number_Ser(NumFreq), &
-                     Theta_2D(NumFreq,NumDir))
-           ALLOCATE(Cm_eta(Mloc,Nloc,Numfreq),Sm_eta(Mloc,Nloc,Numfreq), &
-                    Cm_u(Mloc,Nloc,Numfreq),Sm_u(Mloc,Nloc,Numfreq),&
-                    Cm_v(Mloc,Nloc,Numfreq),Sm_v(Mloc,Nloc,Numfreq) )
+      READ (Ifile, *) NumFreq, NumDir
+      ALLOCATE (Amp_Ser(NumFreq, NumDir), AmpData1(NumFreq, NumDir), &
+                AmpData2(NumFreq, NumDir), &
+                Per_Ser(NumFreq), Theta_Ser(NumDir), Phase_LEFT(NumFreq, NumDir), &
+                Segma_Ser(NumFreq), Wave_Number_Ser(NumFreq), &
+                Theta_2D(NumFreq, NumDir))
+      ALLOCATE (Cm_eta(Mloc, Nloc, Numfreq), Sm_eta(Mloc, Nloc, Numfreq), &
+                Cm_u(Mloc, Nloc, Numfreq), Sm_u(Mloc, Nloc, Numfreq), &
+                Cm_v(Mloc, Nloc, Numfreq), Sm_v(Mloc, Nloc, Numfreq))
 
-         READ(Ifile,'(A80)')  WHAT ! frequency bins
+      READ (Ifile, '(A80)') WHAT ! frequency bins
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) WHAT
+      if (myid .eq. 0) WRITE (*, *) WHAT
 # else
-         WRITE(*,*) WHAT
+      WRITE (*, *) WHAT
 # endif
-       DO J=1,NumFreq
-          READ(Ifile,*)Per_Ser(J)  ! read in as frequency
-          Per_Ser(J)=1.0_SP/Per_Ser(J)
-       ENDDO
-         READ(Ifile,'(A80)')  WHAT ! direction bins
+      DO J = 1, NumFreq
+         READ (Ifile, *) Per_Ser(J)  ! read in as frequency
+         Per_Ser(J) = 1.0_SP/Per_Ser(J)
+      END DO
+      READ (Ifile, '(A80)') WHAT ! direction bins
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) WHAT
+      if (myid .eq. 0) WRITE (*, *) WHAT
 # else
-         WRITE(*,*) WHAT
+      WRITE (*, *) WHAT
 # endif
-       DO I=1,NumDir
-          READ(Ifile,*)Theta_Ser(I)
-          Theta_Ser(I) = Theta_Ser(I)*PI/180.0_SP
-       ENDDO
-         READ(Ifile,'(A80)')  WHAT ! phases, the following can be empty 
+      DO I = 1, NumDir
+         READ (Ifile, *) Theta_Ser(I)
+         Theta_Ser(I) = Theta_Ser(I)*PI/180.0_SP
+      END DO
+      READ (Ifile, '(A80)') WHAT ! phases, the following can be empty
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) WHAT
+      if (myid .eq. 0) WRITE (*, *) WHAT
 # else
-         WRITE(*,*) WHAT
+      WRITE (*, *) WHAT
 # endif
-         READ(Ifile,*) Phase_Data
-         IF (Phase_Data == 1) THEN
-           DO I=1,NumDir
-             READ(Ifile,*)(Phase_LEFT(J,I),J=1,NumFreq)
-           ENDDO
-           DO J=1,NumFreq
-           DO I=1,NumDir
-             Phase_LEFT(J,I)=Phase_LEFT(J,I)*3.1415926/180.0_SP
-           ENDDO
-           ENDDO
+      READ (Ifile, *) Phase_Data
+      IF (Phase_Data == 1) THEN
+         DO I = 1, NumDir
+            READ (Ifile, *) (Phase_LEFT(J, I), J=1, NumFreq)
+         END DO
+         DO J = 1, NumFreq
+         DO I = 1, NumDir
+            Phase_LEFT(J, I) = Phase_LEFT(J, I)*3.1415926/180.0_SP
+         END DO
+         END DO
 
-         ELSE
-           DO J=1,NumFreq
-           DO I=1,NumDir
+      ELSE
+         DO J = 1, NumFreq
+         DO I = 1, NumDir
 # if defined (INTEL)
-              Phase_LEFT(J,I)=rand()*2.0_SP*3.1415926
+            Phase_LEFT(J, I) = rand()*2.0_SP*3.1415926
 # elif defined (CRAY)
-              Phase_LEFT(J,I)=rand()*2.0_SP*3.1415926
+            Phase_LEFT(J, I) = rand()*2.0_SP*3.1415926
 # else
-              Phase_LEFT(J,I)=rand(0)*2.0_SP*3.1415926
+            Phase_LEFT(J, I) = rand(0)*2.0_SP*3.1415926
 # endif
-           ENDDO
-           ENDDO
-         ENDIF ! phase true
+         END DO
+         END DO
+      END IF ! phase true
 
-
-         READ(Ifile,'(A80)')  WHAT ! t, file name
+      READ (Ifile, '(A80)') WHAT ! t, file name
 # if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) WHAT
+      if (myid .eq. 0) WRITE (*, *) WHAT
 # else
-         WRITE(*,*) WHAT
+      WRITE (*, *) WHAT
 # endif
-         READ(Ifile,*)  TimeSpectra2
-         READ(Ifile,'(A80)')  NameSpectra2
+      READ (Ifile, *) TimeSpectra2
+      READ (Ifile, '(A80)') NameSpectra2
+
+      TimeSpectra1 = TimeSpectra2
+      NameSpectra1 = NameSpectra2
+
+# if defined (PARALLEL)
+      IF (MYID == 0) THEN
+         WRITE (3, *) 'Initial Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+         WRITE (*, *) 'Initial Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+      END IF
+# else
+      WRITE (3, *) 'Initial Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+      WRITE (*, *) 'Initial Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+# endif
+
+! read data
+      Ifile = 401
+      OPEN (Ifile, FILE=TRIM(NameSpectra2))
+
+      DO I = 1, NumDir
+         READ (Ifile, *) (AmpData2(J, I), J=1, NumFreq)
+!print*,I,AmpData2(J,I)
+      END DO
+
+      CLOSE (Ifile)
+
+   End SUBROUTINE TIME_SPECTRA_INITIAL
+
+   SUBROUTINE TIME_SPECTRA_PROTECTION
+      USE GLOBAL, ONLY: tmp1, tmp2, SMALL, TIME, ZERO
+#if defined (PARALLEL)
+      USE GLOBAL, ONLY: myid, ier, npx, npy, PX, PY
+      USE MPI
+# endif
+      USE TIDE_MODULE
+
+      IF (TIDAL_BC_GEN_ABS) THEN
+         ! do nothing
+      ELSE
+# if defined (PARALLEL)
+         IF (MYID == 0) THEN
+            WRITE (3, *) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
+            WRITE (*, *) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
+         END IF
+         call MPI_FINALIZE(ier)
+# else
+         WRITE (3, *) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
+         WRITE (*, *) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
+# endif
+         STOP
+      END IF
+
+      IF (TideBcType(1:4) == 'DATA') THEN
+         ! do nothing
+      ELSE
+# if defined (PARALLEL)
+         IF (MYID == 0) THEN
+            WRITE (3, *) 'You should specify TideBcType = DATA, STOP!'
+            WRITE (*, *) 'You should specify TideBcType, STOP!'
+         END IF
+         call MPI_FINALIZE(ier)
+# else
+         WRITE (3, *) 'You should specify TideBcType, STOP!'
+         WRITE (*, *) 'You should specify TideBcType, STOP!'
+# endif
+         STOP
+      END IF
+
+   END SUBROUTINE TIME_SPECTRA_PROTECTION
+
+   SUBROUTINE TIME_SPECTRA_INTERPOLATION
+      USE GLOBAL, ONLY: tmp1, tmp2, SMALL, TIME, ZERO
+      USE INPUT_READ
+      IMPLICIT NONE
+      INTEGER :: Ifile, ierr, I, J
+      REAL(SP) :: rII, rJJ
+      INTEGER :: IOstatus
+
+      IF (TIME > TimeSpectra1 .AND. TIME > TimeSpectra2) THEN
 
          TimeSpectra1 = TimeSpectra2
          NameSpectra1 = NameSpectra2
+         AmpData1 = AmpData2
+
+         Ifile = 400
+
+         READ (Ifile, *, IOSTAT=IOstatus) TimeSpectra2
+
+         IF (IOstatus < 0) GOTO 120
+
+         READ (Ifile, *) NameSpectra2
 
 # if defined (PARALLEL)
-   IF(MYID==0)THEN
-   WRITE(3,*) 'Initial Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-   WRITE(*,*) 'Initial Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-   ENDIF
+         IF (MYID == 0) THEN
+            WRITE (3, *) 'READ Spectra, Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+            WRITE (*, *) 'READ Spectra, Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+         END IF
 # else
-   WRITE(3,*) 'Initial Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-   WRITE(*,*) 'Initial Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
+         WRITE (3, *) 'READ Spectra, Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
+         WRITE (*, *) 'READ Spectra, Time, FileName: ', TimeSpectra2, TRIM(NameSpectra2)
 # endif
 
 ! read data
-  Ifile=401
-  OPEN(Ifile,FILE=TRIM(NameSpectra2))
+         Ifile = 401
 
-       DO I=1,NumDir
-         READ(Ifile,*)(AmpData2(J,I),J=1,NumFreq)
-!print*,I,AmpData2(J,I)
-       ENDDO
-
-
-  CLOSE(Ifile)
-
-
-End SUBROUTINE TIME_SPECTRA_INITIAL
-
-SUBROUTINE TIME_SPECTRA_PROTECTION
-  USE GLOBAL,ONLY : tmp1,tmp2,SMALL,TIME,ZERO
-#if defined (PARALLEL)
-  USE GLOBAL,ONLY : myid,ier, npx,npy,PX,PY
-  USE MPI
-# endif
-  USE TIDE_MODULE
-  
-  IF (TIDAL_BC_GEN_ABS) THEN
-    ! do nothing
-  ELSE
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-   WRITE(3,*) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
-   WRITE(*,*) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
-   ENDIF
-          call MPI_FINALIZE ( ier )
-# else
-   WRITE(3,*) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
-   WRITE(*,*) 'You should specify TIDAL_BC_GEN_ABS, STOP!'
-# endif
-  STOP
-  ENDIF
-
-  IF (TideBcType(1:4)=='DATA') THEN
-    ! do nothing
-  ELSE
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-   WRITE(3,*) 'You should specify TideBcType = DATA, STOP!'
-   WRITE(*,*) 'You should specify TideBcType, STOP!'
-   ENDIF
-          call MPI_FINALIZE ( ier )
-# else
-   WRITE(3,*) 'You should specify TideBcType, STOP!'
-   WRITE(*,*) 'You should specify TideBcType, STOP!'
-# endif
-  STOP
-  ENDIF
-
-END SUBROUTINE TIME_SPECTRA_PROTECTION
-
-SUBROUTINE TIME_SPECTRA_INTERPOLATION
-  USE GLOBAL,ONLY : tmp1,tmp2,SMALL,TIME,ZERO
-  USE INPUT_READ
-  IMPLICIT NONE
-  INTEGER :: Ifile,ierr,I,J
-  REAL(SP) :: rII,rJJ
-  INTEGER :: IOstatus
-
-
-    IF(TIME>TimeSpectra1.AND.TIME>TimeSpectra2) THEN
-
-         TimeSpectra1=TimeSpectra2
-         NameSpectra1=NameSpectra2
-         AmpData1=AmpData2
-
-    Ifile = 400
-
-    READ(Ifile,*,IOSTAT=IOstatus)  TimeSpectra2
-
-    IF(IOstatus< 0)GOTO 120
-
-    READ(Ifile,*)  NameSpectra2
-
-# if defined (PARALLEL)
-   IF(MYID==0)THEN
-   WRITE(3,*) 'READ Spectra, Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-   WRITE(*,*) 'READ Spectra, Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-   ENDIF
-# else
-   WRITE(3,*) 'READ Spectra, Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-   WRITE(*,*) 'READ Spectra, Time, FileName: ', TimeSpectra2,TRIM(NameSpectra2)
-# endif
-
-! read data
-  Ifile=401
-
-  OPEN(Ifile,FILE=TRIM(NameSpectra2))
-       DO I=1,NumDir
-         READ(Ifile,*)(AmpData2(J,I),J=1,NumFreq)
+         OPEN (Ifile, FILE=TRIM(NameSpectra2))
+         DO I = 1, NumDir
+            READ (Ifile, *) (AmpData2(J, I), J=1, NumFreq)
 !print*,I,Amp_Ser(J,I)
-       ENDDO
-  CLOSE(Ifile)
+         END DO
+         CLOSE (Ifile)
 
-    ENDIF ! end time > timeSpectra2
+      END IF ! end time > timeSpectra2
 
 ! intermpolation
-    tmp2=ZERO
-    tmp1=ZERO
+      tmp2 = ZERO
+      tmp1 = ZERO
 
-    IF(TIME>TimeSpectra1)THEN
-      IF(TimeSpectra1.EQ.TimeSpectra2)THEN
-        ! no more data
-        tmp2=ZERO
-        tmp1=ZERO
-      ELSE
-      tmp2=(TimeSpectra2-TIME) &
-            /MAX(SMALL, ABS(TimeSpectra2-TimeSpectra1))
-      tmp1=1.0_SP - tmp2;
-      ENDIF  ! no more data?
-    ENDIF ! time>time_1
+      IF (TIME > TimeSpectra1) THEN
+         IF (TimeSpectra1 .EQ. TimeSpectra2) THEN
+            ! no more data
+            tmp2 = ZERO
+            tmp1 = ZERO
+         ELSE
+            tmp2 = (TimeSpectra2 - TIME) &
+                   /MAX(SMALL, ABS(TimeSpectra2 - TimeSpectra1))
+            tmp1 = 1.0_SP - tmp2; 
+         END IF  ! no more data?
+      END IF ! time>time_1
 
-    Amp_Ser = AmpData2*tmp1 +AmpData1*tmp2
+      Amp_Ser = AmpData2*tmp1 + AmpData1*tmp2
 
-120 CONTINUE  ! no more data for vessel Kves
+120   CONTINUE  ! no more data for vessel Kves
 
-   Dep_Ser = TideWest_ETA + Depth(1,1)
+      Dep_Ser = TideWest_ETA + Depth(1, 1)
 
-     CALL CALCULATE_DATA2D_Cm_Sm_TIME
-
+      CALL CALCULATE_DATA2D_Cm_Sm_TIME
 
 ! debug -------
 
@@ -402,138 +394,135 @@ SUBROUTINE TIME_SPECTRA_INTERPOLATION
 !    CALL MPI_FINALIZE (ier)
 ! debug over --------
 
-END SUBROUTINE TIME_SPECTRA_INTERPOLATION
+   END SUBROUTINE TIME_SPECTRA_INTERPOLATION
 
-SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
+   SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
 
-     IMPLICIT NONE
-     INTEGER :: Iter,KK,K,KKK
-     REAL(SP) :: Celerity,Wave_Length,Fk,Fkdif,Zlev,Fact,X_maker,Y_maker
+      IMPLICIT NONE
+      INTEGER :: Iter, KK, K, KKK
+      REAL(SP) :: Celerity, Wave_Length, Fk, Fkdif, Zlev, Fact, X_maker, Y_maker
 !     real(SP),DIMENSION(Mloc,Nloc) :: Ein2D,Din2D
 !     real(SP),DIMENSION(Mloc,Nloc) :: Uin2D,Vin2D
-     REAL(SP) :: tmp_eta,tmp_u,tmp_v
-     REAL(SP) :: Theta_Per
-     LOGICAL :: Not_done_wavenumber = .TRUE., Not_done_periodic = .TRUE.
+      REAL(SP) :: tmp_eta, tmp_u, tmp_v
+      REAL(SP) :: Theta_Per
+      LOGICAL :: Not_done_wavenumber = .TRUE., Not_done_periodic = .TRUE.
 
 ! wave_number
 
-  IF (Not_done_wavenumber) THEN
-   Not_done_wavenumber = .FALSE.
-   DO I=1,NumFreq
-     Segma_Ser(I) = 2.0*pi/Per_Ser(I)
-     Celerity = sqrt(Grav*Dep_Ser)
-     Wave_Length = Celerity*Per_Ser(I)
-     Wave_Number_Ser(I) = 2.0*pi/Wave_Length
-     
-     Iter = 0
-55   Fk = Grav*Wave_Number_Ser(I)*tanh(Wave_Number_Ser(I)*Dep_Ser)-Segma_Ser(I)**2
-     if(abs(Fk)<=1.0e-8.or.Iter>1000) goto 65
-     Fkdif = Grav*Wave_Number_Ser(I)*Dep_Ser*(1.0-tanh(Wave_Number_Ser(I)*Dep_Ser)**2)+  &
-        Grav*tanh(Wave_Number_ser(I)*Dep_Ser) 
-     Wave_Number_Ser(I) = Wave_Number_Ser(I)-Fk/Fkdif
-     Iter = Iter+1
-     goto 55
-65   continue
-     Wave_Length = 2.0*pi/Wave_Number_Ser(I)
+      IF (Not_done_wavenumber) THEN
+         Not_done_wavenumber = .FALSE.
+         DO I = 1, NumFreq
+            Segma_Ser(I) = 2.0*pi/Per_Ser(I)
+            Celerity = sqrt(Grav*Dep_Ser)
+            Wave_Length = Celerity*Per_Ser(I)
+            Wave_Number_Ser(I) = 2.0*pi/Wave_Length
 
-    ENDDO ! end NumCompSer  
-  ENDIF  ! if not done
+            Iter = 0
+55          Fk = Grav*Wave_Number_Ser(I)*tanh(Wave_Number_Ser(I)*Dep_Ser) - Segma_Ser(I)**2
+            if (abs(Fk) <= 1.0e-8 .or. Iter > 1000) goto 65
+            Fkdif = Grav*Wave_Number_Ser(I)*Dep_Ser*(1.0 - tanh(Wave_Number_Ser(I)*Dep_Ser)**2) + &
+                    Grav*tanh(Wave_Number_ser(I)*Dep_Ser)
+            Wave_Number_Ser(I) = Wave_Number_Ser(I) - Fk/Fkdif
+            Iter = Iter + 1
+            goto 55
+65          continue
+            Wave_Length = 2.0*pi/Wave_Number_Ser(I)
 
-  IF(Not_done_periodic) THEN
-   Not_done_periodic = .FALSE.
-   DO KK=1,NumFreq
-      DO KKK=1,NumDir      
-        IF(PERIODIC)THEN
-            CALL CalcPeriodicTheta(Wave_Number_Ser(KK),Theta_Ser(KKK),Theta_Per)
-            Theta_2D(I,KKK)=Theta_Per
-        ELSE
-           Theta_2D(I,KKK)=Theta_Ser(KKK)
-        ENDIF 
-      ENDDO ! numdir
-   ENDDO  ! numfreq
-  ENDIF
+         END DO ! end NumCompSer
+      END IF  ! if not done
 
-     Stokes_Drift_Ser = ZERO
-     Fact = 1.0 
+      IF (Not_done_periodic) THEN
+         Not_done_periodic = .FALSE.
+         DO KK = 1, NumFreq
+            DO KKK = 1, NumDir
+               IF (PERIODIC) THEN
+                  CALL CalcPeriodicTheta(Wave_Number_Ser(KK), Theta_Ser(KKK), Theta_Per)
+                  Theta_2D(I, KKK) = Theta_Per
+               ELSE
+                  Theta_2D(I, KKK) = Theta_Ser(KKK)
+               END IF
+            END DO ! numdir
+         END DO  ! numfreq
+      END IF
+
+      Stokes_Drift_Ser = ZERO
+      Fact = 1.0
 
 ! Cm and Sm
-     Cm_eta = ZERO
-     Sm_eta = ZERO
-     Cm_u = ZERO
-     Sm_u = ZERO
-     Cm_v = ZERO
-     Sm_v = ZERO
+      Cm_eta = ZERO
+      Sm_eta = ZERO
+      Cm_u = ZERO
+      Sm_u = ZERO
+      Cm_v = ZERO
+      Sm_v = ZERO
 
-     Zlev = ABS(1.0_SP+Beta_ref)*Dep_Ser
+      Zlev = ABS(1.0_SP + Beta_ref)*Dep_Ser
 
-     DO KK=1,NumFreq
+      DO KK = 1, NumFreq
 
+         DO KKK = 1, NumDir
 
-         DO KKK=1,NumDir
-
-       DO J=1,Nloc
-       DO I=1,Mloc
+            DO J = 1, Nloc
+            DO I = 1, Mloc
 # if defined (PARALLEL)
 # if defined (CARTESIAN)
-         X_maker=( I-Ibeg+(iista-1) )*DX
-         Y_maker=( J-Jbeg+(jjsta-1) )*DY
+               X_maker = (I - Ibeg + (iista - 1))*DX
+               Y_maker = (J - Jbeg + (jjsta - 1))*DY
 # else
-         X_maker=( I-Ibeg+(iista-1) )*DX(I,J)
-         Y_maker=( J-Jbeg+(jjsta-1) )*DY(I,J)
+               X_maker = (I - Ibeg + (iista - 1))*DX(I, J)
+               Y_maker = (J - Jbeg + (jjsta - 1))*DY(I, J)
 # endif
 
 # else
 
 # if defined (CARTESIAN)
-         X_maker=(I-Ibeg)*DX
-         Y_maker=(J-Jbeg)*DY
+               X_maker = (I - Ibeg)*DX
+               Y_maker = (J - Jbeg)*DY
 # else
-         X_maker=(I-Ibeg)*DX(I,J)
-         Y_maker=(J-Jbeg)*DY(I,J)
+               X_maker = (I - Ibeg)*DX(I, J)
+               Y_maker = (J - Jbeg)*DY(I, J)
 # endif
 
 # endif
 
-          Cm_eta(I,J,KK)=Cm_eta(I,J,KK)+Amp_Ser(KK,KKK)*COS( &
-                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK) )
-          Sm_eta(I,J,KK)=Sm_eta(I,J,KK)+Amp_Ser(KK,KKK)*SIN( &
-                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
-          Cm_u(I,J,KK)=Cm_u(I,J,KK)+Amp_Ser(KK,KKK) &
-                       *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
-                       /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *COS(Theta_2D(KK,KKK))*COS( &
-                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
-          Cm_v(I,J,KK)=Cm_v(I,J,KK)+Amp_Ser(KK,KKK) &
-                       *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
-                       /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *SIN(Theta_2D(KK,KKK))*COS( &
-                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))                   
-          Sm_u(I,J,KK)=Sm_u(I,J,KK)+Amp_Ser(KK,KKK) &
-                       *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
-                       /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *COS(Theta_2D(KK,KKK))*SIN( &
-                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
-          Sm_v(I,J,KK)=Sm_v(I,J,KK)+Amp_Ser(KK,KKK) &
-                       *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev)  &
-                       /sinh(Wave_Number_Ser(KK)*Dep_Ser)  &
-                   *SIN(Theta_2D(KK,KKK))*SIN( &
-                   Wave_Number_Ser(KK)*SIN(Theta_2D(KK,KKK))*Y_maker &
-                  +Wave_Number_Ser(KK)*COS(Theta_2D(KK,KKK))*X_maker + Phase_LEFT(KK,KKK))
+               Cm_eta(I, J, KK) = Cm_eta(I, J, KK) + Amp_Ser(KK, KKK)*COS( &
+                                  Wave_Number_Ser(KK)*SIN(Theta_2D(KK, KKK))*Y_maker &
+                                  + Wave_Number_Ser(KK)*COS(Theta_2D(KK, KKK))*X_maker + Phase_LEFT(KK, KKK))
+               Sm_eta(I, J, KK) = Sm_eta(I, J, KK) + Amp_Ser(KK, KKK)*SIN( &
+                                  Wave_Number_Ser(KK)*SIN(Theta_2D(KK, KKK))*Y_maker &
+                                  + Wave_Number_Ser(KK)*COS(Theta_2D(KK, KKK))*X_maker + Phase_LEFT(KK, KKK))
+               Cm_u(I, J, KK) = Cm_u(I, J, KK) + Amp_Ser(KK, KKK) &
+                                *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev) &
+                                /sinh(Wave_Number_Ser(KK)*Dep_Ser) &
+                                *COS(Theta_2D(KK, KKK))*COS( &
+                                Wave_Number_Ser(KK)*SIN(Theta_2D(KK, KKK))*Y_maker &
+                                + Wave_Number_Ser(KK)*COS(Theta_2D(KK, KKK))*X_maker + Phase_LEFT(KK, KKK))
+               Cm_v(I, J, KK) = Cm_v(I, J, KK) + Amp_Ser(KK, KKK) &
+                                *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev) &
+                                /sinh(Wave_Number_Ser(KK)*Dep_Ser) &
+                                *SIN(Theta_2D(KK, KKK))*COS( &
+                                Wave_Number_Ser(KK)*SIN(Theta_2D(KK, KKK))*Y_maker &
+                                + Wave_Number_Ser(KK)*COS(Theta_2D(KK, KKK))*X_maker + Phase_LEFT(KK, KKK))
+               Sm_u(I, J, KK) = Sm_u(I, J, KK) + Amp_Ser(KK, KKK) &
+                                *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev) &
+                                /sinh(Wave_Number_Ser(KK)*Dep_Ser) &
+                                *COS(Theta_2D(KK, KKK))*SIN( &
+                                Wave_Number_Ser(KK)*SIN(Theta_2D(KK, KKK))*Y_maker &
+                                + Wave_Number_Ser(KK)*COS(Theta_2D(KK, KKK))*X_maker + Phase_LEFT(KK, KKK))
+               Sm_v(I, J, KK) = Sm_v(I, J, KK) + Amp_Ser(KK, KKK) &
+                                *Segma_Ser(KK)*cosh(Wave_Number_Ser(KK)*Zlev) &
+                                /sinh(Wave_Number_Ser(KK)*Dep_Ser) &
+                                *SIN(Theta_2D(KK, KKK))*SIN( &
+                                Wave_Number_Ser(KK)*SIN(Theta_2D(KK, KKK))*Y_maker &
+                                + Wave_Number_Ser(KK)*COS(Theta_2D(KK, KKK))*X_maker + Phase_LEFT(KK, KKK))
 
-         ENDDO
+            END DO
 
-       ENDDO
-       ENDDO
-      ENDDO
+            END DO
+         END DO
+      END DO
 
-
-END SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
-
+   END SUBROUTINE CALCULATE_DATA2D_Cm_Sm_TIME
 
 END MODULE TIME_SPECTRA_MODULE
 

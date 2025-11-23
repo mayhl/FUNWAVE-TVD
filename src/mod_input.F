@@ -5,7 +5,7 @@
 !      This file is part of the FUNWAVE-TVD program under the Simplified BSD license
 !
 !-------------------------------------------------------------------------------------
-! 
+!
 !    Copyright (c) 2016, FUNWAVE Development Team
 !
 !    (See http://www.udel.edu/kirby/programs/funwave/funwave.html
@@ -36,14 +36,14 @@
 !    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 !    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 !    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-!  
+!
 !    The views and conclusions contained in the software and documentation are those
 !    of the authors and should not be interpreted as representing official policies,
 !    either expressed or implied, of the FreeBSD Project.
-!  
+!
 !-------------------------------------------------------------------------------------
 !
-!  INPUT_READ is a module to handle reading input.txt     
+!  INPUT_READ is a module to handle reading input.txt
 !
 !  HISTORY :
 !    02/17/2016  Fengyan Shi
@@ -52,300 +52,290 @@
 
 MODULE INPUT_READ
 
-USE PARAM,ONLY : SP
+   USE PARAM, ONLY: SP
 #if defined (PARALLEL)
-  USE GLOBAL,ONLY : myid,ier
-  USE MPI
+   USE GLOBAL, ONLY: myid, ier
+   USE MPI
 # endif
-  IMPLICIT NONE
-  LOGICAL :: FILE_EXIST
-  CHARACTER(LEN=80) :: VAL_TYPE 
-  CHARACTER(LEN=80) :: VAL_READ 
+   IMPLICIT NONE
+   LOGICAL :: FILE_EXIST
+   CHARACTER(LEN=80) :: VAL_TYPE
+   CHARACTER(LEN=80) :: VAL_READ
 
-INTERFACE READ_FOUR_TYPE_VALUES
-  Module Procedure READ_FLOAT
-  Module Procedure READ_STRING
-  Module Procedure READ_LOGICAL
-  Module Procedure READ_INTEGER
-END INTERFACE
+   INTERFACE READ_FOUR_TYPE_VALUES
+      Module Procedure READ_FLOAT
+      Module Procedure READ_STRING
+      Module Procedure READ_LOGICAL
+      Module Procedure READ_INTEGER
+   END INTERFACE
 
 CONTAINS
-  
+
 ! INTEGER
 
-SUBROUTINE READ_INTEGER(INTEGER_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
-  IMPLICIT NONE
-  INTEGER,          INTENT(OUT) :: INTEGER_VAL 
-  CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
-  CHARACTER(LEN=*), INTENT(IN ) :: MatchCharacter
-  INTEGER           :: ERR_IF_ONE
+   SUBROUTINE READ_INTEGER(INTEGER_VAL, InputFileName, MatchCharacter, ERR_IF_ONE)
+      IMPLICIT NONE
+      INTEGER, INTENT(OUT) :: INTEGER_VAL
+      CHARACTER(LEN=*), INTENT(IN) :: InputFileName
+      CHARACTER(LEN=*), INTENT(IN) :: MatchCharacter
+      INTEGER           :: ERR_IF_ONE
 
-  INQUIRE(FILE=InputFileName,EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
+      INQUIRE (FILE=InputFileName, EXIST=FILE_EXIST)
+      IF (.NOT. FILE_EXIST) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
-    STOP
+         WRITE (*, *) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-  CALL READ_VALUE(InputFileName,MatchCharacter,VAL_READ,ERR_IF_ONE)
-  IF(ERR_IF_ONE == 1)THEN
+      CALL READ_VALUE(InputFileName, MatchCharacter, VAL_READ, ERR_IF_ONE)
+      IF (ERR_IF_ONE == 1) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # endif
-     RETURN
-  ENDIF
+         RETURN
+      END IF
 
-  !check argument type
-  CALL CHECK_CONSISTENCY_TYPE(VAL_READ,VAL_TYPE)
-  IF(TRIM(VAL_TYPE) .NE. 'INTEGER')THEN
+      !check argument type
+      CALL CHECK_CONSISTENCY_TYPE(VAL_READ, VAL_TYPE)
+      IF (TRIM(VAL_TYPE) .NE. 'INTEGER') THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' IS NOT INTEGER, STOP!'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' IS NOT INTEGER, STOP!'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' IS NOT INTEGER, STOP!'
-    STOP
+         WRITE (*, *) TRIM(MatchCharacter), ' IS NOT INTEGER, STOP!'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-  READ(VAL_READ,*)INTEGER_VAL   
+      READ (VAL_READ, *) INTEGER_VAL
 
-  
-  END SUBROUTINE READ_INTEGER
-
+   END SUBROUTINE READ_INTEGER
 
 ! Float
 
-  SUBROUTINE READ_FLOAT(FLOAT_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
-  IMPLICIT NONE
-  REAL(SP),         INTENT(OUT) :: FLOAT_VAL
-  CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
-  CHARACTER(LEN=*), INTENT(IN ) :: MatchCharacter
+   SUBROUTINE READ_FLOAT(FLOAT_VAL, InputFileName, MatchCharacter, ERR_IF_ONE)
+      IMPLICIT NONE
+      REAL(SP), INTENT(OUT) :: FLOAT_VAL
+      CHARACTER(LEN=*), INTENT(IN) :: InputFileName
+      CHARACTER(LEN=*), INTENT(IN) :: MatchCharacter
 
-  INTEGER           :: ERR_IF_ONE
+      INTEGER           :: ERR_IF_ONE
 
-  INQUIRE(FILE=InputFileName,EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
+      INQUIRE (FILE=InputFileName, EXIST=FILE_EXIST)
+      IF (.NOT. FILE_EXIST) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
-    STOP
+         WRITE (*, *) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-  CALL READ_VALUE(InputFileName,MatchCharacter,VAL_READ,ERR_IF_ONE)
-  IF(ERR_IF_ONE == 1)THEN
+      CALL READ_VALUE(InputFileName, MatchCharacter, VAL_READ, ERR_IF_ONE)
+      IF (ERR_IF_ONE == 1) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # endif
-     RETURN
-  ENDIF
+         RETURN
+      END IF
 
-  CALL CHECK_CONSISTENCY_TYPE(VAL_READ,VAL_TYPE)
-  IF(TRIM(VAL_TYPE) .NE. 'float')THEN
+      CALL CHECK_CONSISTENCY_TYPE(VAL_READ, VAL_TYPE)
+      IF (TRIM(VAL_TYPE) .NE. 'float') THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' IS NOT FLOAT, STOP!'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' IS NOT FLOAT, STOP!'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' IS NOT FLOAT, STOP!'
-    STOP
+         WRITE (*, *) TRIM(MatchCharacter), ' IS NOT FLOAT, STOP!'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-  READ(VAL_READ,*)FLOAT_VAL  
-    
-  
-  End SUBROUTINE READ_FLOAT
+      READ (VAL_READ, *) FLOAT_VAL
 
+   End SUBROUTINE READ_FLOAT
 
 ! Logical
-  SUBROUTINE READ_LOGICAL(LOGICAL_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
-  IMPLICIT NONE
-  LOGICAL,          INTENT(OUT) :: LOGICAL_VAL
-  CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
-  CHARACTER(LEN=*), INTENT(IN ) :: MatchCharacter
+   SUBROUTINE READ_LOGICAL(LOGICAL_VAL, InputFileName, MatchCharacter, ERR_IF_ONE)
+      IMPLICIT NONE
+      LOGICAL, INTENT(OUT) :: LOGICAL_VAL
+      CHARACTER(LEN=*), INTENT(IN) :: InputFileName
+      CHARACTER(LEN=*), INTENT(IN) :: MatchCharacter
 
-  INTEGER           :: ERR_IF_ONE
+      INTEGER           :: ERR_IF_ONE
 
-  INQUIRE(FILE=InputFileName,EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
+      INQUIRE (FILE=InputFileName, EXIST=FILE_EXIST)
+      IF (.NOT. FILE_EXIST) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
-    STOP
+         WRITE (*, *) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-  call READ_VALUE(InputFileName,MatchCharacter,VAL_READ,ERR_IF_ONE)
-  IF(ERR_IF_ONE == 1)THEN
+      call READ_VALUE(InputFileName, MatchCharacter, VAL_READ, ERR_IF_ONE)
+      IF (ERR_IF_ONE == 1) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # endif
-     RETURN
-  ENDIF
-  !check argument type
-  CALL CHECK_CONSISTENCY_TYPE(VAL_READ,VAL_TYPE)
-  IF(TRIM(VAL_TYPE) .NE. 'logical')THEN
+         RETURN
+      END IF
+      !check argument type
+      CALL CHECK_CONSISTENCY_TYPE(VAL_READ, VAL_TYPE)
+      IF (TRIM(VAL_TYPE) .NE. 'logical') THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' IS NOT LOGICAL, SET FALSE EXCEPT FIRST LETTER IS T'
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' IS NOT LOGICAL, SET FALSE EXCEPT FIRST LETTER IS T'
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' IS NOT LOGICAL, SET FALSE EXCEPT FIRST LETTER IS T'
+         WRITE (*, *) TRIM(MatchCharacter), ' IS NOT LOGICAL, SET FALSE EXCEPT FIRST LETTER IS T'
 # endif
-  ENDIF
+      END IF
 
-  LOGICAL_VAL = .FALSE.
-  IF(VAL_READ(1:1) == 'T') LOGICAL_VAL = .TRUE.
+      LOGICAL_VAL = .FALSE.
+      IF (VAL_READ(1:1) == 'T') LOGICAL_VAL = .TRUE.
 
-  End SUBROUTINE READ_LOGICAL
+   End SUBROUTINE READ_LOGICAL
 
+   SUBROUTINE READ_STRING(STRING_VAL, InputFileName, MatchCharacter, ERR_IF_ONE)
+      IMPLICIT NONE
+      CHARACTER(LEN=*), INTENT(OUT) :: STRING_VAL
+      CHARACTER(LEN=*), INTENT(IN) :: InputFileName
+      CHARACTER(LEN=*), INTENT(IN) :: MatchCharacter
+      INTEGER, INTENT(OUT) :: ERR_IF_ONE
 
-  SUBROUTINE READ_STRING(STRING_VAL,InputFileName,MatchCharacter,ERR_IF_ONE)  
-  IMPLICIT NONE
-  CHARACTER(LEN=*), INTENT(OUT) :: STRING_VAL
-  CHARACTER(LEN=*), INTENT(IN ) :: InputFileName
-  CHARACTER(LEN=*), INTENT(IN ) :: MatchCharacter
-  INTEGER, INTENT(OUT) :: ERR_IF_ONE
-
-  INQUIRE(FILE=InputFileName,EXIST=FILE_EXIST)
-  IF(.NOT.FILE_EXIST)THEN
+      INQUIRE (FILE=InputFileName, EXIST=FILE_EXIST)
+      IF (.NOT. FILE_EXIST) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(InputFileName), ' CAN NOT BE FOUND. STOP'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
-    STOP
+         WRITE (*, *) TRIM(InputFileName), 'CAN NOT BE FOUND. STOP'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-
-  call READ_VALUE(InputFileName,MatchCharacter,VAL_READ,ERR_IF_ONE)
-  IF(ERR_IF_ONE == 1)THEN
+      call READ_VALUE(InputFileName, MatchCharacter, VAL_READ, ERR_IF_ONE)
+      IF (ERR_IF_ONE == 1) THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
+         WRITE (*, *) TRIM(MatchCharacter), ' DOES NOT EXIST. USE DEFAULT VALUE'
 # endif
-     RETURN
-  ENDIF
+         RETURN
+      END IF
 
-  !check argument type
-  call CHECK_CONSISTENCY_TYPE(VAL_READ,VAL_TYPE)
-  IF(TRIM(VAL_TYPE) .NE. 'string')THEN
+      !check argument type
+      call CHECK_CONSISTENCY_TYPE(VAL_READ, VAL_TYPE)
+      IF (TRIM(VAL_TYPE) .NE. 'string') THEN
 # if defined (PARALLEL)
-   IF(MYID==0) WRITE(*,*) TRIM(MatchCharacter), ' IS NOT STRING, STOP'
-   CALL MPI_FINALIZE (ier)
-   STOP
+         IF (MYID == 0) WRITE (*, *) TRIM(MatchCharacter), ' IS NOT STRING, STOP'
+         CALL MPI_FINALIZE(ier)
+         STOP
 # else
-    WRITE(*,*) TRIM(MatchCharacter), ' IS NOT STRING, STOP'
-    STOP
+         WRITE (*, *) TRIM(MatchCharacter), ' IS NOT STRING, STOP'
+         STOP
 # endif
-  ENDIF
+      END IF
 
-  STRING_VAL = ADJUSTL(TRIM(VAL_READ))
-  
+      STRING_VAL = ADJUSTL(TRIM(VAL_READ))
 
-  End SUBROUTINE READ_STRING
+   End SUBROUTINE READ_STRING
 
+!  read value from file
 
-!  read value from file 
+   SUBROUTINE READ_VALUE(FileName, MatchCharacter, VAL, ERR_IF_ONE)
+      IMPLICIT NONE
+      CHARACTER(LEN=*), INTENT(IN) :: FileName
+      CHARACTER(LEN=*), INTENT(IN) :: MatchCharacter
+      CHARACTER(LEN=80), INTENT(OUT) :: VAL
+      INTEGER, INTENT(OUT) :: ERR_IF_ONE
 
-  SUBROUTINE READ_VALUE(FileName,MatchCharacter,VAL,ERR_IF_ONE)
-  IMPLICIT NONE
-  CHARACTER(LEN=* ), INTENT(IN ) :: FileName 
-  CHARACTER(LEN=* ), INTENT(IN ) :: MatchCharacter 
-  CHARACTER(LEN=80), INTENT(OUT) :: VAL
-  INTEGER,           INTENT(OUT) :: ERR_IF_ONE
-  
-  CHARACTER(LEN=80)  :: TMPV,TMPV_NEXT,TEXT,TEXT_READ
-  INTEGER            :: LOCATION,FRONT,TEXT_LENGTH,I
-  CHARACTER(LEN=1), PARAMETER :: COM_CHAR = '!'
+      CHARACTER(LEN=80)  :: TMPV, TMPV_NEXT, TEXT, TEXT_READ
+      INTEGER            :: LOCATION, FRONT, TEXT_LENGTH, I
+      CHARACTER(LEN=1), PARAMETER :: COM_CHAR = '!'
 
-  ERR_IF_ONE   = 0
-  OPEN(10,FILE=TRIM(FileName)) ; REWIND(10) 
+      ERR_IF_ONE = 0
+      OPEN (10, FILE=TRIM(FileName)); REWIND (10)
 
-   DO WHILE(.TRUE.)
+      DO WHILE (.TRUE.)
 
-     READ(10,'(A)',END=100) TEXT_READ 
+         READ (10, '(A)', END=100) TEXT_READ
 
+         LOCATION = index(TEXT_READ, com_char)
+         if (LOCATION == 0) LOCATION = len_trim(TEXT_READ) + 1
+         TMPV = TEXT_READ(1:LOCATION - 1)
+         TEXT = TMPV
+         TEXT_LENGTH = len_trim(TEXT)
+         FRONT = index(TEXT, "=")
+         TMPV_NEXT = TEXT(1:FRONT - 1)
+         IF (ADJUSTL(TRIM(TMPV_NEXT)) == TRIM(MatchCharacter)) THEN
+            VAL = ADJUSTL(TEXT(FRONT + 1:TEXT_LENGTH))
+            RETURN
+         END IF
 
-    LOCATION = index(TEXT_READ,com_char)
-    if(LOCATION == 0)LOCATION = len_trim(TEXT_READ)+1
-    TMPV = TEXT_READ(1:LOCATION-1)
-    TEXT = TMPV
-    TEXT_LENGTH = len_trim(TEXT)
-    FRONT = index(TEXT,"=")
-    TMPV_NEXT = TEXT(1:FRONT-1)
-    IF(ADJUSTL(TRIM(TMPV_NEXT)) == TRIM(MatchCharacter))THEN
-      VAL  = ADJUSTL(TEXT(FRONT+1:TEXT_LENGTH))
-      RETURN
-    ENDIF
+      END DO
 
-  ENDDO
+100   CONTINUE
+      ERR_IF_ONE = 1
+      CLOSE (10)
 
-  100 CONTINUE
-  ERR_IF_ONE = 1
-  CLOSE(10)
+   End SUBROUTINE READ_VALUE
 
-  End SUBROUTINE READ_VALUE  
+   SUBROUTINE CHECK_CONSISTENCY_TYPE(VREAD, VTYPE)
+      IMPLICIT NONE
+      CHARACTER(LEN=80), INTENT(OUT) :: VTYPE
+      CHARACTER(LEN=80), INTENT(IN) :: VREAD
 
-  SUBROUTINE CHECK_CONSISTENCY_TYPE(VREAD,VTYPE)
-  IMPLICIT NONE
-  CHARACTER(LEN=80), INTENT(OUT) :: VTYPE 
-  CHARACTER(LEN=80), INTENT(IN ) :: VREAD  
+      CHARACTER(LEN=16) :: NUMBERS
+      INTEGER           :: LOGICAL_VAL_READ
+      INTEGER           :: DotLocation
+      INTEGER           :: I
+      numbers = "0123456789+-Ee. "
 
-  CHARACTER(LEN=16) :: NUMBERS
-  INTEGER           :: LOGICAL_VAL_READ
-  INTEGER           :: DotLocation
-  INTEGER           :: I
-  numbers = "0123456789+-Ee. " 
-
-  LOGICAL_VAL_READ = LEN_TRIM(ADJUSTL(VREAD))
+      LOGICAL_VAL_READ = LEN_TRIM(ADJUSTL(VREAD))
 
 ! check it it is logical
-  IF(LOGICAL_VAL_READ == 1)THEN
-  IF(VREAD(1:1) == "T" .or. VREAD(1:1) == "F")then 
-    VTYPE = 'logical' 
-    RETURN
-  ENDIF
-  ENDIF
-    
-  ! check if it is a string
-  DO I=1,LOGICAL_VAL_READ
-    IF(INDEX(NUMBERS,VREAD(i:i)) == 0)THEN
-      VTYPE = "string" 
-      RETURN
-    ENDIF
-  ENDDO
+      IF (LOGICAL_VAL_READ == 1) THEN
+      IF (VREAD(1:1) == "T" .or. VREAD(1:1) == "F") then
+         VTYPE = 'logical'
+         RETURN
+      END IF
+      END IF
 
-  ! check if it is a float
-  DotLocation = index(VREAD,".")
-  IF(DotLocation .NE. 0) then
-    VTYPE = "float"
-  ELSE
-    VTYPE = "INTEGER"
-  ENDIF
+      ! check if it is a string
+      DO I = 1, LOGICAL_VAL_READ
+         IF (INDEX(NUMBERS, VREAD(i:i)) == 0) THEN
+            VTYPE = "string"
+            RETURN
+         END IF
+      END DO
 
-  End SUBROUTINE CHECK_CONSISTENCY_TYPE
+      ! check if it is a float
+      DotLocation = index(VREAD, ".")
+      IF (DotLocation .NE. 0) then
+         VTYPE = "float"
+      ELSE
+         VTYPE = "INTEGER"
+      END IF
+
+   End SUBROUTINE CHECK_CONSISTENCY_TYPE
 
 END MODULE INPUT_READ
-
 

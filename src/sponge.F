@@ -5,7 +5,7 @@
 !      This file is part of the FUNWAVE-TVD program under the Simplified BSD license
 !
 !-------------------------------------------------------------------------------------
-! 
+!
 !    Copyright (c) 2016, FUNWAVE Development Team
 !
 !    (See http://www.udel.edu/kirby/programs/funwave/funwave.html
@@ -36,32 +36,32 @@
 !    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 !    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 !    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-!  
+!
 !    The views and conclusions contained in the software and documentation are those
 !    of the authors and should not be interpreted as representing official policies,
 !    either expressed or implied, of the FreeBSD Project.
-!  
+!
 !-------------------------------------------------------------------------------------
 !
 !    SPONGE_DAMPING is subroutine for dampping waves using Larsen-Dancy(1983)
-!    type sponge layer 
-!    
+!    type sponge layer
+!
 !    HISTORY: 10/27/2010 Fengyan Shi
 !
 !-------------------------------------------------------------------------------------
 SUBROUTINE SPONGE_DAMPING
-     USE GLOBAL
-     IMPLICIT NONE
+   USE GLOBAL
+   IMPLICIT NONE
 
-     DO J=1,Nloc
-     DO I=1,Mloc
-      IF(MASK(I,J)>ZERO)THEN
-       ETA(I,J)=ETA(I,J)/SPONGE(I,J)
-      ENDIF
-       U(I,J)=U(I,J)/SPONGE(I,J)
-       V(I,J)=V(I,J)/SPONGE(I,J)
-     ENDDO
-     ENDDO
+   DO J = 1, Nloc
+   DO I = 1, Mloc
+      IF (MASK(I, J) > ZERO) THEN
+         ETA(I, J) = ETA(I, J)/SPONGE(I, J)
+      END IF
+      U(I, J) = U(I, J)/SPONGE(I, J)
+      V(I, J) = V(I, J)/SPONGE(I, J)
+   END DO
+   END DO
 
 END SUBROUTINE SPONGE_DAMPING
 
@@ -69,33 +69,33 @@ END SUBROUTINE SPONGE_DAMPING
 !
 !    ABSORBING_GENERATING_BC is subroutine for wave generation using Larsen-Dancy(1983)
 !      type wave-maker
-!    
-!    HISTORY: 
+!
+!    HISTORY:
 !      05/01/2014 Fengyan Shi
 !
 !-------------------------------------------------------------------------------------
 SUBROUTINE ABSORBING_GENERATING_BC
-     USE GLOBAL, ONLY : ETA,U,V,SPONGEMAKER,Mloc,Nloc,MASK,I,J,DX,DY,ZERO
-     USE GLOBAL, ONLY : SP,PI,Grav,TIME,NumFreq,Phase_Ser,&
-                       Ibeg,Iend,Jbeg,Jend,&
-                       Segma_Ser,Stokes_Drift_Ser,Cm_eta,Sm_eta,&
-                       Cm_u,Sm_u,Cm_v,Sm_v,SPONGE,tmp4preview, &
-                       HU, HV,Depth
-     USE TIDE_MODULE
+   USE GLOBAL, ONLY: ETA, U, V, SPONGEMAKER, Mloc, Nloc, MASK, I, J, DX, DY, ZERO
+   USE GLOBAL, ONLY: SP, PI, Grav, TIME, NumFreq, Phase_Ser, &
+                     Ibeg, Iend, Jbeg, Jend, &
+                     Segma_Ser, Stokes_Drift_Ser, Cm_eta, Sm_eta, &
+                     Cm_u, Sm_u, Cm_v, Sm_v, SPONGE, tmp4preview, &
+                     HU, HV, Depth
+   USE TIDE_MODULE
 
-     IMPLICIT NONE
-     INTEGER :: KK_sponge
-     real(SP),DIMENSION(Mloc,Nloc) :: Ein2D,Din2D
-     real(SP),DIMENSION(Mloc,Nloc) :: Uin2D,Vin2D
-     
+   IMPLICIT NONE
+   INTEGER :: KK_sponge
+   real(SP), DIMENSION(Mloc, Nloc) :: Ein2D, Din2D
+   real(SP), DIMENSION(Mloc, Nloc) :: Uin2D, Vin2D
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!START!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    REAL(SP),DIMENSION(NumFreq) :: BB,CC                  ! Salatin et al. 2021
+   REAL(SP), DIMENSION(NumFreq) :: BB, CC                  ! Salatin et al. 2021
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-     Ein2D = ZERO
-     Uin2D = ZERO
-     Vin2D = ZERO
-     
+   Ein2D = ZERO
+   Uin2D = ZERO
+   Vin2D = ZERO
+
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!START!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
@@ -107,475 +107,466 @@ SUBROUTINE ABSORBING_GENERATING_BC
 
 ! Eliminate redundant operations to speed up!
 
-
-    ! eliminate sine and cosine from redundant calculations
-    DO KK_sponge= 1, NumFreq
+   ! eliminate sine and cosine from redundant calculations
+   DO KK_sponge = 1, NumFreq
 !        BB(KK_sponge) = COS(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
 !        CC(KK_sponge) = SIN(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME+Phase_Ser(KK_sponge))
-        BB(KK_sponge) = COS(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME)
-        CC(KK_sponge) = SIN(pi/2.0_SP+Segma_Ser(KK_sponge)*TIME)
-    ENDDO
+      BB(KK_sponge) = COS(pi/2.0_SP + Segma_Ser(KK_sponge)*TIME)
+      CC(KK_sponge) = SIN(pi/2.0_SP + Segma_Ser(KK_sponge)*TIME)
+   END DO
 
-
-    ! use constant values to speed up
-    DO J = 1,Nloc
-        DO I = 1,Mloc
-            DO KK_sponge= 1, NumFreq
-                Ein2D(I,J)=Ein2D(I,J)+Cm_eta(I,J,KK_sponge)*BB(KK_sponge)+Sm_eta(I,J,KK_sponge)*&
-                CC(KK_sponge)
-                Uin2D(I,J)=Uin2D(I,J)+Cm_u(I,J,KK_sponge)*BB(KK_sponge)+ &
-                           Sm_u(I,J,KK_sponge)*CC(KK_sponge)
-                Vin2D(I,J)=Vin2D(I,J)+Cm_v(I,J,KK_sponge)*BB(KK_sponge)+ &
-                           Sm_v(I,J,KK_sponge)*CC(KK_sponge)
-            ENDDO
-   ! add tidal information at boundary
-           IF(TIDAL_BC_GEN_ABS) THEN
-            Ein2D(I,J)=Ein2D(I,J) + TideWEST_ETA
-            Uin2D(I,J)=Uin2D(I,J)+ TideWEST_U
-            Vin2D(I,J)=Vin2D(I,J)+ TideWEST_V
-           ENDIF
+   ! use constant values to speed up
+   DO J = 1, Nloc
+      DO I = 1, Mloc
+         DO KK_sponge = 1, NumFreq
+            Ein2D(I, J) = Ein2D(I, J) + Cm_eta(I, J, KK_sponge)*BB(KK_sponge) + Sm_eta(I, J, KK_sponge)* &
+                          CC(KK_sponge)
+            Uin2D(I, J) = Uin2D(I, J) + Cm_u(I, J, KK_sponge)*BB(KK_sponge) + &
+                          Sm_u(I, J, KK_sponge)*CC(KK_sponge)
+            Vin2D(I, J) = Vin2D(I, J) + Cm_v(I, J, KK_sponge)*BB(KK_sponge) + &
+                          Sm_v(I, J, KK_sponge)*CC(KK_sponge)
+         END DO
+         ! add tidal information at boundary
+         IF (TIDAL_BC_GEN_ABS) THEN
+            Ein2D(I, J) = Ein2D(I, J) + TideWEST_ETA
+            Uin2D(I, J) = Uin2D(I, J) + TideWEST_U
+            Vin2D(I, J) = Vin2D(I, J) + TideWEST_V
+         END IF
 
 !            Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))/SpongeMaker(I,J)
 
-            Eta(I,J) = Ein2D(I,J)+ (Eta(I,J)-Ein2D(I,J))*SPONGE_TIDE_WEST(I,J)
+         Eta(I, J) = Ein2D(I, J) + (Eta(I, J) - Ein2D(I, J))*SPONGE_TIDE_WEST(I, J)
 
 !            U(I,J) = Uin2D(I,J)+(U(I,J)-Uin2D(I,J))*SPONGE_TIDE_WEST(I,J)
 !            V(I,J) = Vin2D(I,J)+(V(I,J)-Vin2D(I,J))*SPONGE_TIDE_WEST(I,J)
 
-            HU(I,J)=(Depth(I,J)+ETA(I,J))*U(I,J)
-            HV(I,J)=(Depth(I,J)+ETA(I,J))*V(I,J)
-        ENDDO
-    ENDDO
-
+         HU(I, J) = (Depth(I, J) + ETA(I, J))*U(I, J)
+         HV(I, J) = (Depth(I, J) + ETA(I, J))*V(I, J)
+      END DO
+   END DO
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 
-       tmp4preview = Ein2D
+   tmp4preview = Ein2D
 
 END SUBROUTINE ABSORBING_GENERATING_BC
 
 !-------------------------------------------------------------------------------------
-!    CALCULATE_SPONGE_MAKER is subroutine for calculation of 
+!    CALCULATE_SPONGE_MAKER is subroutine for calculation of
 !      spong layer coefficient
-!    
-!    HISTORY: 
+!
+!    HISTORY:
 !      05/01/2014 Fengyan Shi
 !-------------------------------------------------------------------------------------
-SUBROUTINE CALCULATE_SPONGE_MAKER(M,N,Nghost,DX,DY,&
-                            Sponge_west_width, &
-                            R_sponge,A_sponge,SPONGE)
-     USE PARAM
+SUBROUTINE CALCULATE_SPONGE_MAKER(M, N, Nghost, DX, DY, &
+                                  Sponge_west_width, &
+                                  R_sponge, A_sponge, SPONGE)
+   USE PARAM
 # if defined (PARALLEL)
-     USE GLOBAL, ONLY : n_west, n_east, n_suth, n_nrth,&
-                 px,py,npx,npy,Mglob,Nglob, &
-	           iista   !ykchoi Jan/23/2018
+   USE GLOBAL, ONLY: n_west, n_east, n_suth, n_nrth, &
+                     px, py, npx, npy, Mglob, Nglob, &
+                     iista   !ykchoi Jan/23/2018
 # endif
-     IMPLICIT NONE
-     INTEGER, INTENT(IN)::M,N,Nghost
+   IMPLICIT NONE
+   INTEGER, INTENT(IN)::M, N, Nghost
 # if defined (CARTESIAN)
-     REAL(SP),INTENT(IN)::DX,DY
+   REAL(SP), INTENT(IN)::DX, DY
 # else
-     REAL(SP),DIMENSION(M,N),INTENT(IN)::DX,DY
+   REAL(SP), DIMENSION(M, N), INTENT(IN)::DX, DY
 # endif
-     REAL(SP),INTENT(IN) :: &
-                          Sponge_west_width, &
-                          R_sponge,A_sponge
-     REAL(SP),DIMENSION(M,N),INTENT(INOUT)::SPONGE
-     REAL(SP)::ri,lim
-     INTEGER::Iwidth
-
+   REAL(SP), INTENT(IN) :: &
+      Sponge_west_width, &
+      R_sponge, A_sponge
+   REAL(SP), DIMENSION(M, N), INTENT(INOUT)::SPONGE
+   REAL(SP)::ri, lim
+   INTEGER::Iwidth
 
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_west_width/DX)+Nghost
+   Iwidth = INT(Sponge_west_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_west_width/DX(1,1))+Nghost
+   Iwidth = INT(Sponge_west_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,Iwidth
-       IF(SPONGE(I,J)>1.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=1.0_SP
-       ENDIF
+   DO J = 1, N
+   DO I = 1, Iwidth
+      IF (SPONGE(I, J) > 1.0_SP) THEN
+         lim = SPONGE(I, J)
+      ELSE
+         lim = 1.0_SP
+      END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri = R_Sponge**(50*(i+npx*Mglob/px-1)/(Iwidth-1))
-	ri = R_Sponge**(50*(i + (iista - 1) -1)/(Iwidth-1))
+      ri = R_Sponge**(50*(i + (iista - 1) - 1)/(Iwidth - 1))
 !---ykchoi Jan/23/2018]
 # else
-       ri=R_sponge**(50*(I-1)/(Iwidth-1))
+      ri = R_sponge**(50*(I - 1)/(Iwidth - 1))
 # endif
-       Sponge(i,j)=MAX(A_Sponge**ri,lim)
-     ENDDO
-     ENDDO
+      Sponge(i, j) = MAX(A_Sponge**ri, lim)
+   END DO
+   END DO
 
 END SUBROUTINE CALCULATE_SPONGE_MAKER
 
 !-------------------------------------------------------------------------------------
 !
-!    CALCULATE_FRICTION_SPONGE is subroutine for coefficient of 
+!    CALCULATE_FRICTION_SPONGE is subroutine for coefficient of
 !      friction type sponge layer
-!    
+!
 !    HISTORY: 05/01/2014 Fengyan Shi
 !
 !-------------------------------------------------------------------------------------
-SUBROUTINE CALCULATE_FRICTION_SPONGE(M,N,Nghost,DX,DY,&
-                            Sponge_west_width,Sponge_east_width,&
-                            Sponge_south_width,Sponge_north_width, &
-                            R_sponge,A_sponge,SPONGE)
-     USE PARAM
-     USE GLOBAL, ONLY : depth,MinDepthFrc,CDsponge
-                        
+SUBROUTINE CALCULATE_FRICTION_SPONGE(M, N, Nghost, DX, DY, &
+                                     Sponge_west_width, Sponge_east_width, &
+                                     Sponge_south_width, Sponge_north_width, &
+                                     R_sponge, A_sponge, SPONGE)
+   USE PARAM
+   USE GLOBAL, ONLY: depth, MinDepthFrc, CDsponge
+
 # if defined (PARALLEL)
-     USE GLOBAL, ONLY : n_west, n_east, n_suth, n_nrth,px,py,npx,npy,&
-                        Mglob,Nglob, &
-	                  iista, iiend, jjsta, jjend    !ykchoi Jan/23/2018
+   USE GLOBAL, ONLY: n_west, n_east, n_suth, n_nrth, px, py, npx, npy, &
+                     Mglob, Nglob, &
+                     iista, iiend, jjsta, jjend    !ykchoi Jan/23/2018
 # endif
-     IMPLICIT NONE
-     INTEGER, INTENT(IN)::M,N,Nghost
+   IMPLICIT NONE
+   INTEGER, INTENT(IN)::M, N, Nghost
 # if defined (CARTESIAN)
-     REAL(SP),INTENT(IN)::DX,DY
+   REAL(SP), INTENT(IN)::DX, DY
 # else
-     REAL(SP),DIMENSION(M,N),INTENT(IN)::DX,DY
+   REAL(SP), DIMENSION(M, N), INTENT(IN)::DX, DY
 # endif
-     REAL(SP),INTENT(IN) :: &
-                          Sponge_west_width,Sponge_east_width,&
-                          Sponge_south_width,Sponge_north_width, &
-                          R_sponge,A_sponge
-     REAL(SP),DIMENSION(M,N),INTENT(OUT)::SPONGE
-     REAL(SP)::ri,lim
-     INTEGER::Iwidth
-     REAL(SP) :: DXg,DYg,xx
-     REAL(SP),DIMENSION(M,N) :: tmp_2d_1,tmp_2d_2
+   REAL(SP), INTENT(IN) :: &
+      Sponge_west_width, Sponge_east_width, &
+      Sponge_south_width, Sponge_north_width, &
+      R_sponge, A_sponge
+   REAL(SP), DIMENSION(M, N), INTENT(OUT)::SPONGE
+   REAL(SP)::ri, lim
+   INTEGER::Iwidth
+   REAL(SP) :: DXg, DYg, xx
+   REAL(SP), DIMENSION(M, N) :: tmp_2d_1, tmp_2d_2
 
-
-! note that I used SPONGE represent CD from input, do not mess up 
-! with the sponge defined in the direction sponge 
+! note that I used SPONGE represent CD from input, do not mess up
+! with the sponge defined in the direction sponge
 
 # if defined (CARTESIAN)
-     DXg=DX
-     DYg=DY
+   DXg = DX
+   DYg = DY
 # else
-     DXg=DX(1,1)
-     DYg=DY(1,1)
+   DXg = DX(1, 1)
+   DYg = DY(1, 1)
 # endif
 
-     SPONGE = ZERO
-     tmp_2d_2 = ZERO
-     tmp_2d_1 = ZERO
+   SPONGE = ZERO
+   tmp_2d_2 = ZERO
+   tmp_2d_1 = ZERO
 
 ! west
 
-     IF(Sponge_west_width>ZERO)THEN
+   IF (Sponge_west_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_west_width/DX)+Nghost
+      Iwidth = INT(Sponge_west_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_west_width/DX(1,1))+Nghost
+      Iwidth = INT(Sponge_west_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,M
-         lim=0.0_SP
+      DO J = 1, N
+      DO I = 1, M
+         lim = 0.0_SP
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !        ri=MAX(0.0,REAL(Iwidth-i-npx*Mglob/px))
-        ri=MAX(0.0,REAL( Iwidth-i-(iista-1) ))
+         ri = MAX(0.0, REAL(Iwidth - i - (iista - 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-I))
+         ri = MAX(0.0, REAL(Iwidth - I))
 # endif
-       tmp_2d_1(i,j)=MAX(CDsponge*TANH(ri/10.0),lim)
+         tmp_2d_1(i, j) = MAX(CDsponge*TANH(ri/10.0), lim)
 
-     ENDDO
-     ENDDO
-     ENDIF
+      END DO
+      END DO
+   END IF
 
 ! east
 
-     IF(Sponge_east_width>ZERO)THEN
+   IF (Sponge_east_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_east_width/DX)+Nghost
+      Iwidth = INT(Sponge_east_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_east_width/DX(1,1))+Nghost
+      Iwidth = INT(Sponge_east_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,M
-         lim=0.0_SP
+      DO J = 1, N
+      DO I = 1, M
+         lim = 0.0_SP
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-M+I-(px-npx-1)*Mglob/px))
-       ri=MAX(0.0,REAL(Iwidth-M+I-(px-npx-1)*(iiend - iista + 1) ))
+         ri = MAX(0.0, REAL(Iwidth - M + I - (px - npx - 1)*(iiend - iista + 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-M+I))
+         ri = MAX(0.0, REAL(Iwidth - M + I))
 # endif
-       tmp_2d_2(i,j)=MAX(CDsponge*TANH(ri/10.0),lim)
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_2(i, j) = MAX(CDsponge*TANH(ri/10.0), lim)
+      END DO
+      END DO
+   END IF
 
-      DO J=1,N
-      DO I=1,M
-        IF(tmp_2d_1(I,J)>tmp_2d_2(I,J)) THEN
-          Sponge(I,J)=tmp_2d_1(I,J)
-        ELSE
-          Sponge(I,J)=tmp_2d_2(I,J)
-        ENDIF
-      ENDDO
-      ENDDO
+   DO J = 1, N
+   DO I = 1, M
+      IF (tmp_2d_1(I, J) > tmp_2d_2(I, J)) THEN
+         Sponge(I, J) = tmp_2d_1(I, J)
+      ELSE
+         Sponge(I, J) = tmp_2d_2(I, J)
+      END IF
+   END DO
+   END DO
 
 ! south
 
-     IF(Sponge_south_width>ZERO)THEN
+   IF (Sponge_south_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_south_width/DY)+Nghost
+      Iwidth = INT(Sponge_south_width/DY) + Nghost
 # else
-     Iwidth=INT(Sponge_south_width/DY(1,1))+Nghost
+      Iwidth = INT(Sponge_south_width/DY(1, 1)) + Nghost
 # endif
-     DO I=1,M
-     DO J=1,N
-       IF(SPONGE(I,J)>0.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=0.0_SP
-       ENDIF
+      DO I = 1, M
+      DO J = 1, N
+         IF (SPONGE(I, J) > 0.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 0.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-J-npy*Nglob/py))
-       ri=MAX(0.0,REAL(Iwidth-J-(jjsta - 1)))
+         ri = MAX(0.0, REAL(Iwidth - J - (jjsta - 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-J))
+         ri = MAX(0.0, REAL(Iwidth - J))
 # endif
-       tmp_2d_1(i,j)=MAX(CDsponge*TANH(ri/10.0),lim)
-     ENDDO
-     ENDDO
-     ENDIF
-
+         tmp_2d_1(i, j) = MAX(CDsponge*TANH(ri/10.0), lim)
+      END DO
+      END DO
+   END IF
 
 ! north
 
-     IF(Sponge_north_width>ZERO)THEN
+   IF (Sponge_north_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_north_width/DY)+Nghost
+      Iwidth = INT(Sponge_north_width/DY) + Nghost
 # else
-     Iwidth=INT(Sponge_north_width/DY(1,1))+Nghost
+      Iwidth = INT(Sponge_north_width/DY(1, 1)) + Nghost
 # endif
-     DO I=1,M
-     DO J=1,N
-       IF(SPONGE(I,J)>0.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=0.0_SP
-       ENDIF
+      DO I = 1, M
+      DO J = 1, N
+         IF (SPONGE(I, J) > 0.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 0.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-N+J-(py-npy-1)*Nglob/py))
-       ri=MAX(0.0,REAL(Iwidth-N+J-(py-npy-1)*(jjend - jjsta + 1) ))
+         ri = MAX(0.0, REAL(Iwidth - N + J - (py - npy - 1)*(jjend - jjsta + 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-N+J))
+         ri = MAX(0.0, REAL(Iwidth - N + J))
 # endif
-       tmp_2d_2(i,j)=MAX(CDsponge*TANH(ri/10.0),lim)
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_2(i, j) = MAX(CDsponge*TANH(ri/10.0), lim)
+      END DO
+      END DO
+   END IF
 
-      DO J=1,N
-      DO I=1,M
-        IF(tmp_2d_1(I,J)>tmp_2d_2(I,J)) THEN
-          Sponge(I,J)=tmp_2d_1(I,J)
-        ELSE
-          Sponge(I,J)=tmp_2d_2(I,J)
-        ENDIF
-      ENDDO
-      ENDDO
-
+   DO J = 1, N
+   DO I = 1, M
+      IF (tmp_2d_1(I, J) > tmp_2d_2(I, J)) THEN
+         Sponge(I, J) = tmp_2d_1(I, J)
+      ELSE
+         Sponge(I, J) = tmp_2d_2(I, J)
+      END IF
+   END DO
+   END DO
 
 END SUBROUTINE CALCULATE_FRICTION_SPONGE
 
 !-------------------------------------------------------------------------------------
 !
-!    CALCULATE_DIFFUSION_SPONGE is subroutine for coefficient of 
+!    CALCULATE_DIFFUSION_SPONGE is subroutine for coefficient of
 !      diffusion type sponge layer
-!    
+!
 !    HISTORY: 05/01/2014 Fengyan Shi
 !
 !-------------------------------------------------------------------------------------
-SUBROUTINE CALCULATE_DIFFUSION_SPONGE(M,N,Nghost,DX,DY,&
-                            Sponge_west_width,Sponge_east_width,&
-                            Sponge_south_width,Sponge_north_width, &
-                            R_sponge,A_sponge,SPONGE)
-     USE PARAM
-     USE GLOBAL, ONLY : depth,MinDepthFrc,Csp
-                        
+SUBROUTINE CALCULATE_DIFFUSION_SPONGE(M, N, Nghost, DX, DY, &
+                                      Sponge_west_width, Sponge_east_width, &
+                                      Sponge_south_width, Sponge_north_width, &
+                                      R_sponge, A_sponge, SPONGE)
+   USE PARAM
+   USE GLOBAL, ONLY: depth, MinDepthFrc, Csp
+
 # if defined (PARALLEL)
-     USE GLOBAL, ONLY : n_west, n_east, n_suth, n_nrth,px,py,npx,npy,&
-                        Mglob,Nglob, &
-	                  iista, iiend, jjsta, jjend    !ykchoi Jan/23/2018
+   USE GLOBAL, ONLY: n_west, n_east, n_suth, n_nrth, px, py, npx, npy, &
+                     Mglob, Nglob, &
+                     iista, iiend, jjsta, jjend    !ykchoi Jan/23/2018
 # endif
-     IMPLICIT NONE
-     INTEGER, INTENT(IN)::M,N,Nghost
+   IMPLICIT NONE
+   INTEGER, INTENT(IN)::M, N, Nghost
 # if defined (CARTESIAN)
-     REAL(SP),INTENT(IN)::DX,DY
+   REAL(SP), INTENT(IN)::DX, DY
 # else
-     REAL(SP),DIMENSION(M,N),INTENT(IN)::DX,DY
+   REAL(SP), DIMENSION(M, N), INTENT(IN)::DX, DY
 # endif
-     REAL(SP),INTENT(IN) :: &
-                          Sponge_west_width,Sponge_east_width,&
-                          Sponge_south_width,Sponge_north_width, &
-                          R_sponge,A_sponge
-     REAL(SP),DIMENSION(M,N),INTENT(INOUT)::SPONGE
-     REAL(SP)::ri,lim
-     INTEGER::Iwidth
-     REAL(SP) :: DXg,DYg,xx
-     REAL(SP),DIMENSION(M,N) :: tmp_2d_1,tmp_2d_2
+   REAL(SP), INTENT(IN) :: &
+      Sponge_west_width, Sponge_east_width, &
+      Sponge_south_width, Sponge_north_width, &
+      R_sponge, A_sponge
+   REAL(SP), DIMENSION(M, N), INTENT(INOUT)::SPONGE
+   REAL(SP)::ri, lim
+   INTEGER::Iwidth
+   REAL(SP) :: DXg, DYg, xx
+   REAL(SP), DIMENSION(M, N) :: tmp_2d_1, tmp_2d_2
 
-
-     tmp_2d_2 = ZERO
-     tmp_2d_1 = ZERO
+   tmp_2d_2 = ZERO
+   tmp_2d_1 = ZERO
 
 # if defined (CARTESIAN)
-     DXg=DX
-     DYg=DY
+   DXg = DX
+   DYg = DY
 # else
-     DXg=DX(1,1)
-     DYg=DY(1,1)
+   DXg = DX(1, 1)
+   DYg = DY(1, 1)
 # endif
 
 ! west
 
-     IF(Sponge_west_width>ZERO)THEN
+   IF (Sponge_west_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_west_width/DX)+Nghost
+      Iwidth = INT(Sponge_west_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_west_width/DX(1,1))+Nghost
+      Iwidth = INT(Sponge_west_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,M
-       IF(SPONGE(I,J)>0.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=0.0_SP
-       ENDIF
+      DO J = 1, N
+      DO I = 1, M
+         IF (SPONGE(I, J) > 0.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 0.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-i-npx*Mglob/px))
-       ri=MAX(0.0,REAL(Iwidth-i-(iista - 1)))
+         ri = MAX(0.0, REAL(Iwidth - i - (iista - 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-I))
+         ri = MAX(0.0, REAL(Iwidth - I))
 # endif
-       tmp_2d_1(i,j)=MAX(Csp*TANH(ri/10.0),lim)
+         tmp_2d_1(i, j) = MAX(Csp*TANH(ri/10.0), lim)
 
-     ENDDO
-     ENDDO
-     ENDIF
+      END DO
+      END DO
+   END IF
 
 ! east
 
-     IF(Sponge_east_width>ZERO)THEN
+   IF (Sponge_east_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_east_width/DX)+Nghost
+      Iwidth = INT(Sponge_east_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_east_width/DX(1,1))+Nghost
+      Iwidth = INT(Sponge_east_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,M
-       IF(SPONGE(I,J)>0.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=0.0_SP
-       ENDIF
+      DO J = 1, N
+      DO I = 1, M
+         IF (SPONGE(I, J) > 0.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 0.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-M+I-(px-npx-1)*Mglob/px))
-       ri=MAX(0.0,REAL(Iwidth-M+I-(px-npx-1)*(iiend - iista + 1) ))
+         ri = MAX(0.0, REAL(Iwidth - M + I - (px - npx - 1)*(iiend - iista + 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-M+I))
+         ri = MAX(0.0, REAL(Iwidth - M + I))
 # endif
-       tmp_2d_2(i,j)=MAX(Csp*TANH(ri/10.0),lim)
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_2(i, j) = MAX(Csp*TANH(ri/10.0), lim)
+      END DO
+      END DO
+   END IF
 
-      DO J=1,N
-      DO I=1,M
-        IF(tmp_2d_1(I,J)>tmp_2d_2(I,J)) THEN
-          Sponge(I,J)=tmp_2d_1(I,J)
-        ELSE
-          Sponge(I,J)=tmp_2d_2(I,J)
-        ENDIF
-      ENDDO
-      ENDDO
+   DO J = 1, N
+   DO I = 1, M
+      IF (tmp_2d_1(I, J) > tmp_2d_2(I, J)) THEN
+         Sponge(I, J) = tmp_2d_1(I, J)
+      ELSE
+         Sponge(I, J) = tmp_2d_2(I, J)
+      END IF
+   END DO
+   END DO
 
 ! south
 
-     IF(Sponge_south_width>ZERO)THEN
+   IF (Sponge_south_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_south_width/DY)+Nghost
+      Iwidth = INT(Sponge_south_width/DY) + Nghost
 # else
-     Iwidth=INT(Sponge_south_width/DY(1,1))+Nghost
+      Iwidth = INT(Sponge_south_width/DY(1, 1)) + Nghost
 # endif
-     DO I=1,M
-     DO J=1,N
-       IF(SPONGE(I,J)>0.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=0.0_SP
-       ENDIF
+      DO I = 1, M
+      DO J = 1, N
+         IF (SPONGE(I, J) > 0.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 0.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-J-npy*Nglob/py))
-       ri=MAX(0.0,REAL(Iwidth-J-(jjsta - 1)))
+         ri = MAX(0.0, REAL(Iwidth - J - (jjsta - 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-J))
+         ri = MAX(0.0, REAL(Iwidth - J))
 # endif
-       tmp_2d_1(i,j)=MAX(Csp*TANH(ri/10.0),lim)
-     ENDDO
-     ENDDO
-     ENDIF
-
+         tmp_2d_1(i, j) = MAX(Csp*TANH(ri/10.0), lim)
+      END DO
+      END DO
+   END IF
 
 ! north
 
-     IF(Sponge_north_width>ZERO)THEN
+   IF (Sponge_north_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_north_width/DY)+Nghost
+      Iwidth = INT(Sponge_north_width/DY) + Nghost
 # else
-     Iwidth=INT(Sponge_north_width/DY(1,1))+Nghost
+      Iwidth = INT(Sponge_north_width/DY(1, 1)) + Nghost
 # endif
-     DO I=1,M
-     DO J=1,N
-       IF(SPONGE(I,J)>0.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=0.0_SP
-       ENDIF
+      DO I = 1, M
+      DO J = 1, N
+         IF (SPONGE(I, J) > 0.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 0.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=MAX(0.0,REAL(Iwidth-N+J-(py-npy-1)*Nglob/py))
-       ri=MAX(0.0,REAL(Iwidth-N+J-(py-npy-1)*(jjend - jjsta + 1) ))
+         ri = MAX(0.0, REAL(Iwidth - N + J - (py - npy - 1)*(jjend - jjsta + 1)))
 !---ykchoi Jan/23/2018]
 # else
-       ri=MAX(0.0,REAL(Iwidth-N+J))
+         ri = MAX(0.0, REAL(Iwidth - N + J))
 # endif
-       tmp_2d_2(i,j)=MAX(Csp*TANH(ri/10.0),lim)
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_2(i, j) = MAX(Csp*TANH(ri/10.0), lim)
+      END DO
+      END DO
+   END IF
 
-      DO J=1,N
-      DO I=1,M
-        IF(tmp_2d_1(I,J)>tmp_2d_2(I,J)) THEN
-          Sponge(I,J)=tmp_2d_1(I,J)
-        ELSE
-          Sponge(I,J)=tmp_2d_2(I,J)
-        ENDIF
-      ENDDO
-      ENDDO
+   DO J = 1, N
+   DO I = 1, M
+      IF (tmp_2d_1(I, J) > tmp_2d_2(I, J)) THEN
+         Sponge(I, J) = tmp_2d_1(I, J)
+      ELSE
+         Sponge(I, J) = tmp_2d_2(I, J)
+      END IF
+   END DO
+   END DO
 
 END SUBROUTINE CALCULATE_DIFFUSION_SPONGE
 
@@ -583,276 +574,274 @@ END SUBROUTINE CALCULATE_DIFFUSION_SPONGE
 !
 !    CALCULATE_SPONGE is subroutine of sponge layer to get coefficient
 !
-!    HISTORY: 
+!    HISTORY:
 !     10/27/2010 Fengyan Shi
 !
 !-------------------------------------------------------------------------------------
 
-SUBROUTINE CALCULATE_SPONGE(M,N,Nghost,DX,DY,&
-                            Sponge_west_width,Sponge_east_width,&
-                            Sponge_south_width,Sponge_north_width, &
-                            R_sponge,A_sponge,SPONGE)
+SUBROUTINE CALCULATE_SPONGE(M, N, Nghost, DX, DY, &
+                            Sponge_west_width, Sponge_east_width, &
+                            Sponge_south_width, Sponge_north_width, &
+                            R_sponge, A_sponge, SPONGE)
 
-     USE PARAM
-     USE GLOBAL, ONLY : depth,MinDepthFrc
+   USE PARAM
+   USE GLOBAL, ONLY: depth, MinDepthFrc
 # if defined (PARALLEL)
-     USE GLOBAL, ONLY : n_west, n_east, n_suth, n_nrth,px,py,npx,npy,&
-                        Mglob,Nglob, &
-	                  iista, iiend, jjsta, jjend    !ykchoi Jan/23/2018
+   USE GLOBAL, ONLY: n_west, n_east, n_suth, n_nrth, px, py, npx, npy, &
+                     Mglob, Nglob, &
+                     iista, iiend, jjsta, jjend    !ykchoi Jan/23/2018
 # endif
-     IMPLICIT NONE
-     INTEGER, INTENT(IN)::M,N,Nghost
+   IMPLICIT NONE
+   INTEGER, INTENT(IN)::M, N, Nghost
 # if defined (CARTESIAN)
-     REAL(SP),INTENT(IN)::DX,DY
+   REAL(SP), INTENT(IN)::DX, DY
 # else
-     REAL(SP),DIMENSION(M,N),INTENT(IN)::DX,DY
+   REAL(SP), DIMENSION(M, N), INTENT(IN)::DX, DY
 # endif
-     REAL(SP),INTENT(IN) :: &
-                          Sponge_west_width,Sponge_east_width,&
-                          Sponge_south_width,Sponge_north_width, &
-                          R_sponge,A_sponge
+   REAL(SP), INTENT(IN) :: &
+      Sponge_west_width, Sponge_east_width, &
+      Sponge_south_width, Sponge_north_width, &
+      R_sponge, A_sponge
 
-     REAL(SP),DIMENSION(M,N),INTENT(INOUT)::SPONGE
-     REAL(SP)::ri,lim
-     INTEGER::Iwidth
-     REAL(SP) :: DXg,DYg,xx
-     REAL(SP),DIMENSION(M,N) :: tmp_2d_1,tmp_2d_2 
+   REAL(SP), DIMENSION(M, N), INTENT(INOUT)::SPONGE
+   REAL(SP)::ri, lim
+   INTEGER::Iwidth
+   REAL(SP) :: DXg, DYg, xx
+   REAL(SP), DIMENSION(M, N) :: tmp_2d_1, tmp_2d_2
 
-     tmp_2d_2 = ZERO
-     tmp_2d_1 = ZERO
+   tmp_2d_2 = ZERO
+   tmp_2d_1 = ZERO
 
 # if defined (CARTESIAN)
-     DXg=DX
-     DYg=DY
+   DXg = DX
+   DYg = DY
 # else
-     DXg=DX(1,1)
-     DYg=DY(1,1)
+   DXg = DX(1, 1)
+   DYg = DY(1, 1)
 # endif
 
 ! west
 
-     IF(Sponge_west_width>ZERO)THEN
+   IF (Sponge_west_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_west_width/DX)+Nghost
+      Iwidth = INT(Sponge_west_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_west_width/DX(1,1))+Nghost
+      Iwidth = INT(Sponge_west_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,M
-       IF(SPONGE(I,J)>1.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=1.0_SP
-       ENDIF
+      DO J = 1, N
+      DO I = 1, M
+         IF (SPONGE(I, J) > 1.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 1.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri = R_Sponge**(50*(i+npx*Mglob/px-1)/(Iwidth-1))
-       ri = R_Sponge**(50*(i+(iista-1)-1)/(Iwidth-1))
+         ri = R_Sponge**(50*(i + (iista - 1) - 1)/(Iwidth - 1))
 !---ykchoi Jan/23/2018]
 # else
-       ri=R_sponge**(50*(I-1)/(Iwidth-1))
+         ri = R_sponge**(50*(I - 1)/(Iwidth - 1))
 # endif
-       tmp_2d_1(i,j)=MAX(A_Sponge**ri,lim)
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_1(i, j) = MAX(A_Sponge**ri, lim)
+      END DO
+      END DO
+   END IF
 
 ! east
 
-     IF(Sponge_east_width>ZERO)THEN
+   IF (Sponge_east_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_east_width/DX)+Nghost
+      Iwidth = INT(Sponge_east_width/DX) + Nghost
 # else
-     Iwidth=INT(Sponge_east_width/DX(1,1))+Nghost
+      Iwidth = INT(Sponge_east_width/DX(1, 1)) + Nghost
 # endif
-     DO J=1,N
-     DO I=1,M
-       IF(SPONGE(I,J)>1.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=1.0_SP
-       ENDIF
+      DO J = 1, N
+      DO I = 1, M
+         IF (SPONGE(I, J) > 1.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 1.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri = R_Sponge**(50*(M-i+(px-npx-1)*Mglob/px)/(Iwidth-1))
-       ri = R_Sponge**(50*(M-i+(px-npx-1)*(iiend - iista + 1))/(Iwidth-1))
+         ri = R_Sponge**(50*(M - i + (px - npx - 1)*(iiend - iista + 1))/(Iwidth - 1))
 !---ykchoi Jan/23/2018]
 # else
-       ri=R_sponge**(50*(M-I)/(Iwidth-1))
+         ri = R_sponge**(50*(M - I)/(Iwidth - 1))
 # endif
-       tmp_2d_2(i,j)=MAX(A_Sponge**ri,lim)
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_2(i, j) = MAX(A_Sponge**ri, lim)
+      END DO
+      END DO
+   END IF
 
-      DO J=1,N
-      DO I=1,M
-        IF(tmp_2d_1(I,J)>tmp_2d_2(I,J)) THEN
-          Sponge(I,J)=tmp_2d_1(I,J)
-        ELSE
-          Sponge(I,J)=tmp_2d_2(I,J)
-        ENDIF
-        IF(Sponge(I,J)<A_Sponge**(R_Sponge**50))Sponge(I,J)=1.0_SP
-      ENDDO
-      ENDDO
+   DO J = 1, N
+   DO I = 1, M
+      IF (tmp_2d_1(I, J) > tmp_2d_2(I, J)) THEN
+         Sponge(I, J) = tmp_2d_1(I, J)
+      ELSE
+         Sponge(I, J) = tmp_2d_2(I, J)
+      END IF
+      IF (Sponge(I, J) < A_Sponge**(R_Sponge**50)) Sponge(I, J) = 1.0_SP
+   END DO
+   END DO
 
 ! south
 
-     IF(Sponge_south_width>ZERO)THEN
+   IF (Sponge_south_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_south_width/DY)+Nghost
+      Iwidth = INT(Sponge_south_width/DY) + Nghost
 # else
-     Iwidth=INT(Sponge_south_width/DY(1,1))+Nghost
+      Iwidth = INT(Sponge_south_width/DY(1, 1)) + Nghost
 # endif
-     DO I=1,M
-     DO J=1,N
-       IF(SPONGE(I,J)>1.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=1.0_SP
-       ENDIF
+      DO I = 1, M
+      DO J = 1, N
+         IF (SPONGE(I, J) > 1.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 1.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri=R_sponge**(50*(J+npy*Nglob/py-1)/(Iwidth-1))
-       ri=R_sponge**(50*(J+ (jjsta - 1) -1)/(Iwidth-1))
+         ri = R_sponge**(50*(J + (jjsta - 1) - 1)/(Iwidth - 1))
 !---ykchoi Jan/23/2018]
 # else
-       ri=R_sponge**(50*(J-1)/(Iwidth-1))
+         ri = R_sponge**(50*(J - 1)/(Iwidth - 1))
 # endif
-       tmp_2d_1(i,j)=MAX(A_Sponge**ri,lim)
-     ENDDO
-     ENDDO
-     ENDIF
-
+         tmp_2d_1(i, j) = MAX(A_Sponge**ri, lim)
+      END DO
+      END DO
+   END IF
 
 ! north
 
-     IF(Sponge_north_width>ZERO)THEN
+   IF (Sponge_north_width > ZERO) THEN
 # if defined (CARTESIAN)
-     Iwidth=INT(Sponge_north_width/DY)+Nghost
+      Iwidth = INT(Sponge_north_width/DY) + Nghost
 # else
-     Iwidth=INT(Sponge_north_width/DY(1,1))+Nghost
+      Iwidth = INT(Sponge_north_width/DY(1, 1)) + Nghost
 # endif
-     DO I=1,M
-     DO J=1,N
-       IF(SPONGE(I,J)>1.0_SP)THEN
-         lim=SPONGE(I,J)
-       ELSE
-         lim=1.0_SP
-       ENDIF
+      DO I = 1, M
+      DO J = 1, N
+         IF (SPONGE(I, J) > 1.0_SP) THEN
+            lim = SPONGE(I, J)
+         ELSE
+            lim = 1.0_SP
+         END IF
 # if defined(PARALLEL)
 ![---ykchoi Jan/23/2018
 !       ri = R_Sponge**(50*(N-J+(py-npy-1)*Nglob/py)/(Iwidth-1))
-       ri = R_Sponge**(50*(N-J+(py-npy-1)*(jjend - jjsta + 1) )/(Iwidth-1))
+         ri = R_Sponge**(50*(N - J + (py - npy - 1)*(jjend - jjsta + 1))/(Iwidth - 1))
 !---ykchoi Jan/23/2018]
 # else
-       ri=R_sponge**(50*(N-J)/(Iwidth-1))	  
+         ri = R_sponge**(50*(N - J)/(Iwidth - 1))
 # endif
-       tmp_2d_2(i,j)=MAX(A_Sponge**ri,lim)	  
-     ENDDO
-     ENDDO
-     ENDIF
+         tmp_2d_2(i, j) = MAX(A_Sponge**ri, lim)
+      END DO
+      END DO
+   END IF
 
-      DO J=1,N
-      DO I=1,M
-        IF(tmp_2d_1(I,J)>tmp_2d_2(I,J)) THEN
-          Sponge(I,J)=tmp_2d_1(I,J)
-        ELSE
-          Sponge(I,J)=tmp_2d_2(I,J)
-        ENDIF
-        IF(Sponge(I,J)<A_Sponge**(R_Sponge**50))Sponge(I,J)=1.0_SP	  
-      ENDDO
-      ENDDO
+   DO J = 1, N
+   DO I = 1, M
+      IF (tmp_2d_1(I, J) > tmp_2d_2(I, J)) THEN
+         Sponge(I, J) = tmp_2d_1(I, J)
+      ELSE
+         Sponge(I, J) = tmp_2d_2(I, J)
+      END IF
+      IF (Sponge(I, J) < A_Sponge**(R_Sponge**50)) Sponge(I, J) = 1.0_SP
+   END DO
+   END DO
 
 END SUBROUTINE CALCULATE_SPONGE
 
-
 !-------------------------------------------------------------------------------------
 !
-!    CALCULATE_CD_BREAKWATER is subroutine for coefficient of 
+!    CALCULATE_CD_BREAKWATER is subroutine for coefficient of
 !      friction type breakwater
-!    
+!
 !    HISTORY: 04/27/2017 Fengyan Shi
 !
 !-------------------------------------------------------------------------------------
 SUBROUTINE CALCULATE_CD_BREAKWATER
-     USE PARAM
-     USE GLOBAL, ONLY : depth,MinDepthFrc,CD_breakwater,BreakWaterWidth, &
-                        Mglob,Nglob,Ibeg,Iend,Jbeg,Jend,Nghost,DX,DY,&
-                        Mloc,Nloc,BreakWaterAbsorbCoef
+   USE PARAM
+   USE GLOBAL, ONLY: depth, MinDepthFrc, CD_breakwater, BreakWaterWidth, &
+                     Mglob, Nglob, Ibeg, Iend, Jbeg, Jend, Nghost, DX, DY, &
+                     Mloc, Nloc, BreakWaterAbsorbCoef
 # if defined (PARALLEL)
-     USE GLOBAL, ONLY : px,py,npx,npy,myid,ier,NumberProcessor, &
-                        iista, iiend, jjsta, jjend    !ykchoi (28/Jan/2018)   
-# endif                 
-     IMPLICIT NONE
+   USE GLOBAL, ONLY: px, py, npx, npy, myid, ier, NumberProcessor, &
+                     iista, iiend, jjsta, jjend    !ykchoi (28/Jan/2018)
+# endif
+   IMPLICIT NONE
 # if defined (PARALLEL)
-![-------ykchoi (28/Jan/2018)      
-	!INTEGER,DIMENSION(NumberProcessor) :: npxs,npys
-      !REAL(SP),DIMENSION(NumberProcessor) :: xx
-      !INTEGER :: l
-	INTEGER :: Nista, Niend, Njsta, Njend
-	INTEGER, ALLOCATABLE :: Nistas(:), Niends(:), Njstas(:), Njends(:)
-	INTEGER :: irank, lenx, leny, lenxy, ireq
-	INTEGER :: istanum, iendnum, jstanum, jendnum
-	INTEGER :: istatus(mpi_status_size)
-	REAL(SP), ALLOCATABLE :: xx(:,:)
+![-------ykchoi (28/Jan/2018)
+   !INTEGER,DIMENSION(NumberProcessor) :: npxs,npys
+   !REAL(SP),DIMENSION(NumberProcessor) :: xx
+   !INTEGER :: l
+   INTEGER :: Nista, Niend, Njsta, Njend
+   INTEGER, ALLOCATABLE :: Nistas(:), Niends(:), Njstas(:), Njends(:)
+   INTEGER :: irank, lenx, leny, lenxy, ireq
+   INTEGER :: istanum, iendnum, jstanum, jendnum
+   INTEGER :: istatus(mpi_status_size)
+   REAL(SP), ALLOCATABLE :: xx(:, :)
 !-------ykchoi (28/Jan/2018)]
 # endif
 
-     REAL(SP)::ri,lim
-     INTEGER::Iwidth,Jwidth,Ib,Jb
-     REAL(SP) :: DXg,DYg,tmp_2d
-     REAL(SP),DIMENSION(:,:),ALLOCATABLE :: tmp_glob
- 
-     ALLOCATE (tmp_glob(Mglob+2*Nghost,Nglob+2*Nghost))
+   REAL(SP)::ri, lim
+   INTEGER::Iwidth, Jwidth, Ib, Jb
+   REAL(SP) :: DXg, DYg, tmp_2d
+   REAL(SP), DIMENSION(:, :), ALLOCATABLE :: tmp_glob
+
+   ALLOCATE (tmp_glob(Mglob + 2*Nghost, Nglob + 2*Nghost))
 
 # if defined (PARALLEL)
-     if (myid.eq.0) then
+   if (myid .eq. 0) then
 # endif
 
 # if defined (CARTESIAN)
-     DXg=DX
-     DYg=DY
+      DXg = DX
+      DYg = DY
 # else
-     DXg=DX(1,1)
-     DYg=DY(1,1)
+      DXg = DX(1, 1)
+      DYg = DY(1, 1)
 # endif
 
-     CD_breakwater = ZERO
+      CD_breakwater = ZERO
 
 ! global
 
-    tmp_glob = ZERO
-    DO J=1,Nglob+2*Nghost
-    DO I=1,Mglob+2*Nghost
-      IF(BreakWaterWidth(I,J).GT.ZERO)THEN
-        Iwidth=INT(BreakWaterWidth(I,J)/DXg)
-        Jwidth=INT(BreakWaterWidth(I,J)/DYg)
-    ! fixed bug from gangfeng 02/26/2021, should add 2*Nghost
-        DO Jb=MAX(1,J-Jwidth),Min(Nglob+2*Nghost,J+Jwidth)
-        DO Ib=MAX(1,I-Iwidth),Min(Mglob+2*Nghost,I+Iwidth)
-          ri=SQRT(((Ib-I)*DXg)**2+((Jb-J)*DYg)**2)
-          IF(ri.LE.BreakWaterWidth(I,J))THEN
-           tmp_2d=BreakWaterAbsorbCoef* &
-             TANH( (BreakWaterWidth(I,J)-ri) / (0.3_SP*BreakWaterWidth(I,J)) )
+      tmp_glob = ZERO
+      DO J = 1, Nglob + 2*Nghost
+      DO I = 1, Mglob + 2*Nghost
+         IF (BreakWaterWidth(I, J) .GT. ZERO) THEN
+            Iwidth = INT(BreakWaterWidth(I, J)/DXg)
+            Jwidth = INT(BreakWaterWidth(I, J)/DYg)
+            ! fixed bug from gangfeng 02/26/2021, should add 2*Nghost
+            DO Jb = MAX(1, J - Jwidth), Min(Nglob + 2*Nghost, J + Jwidth)
+            DO Ib = MAX(1, I - Iwidth), Min(Mglob + 2*Nghost, I + Iwidth)
+               ri = SQRT(((Ib - I)*DXg)**2 + ((Jb - J)*DYg)**2)
+               IF (ri .LE. BreakWaterWidth(I, J)) THEN
+                  tmp_2d = BreakWaterAbsorbCoef* &
+                           TANH((BreakWaterWidth(I, J) - ri)/(0.3_SP*BreakWaterWidth(I, J)))
 
 !if (J==20+Nghost.AND.I==825+Nghost)then
 !print*,Ib,Jb,I,J,ri,tmp_2d,tmp_glob(I,J)
 !endif
-           IF(tmp_2d.GT.tmp_glob(Ib,Jb)) tmp_glob(Ib,Jb)=tmp_2d
+                  IF (tmp_2d .GT. tmp_glob(Ib, Jb)) tmp_glob(Ib, Jb) = tmp_2d
 
-          ENDIF
-        ENDDO
-        ENDDO
-      ENDIF
-    ENDDO
-    ENDDO
+               END IF
+            END DO
+            END DO
+         END IF
+      END DO
+      END DO
 
 # if defined (PARALLEL)
-     endif ! end myid
+   end if ! end myid
 # endif
 
-! distribute to CD_breakwater 
+! distribute to CD_breakwater
 
 # if defined (PARALLEL)
 ![-------ykchoi (28/Jan/2018)
@@ -874,66 +863,63 @@ SUBROUTINE CALCULATE_CD_BREAKWATER
 !     enddo
 !     enddo
 
-     Nista = iista + Nghost;
-     Niend = iiend + Nghost;     
-     Njsta = jjsta + Nghost;     
-     Njend = jjend + Nghost;
+   Nista = iista + Nghost; 
+   Niend = iiend + Nghost; 
+   Njsta = jjsta + Nghost; 
+   Njend = jjend + Nghost; 
+   allocate (Nistas(NumberProcessor), Niends(NumberProcessor), &
+             Njstas(NumberProcessor), Njends(NumberProcessor))
 
-     allocate( Nistas(NumberProcessor), Niends(NumberProcessor),   &
-               Njstas(NumberProcessor), Njends(NumberProcessor) )
-          
-     call MPI_Gather( Nista, 1, MPI_INTEGER, Nistas, 1, MPI_INTEGER, &
-                      0, MPI_COMM_WORLD, ier )
-     call MPI_Gather( Niend, 1, MPI_INTEGER, Niends, 1, MPI_INTEGER, &
-                      0, MPI_COMM_WORLD, ier )
-     call MPI_Gather( Njsta, 1, MPI_INTEGER, Njstas, 1, MPI_INTEGER, &
-                      0, MPI_COMM_WORLD, ier )
-     call MPI_Gather( Njend, 1, MPI_INTEGER, Njends, 1, MPI_INTEGER, &
-                      0, MPI_COMM_WORLD, ier )
+   call MPI_Gather(Nista, 1, MPI_INTEGER, Nistas, 1, MPI_INTEGER, &
+                   0, MPI_COMM_WORLD, ier)
+   call MPI_Gather(Niend, 1, MPI_INTEGER, Niends, 1, MPI_INTEGER, &
+                   0, MPI_COMM_WORLD, ier)
+   call MPI_Gather(Njsta, 1, MPI_INTEGER, Njstas, 1, MPI_INTEGER, &
+                   0, MPI_COMM_WORLD, ier)
+   call MPI_Gather(Njend, 1, MPI_INTEGER, Njends, 1, MPI_INTEGER, &
+                   0, MPI_COMM_WORLD, ier)
 
-     if( myid == 0 )then
-	     CD_breakwater = tmp_glob( 1:Mloc, 1:Nloc )
-     endif          
+   if (myid == 0) then
+      CD_breakwater = tmp_glob(1:Mloc, 1:Nloc)
+   end if
 
-     do irank=1, px*py-1
-     	  if( myid == 0 ) then
-          istanum = Nistas(irank+1) - Nghost
-          iendnum = Niends(irank+1) + Nghost
-          jstanum = Njstas(irank+1) - Nghost
-          jendnum = Njends(irank+1) + Nghost
+   do irank = 1, px*py - 1
+      if (myid == 0) then
+         istanum = Nistas(irank + 1) - Nghost
+         iendnum = Niends(irank + 1) + Nghost
+         jstanum = Njstas(irank + 1) - Nghost
+         jendnum = Njends(irank + 1) + Nghost
 
-          lenx = iendnum - istanum + 1
-          leny = jendnum - jstanum + 1
-          lenxy = lenx*leny
-          allocate( xx(lenx, leny) )
-          
-          xx = tmp_glob( istanum:iendnum, jstanum:jendnum )
-          call mpi_isend( xx, lenxy, mpi_sp, irank, 1, mpi_comm_world, ireq, ier )
-          call mpi_wait( ireq, istatus, ier )
-          deallocate( xx )
-          
-	  elseif( myid == irank ) then
-	    
-          lenx = Niend-Nista+1+2*Nghost
-          leny = Njend-Njsta+1+2*Nghost
-          lenxy = lenx*leny
-          
-          call mpi_irecv( CD_breakwater, lenxy, mpi_sp, 0, 1, mpi_comm_world, ireq, ier )
-          call mpi_wait( ireq, istatus, ier )
-          
-	  endif
-     enddo
+         lenx = iendnum - istanum + 1
+         leny = jendnum - jstanum + 1
+         lenxy = lenx*leny
+         allocate (xx(lenx, leny))
 
-     deallocate( Nistas, Niends, Njstas, Njends )
+         xx = tmp_glob(istanum:iendnum, jstanum:jendnum)
+         call mpi_isend(xx, lenxy, mpi_sp, irank, 1, mpi_comm_world, ireq, ier)
+         call mpi_wait(ireq, istatus, ier)
+         deallocate (xx)
+
+      elseif (myid == irank) then
+
+         lenx = Niend - Nista + 1 + 2*Nghost
+         leny = Njend - Njsta + 1 + 2*Nghost
+         lenxy = lenx*leny
+
+         call mpi_irecv(CD_breakwater, lenxy, mpi_sp, 0, 1, mpi_comm_world, ireq, ier)
+         call mpi_wait(ireq, istatus, ier)
+
+      end if
+   end do
+
+   deallocate (Nistas, Niends, Njstas, Njends)
 !-------ykchoi (28/Jan/2018)]
 
 # else
-     CD_breakwater = tmp_glob
+   CD_breakwater = tmp_glob
 # endif
-    
-    DEALLOCATE (tmp_glob)
+
+   DEALLOCATE (tmp_glob)
 
 END SUBROUTINE CALCULATE_CD_BREAKWATER
-
-
 

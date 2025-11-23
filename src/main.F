@@ -5,7 +5,7 @@
 !      This file is part of the FUNWAVE-TVD program under the Simplified BSD license
 !
 !-------------------------------------------------------------------------------------
-! 
+!
 !    Copyright (c) 2016, FUNWAVE Development Team
 !
 !    (See http://www.udel.edu/kirby/programs/funwave/funwave.html
@@ -36,11 +36,11 @@
 !    ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 !    (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
 !    SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-!  
+!
 !    The views and conclusions contained in the software and documentation are those
 !    of the authors and should not be interpreted as representing official policies,
 !    either expressed or implied, of the FreeBSD Project.
-!  
+!
 !-------------------------------------------------------------------------------------
 Program FUNWAVE_TVD
 !-------------------------------------------------------------------------------------
@@ -49,18 +49,18 @@ Program FUNWAVE_TVD
 !    MAIN - READ_INPUT
 !         - INDEX
 !         - ALLOCATE_VARIABLES
-!         - INITIALIZATION 
+!         - INITIALIZATION
 !         DO LOOP
 !             - VARIABLE_UPDATING
 !             - EXCHANGE
 !             - ESTIMATE_DT
 !             - RUNGE-KUTTA
 !             - DISPERSION
-!             - FLUXES          
-!             - SourceTerms      
+!             - FLUXES
+!             - SourceTerms
 !             - ESTIMATE_HUV
-!             - EXCHANGE 
-!             - FLUXES                 
+!             - EXCHANGE
+!             - FLUXES
 !             - SourceTerms again
 !
 !             - STATISTICS
@@ -71,13 +71,13 @@ Program FUNWAVE_TVD
 !  (1): read input, (2): output, (3): log, (4): !write/read hotstart
 !-------------------------------------------------------------------------------------
 ! ** HOT START DATA **
-!   NOTE: read input.txt first, if HOT_START, then read  
-        ! -- dimension
+!   NOTE: read input.txt first, if HOT_START, then read
+   ! -- dimension
 ! Mloc,Nloc,Mloc1,Nloc1
 ! Nghost
 ! Ibeg,Iend,Jbeg,Jend,Iend1,Jend1
 !   NOTE: need to confirm if the saved data is consistent with input.txt
-        ! -- time
+   ! -- time
 ! TIME
 ! TOTAL_TIME
 ! PLOT_INTV
@@ -86,28 +86,28 @@ Program FUNWAVE_TVD
 ! SCREEN_COUNT
 ! HOTSTART_INTV
 ! ICOUNT
-        ! spacing
+   ! spacing
 ! DX,DY
-        ! -- physics
+   ! -- physics
 ! DISPERSION
 ! Gamma1
 ! a1,a2,b1,b2
 ! SWE_ETA_DEP
-        ! -- numerics
+   ! -- numerics
 ! Time_Scheme
 ! HIGH_ORDER
 ! CONSTR
 ! CFL
 ! FroudeCap
 ! DISP_TIME_LEFT
-        ! -- wet-dry
+   ! -- wet-dry
 ! MinDepth,MinDepthfrc
 
-        ! -- depth
+   ! -- depth
 ! DEPTH
 ! DEPTHx
 ! DEPTHy
-        ! variables
+   ! variables
 ! U
 ! V
 ! if (.NOT.DISP_TIME_LEFT)THEN
@@ -116,13 +116,13 @@ Program FUNWAVE_TVD
 ! endif
 ! Ubar
 ! Vbar
-! ETA 
+! ETA
 ! H
 ! MASK
 ! MASK9
 ! MAST_STRUC
 !
-       ! -- wavemaker
+   ! -- wavemaker
 ! if (WAVEMAKER is WK_IRR)
 ! turns out the data for Cm Sm too large, calculate it when hotstart
 !
@@ -130,461 +130,453 @@ Program FUNWAVE_TVD
 ! D_gen
 ! Beta_gen
 ! rlamda
-! 
+!
 !
 !-------------------------------------------------------------------------------------
-     USE GLOBAL
-     
+   USE GLOBAL
+
 # if defined (VESSEL)
-     USE VESSEL_MODULE
+   USE VESSEL_MODULE
 # endif
 # if defined (SEDIMENT)
-     USE SEDIMENT_MODULE
+   USE SEDIMENT_MODULE
 # endif
 
 # if defined (FOAM)
-     USE MOD_FOAM
+   USE MOD_FOAM
 # endif
 
 # if defined (METEO)
-     USE METEO_MODULE
+   USE METEO_MODULE
 # endif
 # if defined (TRACKING)
-     USE TRACER
+   USE TRACER
 # endif
 # if defined (PRECIPITATION)
-     USE PRECIPITATION_MODULE
+   USE PRECIPITATION_MODULE
 # endif
 
-     USE TIDE_MODULE
-     USE TIME_SPECTRA_MODULE
+   USE TIDE_MODULE
+   USE TIME_SPECTRA_MODULE
 
-     IMPLICIT NONE
+   IMPLICIT NONE
 
 !     INTEGER::ISTAGE ! moved to mod_global 09/12/2017
 !     REAL(SP) :: tbegin,tend  ! moved to mod_global 07/29/2016
 
 # if defined (PARALLEL)
-     CALL MPI_INIT ( ier )
+   CALL MPI_INIT(ier)
 # endif
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'MPI_INIT'     
+   IF (myid == 0) WRITE (*, *) 'MPI_INIT'
 #    endif
 # endif
 
-     CALL READ_INPUT
+   CALL READ_INPUT
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'READ_INPUT'     
-#    else   
-       WRITE(*,*) 'READ_INPUT'
+   IF (myid == 0) WRITE (*, *) 'READ_INPUT'
+#    else
+   WRITE (*, *) 'READ_INPUT'
 #    endif
 # endif
 
-	![ykchoi(14.12.24.)
-	IF(INI_UVZ)THEN
-        TIME=HotStartTime
-      ENDIF
-	!ykchoi(14.12.24.)]
+   ![ykchoi(14.12.24.)
+   IF (INI_UVZ) THEN
+      TIME = HotStartTime
+   END IF
+   !ykchoi(14.12.24.)]
 
-     CALL INDEX
+   CALL INDEX
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'INDEX'     
-#    else   
-       WRITE(*,*) 'INDEX'
+   IF (myid == 0) WRITE (*, *) 'INDEX'
+#    else
+   WRITE (*, *) 'INDEX'
 #    endif
 # endif
 
 ! allocate variables
-     CALL ALLOCATE_VARIABLES
+   CALL ALLOCATE_VARIABLES
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ALLOCATION'     
-#    else   
-       WRITE(*,*) 'ALLOCATION'
+   IF (myid == 0) WRITE (*, *) 'ALLOCATION'
+#    else
+   WRITE (*, *) 'ALLOCATION'
 #    endif
 # endif
 
-     CALL INITIALIZATION
+   CALL INITIALIZATION
 
 ! time dependent wave spectra
 
-     IF(WaveMaker(1:12)=='TIME_SPECTRA') THEN
-       CALL TIME_SPECTRA_INITIAL
-     ENDIF
+   IF (WaveMaker(1:12) == 'TIME_SPECTRA') THEN
+      CALL TIME_SPECTRA_INITIAL
+   END IF
 
-     CALL TIDE_INITIAL
+   CALL TIDE_INITIAL
 
-     IF(WaveMaker(1:12)=='TIME_SPECTRA') THEN
+   IF (WaveMaker(1:12) == 'TIME_SPECTRA') THEN
 !    time spectra only use tide abs_gen and tide data type
-     CALL TIME_SPECTRA_PROTECTION
-     ENDIF
-      
+      CALL TIME_SPECTRA_PROTECTION
+   END IF
+
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'INITIALIZATION'     
-#    else   
-       WRITE(*,*) 'INITIALIZATION'
+   IF (myid == 0) WRITE (*, *) 'INITIALIZATION'
+#    else
+   WRITE (*, *) 'INITIALIZATION'
 #    endif
 # endif
 
 # if defined (COUPLING)
-     TIME=TIME_COUPLING_1
+   TIME = TIME_COUPLING_1
 # endif
 
 # if defined (VESSEL)
-     CALL VESSEL_INITIAL
+   CALL VESSEL_INITIAL
 # endif
 
 # if defined (METEO)
-     CALL METEO_INITIAL
+   CALL METEO_INITIAL
 # endif
 
 # if defined (SEDIMENT)
-     CALL SEDIMENT_INITIAL
+   CALL SEDIMENT_INITIAL
 # endif
 
 # if defined (FOAM)
-     CALL ALLOCATE_FOAM
-     CALL INITIALIZATION_FOAM
+   CALL ALLOCATE_FOAM
+   CALL INITIALIZATION_FOAM
 # endif
 
 #if defined (PRECIPITATION)
-     CALL PRECIPITATION_INITIAL
+   CALL PRECIPITATION_INITIAL
 # endif
 
 #if defined (TRACKING)
-     CALL TRACER_INITIAL
+   CALL TRACER_INITIAL
 # endif
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'INITIAL VESSEL, METEO, OR SEDIMENT if included'     
-#    else   
-       WRITE(*,*) 'INITIAL VESSEL, METEO, OR SEDIMENT if included'
+   IF (myid == 0) WRITE (*, *) 'INITIAL VESSEL, METEO, OR SEDIMENT if included'
+#    else
+   WRITE (*, *) 'INITIAL VESSEL, METEO, OR SEDIMENT if included'
 #    endif
 # endif
 
 ! time integration
 
-     ! record wall time
+   ! record wall time
 # if defined (PARALLEL)
-     if(myid == 0) tbegin = MPI_Wtime( )
+   if (myid == 0) tbegin = MPI_Wtime()
 # else
-     CALL CPU_TIME(tbegin)
+   CALL CPU_TIME(tbegin)
 # endif
 
-
-   DO WHILE (TIME<TOTAL_TIME)
+   DO WHILE (TIME < TOTAL_TIME)
 
 !     move output here to get the initial condition 11/27/2018
 
       CALL OUTPUT
 
-     IF(WaveMaker(1:7)=='LEF_SOL')THEN
-       CALL SOLITARY_WAVE_LEFT_BOUNDARY
-     ENDIF   
+      IF (WaveMaker(1:7) == 'LEF_SOL') THEN
+         CALL SOLITARY_WAVE_LEFT_BOUNDARY
+      END IF
 
 ! update three variables
-     Eta0=Eta
-     Ubar0=Ubar
-     Vbar0=Vbar  
+      Eta0 = Eta
+      Ubar0 = Ubar
+      Vbar0 = Vbar
 # if defined (SEDIMENT)
-     CHH0=CHH
+      CHH0 = CHH
 # endif
 
 ! previous update_mask
-   
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'UPDATE Eta Ubar Vbar, MASK'     
-#    else   
-       WRITE(*,*) 'UPDATE Eta Ubar Vbar, MASK'
+      IF (myid == 0) WRITE (*, *) 'UPDATE Eta Ubar Vbar, MASK'
+#    else
+      WRITE (*, *) 'UPDATE Eta Ubar Vbar, MASK'
 #    endif
 # endif
 
-     CALL EXCHANGE
+      CALL EXCHANGE
+
+# if defined (COUPLING)
+      CALL OneWayCoupling
+# endif
+
+      CALL ESTIMATE_DT(Mloc, Nloc, DX, DY, U, V, H, MinDepthFrc, DT, CFL, TIME)
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+      IF (myid == 0) WRITE (*, *) 'ESTIMATE_DT'
+#    else
+      WRITE (*, *) 'ESTIMATE_DT'
+#    endif
+# endif
+
+! U0, V0 are moved to following part due to computation of Ut, Vt.
+      U0 = U   !ykchoi(15. 08. 06.)
+      V0 = V   !ykchoi
+
+# if defined (VESSEL)
+      CALL VESSEL_FORCING
+# endif
+
+# if defined (METEO)
+      CALL METEO_FORCING
+# endif
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+      IF (myid == 0) WRITE (*, *) 'vessel, meteo forcing, if included'
+#    else
+      WRITE (*, *) 'vessel, meteo forcing, if included'
+#    endif
+# endif
+
+      IF (TideBcType(1:4) == 'DATA') THEN
+         CALL TIDE_DATA
+      END IF
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+      IF (myid == 0) WRITE (*, *) 'PASS CALL TIDE_DATA'
+#    else
+      WRITE (*, *) 'PASS CALL TIDE_DATA'
+#    endif
+# endif
+
+      IF (WaveMaker(1:12) == 'TIME_SPECTRA') THEN
+         CALL TIME_SPECTRA_INTERPOLATION
+      END IF
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+      IF (myid == 0) WRITE (*, *) 'PASS CALL TIME_SPECTRA_INTERPOLATION'
+#    else
+      WRITE (*, *) 'PASS CALL TIME_SPECTRA_INTERPOLATION'
+#    endif
+# endif
+
+#if defined (PRECIPITATION)
+      CALL PRECIPITATION_DISTRIBUTION
+# endif
+
+      ! 3-ORDER RUNGE-KUTTA TIME STEPPING
+      DO ISTAGE = 1, 3
+
+         IF (DISPERSION) THEN
+            CALL Cal_Dispersion
+         END IF
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+         IF (myid == 0) WRITE (*, *) 'Cal_Dispersion'
+#    else
+         WRITE (*, *) 'Cal_Dispersion'
+#    endif
+# endif
+
+         CALL FLUXES
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+         IF (myid == 0) WRITE (*, *) 'FLUXES'
+#    else
+         WRITE (*, *) 'FLUXES'
+#    endif
+# endif
+
+         CALL SourceTerms   ! put sourceterms after fluxes in order to get eta_t
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+         IF (myid == 0) WRITE (*, *) 'SourceTerms'
+#    else
+         WRITE (*, *) 'SourceTerms'
+#    endif
+# endif
+
+         CALL ESTIMATE_HUV(ISTAGE)
+
+! etascreen was added, update_mask was moved here from outside RK
+         CALL UPDATE_MASK
+
+         IF (TIDAL_BC_ABS) THEN
+            CALL TIDE_BC
+         END IF
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+         IF (myid == 0) WRITE (*, *) 'ESTIMATE_HUV'
+#    else
+         WRITE (*, *) 'ESTIMATE_HUV'
+#    endif
+# endif
+
+# if defined (SEDIMENT)
+         CALL SEDIMENT_ADVECTION_DIFFUSION(ISTAGE)
+# endif
+
+         CALL WAVE_BREAKING
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+         IF (myid == 0) WRITE (*, *) 'WAVE_BREAKING'
+#    else
+         WRITE (*, *) 'WAVE_BREAKING'
+#    endif
+# endif
+
+# if defined (FOAM)
+         CALL FOAM_FLUX
+         CALL FOAM_UPDATE
+         CALL FOAM_BC
+# endif
+
+         CALL EXCHANGE
+
+# if defined (DEBUG)
+#    if defined (PARALLEL)
+         IF (myid == 0) WRITE (*, *) 'EXCHANGE'
+#    else
+         WRITE (*, *) 'EXCHANGE'
+#    endif
+# endif
 
 # if defined (COUPLING)
          CALL OneWayCoupling
 # endif
 
- 
-     CALL ESTIMATE_DT(Mloc,Nloc,DX,DY,U,V,H,MinDepthFrc,DT,CFL,TIME)
+         IF (WaveMaker(1:3) == 'ABS' .OR. WaveMaker(1:12) == 'TIME_SPECTRA') THEN
+            CALL ABSORBING_GENERATING_BC
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ESTIMATE_DT'     
-#    else   
-       WRITE(*,*) 'ESTIMATE_DT'
-#    endif
-# endif
-  
-! U0, V0 are moved to following part due to computation of Ut, Vt.
-	U0=U   !ykchoi(15. 08. 06.)
-	V0=V   !ykchoi
-
-# if defined (VESSEL)
-       CALL VESSEL_FORCING
-# endif
-
-# if defined (METEO)
-       CALL METEO_FORCING
-# endif
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'vessel, meteo forcing, if included'     
-#    else   
-       WRITE(*,*) 'vessel, meteo forcing, if included'
+            IF (myid == 0) WRITE (*, *) 'ABS or TIME_SPECTRA wavemaker'
+#    else
+            WRITE (*, *) 'ABS or TIME_SPECTRA wavemakerwavemaker'
 #    endif
 # endif
 
-       IF(TideBcType(1:4)=='DATA')THEN
-         CALL TIDE_DATA
-       ENDIF
+         END IF
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'PASS CALL TIDE_DATA'     
-#    else   
-       WRITE(*,*) 'PASS CALL TIDE_DATA'
-#    endif
-# endif
+         IF (WaveMaker(1:11) == 'LEFT_BC_IRR') THEN
+            CALL IRREGULAR_LEFT_BC
+         END IF
 
-       IF(WaveMaker(1:12) == 'TIME_SPECTRA') THEN
-         CALL TIME_SPECTRA_INTERPOLATION
-       ENDIF
+         IF (DIRECT_SPONGE) THEN
+            CALL SPONGE_DAMPING
+         END IF
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'PASS CALL TIME_SPECTRA_INTERPOLATION'     
-#    else   
-       WRITE(*,*) 'PASS CALL TIME_SPECTRA_INTERPOLATION'
-#    endif
-# endif
-
-
-#if defined (PRECIPITATION)
-     CALL PRECIPITATION_DISTRIBUTION
-# endif
-
-     ! 3-ORDER RUNGE-KUTTA TIME STEPPING
-     DO ISTAGE=1,3
-
-       IF(DISPERSION)THEN
-         CALL Cal_Dispersion
-       ENDIF 
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'Cal_Dispersion'     
-#    else   
-       WRITE(*,*) 'Cal_Dispersion'
-#    endif
-# endif
-
-       CALL FLUXES
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'FLUXES'     
-#    else   
-       WRITE(*,*) 'FLUXES'
-#    endif
-# endif
-
-       CALL SourceTerms   ! put sourceterms after fluxes in order to get eta_t
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'SourceTerms'     
-#    else   
-       WRITE(*,*) 'SourceTerms'
-#    endif
-# endif
-
-       CALL ESTIMATE_HUV(ISTAGE) 
-
-! etascreen was added, update_mask was moved here from outside RK 
-       CALL UPDATE_MASK
-
-       IF(TIDAL_BC_ABS)THEN
-         CALL TIDE_BC
-       ENDIF
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ESTIMATE_HUV'     
-#    else   
-       WRITE(*,*) 'ESTIMATE_HUV'
-#    endif
-# endif   
-
-# if defined (SEDIMENT)
-     CALL SEDIMENT_ADVECTION_DIFFUSION(ISTAGE) 
-# endif
-
-       CALL WAVE_BREAKING
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'WAVE_BREAKING'     
-#    else   
-       WRITE(*,*) 'WAVE_BREAKING'
-#    endif
-# endif
-
-# if defined (FOAM)
-       CALL FOAM_FLUX
-       CALL FOAM_UPDATE
-       CALL FOAM_BC
-# endif
-       
-       CALL EXCHANGE
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'EXCHANGE'     
-#    else   
-       WRITE(*,*) 'EXCHANGE'
-#    endif
-# endif
-       
-# if defined (COUPLING)
-       CALL OneWayCoupling
-# endif
-         
-
-       IF(WaveMaker(1:3)=='ABS' .OR. WaveMaker(1:12)=='TIME_SPECTRA') THEN
-         CALL ABSORBING_GENERATING_BC
-
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'ABS or TIME_SPECTRA wavemaker'     
-#    else   
-       WRITE(*,*) 'ABS or TIME_SPECTRA wavemakerwavemaker'
-#    endif
-# endif
-
-       ENDIF
-
-       IF(WaveMaker(1:11)=='LEFT_BC_IRR') THEN
-         CALL IRREGULAR_LEFT_BC
-       ENDIF
-
-       IF(DIRECT_SPONGE)THEN
-           CALL SPONGE_DAMPING
-       ENDIF
-
-     ENDDO
+      END DO
 
 # if defined (SEDIMENT)
 !   moved out of the RK loop 07/02/2019
-     IF(Bed_Change)THEN
-       CALL MORPHOLOGICAL_CHANGE
-     ENDIF
+      IF (Bed_Change) THEN
+         CALL MORPHOLOGICAL_CHANGE
+      END IF
 # endif
 
-     CALL MIXING_STUFF
+      CALL MIXING_STUFF
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'MIXING_STUFF'     
-#    else   
-       WRITE(*,*) 'MIXING_STUFF'
+      IF (myid == 0) WRITE (*, *) 'MIXING_STUFF'
+#    else
+      WRITE (*, *) 'MIXING_STUFF'
 #    endif
 # endif
 
 # if defined (TRACKING)
-     CALL TRACK_XY
+      CALL TRACK_XY
 # endif
 
+!  find maximum eta velocity
 
-!  find maximum eta velocity 
-
-      IF (OUT_Hmax.OR.OUT_Hmin.OR.OUT_Umax.OR.OUT_MFmax.OR.OUT_VORmax.OR.OUT_Time)THEN
-        CALL MAX_MIN_PROPERTY
-      ENDIF        
+      IF (OUT_Hmax .OR. OUT_Hmin .OR. OUT_Umax .OR. OUT_MFmax .OR. OUT_VORmax .OR. OUT_Time) THEN
+         CALL MAX_MIN_PROPERTY
+      END IF
 
       CALL CHECK_BLOWUP
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'CHECK_BLOWUP'     
-#    else   
-       WRITE(*,*) 'CHECK_BLOWUP'
+      IF (myid == 0) WRITE (*, *) 'CHECK_BLOWUP'
+#    else
+      WRITE (*, *) 'CHECK_BLOWUP'
 #    endif
 # endif
 
 # if defined (DEBUG)
 #    if defined (PARALLEL)
-       IF(myid==0) WRITE(*,*) 'CHECK_BLOWUP'     
-#    else   
-       WRITE(*,*) 'CHECK_BLOWUP'
+      IF (myid == 0) WRITE (*, *) 'CHECK_BLOWUP'
+#    else
+      WRITE (*, *) 'CHECK_BLOWUP'
 #    endif
 # endif
-  
+
    END DO
 
-   IF(NumberStations>0)THEN
+   IF (NumberStations > 0) THEN
 # if defined (SPHERICAL_IJ_STATION)
-       ! use IJ for coupling purpose
-       CALL STATIONS_SPHERICAL_IJ
+      ! use IJ for coupling purpose
+      CALL STATIONS_SPHERICAL_IJ
 # else
-       CALL STATIONS
+      CALL STATIONS
 # endif
-   ENDIF
-
+   END IF
 
 # if defined (COUPLING)
-     CLOSE(11)
+   CLOSE (11)
 # endif
 
 # if defined (VESSEL)
 
-DO Kves = 201,200+NumVessel
-    CLOSE(Kves)
-ENDDO
+   DO Kves = 201, 200 + NumVessel
+      CLOSE (Kves)
+   END DO
 # endif
 
-     ! record wall time at the end
+   ! record wall time at the end
 # if defined (PARALLEL)
-     if(myid.eq.0) tend = MPI_Wtime( )
+   if (myid .eq. 0) tend = MPI_Wtime()
 # else
-     CALL CPU_TIME (tend)
+   CALL CPU_TIME(tend)
 # endif
 
 # if defined (PARALLEL)
-     if(myid.eq.0) write(*,*) 'Simulation takes',tend-tbegin,'seconds'
-     if(myid.eq.0) write(3,*) 'Simulation takes',tend-tbegin,'seconds'
-     if (myid.eq.0) WRITE(*,*)'Normal Termination!'
-     if (myid.eq.0) WRITE(3,*)'Normal Termination!'
+   if (myid .eq. 0) write (*, *) 'Simulation takes', tend - tbegin, 'seconds'
+   if (myid .eq. 0) write (3, *) 'Simulation takes', tend - tbegin, 'seconds'
+   if (myid .eq. 0) WRITE (*, *) 'Normal Termination!'
+   if (myid .eq. 0) WRITE (3, *) 'Normal Termination!'
 # else
-     write(*,*) 'Simulation takes',tend-tbegin,'seconds'
-     write(3,*) 'Simulation takes',tend-tbegin,'seconds'
-     WRITE(*,*)'Normal Termination!'
-     WRITE(3,*)'Normal Termination!'
+   write (*, *) 'Simulation takes', tend - tbegin, 'seconds'
+   write (3, *) 'Simulation takes', tend - tbegin, 'seconds'
+   WRITE (*, *) 'Normal Termination!'
+   WRITE (3, *) 'Normal Termination!'
 # endif
 
 # if defined (PARALLEL)
-     call MPI_FINALIZE ( ier )
+   call MPI_FINALIZE(ier)
 # endif
 
 END PROGRAM FUNWAVE_TVD
 
-
 !-------------------------------------------------------------------------------------
 ! This part is not subroutines
 !  DEFINITIONS OF VARIABLES
-! 
+!
 !    Last Update: 02/18/2016 Fengyan Shi
 !-------------------------------------------------------------------------------------
 !
@@ -599,7 +591,7 @@ END PROGRAM FUNWAVE_TVD
 !         0 - dry
 ! MASK_STRUC(): 0 - permanent dry point
 ! MASK9: mask for itself and 8 elements around
-! 
+!
 ! U():  depth-averaged u or u at the reference level (u_alpha) at element
 ! V():  depth-averaged v or v at the reference level (v_alpha) at element
 ! HU(): (dep+eta)*u at element
@@ -617,7 +609,7 @@ END PROGRAM FUNWAVE_TVD
 ! U1p(:,:): x-component of V1p
 ! V1p(:,:): y-component of V1p
 
-! 
+!
 ! EtaRxL(): Eta Left value at x-interface
 ! EtaRxR(): Eta Right value at x-interface
 ! EtaRyL(): Eta Left value at y-interface
@@ -645,9 +637,5 @@ END PROGRAM FUNWAVE_TVD
 ! GxL = HxL*UxL*VxL
 ! GxR = HxR*UxR*VxR
 ! GyL = HVyL*VyL + 1/2*g*(EtaRyL^2 + 2*EtaRyL*Depthy)
-! GyR = HVyR*VyR + 1/2*g*(EtaRyR^2 + 2*EtaRyR*Depthy) 
-
-
-
-
+! GyR = HVyR*VyR + 1/2*g*(EtaRyR^2 + 2*EtaRyR*Depthy)
 
