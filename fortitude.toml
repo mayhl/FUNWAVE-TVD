@@ -1,0 +1,9 @@
+[check]
+select = ["C", "E", "S"]
+ignore = ["S001", "S082"]
+line-length = 132
+
+#[check]
+#select = ["C", "E", "S"]
+#ignore = ['E001' 'S091']
+#line-length = 132

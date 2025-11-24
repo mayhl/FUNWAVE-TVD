@@ -1,4 +1,8 @@
 cmake_minimum_required(VERSION 3.5)
+
+# ------------
+# Basic Config
+# ------------
 project(
   my_project
   VERSION 4.0.0
@@ -7,44 +11,146 @@ project(
 
 enable_language(Fortran)
 
+# Support Modules
+include(FetchContent)
+
+# ------------------
+# Build Requirements
+# ------------------
+find_package(MPI REQUIRED)
+find_package(Git REQUIRED)
+
+# ---------------------
+# External Dependencies
+# ---------------------
+
+# YAML reader for input file
+set(YAML_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/fortran-yaml")
+FetchContent_Declare(
+  yamlio
+  GIT_REPOSITORY https://github.com/BoldingBruggeman/fortran-yaml.git
+  GIT_TAG d10f56bfd6339c203d8ccc74d522596e076d480c
+  SOURCE_DIR ${YAML_SRC_DIR})
+
+# Prettify logging
+set(FLOG_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/flogging")
+FetchContent_Declare(
+  floggingio
+  GIT_REPOSITORY https://github.com/cmacmackin/flogging.git
+  GIT_TAG 2429bae8080bce33771fb888bf47395ce518d5b2
+  SOURCE_DIR ${FLOG_SRC_DIR})
+
+# Ansi Colors for flogging
+set(FACE_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/FACE")
+FetchContent_Declare(
+  faceio
+  GIT_REPOSITORY https://github.com/szaghi/FACE.git
+  GIT_TAG c0b9d95b1fa27e9a6b75025a55ceea8b86b644ba
+  SOURCE_DIR ${FACE_SRC_DIR})
+
+# ---------------------
+# Basic Compiler Config
+# ---------------------
+
 # Set Fortran standard (e.g., F95)
 set(FVERSION "-std=f95")
+# TODO::
+# cmake-format: off
+#   [] Cray/Intel HPC support
+#   [] Windows support
+#   [] Preprocessor flag selection
+# cmake-format: on
+
+# NOTE:: Temporaarily hard-coded
+list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
 
 # module directory is set before building
 set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
 
-# Setting MPI linkage find_package(MPI)
-find_package(MPI REQUIRED)
+set(CMAKE_Fortran_FLAGS "-ffree-form -cpp")
+# set(CMAKE_Fortran_FLAGS "-cpp")
 
-list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
-
-set(CMAKE_Fortran_FLAGS "-ffree-form")
-
-set_source_files_properties(./src/mod_vessel.F PROPERTIES Fortran_PREPROCESS ON)
-message(STATUS "MPI_Fortran_COMPILER: ${MPI_Fortran_COMPILER}")
-# Add source files add_subdirectory(src)
+set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_definitions(${MPI_Fortran_COMPILE_FLAGS})
 include_directories(${MPI_Fortran_INCLUDE_PATH})
 
+# cmake-format: off
+# message(STATUS "MPI_Fortran_COMPILER: ${MPI_Fortran_COMPILER}")
+# message(${CMAKE_Fortran_COMPILER})
+# message("${CMAKE_Fortran_FLAGS}")
+# cmake-format: on
+
+# -----------------------------
+# External Build Dependencies
+# ------------------------------
+
+# NOTE: Temporary folder for transitioning original code
+set(OLD_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/old")
+# FUNWAVE source code directory path
+set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src")
+
+# Make external dependency available for build
+FetchContent_MakeAvailable(yamlio floggingio faceio)
+
+# flogging dependencies
+add_library(fface ${FACE_SRC_DIR}/src/lib/face.F90)
+add_library(flogging ${FLOG_SRC_DIR}/src/logging.f90)
+target_link_libraries(flogging fface)
+
+# yaml dependencies
+add_library(fyaml ${YAML_SRC_DIR}/yaml_types.F90 ${YAML_SRC_DIR}/yaml.F90)
+# ${YAML_SRC_DIR}/yaml_settings.F90
+
+# ------------------------------------------
+# Internal dependencies on external libaries
+# ------------------------------------------
+
+# FUNWAVE YAML Input Reader
+add_library(fwyaml ${SRC_DIR}/io/yaml.F)
+# target_compile_definitions(fwyaml PUBLIC ${_module_flags})
+target_link_libraries(fwyaml fyaml)
+
+# FUNWAVE Pretty Logging
+add_library(fwlogging ${SRC_DIR}/io/logging.F)
+# target_compile_definitions(fwlogging PUBLIC ${_module_flags})
+target_link_libraries(fwlogging flogging)
+
 add_compile_definitions(${_module_flags})
+# ----------------------------
+# FUNWAVE Central Dependencies
+# ----------------------------
 
 # Central Modules
-add_library(param ./src/mod_param.F)
+add_library(param ${OLD_SRC_DIR}/mod_param.F)
+# target_compile_definitions(param PUBLIC ${_module_flags})
 
-# target_compile_definitions(param PUBLIC DUMMY)
-add_library(global ./src/mod_global.F)
-add_library(input ./src/mod_input.F)
-add_library(bathy_correction ./src/mod_bathy_correction.F)
-add_library(parallel_field_io ./src/mod_parallel_field_io.F)
-add_library(tide ./src/mod_tide.F)
-add_library(time_spectra ./src/mod_time_spectra.F)
+add_library(global ${OLD_SRC_DIR}/mod_global.F)
+# target_compile_definitions(global PUBLIC ${_module_flags})
+
+add_library(input ${OLD_SRC_DIR}/mod_input.F)
+# target_compile_definitions(input PUBLIC ${_module_flags})
+
+add_library(bathy_correction ${OLD_SRC_DIR}/mod_bathy_correction.F)
+# target_compile_definitions(bathy_correction PUBLIC ${_module_flags})
+
+add_library(parallel_field_io ${OLD_SRC_DIR}/mod_parallel_field_io.F)
+# target_compile_definitions(parallel_field_io PUBLIC ${_module_flags})
+
+add_library(tide ${OLD_SRC_DIR}/mod_tide.F)
+# target_compile_definitions(tide PUBLIC ${_module_flags})
+
+add_library(time_spectra ${OLD_SRC_DIR}/mod_time_spectra.F)
+# target_compile_definitions(time_spectra PUBLIC ${_module_flags})
+
+target_link_libraries(global fwyaml fwlogging)
 
 list(
   APPEND
   _modules
-  "param"
-  "global"
+  # Old Code
+  param
+  global
   input
   bathy_correction
   parallel_field_io
@@ -57,61 +163,62 @@ list(
 # chain.
 
 if("VESSEL" IN_LIST _module_flags)
-  add_library(vessel ./src/mod_vessel.F)
+  add_library(vessel ${OLD_SRC_DIR}/mod_vessel.F)
   list(APPEND _modules vessel)
 endif()
 
 if("METEO" IN_LIST _module_flags)
-  add_library(meteo ./src/mod_meteo.F)
+  add_library(meteo ${OLD_SRC_DIR}/mod_meteo.F)
   list(APPEND _modules meteo)
 endif()
 
 if("SEDIMENT" IN_LIST _module_flags)
-  add_library(sediment ./src/mod_sediment.F)
+  add_library(sediment ${OLD_SRC_DIR}/mod_sediment.F)
   list(APPEND _modules sediment)
 endif()
 
 if("FOAM" IN_LIST _module_flags)
-  add_library(foam ./src/mod_foam.F)
+  add_library(foam ${OLD_SRC_DIR}/mod_foam.F)
   list(APPEND _modules foam)
 endif()
 
 if("TRACKING" IN_LIST _module_flags)
-  add_library(tracer ./src/mod_tracer.F)
+  add_library(tracer ${OLD_SRC_DIR}/mod_tracer.F)
   list(APPEND _modules tracer)
 endif()
 
 if("SUBGRID" IN_LIST _module_flags)
-  add_library(subgrid ./src/mod_subgrid.F)
+  add_library(subgrid ${OLD_SRC_DIR}/mod_subgrid.F)
   list(APPEND _modules subgrid)
 endif()
 
 if("PERCIPITATION" IN_LIST _module_flags)
-  add_library(percipitation ./src/mod_meteo.F)
+  add_library(percipitation ${OLD_SRC_DIR}/mod_meteo.F)
   list(APPEND _modules percipitation)
 endif()
 
 add_executable(
   exe
-  ./src/main.F
-  ./src/bc.F
-  ./src/fluxes.F
-  ./src/init.F
-  ./src/io.F
-  ./src/tridiagnal.F
-  ./src/breaker.F
-  ./src/derivatives.F
-  ./src/dispersion.F
-  ./src/etauv_solver.F
-  ./src/sponge.F
-  ./src/sources.F
-  ./src/masks.F
-  ./src/parallel.F
-  ./src/statistics.F
-  ./src/wavemaker.F
-  ./src/mixing.F
-  ./src/nesting.F
-  ./src/misc.F
-  ./src/samples.F)
+  ${OLD_SRC_DIR}/main.F
+  ${OLD_SRC_DIR}/bc.F
+  ${OLD_SRC_DIR}/fluxes.F
+  ${OLD_SRC_DIR}/init.F
+  ${OLD_SRC_DIR}/io.F
+  ${OLD_SRC_DIR}/tridiagnal.F
+  ${OLD_SRC_DIR}/breaker.F
+  ${OLD_SRC_DIR}/derivatives.F
+  ${OLD_SRC_DIR}/dispersion.F
+  ${OLD_SRC_DIR}/etauv_solver.F
+  ${OLD_SRC_DIR}/sponge.F
+  ${OLD_SRC_DIR}/sources.F
+  ${OLD_SRC_DIR}/samples.F
+  ${OLD_SRC_DIR}/masks.F
+  ${OLD_SRC_DIR}/parallel.F
+  ${OLD_SRC_DIR}/statistics.F
+  ${OLD_SRC_DIR}/wavemaker.F
+  ${OLD_SRC_DIR}/mixing.F
+  ${OLD_SRC_DIR}/nesting.F
+  ${OLD_SRC_DIR}/misc.F)
 
+# target_compile_definitions(exe PUBLIC ${_module_flags})
 target_link_libraries(exe ${_modules} ${MPI_Fortran_LIBRARIES})
