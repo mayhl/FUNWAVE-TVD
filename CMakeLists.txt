@@ -11,18 +11,16 @@ project(
 
 enable_language(Fortran)
 
-# Support Modules
-include(FetchContent)
-
 # ------------------
 # Build Requirements
 # ------------------
 find_package(MPI REQUIRED)
 find_package(Git REQUIRED)
+include(FetchContent)
 
-# ---------------------
-# External Dependencies
-# ---------------------
+# -------------------
+# External Libraries
+# -------------------
 
 # YAML reader for input file
 set(YAML_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/ext/fortran-yaml")
@@ -48,42 +46,49 @@ FetchContent_Declare(
   GIT_TAG c0b9d95b1fa27e9a6b75025a55ceea8b86b644ba
   SOURCE_DIR ${FACE_SRC_DIR})
 
-# ---------------------
-# Basic Compiler Config
-# ---------------------
+# -----------------------
+# Setting Compiler Flags
+# -----------------------
 
-# Set Fortran standard (e.g., F95)
-set(FVERSION "-std=f95")
 # TODO::
 # cmake-format: off
-#   [] Cray/Intel HPC support
+#   [x] Cray/Intel HPC support
 #   [] Windows support
 #   [] Preprocessor flag selection
 # cmake-format: on
 
+# Platform Specfic Flags
+if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
+  set(dialect "-ffree-form -std=f2008 -fimplicit-none")
+  set(bounds "-fbounds-check")
+endif()
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
+  set(dialect "-stand f08 -free -implicitnone")
+  list(APPEND _module_flags "INTEL")
+  # set(bounds "-check bounds")
+endif()
+if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
+  set(dialect "-f free")
+  list(APPEND _module_flags "CRAY")
+endif()
+
+# set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${bounds}")
+set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}")
+
 # NOTE:: Temporaarily hard-coded
 list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
 
-# module directory is set before building
-set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
-
-set(CMAKE_Fortran_FLAGS "-ffree-form -cpp")
-# set(CMAKE_Fortran_FLAGS "-cpp")
-
-set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+# set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
 
 add_definitions(${MPI_Fortran_COMPILE_FLAGS})
 include_directories(${MPI_Fortran_INCLUDE_PATH})
 
-# cmake-format: off
-# message(STATUS "MPI_Fortran_COMPILER: ${MPI_Fortran_COMPILER}")
-# message(${CMAKE_Fortran_COMPILER})
-# message("${CMAKE_Fortran_FLAGS}")
-# cmake-format: on
+# module directory is set before building
+set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
 
-# -----------------------------
-# External Build Dependencies
-# ------------------------------
+# --------------------------------
+# External Libaries Build Recipes
+# ---------------------------------
 
 # NOTE: Temporary folder for transitioning original code
 set(OLD_SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src/old")
@@ -102,9 +107,9 @@ target_link_libraries(flogging fface)
 add_library(fyaml ${YAML_SRC_DIR}/yaml_types.F90 ${YAML_SRC_DIR}/yaml.F90)
 # ${YAML_SRC_DIR}/yaml_settings.F90
 
-# ------------------------------------------
-# Internal dependencies on external libaries
-# ------------------------------------------
+# ----------------------------------------------
+# FUNWAVE build recipe linking external libaries
+# ----------------------------------------------
 
 # FUNWAVE YAML Input Reader
 add_library(fwyaml ${SRC_DIR}/io/yaml.F)
@@ -117,6 +122,7 @@ add_library(fwlogging ${SRC_DIR}/io/logging.F)
 target_link_libraries(fwlogging flogging)
 
 add_compile_definitions(${_module_flags})
+
 # ----------------------------
 # FUNWAVE Central Dependencies
 # ----------------------------
@@ -128,22 +134,29 @@ add_library(param ${OLD_SRC_DIR}/mod_param.F)
 add_library(global ${OLD_SRC_DIR}/mod_global.F)
 # target_compile_definitions(global PUBLIC ${_module_flags})
 
+target_link_libraries(global param fwyaml fwlogging)
+
 add_library(input ${OLD_SRC_DIR}/mod_input.F)
+target_link_libraries(input param global)
 # target_compile_definitions(input PUBLIC ${_module_flags})
 
 add_library(bathy_correction ${OLD_SRC_DIR}/mod_bathy_correction.F)
+target_link_libraries(bathy_correction param global input)
 # target_compile_definitions(bathy_correction PUBLIC ${_module_flags})
 
 add_library(parallel_field_io ${OLD_SRC_DIR}/mod_parallel_field_io.F)
+# target_link_libraries(parallel_field_io param global input)
 # target_compile_definitions(parallel_field_io PUBLIC ${_module_flags})
 
 add_library(tide ${OLD_SRC_DIR}/mod_tide.F)
+target_link_libraries(tide param global input)
+
 # target_compile_definitions(tide PUBLIC ${_module_flags})
 
 add_library(time_spectra ${OLD_SRC_DIR}/mod_time_spectra.F)
-# target_compile_definitions(time_spectra PUBLIC ${_module_flags})
+target_link_libraries(time_spectra param global input)
 
-target_link_libraries(global fwyaml fwlogging)
+# target_compile_definitions(time_spectra PUBLIC ${_module_flags})
 
 list(
   APPEND
