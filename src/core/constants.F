@@ -17,9 +17,15 @@
 
 module Constants
 
-   !implict none
-   use MPI
+   ! ignore
+   use MPI, only: MPI_DOUBLE_PRECISION
 
+   implicit none(external)
+
+   ! TODO: Switch data types to standard
+   ! use, intrinsic :: iso_fortran_env
+
+   public
    ! -------------------
    ! Numerical Constants
    ! -------------------
@@ -29,21 +35,33 @@ module Constants
    real(SP), parameter::LARGE = 999999.0_SP
    real(SP), parameter:: ZERO = 0.0_SP
    integer, parameter :: STRING_SIZE = 256
+   integer, parameter :: MESSAGE_SIZE = 2048
+   integer, parameter  :: PATH_SIZE = 512
+   integer, parameter  :: LABEL_SIZE = 10
 
    ! ----------------------
    ! Mathematical Constants
    ! ----------------------
    real(SP), parameter::PI = 3.141592653_SP
+   ! Number of ghost points to share boundary data with sub-grids
+   integer, parameter :: n_ghost = 3
 
    ! ------------------
    ! Physical Constants
    ! ------------------
    real(SP), parameter::R_EARTH = 6371000.0_SP
    real(SP), parameter:: GRAV = 9.81_SP
-   real(SP), parameter:: RHO_AW = 0.0012041_SP  ! relative to water
-   real(SP), parameter:: RHO_AIR = 1.15_SP  ! absolute value
+   real(SP), parameter:: RHO_AW = 0.0012041_SP  ! Relative to water
+   real(SP), parameter:: RHO_AIR = 1.15_SP  ! Absolute value
    real(SP), parameter:: RHO_WATER = 1000.0_SP
    real(SP), parameter:: DEG2RAD = 0.0175_SP
 
+   ! -----------
+   ! Error Codes
+   ! ----------
+   integer, parameter :: err_file_permission = 9
+   integer, parameter :: err_no_file = 29
+
+   !integer, parameter ::
 end module Constants
 

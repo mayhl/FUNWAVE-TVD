@@ -51,9 +51,14 @@
 ! --------------------------------------------------
 MODULE GLOBAL
    USE PARAM
+   USE comm_mod, only: type_comm
+
+   use log_io_mod, only: type_log_writer
+   !use yaml_file_mod, only: type_yaml_reader
    IMPLICIT NONE
    SAVE
-
+   type(type_comm), target :: comm
+   type(type_log_writer), ALLOCATABLE, TARGET :: logger
 # if defined (PARALLEL)
 ! MPI variables
    INTEGER :: myid, ier

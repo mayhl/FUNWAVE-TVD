@@ -68,6 +68,8 @@
 !-------------------------------------------------------------------------------------
 
 MODULE TIME_SPECTRA_MODULE
+
+   use misc_mod, only: random
    USE PARAM
    USE GLOBAL, ONLY: Mloc, Nloc, Nghost, Ibeg, Iend, Jbeg, Jend, Mglob, Nglob, &
                      WidthWaveMaker, R_sponge_wavemaker, A_sponge_wavemaker, &
@@ -219,13 +221,7 @@ CONTAINS
       ELSE
          DO J = 1, NumFreq
          DO I = 1, NumDir
-# if defined (INTEL)
-            Phase_LEFT(J, I) = rand()*2.0_SP*3.1415926
-# elif defined (CRAY)
-            Phase_LEFT(J, I) = rand()*2.0_SP*3.1415926
-# else
-            Phase_LEFT(J, I) = rand(0)*2.0_SP*3.1415926
-# endif
+            Phase_LEFT(J, I) = random()*2.0_SP*3.1415926
          END DO
          END DO
       END IF ! phase true

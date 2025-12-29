@@ -133,6 +133,7 @@ Program FUNWAVE_TVD
 !
 !
 !-------------------------------------------------------------------------------------
+
    USE GLOBAL
 
 # if defined (VESSEL)
@@ -159,20 +160,16 @@ Program FUNWAVE_TVD
    USE TIDE_MODULE
    USE TIME_SPECTRA_MODULE
 
+   use Constants, only: STRING_SIZE, MESSAGE_SIZE
    IMPLICIT NONE
 
-!     INTEGER::ISTAGE ! moved to mod_global 09/12/2017
-!     REAL(SP) :: tbegin,tend  ! moved to mod_global 07/29/2016
+   CHARACTER(MESSAGE_SIZE) :: fpath
+   !CHARACTER(*), ALLOCATABLE :: err_msg
+   logical :: is_io_node
 
-# if defined (PARALLEL)
-   CALL MPI_INIT(ier)
-# endif
+   call comm%init()
 
-# if defined (DEBUG)
-#    if defined (PARALLEL)
-   IF (myid == 0) WRITE (*, *) 'MPI_INIT'
-#    endif
-# endif
+   call comm%init_logger(io_rank_id=0)
 
    CALL READ_INPUT
 

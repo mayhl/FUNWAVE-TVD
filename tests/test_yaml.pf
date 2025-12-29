@@ -1,0 +1,192 @@
+
+! allow(E001)
+module test_yaml
+
+   use MPI
+   use pFUnit
+
+   use Constants, only: sp, MESSAGE_SIZE
+   use yaml_file_mod, only: type_yaml_reader
+   use log_io_mod, only: type_log_writer, initialize_logger
+   use comm_mod, only: type_comm
+   use iso_fortran_env, only: error_unit
+
+   implicit none(external)
+
+contains
+
+   ! Dummy function to fix linter, seems to reset @ errors
+   subroutine dummy_fix_lint()
+
+   end subroutine dummy_fix_lint
+
+   subroutine open_yaml(this, reader, comm)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader), intent(inout) :: reader
+      type(type_comm), intent(inout) :: comm
+      character(:), allocatable :: yaml_path
+      character(:), allocatable :: log_path
+
+      ! TODO:
+      ! [] Add CLI YAML Path
+      ! [] For log file?
+      !     - CLI
+      !     - Generate file using pFUnit fixtures?
+
+      log_path = "./new.log"
+      yaml_path = "test.yaml"
+
+      ! call initialize_logger(log_path, 0, 0, 100)
+      ! call comm%init(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      ! call reader%init(yaml_path, comm)
+
+   end subroutine open_yaml
+
+   @test(npes=[1])
+   subroutine test_integer(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      ! integer :: val
+      !
+      !call open_yaml(this, reader, comm)
+      !
+      ! val = 10
+      ! call reader%read_integer('integer', val=val)
+!      @assertEqual(1, val)
+
+      ! val = 1
+      ! call reader%read_integer('dummy_int', default_val="10", val=val)
+      ! @assertEqual(10, val)
+      !
+      ! val = 1
+      ! call reader%read_integer('dummy_real', default_val="10.5", val=val)
+      ! @assertExceptionRaised('Default value for /dummy_real is set to "10.5", which cannot be interpreted as an integer.')
+      !
+      ! val = 1
+      ! call reader%read_integer('real', val=val)
+      ! @assertExceptionRaised('/real is set to "0.1", which cannot be interpreted as an integer.')
+
+!      call dummy_fix_lint()
+   end subroutine test_integer
+
+   ! @test(npes=[1])
+   ! subroutine test_positive_integer(this)
+   !
+   !    class(MpiTestMethod), intent(inout) :: this
+   !    type(type_yaml_reader) :: reader
+   !    type(type_comm) :: comm
+   !    integer :: val
+   !
+   !    ! call open_yaml(this, reader, comm)
+   !    !
+   !    ! call reader%read_integer('positive_integer', val=val)
+   !    ! @assertEqual(5, val)
+   !    !
+   !    ! call reader%read_positive_integer('negative_integer', val=val)
+   !    ! @assertExceptionRaised('/negative_integer is set to "-3", which is not a positive integer.')
+   !    !
+   !    ! call reader%read_positive_integer('zero_integer', val=val)
+   !    ! @assertExceptionRaised('/zero_integer is set to "0", which is not a positive integer.')
+   !    !
+   !    ! call reader%read_positive_integer('negative_integer', include_zero=.true., val=val)
+   !    ! @assertExceptionRaised('/negative_integer is set to "-3", which is not an integer greater than or equal to zero.')
+   !    !
+   !    ! val = -1
+   !    ! call reader%read_positive_integer('zero_integer', include_zero=.true., val=val)
+   !    ! @assertEqual(0, val)
+   !    !
+   !    call dummy_fix_lint()
+   !
+   ! end subroutine test_positive_integer
+   !
+   ! @test(npes=[1])
+   ! subroutine test_real(this)
+   !
+   !    class(MpiTestMethod), intent(inout) :: this
+   !    type(type_yaml_reader) :: reader
+   !    type(type_comm) :: comm
+   !    real(sp) :: val, target_val
+   !
+   !    ! call open_yaml(this, reader, comm)
+   !    !
+   !    ! val = 10
+   !    ! call reader%read_real('integer', val=val)
+   !    ! @assertEqual(1, val)
+   !    !
+   !    ! val = 10
+   !    ! call reader%read_real('real', val=val)
+   !    ! @assertEqual(0.1_sp, val)
+   !    !
+   !    ! val = 1
+   !    ! call reader%read_real('dummy_int', default_val="10", val=val)
+   !    ! @assertEqual(10, val)
+   !    ! !
+   !    ! val = 1
+   !    ! call reader%read_real('dummy_real', default_val="10.5", val=val)
+   !    ! @assertEqual(10.5_sp, val)
+   !
+   !    call dummy_fix_lint()
+   ! end subroutine test_real
+   !
+   ! @test(npes=[1])
+   ! subroutine test_string(this)
+   !
+   !    class(MpiTestMethod), intent(inout) :: this
+   !
+   !    type(type_yaml_reader) :: reader
+   !    type(type_comm) :: comm
+   !    character(:), allocatable :: val
+   !
+   !    ! call open_yaml(this, reader, comm)
+   !
+   !    !call reader%read_string('string1', val=val)
+   !    ! call comm%barrier()
+   !    ! @assertEqual('test string 1', val)
+   !    !
+   !    ! call reader%read_string('dummy_string', default_val="dummy string", val=val)
+   !    ! call comm%barrier()
+   !    ! @assertEqual('dummy string', val)
+   !    !
+   !    ! call reader%read_string('string2', val=val)
+   !    ! call comm%barrier()
+   !    ! @assertEqual('test string 2', val)
+   !
+   !    call dummy_fix_lint()
+   !
+   ! end subroutine test_string
+   !
+   ! @test(npes=[1])
+   ! subroutine test_enum(this)
+   !
+   !    class(MpiTestMethod), intent(inout) :: this
+   !
+   !    type(type_yaml_reader) :: reader
+   !    type(type_comm) :: comm
+   !    character(:), allocatable :: val
+   !    character(len=6), dimension(3) :: words
+   !
+   !    ! data words/'item1', 'item2', 'item3'/
+   !    ! call open_yaml(this, reader, comm)
+   !
+   !    !call reader%read_enum('enum1', words, val=val)
+   !    !@assertEqual('item1', val)
+   !    !if (allocated(val)) deallocate (val)
+   !
+   !    !call reader%read_enum('dummy_enum', words, default_val='item3', val=val)
+   !    !if (allocated(val)) deallocate (val)
+   !    !@assertEqual('item3', val)
+   !    !
+   !    !call reader%read_enum('enum2', words, val=val)
+   !    !@assertEqual('item2', val)
+   !
+   !    !call reader%read_enum('enum_error', words, val=val)
+   !    !@assertExceptionRaised('/enum_error is set to "item5", which is not in the allowable list of values. Valid values: item1, item2, & item3.')
+   !
+   !    call dummy_fix_lint()
+   !
+   ! end subroutine test_enum
+
+end module test_yaml

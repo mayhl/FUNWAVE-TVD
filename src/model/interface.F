@@ -10,36 +10,32 @@
 !
 !-------------------------------------------------
 
-module ModelComponent
+module model_interface_mod
 
-   type, abstract :: TypeInterfaceComp
+   use yaml_file_mod, only: type_yaml_reader
+   use log_io_mod, only: type_log_writer
+
+   type type_model_interface
+
+      type(type_yaml_reader):: yaml
+      type(type_log_writer), pointer :: log
 
    contains
-      ! procedure :: validateInput
-      ! procedure :: allocateMemory
 
-   end type TypeInterfaceComp
+      procedure :: validate_yaml
 
-   type, extends(TypeInterfaceComp) :: TypeGridComp
-
-      public
-      integer :: p_procs, n_procs, m_procs
-      integer :: n_loc, m_loc, n_glob, m_glob
-
-   end type TypeGridComp
+   end type
 
 contains
 
-   function validateInput() result(ierror)
+   subroutine validate_yaml(this, yaml, log)
 
-      integer :: ierror
+      class(type_model_interface), intent(inout) :: this
+      type(type_yaml_reader), intent(inout), target :: yaml
+      type(type_log_writer), intent(inout), target :: log
 
-   end function validateInput
+      call log%exit_on_fatal("Called abstact model interface validate_yaml method.", 1)
 
-   subroutine constructor(grid)
-      type(TypeGridComp), INTENT(INOUT) :: grid
+   end subroutine validate_yaml
 
-   end subroutine constructor
-
-end module ModelComponent
-
+end module model_interface_mod

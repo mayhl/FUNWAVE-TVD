@@ -1,5 +1,4 @@
-!------------------------------------------------------------------------------------
-!
+!-----------------------------------------------------------------------------------
 !      FILE io.F
 !
 !      This file is part of the FUNWAVE-TVD program under the Simplified BSD license
@@ -152,7 +151,11 @@ SUBROUTINE READ_INPUT
 # if defined(INTEL)
    USE IFPORT
 # endif
-
+   use yaml_file_mod, only: type_yaml_reader
+   use log_io_mod, only: type_log_writer
+   use Constants, only: LABEL_SIZE
+   use misc_mod, only: random
+   use model_grid_mod, only: type_model_grid
 !jychoi 14.12.23]
    IMPLICIT NONE
    CHARACTER(LEN=80) FILE_NAME
@@ -162,6 +165,8 @@ SUBROUTINE READ_INPUT
    INTEGER :: I_comp
    LOGICAL :: INPUT_PHASE = .FALSE.
 
+   character(256) :: my_path
+   character(2048) :: error_msg, log_path, yaml_path
    !>by Zhouteng Ye
    CHARACTER(LEN=80)::INPUT_NAME = ''
 
@@ -169,17 +174,20 @@ SUBROUTINE READ_INPUT
    CHARACTER(LEN=80)::FDIR = ' '
 !ykchoi]
 
-# if defined (PARALLEL)
-   CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nprocs, ier)   !ykchoi(04/May/2017)
-   CALL MPI_COMM_RANK(MPI_COMM_WORLD, myid, ier)
-# endif
+   ! NOTE: --- MY VARIABLES -------
+   type(type_yaml_reader), target :: yaml_reader
+   type(type_log_writer), target :: log
+   type(type_model_grid), target :: grid
+   character(LABEL_SIZE) :: log_label = 'config'
+   ! NOTE: --- MY VARIABLES -------
+
+   ! NOTE: --- BELOW TO BE REMOVED -------
 
    FDIR = TRIM(RESULT_FOLDER)
    OPEN (10000, FILE='time_dt.out', STATUS='UNKNOWN')
-
    OPEN (3, FILE='LOG.txt')
-
-! read everything from input.txt
+   CALL getcwd(error_msg)
+   WRITE (*, *) TRIM(error_msg)
 
    !>by Zhouteng Ye
    !> Get the argument from the command.
@@ -210,6 +218,35 @@ SUBROUTINE READ_INPUT
    WRITE (3, *) '                                         '
 # endif
 
+   nprocs = comm%size
+   myid = comm%rank_id
+   ! NOTE: --- TO BE REMOVED -------
+
+   log = comm%get_logger(log_label)
+   yaml_path = "../test.yaml"
+
+   call yaml_reader%init(yaml_path, 100, log, comm)
+
+   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+   call grid%validate_yaml(yaml_reader, log)
+
+   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
+   stop
+
+! # if defined (PARALLEL)
+!    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nprocs, ier)   !ykchoi(04/May/2017)
+!    CALL MPI_COMM_RANK(MPI_COMM_WORLD, myid, ier)
+! # endif
+
+   ! allocate (yaml_reader)
+   !
+   ! write (*, *) 'id', myid, myid .eq. 0
+   ! call yaml_reader%init(yaml_path, 100, log_path, MPI_COMM_WORLD, myid .eq. 0)
+
+!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+!    Old COde
+!!!!!!!!!!!!!!!!!!!!!!!!
 # if defined (PARALLEL)
    if (myid .eq. 0) WRITE (3, *) '                                         '
    if (myid .eq. 0) WRITE (3, *) '-------------- PARALLEL -----------------'
@@ -2038,13 +2075,7 @@ SUBROUTINE READ_INPUT
                IF (INPUT_PHASE) THEN
                   Phase_LEFT(J, I) = Phase_LEFT(J, I)*3.1415926/180.0_SP
                ELSE
-# if defined (INTEL)
-                  Phase_LEFT(J, I) = rand()*2.0_SP*3.1415926
-# elif defined (CRAY)
-                  Phase_LEFT(J, I) = rand()*2.0_SP*3.1415926
-# else
-                  Phase_LEFT(J, I) = rand(0)*2.0_SP*3.1415926
-# endif
+                  Phase_LEFT(J, I) = random()*2.0_SP*3.1415926
                END IF
 
             END DO
@@ -4873,38 +4904,6 @@ SUBROUTINE PutFile(FILE, PHI)
       write (FORMAT_LEN(16:16), '(A1)') ')'
    END IF
 
-   OPEN (1, FILE=TRIM(FILE))
-# if defined(DEBUG)
-   DO J = 1, Nloc
-      WRITE (1, 100) (real(PHI(I, J)), I=1, Mloc)
-   END DO
-# else
-   DO J = Nghost + 1, Nloc - Nghost, OUTPUT_RES
-      WRITE (1, FORMAT_LEN) (real(PHI(I, J)), I=Nghost + 1, Mloc - Nghost, OUTPUT_RES)
-   END DO
-# endif
-100 FORMAT(5000E16.6)
-!100   FORMAT(FORMAT_LEN)
-   CLOSE (1)
-END SUBROUTINE PutFile
-
-# endif
-
-# if defined (VESSEL)
-!-------------------------------------------------------------------------------------
-!
-!    OUTPUT_VESSEL is a subroutine to write vessel data
-!
-! HISTORY:
-!    02/18/2017  Fengyan Shi
-!
-!-------------------------------------------------------------------------------------
-SUBROUTINE OUTPUT_VESSEL
-   USE GLOBAL
-   USE INPUT_READ
-   USE VESSEL_MODULE
-
-   IMPLICIT NONE
    CHARACTER(LEN=80)::FDIR = ' '
    LOGICAL :: FirstCallVessel = .TRUE.
    SAVE FirstCallVessel
