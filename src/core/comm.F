@@ -16,7 +16,7 @@ module comm_mod
    use Constants, only: n_ghost, LABEL_SIZE
    use log_io_mod, only: type_log_writer
 
-   implicit none(external)
+   implicit none !(external)
 
    character(LABEL_SIZE), parameter :: log_key = "MPI"
 
@@ -126,7 +126,7 @@ contains
       ! NOTE: I don't I need to care about ID change with file/IO since flag in memory
       this%comm_id = new_comm_id
 
-      call MPI_CART_COORDS(this%comm_id, this%rank_id, n_dims, coords, ier)
+      call MPI_Cart_coords(this%comm_id, this%rank_id, n_dims, coords, ier)
 
       ! print *, 'ID', this%rank_id, 'WR ID', this%io_node_id
       this%iproc = coords(1)

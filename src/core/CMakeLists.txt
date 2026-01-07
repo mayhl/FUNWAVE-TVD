@@ -44,7 +44,10 @@ add_library(fface ${FACE_SRC_DIR}/src/lib/face.F90)
 target_compile_options(fface PRIVATE)
 
 add_library(flogging ${FLOG_SRC_DIR}/src/logging.f90)
-target_compile_options(flogging PRIVATE -std=f2023)
+target_compile_options(flogging PRIVATE) #
+
+# -std=f2023)
+
 target_link_libraries(flogging PRIVATE fface)
 #
 # target_compile_options(fortran-yaml-c PRIVATE -std=f2023)
@@ -66,7 +69,7 @@ add_library(core constants.F comm.F throw.F logging.F yaml_input.F misc.F)
 # Linking external libraries to FUNWAVE core
 target_link_libraries(core PRIVATE fortran-yaml-c flogging) # constants)
 
-target_compile_options(core PRIVATE -std=f2023)
+target_compile_options(core PRIVATE) # -s:qtd=f2023)
 
 # TODO: Properly encapsulate core lib, i.e., No direct dependence on flogging
 # and fortran-yaml-c

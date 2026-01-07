@@ -1,0 +1,549 @@
+
+! allow(E001)
+module test_yaml
+
+   use MPI
+   use pFUnit
+
+   use Constants, only: sp, MESSAGE_SIZE
+   use yaml_file_mod, only: type_yaml_reader
+   use log_io_mod, only: type_log_writer, initialize_logger
+   use comm_mod, only: type_comm
+   use misc_mod, only: str2int
+   use iso_fortran_env, only: error_unit
+
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+      ! Dummy function to fix linter, seems to reset @ errors
+   end subroutine dummy_fix_lint
+
+   subroutine open_yaml(this, reader, comm)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader), intent(inout) :: reader
+      type(type_comm), intent(inout) :: comm
+      character(:), allocatable :: yaml_path
+      character(:), allocatable :: log_path
+
+      ! TODO:
+      ! [] Add CLI YAML Path
+      ! [] For log file?
+      !     - CLI
+      !     - Generate file using pFUnit fixtures?
+
+      log_path = "./new.log"
+      yaml_path = "test.yaml"
+
+      call initialize_logger(log_path, 0, 0, 100)
+      call comm%init(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      call reader%init(yaml_path, comm)
+
+   end subroutine open_yaml
+
+   @test(npes=[1])
+   subroutine test_integer(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(this, reader, comm)
+
+      val = 10
+      call reader%read_integer('integer', val=val)
+      @assertEqual(1, val)
+
+      val = 1
+      call reader%read_integer('dummy_int', default_val="10", val=val)
+      @assertEqual(10, val)
+
+      val = 1
+      call reader%read_integer('dummy_real', default_val="10.5", val=val)
+      @assertExceptionRaised('Default value for /dummy_real is set to "10.5", which cannot be interpreted as an integer.')
+
+      val = 1
+      call reader%read_integer('real', val=val)
+      @assertExceptionRaised('/real is set to "0.1", which cannot be interpreted as an integer.')
+
+      val = 1
+      call reader%read_integer('string1', val=val)
+      @assertExceptionRaised('/string1 is set to "test string 1", which cannot be interpreted as an integer.')
+
+      call dummy_fix_lint()
+   end subroutine test_integer
+
+   @test(npes=[1])
+   subroutine test_range_integer(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_integer('integer', &
+                               inclusive=[.true., .true.], &
+                               val=val)
+
+      @assertExceptionRaised('/integer can not specify inclusive without also specifying range.')
+
+      call reader%read_integer('integer', &
+                               recommended_inclusive=[.true., .true.], &
+                               val=val)
+
+      @assertExceptionRaised('/integer can not specify recommended_inclusive without also specifying recommended_range.')
+
+      call reader%read_integer('integer', &
+                               range=['0', '1'], &
+                               inclusive=[.true., .false.], &
+                               val=val)
+
+      @assertExceptionRaised('/integer is set to "1", which is not in the required range [0, 1).')
+
+      call reader%read_integer('integer', &
+                               range=['0', '1'], &
+                               val=val)
+      @assertEqual(1, val)
+
+      call reader%read_integer('integer', &
+                               range=['0', '1'], &
+                               recommended_range=['0', '1'], &
+                               recommended_inclusive=[.true., .false.], &
+                               val=val)
+      @assertEqual(1, val)
+
+      call reader%read_integer('integer', &
+                               range=['0', '0'], &
+                               val=val)
+
+      @assertExceptionRaised('/integer [0, 0] is not a valid range.')
+
+      call reader%read_integer('integer', &
+                               recommended_range=['1', '0'], &
+                               recommended_inclusive=[.false., .false.], &
+                               val=val)
+
+      @assertExceptionRaised('/integer (1, 0) is not a valid recommended_range.')
+
+      call reader%read_integer('integer', &
+                               range=['0', '2'], &
+                               recommended_range=['-1', '1 '], &
+                               val=val)
+
+      @assertExceptionRaised('/integer recommended_range, [-1, 1], is not a subinterval of range, [0, 2].')
+
+      call reader%read_integer('integer', &
+                               range=['0', '2'], &
+                               inclusive=[.false., .true.], &
+                               recommended_range=['0', '1'], &
+                               val=val)
+
+      @assertExceptionRaised('/integer recommended_range, [0, 1], is not a subinterval of range, (0, 2].')
+
+      call reader%read_integer('integer', &
+                               range=['0', '2'], &
+                               recommended_range=['0', '1'], &
+                               recommended_inclusive=[.false., .true.], &
+                               val=val)
+      @assertEqual(1, val)
+
+      call reader%read_integer('integer', &
+                               range=['0', '1'], &
+                               recommended_range=['0', '2'], &
+                               val=val)
+
+      @assertExceptionRaised('/integer recommended_range, [0, 2], is not a subinterval of range, [0, 1].')
+
+      call reader%read_integer('integer', &
+                               range=['0', '2'], &
+                               inclusive=[.true., .false.], &
+                               recommended_range=['0', '2'], &
+                               val=val)
+
+      @assertExceptionRaised('/integer recommended_range, [0, 2], is not a subinterval of range, [0, 2).')
+
+      call reader%read_integer('integer', &
+                               range=['0', '1'], &
+                               recommended_range=['0', '1'], &
+                               recommended_inclusive=[.true., .false.], &
+                               val=val)
+
+      @assertEqual(1, val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_range_integer
+
+   @test(npes=[1])
+   subroutine test_positive_integer(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_positive_integer('positive_integer', val=val)
+      @assertEqual(5, val)
+
+      call reader%read_positive_integer('negative_integer', val=val)
+      @assertExceptionRaised('/negative_integer is set to "-3", which is required to be a positive number.')
+
+      call reader%read_positive_integer('zero_integer', val=val)
+      @assertExceptionRaised('/zero_integer is set to "0", which is required to be a positive number.')
+
+      call reader%read_positive_integer('negative_integer', include_zero=.true., val=val)
+      @assertExceptionRaised('/negative_integer is set to "-3", which is required to be greater than or equal to zero.')
+
+      val = -1
+      call reader%read_positive_integer('zero_integer', include_zero=.true., val=val)
+      @assertEqual(0, val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_positive_integer
+
+   @test(npes=[1])
+   subroutine test_real(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(sp) :: val, target_val
+
+      call open_yaml(this, reader, comm)
+
+      val = 10
+      call reader%read_real('integer', val=val)
+      @assertEqual(1, val)
+
+      val = 10
+      call reader%read_real('real', val=val)
+      @assertEqual(0.1_sp, val)
+
+      val = 1
+      call reader%read_real('dummy_int', default_val="10", val=val)
+      @assertEqual(10, val)
+
+      val = 1
+      call reader%read_real('dummy_real', default_val="10.5", val=val)
+      @assertEqual(10.5_sp, val)
+
+      val = 1
+      call reader%read_real('string1', val=val)
+      @assertExceptionRaised('/string1 is set to "test string 1", which cannot be interpreted as a real number.')
+
+      call dummy_fix_lint()
+   end subroutine test_real
+
+   @test(npes=[1])
+   subroutine test_range_real(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(sp) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_real('real', &
+                            inclusive=[.true., .true.], &
+                            val=val)
+
+      @assertExceptionRaised('/real can not specify inclusive without also specifying range.')
+
+      call reader%read_real('real', &
+                            recommended_inclusive=[.true., .true.], &
+                            val=val)
+
+      @assertExceptionRaised('/real can not specify recommended_inclusive without also specifying recommended_range.')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.1'], &
+                            inclusive=[.true., .false.], &
+                            val=val)
+
+      @assertExceptionRaised('/real is set to "0.1", which is not in the required range [0, 0.1).')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.1'], &
+                            val=val)
+      @assertEqual(0.1_sp, val)
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.1'], &
+                            recommended_range=['0  ', '0.1'], &
+                            recommended_inclusive=[.true., .false.], &
+                            val=val)
+      @assertEqual(0.1_sp, val)
+
+      call reader%read_real('real', &
+                            range=['0', '0'], &
+                            val=val)
+
+      @assertExceptionRaised('/real [0, 0] is not a valid range.')
+
+      call reader%read_real('real', &
+                            recommended_range=['0.1', '0  '], &
+                            recommended_inclusive=[.false., .false.], &
+                            val=val)
+
+      @assertExceptionRaised('/real (0.1, 0) is not a valid recommended_range.')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.2'], &
+                            recommended_range=['-0.1', '0.1 '], &
+                            val=val)
+
+      @assertExceptionRaised('/real recommended_range, [-0.1, 0.1], is not a subinterval of range, [0, 0.2].')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.2'], &
+                            inclusive=[.false., .true.], &
+                            recommended_range=['0  ', '0.1'], &
+                            val=val)
+
+      @assertExceptionRaised('/real recommended_range, [0, 0.1], is not a subinterval of range, (0, 0.2].')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.2'], &
+                            recommended_range=['0  ', '0.1'], &
+                            recommended_inclusive=[.false., .true.], &
+                            val=val)
+      @assertEqual(0.1_sp, val)
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.1'], &
+                            recommended_range=['0  ', '0.2'], &
+                            val=val)
+
+      @assertExceptionRaised('/real recommended_range, [0, 0.2], is not a subinterval of range, [0, 0.1].')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.2'], &
+                            inclusive=[.true., .false.], &
+                            recommended_range=['0  ', '0.2'], &
+                            val=val)
+
+      @assertExceptionRaised('/real recommended_range, [0, 0.2], is not a subinterval of range, [0, 0.2).')
+
+      call reader%read_real('real', &
+                            range=['0  ', '0.1'], &
+                            recommended_range=['0  ', '0.1'], &
+                            recommended_inclusive=[.true., .false.], &
+                            val=val)
+
+      @assertEqual(0.1_sp, val)
+
+      call dummy_fix_lint()
+
+   end subroutine
+
+   @test(npes=[1])
+   subroutine test_positive_real(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(sp) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_positive_real('positive_real', val=val)
+      @assertEqual(0.5, val)
+
+      call reader%read_positive_real('negative_real', val=val)
+      @assertExceptionRaised('/negative_real is set to "-0.3", which is required to be a positive number.')
+
+      call reader%read_positive_real('zero_real', val=val)
+      @assertExceptionRaised('/zero_real is set to "0.0", which is required to be a positive number.')
+
+      call reader%read_positive_real('negative_real', include_zero=.true., val=val)
+      @assertExceptionRaised('/negative_real is set to "-0.3", which is required to be greater than or equal to zero.')
+
+      val = -1
+      call reader%read_positive_real('zero_real', include_zero=.true., val=val)
+      @assertEqual(0, val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_positive_real
+
+   @test(npes=[1])
+   subroutine test_logical(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      logical :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_logical('logical_true', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_True', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_TRUE', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_on', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_On', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_ON', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_y', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_Y', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_yes', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_Yes', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read_logical('logical_YES', val=val)
+      @assertEqual(.true., val)
+
+      ! False Tests
+      call reader%read_logical('logical_false', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_False', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_False', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_off', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_Off', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_OFF', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_n', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_N', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_no', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_No', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_NO', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read_logical('logical_t', val=val)
+      @assertExceptionRaised('/logical_t is set to "t", which cannot be interpreted as a Boolean value.')
+
+      call reader%read_logical('logical_T', val=val)
+      @assertExceptionRaised('/logical_T is set to "T", which cannot be interpreted as a Boolean value.')
+
+      call reader%read_logical('logical_f', val=val)
+      @assertExceptionRaised('/logical_f is set to "f", which cannot be interpreted as a Boolean value.')
+
+      call reader%read_logical('logical_F', val=val)
+      @assertExceptionRaised('/logical_F is set to "F", which cannot be interpreted as a Boolean value.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_logical
+
+   @test(npes=[1])
+   subroutine test_string(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), ALLOCATABLE :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_string('string1', val=val)
+      @assertEqual('test string 1', val)
+
+      call reader%read_string('dummy_string', default_val="dummy string", val=val)
+      !call comm%barrier()
+      @assertEqual('dummy string', val)
+
+      call reader%read_string('string2', val=val)
+      call comm%barrier()
+      @assertEqual('test string 2', val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_string
+
+   @test(npes=[1])
+   subroutine test_enum(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: val
+      character(len=6), dimension(3) :: words
+
+      data words/'item1', 'item2', 'item3'/
+      call open_yaml(this, reader, comm)
+
+      call reader%read_enum('enum1', words, val=val)
+      @assertEqual('item1', val)
+
+      call reader%read_enum('dummy_enum', words, default_val='item3', val=val)
+      @assertEqual('item3', val)
+
+      call reader%read_enum('enum2', words, val=val)
+      @assertEqual('item2', val)
+
+      call reader%read_enum('enum_error', words, val=val)
+      @assertExceptionRaised('/enum_error is set to "item5", which is not in the allowable list of values. Valid values: item1, item2, & item3.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_enum
+
+   @test(npes=[1])
+   subroutine test_path(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: val, file_path
+      integer :: unit, iostat
+      call open_yaml(this, reader, comm)
+
+      call reader%read_path('invalid_file_path', val=val)
+      @assertExceptionRaised('/invalid_file_path is set to "invalid_file_path.txt", which is not a valid file path.')
+
+      file_path = 'valid_file_path.txt'
+      open (newunit=unit, file=file_path, iostat=iostat)
+      call reader%read_path('valid_file_path', val=val)
+      @assertEqual(file_path, val)
+      close (unit, status='delete')
+
+      call dummy_fix_lint()
+
+   end subroutine test_path
+end module test_yaml

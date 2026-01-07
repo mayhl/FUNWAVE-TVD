@@ -1,4 +1,4 @@
-set(PFUNIT_SRC_DIR ${EXTERNAL_DIR}/pfunit)
+# set(PFUNIT_SRC_DIR ${EXTERNAL_DIR}/pfunit)
 
 # include(ExternalProject)
 
@@ -14,20 +14,9 @@ set(PFUNIT_SRC_DIR ${EXTERNAL_DIR}/pfunit)
 
 find_package(PFUNIT REQUIRED)
 
-file(COPY test.yaml DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+add_subdirectory(core)
 
 # cmake-format: off
-
-add_pfunit_ctest(test_yaml_input
-  TEST_SOURCES test_yaml.pf
-  OTHER_SOURCES throw_with_pfunit.F90
-  LINK_LIBRARIES core
-  EXTRA_USE throw_with_pfunit_mod
-  EXTRA_INITIALIZE initialize_throw
-  MAX_PES 1
-)
-
-
 #set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
 # cmake-format: on
 
