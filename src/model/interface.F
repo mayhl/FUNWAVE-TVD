@@ -12,6 +12,7 @@
 
 module model_interface_mod
 
+   use comm_mod, only: type_comm
    use yaml_file_mod, only: type_yaml_reader
    use log_io_mod, only: type_log_writer
 
@@ -28,9 +29,10 @@ module model_interface_mod
 
 contains
 
-   subroutine validate_yaml(this, yaml, log)
+   subroutine validate_yaml(this, comm, yaml, log)
 
       class(type_model_interface), intent(inout) :: this
+      class(type_comm), intent(inout) :: comm
       type(type_yaml_reader), intent(inout), target :: yaml
       type(type_log_writer), intent(inout), target :: log
 

@@ -2,7 +2,7 @@
 ! allow(E001)
 module test_yaml
 
-   use MPI
+   use mpi_f08
    use pFUnit
 
    use Constants, only: sp, MESSAGE_SIZE
@@ -25,6 +25,7 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_yaml_reader), intent(inout) :: reader
       type(type_comm), intent(inout) :: comm
+      type(MPI_comm) :: mcomm
       character(:), allocatable :: yaml_path
       character(:), allocatable :: log_path
 
@@ -38,7 +39,9 @@ contains
       yaml_path = "test.yaml"
 
       call initialize_logger(log_path, 0, 0, 100)
-      call comm%init(io_rank_id=0, comm_id=this%getMpiCommunicator())
+
+      !mcomm = this%getMpiCommunicator()
+      call comm%init(io_rank_id=0, comm_id=this%getF08MpiCommunicator())
       call reader%init(yaml_path, comm)
 
    end subroutine open_yaml
@@ -534,12 +537,12 @@ contains
       integer :: unit, iostat
       call open_yaml(this, reader, comm)
 
-      call reader%read_path('invalid_file_path', val=val)
+      call reader%read_input_path('invalid_file_path', val=val)
       @assertExceptionRaised('/invalid_file_path is set to "invalid_file_path.txt", which is not a valid file path.')
 
       file_path = 'valid_file_path.txt'
       open (newunit=unit, file=file_path, iostat=iostat)
-      call reader%read_path('valid_file_path', val=val)
+      call reader%read_input_path('valid_file_path', val=val)
       @assertEqual(file_path, val)
       close (unit, status='delete')
 

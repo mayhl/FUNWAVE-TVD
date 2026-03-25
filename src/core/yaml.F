@@ -66,6 +66,7 @@ module yaml_file_mod
    use log_io_mod, only: type_log_writer
    use comm_mod, only: type_comm
    use misc_mod, only: str2int, str2real
+   ! use filesystem, only: path_t
 
    !use Constants, only: STRING_SIZE
    use fortran_yaml_c, only: YamlFile, dp, &
@@ -97,15 +98,15 @@ module yaml_file_mod
 
       private
       procedure, public :: init
+      procedure, public :: cast_dictionary
       procedure, public :: read_enum
+      procedure, public :: read_input_path
       procedure, public :: read_integer
       procedure, public :: read_logical
-      procedure, public :: read_path
       procedure, public :: read_positive_integer
       procedure, public :: read_positive_real
       procedure, public :: read_real
       procedure, public :: read_string
-      procedure, public :: cast_dictionary
       procedure :: copy_node
       procedure :: parse_error_message
       procedure :: prep_msg
@@ -114,7 +115,6 @@ module yaml_file_mod
       procedure :: read_logical_node
       procedure :: read_real_node
       procedure :: read_string_node
-!      procedure :: exit_on_out_of_bounds_integer
 
    end type type_yaml_reader
 
@@ -987,7 +987,7 @@ contains
 
    end subroutine read_enum
 
-   subroutine read_path(this, key, default_val, is_empty, val)
+   subroutine read_input_path(this, key, default_val, is_empty, val)
       !----------------------------------------------------------
       ! Read key from from root node and parse as integer
       class(type_yaml_reader), intent(inout) :: this
@@ -997,6 +997,7 @@ contains
       character(:), allocatable, intent(inout) :: val
 
       character(:), allocatable :: val_buff
+!      type(path_t) :: path
       logical :: file_exists
       character(len=:), allocatable :: msg
 
@@ -1006,7 +1007,6 @@ contains
          val = trim(val_buff)
 
          inquire (file=val, exist=file_exists)
-
          if (.not. file_exists) then
             msg = "which is not a valid file path."
             msg = this%prep_msg_val(key, msg)
@@ -1015,7 +1015,7 @@ contains
 
       end if
 
-   end subroutine read_path
+   end subroutine read_input_path
 
    function parse_error_message(this, key, io_err, default_val, is_empty) result(is_default)
       ! Parses fortran-yaml-c error message and filters no key error from

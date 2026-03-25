@@ -12,11 +12,11 @@
 
 module comm_mod
 
-   use MPI
-   use Constants, only: n_ghost, LABEL_SIZE
+   use mpi_f08
+   use Constants, only: n_ghost, LABEL_SIZE, sp
    use log_io_mod, only: type_log_writer
 
-   implicit none !(external)
+   implicit none(external)
 
    character(LABEL_SIZE), parameter :: log_key = "MPI"
 
@@ -28,8 +28,8 @@ module comm_mod
       private
 
       integer, public :: size
-      integer, public :: comm_id, rank_id
-      integer, public :: iproc, jproc
+      type(MPI_Comm), public :: comm_id
+      integer, public :: iproc, jproc, rank_id
       integer, public :: nx_proc, ny_proc
       ! cross, public-shore (x-)direction.
       ! back , public=> shore <=> -x > + x
@@ -64,9 +64,10 @@ contains
 
    subroutine init(this, io_rank_id, comm_id)
 
+      use mpi_f08, only: MPI_COMM_WORLD
       class(type_comm), intent(inout) :: this
       integer, intent(in) :: io_rank_id
-      integer, intent(in), optional :: comm_id
+      type(MPI_Comm), intent(in), optional :: comm_id
 
       integer :: ierr
       ! TODO: Add error checking
@@ -83,7 +84,7 @@ contains
       this%p_is_io_node = this%rank_id .eq. io_rank_id
       this%io_node_id = io_rank_id
 
-      call this%log%get(log_key, this%comm_id, this%p_is_io_node)
+      call this%log%get(log_key, this%p_is_io_node)
 
    end subroutine init
 
@@ -93,7 +94,7 @@ contains
       character(LABEL_SIZE), intent(in) :: label
       type(type_log_writer) :: logger
 
-      call logger%get(label, this%comm_id, this%p_is_io_node)
+      call logger%get(label, this%p_is_io_node)
 
    end function get_logger
 
@@ -103,26 +104,30 @@ contains
       flag = this%p_is_io_node
    end function is_io_node
 
-   subroutine create_2d(this, nx_proc, ny_proc, nx_global, ny_global)
+   subroutine create_2d(this, nx_proc, ny_proc, nx_global, ny_global, create_partition)
 
       class(type_comm), intent(inout) :: this
       integer, intent(in) :: nx_global, ny_global
-      integer, intent(in) :: nx_proc, ny_proc
+      integer, intent(inout) :: nx_proc, ny_proc
+      logical, intent(in) :: create_partition
       integer, parameter  :: n_dims = 2
       integer, dimension(n_dims) :: dims, coords
       logical, dimension(n_dims)  :: periods
-      integer :: new_comm_id, old_comm_id, ier, old_rank_id
+      type(MPI_Comm) :: new_comm_id, old_comm_id
+      integer :: ier, old_rank_id
       logical :: reorder
       integer :: io
 
-      CHARACTER(*), PARAMETER :: tmp_file = '.new_reorder_comm_id'
+      if (create_partition) then
+         call compute_optimal_grid_size(this%size, nx_global, ny_global, nx_proc, ny_proc)
+      end if
 
       reorder = .true.
       coords = (/0, 0/)
       periods = (/.false., .false./)
       dims = (/nx_proc, ny_proc/)
 
-      call MPI_Cart_Create(this%comm_id, n_dims, dims, periods, reorder, new_comm_id, ier)
+      call MPI_Cart_Create(this%comm_id, 2, dims, periods, reorder, new_comm_id, ier)
       ! NOTE: I don't I need to care about ID change with file/IO since flag in memory
       this%comm_id = new_comm_id
 
@@ -163,6 +168,85 @@ contains
 
    end subroutine grid_range_per_procs
 
+   subroutine compute_optimal_grid_size(nproc, nx, ny, px, py)
+
+      integer, intent(in) :: nx, ny, nproc
+      integer, intent(out) :: px, py
+
+      integer, allocatable :: factors(:)
+      integer :: nfactors, i, min_i
+
+      real(sp) :: ratio
+      real(sp) :: nx_loc, ny_loc, min_ratio
+
+      call get_factors(nproc, factors, nfactors)
+
+      min_ratio = 9e10_sp
+
+      do i = 1, nfactors
+
+         nx_loc = (1.0_sp*nx)/(1.0_sp*factors(i))
+         ny_loc = (1.0_sp*ny)/((1.0_sp*nproc)/(1.0_sp*factors(i)))
+
+         if (nx_loc > ny_loc) then
+            ratio = nx_loc/ny_loc
+         else
+            ratio = ny_loc/nx_loc
+         end if
+
+         if (ratio < min_ratio) then
+            min_i = i
+            min_ratio = ratio
+         end if
+
+      end do
+
+      px = factors(min_i)
+      py = nproc/factors(min_i)
+
+   end subroutine compute_optimal_grid_size
+
+   subroutine get_factors(n, factors, nfactors)
+      implicit none
+      integer, intent(in) :: n
+      integer, allocatable, intent(out) :: factors(:)
+      integer, intent(out) :: nfactors
+
+      integer :: i, limit, count
+      integer, allocatable :: temp(:)
+
+      if (n <= 0) then
+         nfactors = 0
+         allocate (factors(0))
+         return
+      end if
+
+      limit = int(sqrt(real(n)))
+
+      ! Temporary array (max possible size = 2*limit)
+      allocate (temp(2*limit))
+      count = 0
+
+      do i = 1, limit
+         if (mod(n, i) == 0) then
+            count = count + 1
+            temp(count) = i
+
+            ! Adding other factor if not square root
+            if (i /= n/i) then
+               count = count + 1
+               temp(count) = n/i
+            end if
+         end if
+      end do
+
+      nfactors = count
+      allocate (factors(nfactors))
+      factors = temp(1:nfactors)
+
+      deallocate (temp)
+
+   end subroutine get_factors
    subroutine barrier(this)
       class(type_comm), intent(inout) :: this
       integer :: ierr

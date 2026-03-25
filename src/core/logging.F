@@ -75,25 +75,25 @@ contains
 
    end subroutine initialize_logger
 
-   subroutine init(this, label, world_comm, is_io_node)
+   subroutine init(this, label, is_io_node)
       class(type_log_writer), intent(inout) :: this
       character(LABEL_SIZE), intent(in) :: label
-      integer, intent(in) :: world_comm
+      !integer, intent(in) :: world_comm
       logical, intent(in) :: is_io_node
 
-      this%world_comm = world_comm
+      !this%world_comm = world_comm
       this%is_io_node = is_io_node
       this%label = label
 
    end subroutine init
 
-   subroutine get(this, label, world_comm, is_io_node)
+   subroutine get(this, label, is_io_node)
       class(type_log_writer), intent(inout) :: this
       character(LABEL_SIZE), intent(in) :: label
-      integer, intent(in) :: world_comm
+      !integer, intent(in) :: world_comm
       logical, intent(in) :: is_io_node
 
-      this%world_comm = world_comm
+      !this%world_comm = world_comm
       this%is_io_node = is_io_node
       this%label = label
 

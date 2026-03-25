@@ -228,6 +228,7 @@ SUBROUTINE READ_INPUT
    call yaml_reader%init(yaml_path, 100, log, comm)
 
    call MPI_Barrier(MPI_COMM_WORLD, ierr)
+
    call grid%validate_yaml(yaml_reader, log)
 
    call MPI_Barrier(MPI_COMM_WORLD, ierr)

@@ -2,6 +2,8 @@
 # External Libraries Repositories
 # -------------------------------
 
+# set(BUILD_SHARED_LIBS off)
+
 # Prettify logging
 set(FLOG_SRC_DIR "${EXTERNAL_DIR}/flogging")
 FetchContent_Declare(
@@ -26,8 +28,6 @@ FetchContent_Declare(
   GIT_REPOSITORY https://github.com/Nicholaswogan/fortran-yaml-c.git
   GIT_TAG v0.2.6
   SOURCE_DIR ${FYAML_SRC_DIR})
-
-# Getting source code message(STATUS ${BUILD_TESTING})
 
 # Disable external library tests due to bug with yaml-c tests not building
 set(TEMP_BUILD_TEST ${BUILD_TESTING})
@@ -64,10 +64,10 @@ endif()
 # add_library(constants constants.F)
 add_compile_definitions(${_module_flags})
 
-add_library(core constants.F comm.F throw.F logging.F yaml_input.F misc.F)
+add_library(core constants.F comm.F throw.F logging.F yaml.F misc.F)
 
 # Linking external libraries to FUNWAVE core
-target_link_libraries(core PRIVATE fortran-yaml-c flogging) # constants)
+target_link_libraries(core PRIVATE fortran-yaml-c flogging)
 
 target_compile_options(core PRIVATE) # -s:qtd=f2023)
 
