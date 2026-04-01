@@ -4,6 +4,7 @@
 
 # set(BUILD_SHARED_LIBS off)
 
+
 # Prettify logging
 set(FLOG_SRC_DIR "${EXTERNAL_DIR}/flogging")
 FetchContent_Declare(
@@ -29,13 +30,24 @@ FetchContent_Declare(
   GIT_TAG v0.2.6
   SOURCE_DIR ${FYAML_SRC_DIR})
 
+# FORTRAN interface to YAML-C reader/writer
+set(FFILE_SRC_DIR "${EXTERNAL_DIR}/ffilesystem")
+FetchContent_Declare(
+  ffilesystem
+  GIT_REPOSITORY https://github.com/scivision/ffilesystem.git
+  GIT_TAG v6.4.0
+  SOURCE_DIR ${FFILE_SRC_DIR})
+
 # Disable external library tests due to bug with yaml-c tests not building
 set(TEMP_BUILD_TEST ${BUILD_TESTING})
 if(BUILD_TESTING)
   set(BUILD_TESTING OFF)
 endif()
+#find_package(ffilesystem CONFIG REQUIRED)
 
-FetchContent_MakeAvailable(fortran-yaml-c floggingio faceio)
+#message(STATUS "ffilesystem found: ${ffilesystem_DIR}")
+
+FetchContent_MakeAvailable(fortran-yaml-c floggingio faceio ffilesystem)
 
 # NOTE: Using PRIVATE to apply only target
 
@@ -67,7 +79,7 @@ add_compile_definitions(${_module_flags})
 add_library(core constants.F comm.F throw.F logging.F yaml.F misc.F)
 
 # Linking external libraries to FUNWAVE core
-target_link_libraries(core PRIVATE fortran-yaml-c flogging)
+target_link_libraries(core PRIVATE fortran-yaml-c flogging ffilesystem)
 
 target_compile_options(core PRIVATE) # -s:qtd=f2023)
 

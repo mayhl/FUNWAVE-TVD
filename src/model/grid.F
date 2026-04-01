@@ -14,9 +14,11 @@ module model_grid_mod
 
    use Constants, only: sp
    use comm_mod, only: type_comm
-   use yaml_file_mod, only: type_yaml_reader
+   use yaml_file_mod, only: type_yaml_reader,type_path
    use log_io_mod, only: type_log_writer
    use model_interface_mod, only: type_model_interface
+
+   !use filesystem, only: path_t
 
    character(len=5), dimension(3) ::  gtypes
    character(len=5), dimension(1) ::  ftypes
@@ -27,7 +29,8 @@ module model_grid_mod
 
       integer :: nx, ny
       integer :: nx_proc, ny_proc
-      character(:), allocatable :: gtype, fpath, ftype
+      character(:), allocatable :: gtype, ftype
+      type(type_path) :: fpath      
       real(sp) :: depth_flat, slope_x0, slope_m
       real(sp) :: x0, y0, dx, dy
 
@@ -42,7 +45,7 @@ contains
       class(type_model_grid), intent(inout) :: this
 
       if (allocated(this%gtype)) deallocate (this%gtype)
-      if (allocated(this%fpath)) deallocate (this%fpath)
+      !if (allocated(this%fpath)) deallocate (this%fpath)
       if (allocated(this%ftype)) deallocate (this%ftype)
 
    end subroutine finalize
@@ -66,7 +69,7 @@ contains
       select case (this%gtype)
 
       case ('file')
-         call this%yaml%read_enum('file type', ftypes, val=this%fpath, default_val='ascii')
+         call this%yaml%read_enum('file type', ftypes, val=this%ftype, default_val='ascii')
          call this%yaml%read_input_path('file path', val=this%fpath)
 
       case ('flat')

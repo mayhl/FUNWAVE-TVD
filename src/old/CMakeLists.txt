@@ -113,3 +113,6 @@ add_compile_definitions(${_module_flags})
 # target_compile_options(exe PRIVATE -std=f95)
 
 target_link_libraries(exe ${_modules} ${MPI_Fortran_LIBRARIES})
+
+# Intel needs linker_language Fortran else error "undefined reference to `main'"
+set_property(TARGET exe PROPERTY LINKER_LANGUAGE Fortran)

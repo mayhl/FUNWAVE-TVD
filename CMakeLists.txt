@@ -23,7 +23,7 @@ project(
   my_project
   VERSION 4.0.0
   DESCRIPTION "FUNWAVE-TVD"
-  LANGUAGES Fortran)
+  LANGUAGES Fortran C CXX)
 enable_language(Fortran)
 
 # ------------------

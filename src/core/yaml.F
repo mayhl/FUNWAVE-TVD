@@ -66,7 +66,7 @@ module yaml_file_mod
    use log_io_mod, only: type_log_writer
    use comm_mod, only: type_comm
    use misc_mod, only: str2int, str2real
-   ! use filesystem, only: path_t
+   use filesystem, only: type_path => path_t
 
    !use Constants, only: STRING_SIZE
    use fortran_yaml_c, only: YamlFile, dp, &
@@ -75,7 +75,7 @@ module yaml_file_mod
    implicit none(external)
 
    private
-   public :: type_yaml_reader, err_key, err_none, err_type, err_range
+   public :: type_yaml_reader, err_key, err_none, err_type, err_range, type_path
 
    integer, parameter :: err_none = 0
    integer, parameter :: err_key = 1
@@ -994,20 +994,19 @@ contains
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default_val
       logical, optional, intent(out) :: is_empty
-      character(:), allocatable, intent(inout) :: val
+      type(type_path), intent(inout) :: val
 
       character(:), allocatable :: val_buff
-!      type(path_t) :: path
       logical :: file_exists
       character(len=:), allocatable :: msg
 
       if (this%comm%is_io_node()) then
          call this%read_string_node(key, default_val=default_val, is_empty=is_empty, val=val_buff)
 
-         val = trim(val_buff)
+         val = type_path(trim(val_buff))
 
-         inquire (file=val, exist=file_exists)
-         if (.not. file_exists) then
+
+         if (.not.val % is_file ()) then
             msg = "which is not a valid file path."
             msg = this%prep_msg_val(key, msg)
             call this%log%exit_on_error(msg)
