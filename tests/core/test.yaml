@@ -54,6 +54,21 @@ zero_real: 0.0
 valid_file_path: "valid_file_path.txt"
 invalid_file_path: "invalid_file_path.txt"
 
+time_simple: 100
+
+time_mins:
+  value: 1
+  units: "min"
+
+time_hrs:
+  value: 1
+  units: "hour"
+
+time_hertz:
+  value: 10
+  units: "hertz"
+
+
 dict:
   positive_integer: 5
   positive_real: 0.5

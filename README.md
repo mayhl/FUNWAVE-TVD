@@ -18,6 +18,11 @@ The released version can be downloaded from http://fengyanshi.github.io/build/ht
 
 FUNWAVE unit testing utilizes the [pfUnit](https://github.com/Goddard-Fortran-Ecosystem/pFUnit) framework, which needs to be built separately. However, pfUnit is optional, and FUNWAVE can be built without it. Instructions to build pfUnit may be found [here](https://github.com/Goddard-Fortran-Ecosystem/pFUnit?tab=readme-ov-file#building-and-installing-pfunit).
 
+    $ mkdir build
+    $ cmake .. -DENABLE_MPI_F08=YES
+    $ make 
+    $ make install
+
 ### Obtaining FUNWAVE
 
 The best way to obtain FUNWAVE is to clone the git repository as follows:
@@ -32,10 +37,13 @@ FUNWAVE is now built with CMake. After obtaining the FUNWAVE, in the top directo
     $ mkdir build 
     $ cd build 
     $ cmake ..
+    $ make
 
 ##### Building with Unit Testing
 
     $ mkdir build 
     $ cd build 
     $ cmake .. -DBUILD_TESTING=ON -DCMAKE_PREFIX_PATH=path/to/pfUnit
+    $ make
+    $ make test
 

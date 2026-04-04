@@ -69,7 +69,6 @@
 
 MODULE TIME_SPECTRA_MODULE
 
-   use misc_mod, only: random
    USE PARAM
    USE GLOBAL, ONLY: Mloc, Nloc, Nghost, Ibeg, Iend, Jbeg, Jend, Mglob, Nglob, &
                      WidthWaveMaker, R_sponge_wavemaker, A_sponge_wavemaker, &
@@ -86,6 +85,7 @@ MODULE TIME_SPECTRA_MODULE
    USE GLOBAL, ONLY: myid, ier, npx, npy, PX, PY, iista, jjsta
    USE MPI
 # endif
+   use misc_mod, only: random2
    IMPLICIT NONE
    SAVE
    REAL(SP), DIMENSION(:, :), ALLOCATABLE :: AmpData1, AmpData2
@@ -221,7 +221,7 @@ CONTAINS
       ELSE
          DO J = 1, NumFreq
          DO I = 1, NumDir
-            Phase_LEFT(J, I) = random()*2.0_SP*3.1415926
+            Phase_LEFT(J, I) = random2()*2.0_SP*3.1415926
          END DO
          END DO
       END IF ! phase true

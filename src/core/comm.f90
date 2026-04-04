@@ -13,23 +13,36 @@
 module comm_mod
 
    use mpi_f08
-   use Constants, only: n_ghost, LABEL_SIZE, sp
+   use constants_mod, only: n_ghost, LABEL_SIZE, SP, MPI_SP
    use log_io_mod, only: type_log_writer
 
    implicit none(external)
 
    character(LABEL_SIZE), parameter :: log_key = "MPI"
+   integer, parameter :: param_buff_max = 30
 
    private
    public :: type_comm
+
+   type dummy
+
+   end type dummy
 
    type type_comm
 
       private
 
-      integer, public :: size
-      type(MPI_Comm), public :: comm_id
-      integer, public :: iproc, jproc, rank_id
+      type(MPI_Comm), public :: id
+      logical :: p_is_io_node
+      integer :: io_node_id
+      integer, public :: rank_id, size
+      type(type_log_writer) :: log
+
+      integer, dimension(:), allocatable :: blockcounts, types, offsets
+      integer :: param_type
+      integer, public :: param_size
+
+      integer, public :: iproc, jproc
       integer, public :: nx_proc, ny_proc
       ! cross, public-shore (x-)direction.
       ! back , public=> shore <=> -x > + x
@@ -47,14 +60,15 @@ module comm_mod
       logical, public :: is_shore_boundry
       logical, public :: is_back_boundry
 
-      logical :: p_is_io_node
-      integer :: io_node_id
-      type(type_log_writer) :: log
    contains
-      procedure, public :: create_2d
       procedure, public :: init
       procedure, public :: get_logger
       procedure, public :: is_io_node
+      procedure, public :: create_2d
+      procedure, public :: bcast_integer
+      procedure, public :: bcast_logical
+      procedure, public :: bcast_real
+      procedure, public :: bcast_string
 
       procedure, public :: finalize
       procedure, public :: barrier
@@ -73,13 +87,13 @@ contains
       ! TODO: Add error checking
       !
       if (present(comm_id)) then
-         this%comm_id = comm_id
+         this%id = comm_id
       else
-         this%comm_id = MPI_COMM_WORLD
+         this%id = MPI_COMM_WORLD
          call MPI_Init(ierr)
       end if
-      call MPI_Comm_rank(this%comm_id, this%rank_id, ierr)
-      call MPI_Comm_size(this%comm_id, this%size, ierr)
+      call MPI_Comm_rank(this%id, this%rank_id, ierr)
+      call MPI_Comm_size(this%id, this%size, ierr)
 
       this%p_is_io_node = this%rank_id .eq. io_rank_id
       this%io_node_id = io_rank_id
@@ -120,6 +134,8 @@ contains
 
       if (create_partition) then
          call compute_optimal_grid_size(this%size, nx_global, ny_global, nx_proc, ny_proc)
+
+         print *, this%size, nx_proc, ny_proc
       end if
 
       reorder = .true.
@@ -127,11 +143,11 @@ contains
       periods = (/.false., .false./)
       dims = (/nx_proc, ny_proc/)
 
-      call MPI_Cart_Create(this%comm_id, 2, dims, periods, reorder, new_comm_id, ier)
+      call MPI_Cart_Create(this%id, 2, dims, periods, reorder, new_comm_id, ier)
       ! NOTE: I don't I need to care about ID change with file/IO since flag in memory
-      this%comm_id = new_comm_id
+      this%id = new_comm_id
 
-      call MPI_Cart_coords(this%comm_id, this%rank_id, n_dims, coords, ier)
+      call MPI_Cart_coords(this%id, this%rank_id, n_dims, coords, ier)
 
       ! print *, 'ID', this%rank_id, 'WR ID', this%io_node_id
       this%iproc = coords(1)
@@ -139,8 +155,8 @@ contains
 
       ! TODO: Add rank id change check?
 
-      call MPI_Cart_shift(this%comm_id, 0, 1, this%back_rank_id, this%shore_rank_id, ier)
-      call MPI_Cart_shift(this%comm_id, 1, 1, this%right_rank_id, this%left_rank_id, ier)
+      call MPI_Cart_shift(this%id, 0, 1, this%back_rank_id, this%shore_rank_id, ier)
+      call MPI_Cart_shift(this%id, 1, 1, this%right_rank_id, this%left_rank_id, ier)
 
       call grid_range_per_procs(1, nx_global, nx_proc, this%iproc, this%ibegin, this%istop, this%nx)
       call grid_range_per_procs(1, ny_global, ny_proc, this%jproc, this%jbegin, this%jstop, this%ny)
@@ -176,8 +192,8 @@ contains
       integer, allocatable :: factors(:)
       integer :: nfactors, i, min_i
 
-      real(sp) :: ratio
-      real(sp) :: nx_loc, ny_loc, min_ratio
+      real(SP) :: ratio
+      real(SP) :: nx_loc, ny_loc, min_ratio
 
       call get_factors(nproc, factors, nfactors)
 
@@ -207,7 +223,6 @@ contains
    end subroutine compute_optimal_grid_size
 
    subroutine get_factors(n, factors, nfactors)
-      implicit none
       integer, intent(in) :: n
       integer, allocatable, intent(out) :: factors(:)
       integer, intent(out) :: nfactors
@@ -247,10 +262,59 @@ contains
       deallocate (temp)
 
    end subroutine get_factors
+
+   subroutine bcast_integer(this, val)
+      class(type_comm), intent(inout) :: this
+      integer, intent(inout) :: val
+
+      call MPI_Bcast(val, 1, MPI_INTEGER, this%io_node_id, this%id)
+      call this%barrier()
+
+   end subroutine bcast_integer
+
+   subroutine bcast_logical(this, val)
+      class(type_comm), intent(inout) :: this
+      logical, intent(inout) :: val
+
+      call MPI_Bcast(val, 1, MPI_LOGICAL, this%io_node_id, this%id)
+      call this%barrier()
+
+   end subroutine bcast_logical
+
+   subroutine bcast_real(this, val)
+      class(type_comm), intent(inout) :: this
+      real(SP), intent(inout) :: val
+
+      call MPI_Bcast(val, 1, MPI_DOUBLE_PRECISION, this%io_node_id, this%id)
+      call this%barrier()
+
+   end subroutine bcast_real
+
+   subroutine bcast_string(this, val)
+      class(type_comm), intent(inout) :: this
+      character(:), allocatable, intent(inout) :: val
+
+      integer :: n
+
+      n = len(val)
+      call MPI_Bcast(n, 1, MPI_INTEGER, this%io_node_id, this%id)
+      call this%barrier()
+
+      if (.not. allocated(val)) then
+         allocate (character(n) :: val)
+      end if
+
+      call MPI_Bcast(val, n, MPI_CHARACTER, this%io_node_id, this%id)
+      call this%barrier()
+
+   end subroutine bcast_string
+
    subroutine barrier(this)
       class(type_comm), intent(inout) :: this
       integer :: ierr
-      call MPI_Barrier(this%comm_id, ierr)
+
+      call MPI_Barrier(this%id, ierr)
+
    end subroutine barrier
 
    subroutine finalize(this)

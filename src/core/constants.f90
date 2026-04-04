@@ -15,10 +15,8 @@
 !          the module is updated corresponding to modifications in subroutines
 !-------------------------------------------------
 
-module Constants
-
-   ! ignore
-   use MPI, only: MPI_DOUBLE_PRECISION
+module constants_mod
+   use mpi_f08, only: MPI_DOUBLE_PRECISION, MPI_Datatype
 
    implicit none(external)
 
@@ -30,7 +28,7 @@ module Constants
    ! Numerical Constants
    ! -------------------
    integer, parameter::SP = 8
-   integer, parameter::MPI_SP = MPI_DOUBLE_PRECISION
+   type(MPI_Datatype), parameter::MPI_SP = MPI_DOUBLE_PRECISION
    real(SP), parameter::SMALL = 0.000001_SP
    real(SP), parameter::LARGE = 999999.0_SP
    real(SP), parameter:: ZERO = 0.0_SP
@@ -44,7 +42,7 @@ module Constants
    ! ----------------------
    real(SP), parameter::PI = 3.141592653_SP
    ! Number of ghost points to share boundary data with sub-grids
-   integer, parameter :: n_ghost = 3
+   integer, parameter :: N_GHOST = 3
 
    ! ------------------
    ! Physical Constants
@@ -63,5 +61,5 @@ module Constants
    integer, parameter :: err_no_file = 29
 
    !integer, parameter ::
-end module Constants
+end module constants_mod
 

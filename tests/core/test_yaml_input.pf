@@ -1,11 +1,13 @@
 
+! TODO: Add dict tests
+
 ! allow(E001)
-module test_yaml
+module test_yaml_input
 
    use mpi_f08
    use pFUnit
 
-   use Constants, only: sp, MESSAGE_SIZE
+   use constants_mod, only: SP, MESSAGE_SIZE
    use yaml_file_mod, only: type_yaml_reader, type_path
    use log_io_mod, only: type_log_writer, initialize_logger
    use comm_mod, only: type_comm
@@ -41,8 +43,8 @@ contains
 
       call initialize_logger(log_path, 0, 0, 100)
 
+      ! mcomm = this%getMpiCommunicator()
       mcomm = this%getMpiCommunicator()
-      !mcomm = this%getF08MpiCommunicator()
       call comm%init(io_rank_id=0, comm_id=mcomm)
       call reader%init(yaml_path, comm)
 
@@ -63,17 +65,17 @@ contains
       @assertEqual(1, val)
 
       val = 1
-      call reader%read_integer('dummy_int', default_val="10", val=val)
+      call reader%read_integer('dummy_int', default="10", val=val)
       @assertEqual(10, val)
 
       ! TODO: Fix error
       val = 1
-      ! call reader%read_integer('dummy_real', default_val="10.5", val=val)
-      ! @assertExceptionRaised('Default value for /dummy_real is set to "10.5", which cannot be interpreted as an integer.')
+      call reader%read_integer('dummy_real', default="10.5", val=val)
+      @assertExceptionRaised('Default value for /dummy_real is set to "10.5", which cannot be interpreted as an integer.')
 
       val = 1
-      ! call reader%read_integer('real', val=val)
-      ! @assertExceptionRaised('/real is set to "0.1", which cannot be interpreted as an integer.')
+      call reader%read_integer('real', val=val)
+      @assertExceptionRaised('/real is set to "0.1", which cannot be interpreted as an integer.')
 
       val = 1
       call reader%read_integer('string1', val=val)
@@ -221,7 +223,7 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_yaml_reader) :: reader
       type(type_comm) :: comm
-      real(sp) :: val, target_val
+      real(SP) :: val, target_val
 
       call open_yaml(this, reader, comm)
 
@@ -234,11 +236,11 @@ contains
       @assertEqual(0.1_sp, val)
 
       val = 1
-      call reader%read_real('dummy_int', default_val="10", val=val)
+      call reader%read_real('dummy_int', default="10", val=val)
       @assertEqual(10, val)
 
       val = 1
-      call reader%read_real('dummy_real', default_val="10.5", val=val)
+      call reader%read_real('dummy_real', default="10.5", val=val)
       @assertEqual(10.5_sp, val)
 
       val = 1
@@ -254,7 +256,7 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_yaml_reader) :: reader
       type(type_comm) :: comm
-      real(sp) :: val
+      real(SP) :: val
 
       call open_yaml(this, reader, comm)
 
@@ -357,7 +359,7 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_yaml_reader) :: reader
       type(type_comm) :: comm
-      real(sp) :: val
+      real(SP) :: val
 
       call open_yaml(this, reader, comm)
 
@@ -380,6 +382,25 @@ contains
       call dummy_fix_lint()
 
    end subroutine test_positive_real
+
+   @test(npes=[1])
+   subroutine test_time(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      ! call open_yaml(this, reader, comm)
+      !
+      ! call reader%read_time('time_simple', val=val)
+      ! @assertEqual(100.0_SP, val)
+      !
+      !call reader%read_time('time_mins', val=val)
+      !@assertEqual(60.0_SP, val)
+      call dummy_fix_lint()
+
+   end subroutine test_time
 
    @test(npes=[1])
    subroutine test_logical(this)
@@ -482,19 +503,17 @@ contains
 
       type(type_yaml_reader) :: reader
       type(type_comm) :: comm
-      character(:), ALLOCATABLE :: val
+      character(:), ALLOCATABLE :: val, val2
 
       call open_yaml(this, reader, comm)
 
       call reader%read_string('string1', val=val)
       @assertEqual('test string 1', val)
 
-      call reader%read_string('dummy_string', default_val="dummy string", val=val)
-      !call comm%barrier()
+      call reader%read_string('dummy_string', default="dummy string", val=val)
       @assertEqual('dummy string', val)
 
       call reader%read_string('string2', val=val)
-      call comm%barrier()
       @assertEqual('test string 2', val)
 
       call dummy_fix_lint()
@@ -517,7 +536,7 @@ contains
       call reader%read_enum('enum1', words, val=val)
       @assertEqual('item1', val)
 
-      call reader%read_enum('dummy_enum', words, default_val='item3', val=val)
+      call reader%read_enum('dummy_enum', words, default='item3', val=val)
       @assertEqual('item3', val)
 
       call reader%read_enum('enum2', words, val=val)
@@ -545,12 +564,13 @@ contains
       @assertExceptionRaised('/invalid_file_path is set to "invalid_file_path.txt", which is not a valid file path.')
 
       file_path = type_path('valid_file_path.txt')
-      call file_path % touch()
+      call file_path%touch()
       call reader%read_input_path('valid_file_path', val=val)
-      @assertEqual(file_path % path(), val % path())
-      call file_path % remove()
+      @assertEqual(file_path%path(), val%path())
+      call file_path%remove()
 
       call dummy_fix_lint()
 
    end subroutine test_path
-end module test_yaml
+end module test_yaml_input
+

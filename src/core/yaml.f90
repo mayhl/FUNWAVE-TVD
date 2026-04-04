@@ -42,7 +42,7 @@
 !                     call read_real('key', val=val)
 !
 !     Optional
-!       default_val - Default value as string.
+!       default - Default value as string.
 !       is_empty - Silence no key error and return if key is found
 !
 !     read_real/read_integer
@@ -62,7 +62,7 @@
 !--------------------------------------------------
 module yaml_file_mod
 
-   use Constants, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, sp
+   use constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
    use log_io_mod, only: type_log_writer
    use comm_mod, only: type_comm
    use misc_mod, only: str2int, str2real
@@ -75,12 +75,13 @@ module yaml_file_mod
    implicit none(external)
 
    private
-   public :: type_yaml_reader, err_key, err_none, err_type, err_range, type_path
+   public :: type_yaml_reader, err_key, ERR_NONE, ERR_TYPE, ERR_RANGE, type_path
 
-   integer, parameter :: err_none = 0
+   character(*), parameter:: NO_KEY_ERR = "does not contain key"
+   integer, parameter :: ERR_NONE = 0
    integer, parameter :: err_key = 1
-   integer, parameter :: err_type = 2
-   integer, parameter :: err_range = 3
+   integer, parameter :: ERR_TYPE = 2
+   integer, parameter :: ERR_RANGE = 3
    type(type_log_writer), TARGET :: log_buff
 
    character(LABEL_SIZE), parameter :: log_label = "config"
@@ -90,7 +91,7 @@ module yaml_file_mod
       logical :: is_io_node = .False.
       character(MESSAGE_SIZE):: path = ""
       type(type_log_writer), pointer, public :: log
-      type(type_comm), pointer :: comm
+      type(type_comm), pointer, public :: comm
       class(type_dictionary), pointer :: root => null()
       type(YamlFile):: file
 
@@ -99,6 +100,8 @@ module yaml_file_mod
       private
       procedure, public :: init
       procedure, public :: cast_dictionary
+      procedure, public :: is_dictionary
+      procedure, public :: has_key
       procedure, public :: read_enum
       procedure, public :: read_input_path
       procedure, public :: read_integer
@@ -106,6 +109,7 @@ module yaml_file_mod
       procedure, public :: read_positive_integer
       procedure, public :: read_positive_real
       procedure, public :: read_real
+      procedure, public :: read_time
       procedure, public :: read_string
       procedure :: copy_node
       procedure :: parse_error_message
@@ -152,7 +156,7 @@ module yaml_file_mod
 
    type, extends(type_range) :: type_range_real
       private
-      real(sp), dimension(2) :: range
+      real(SP), dimension(2) :: range
    contains
       private
       procedure, public :: parse => range_real_parse
@@ -437,7 +441,7 @@ contains
    subroutine range_real_parse(this, val)
       !----------------------------------------------------------
       class(type_range_real), intent(inout) :: this
-      real(sp), intent(in) :: val
+      real(SP), intent(in) :: val
 
       if (this%is_skip_checks) return
 
@@ -539,49 +543,108 @@ contains
 
    end subroutine range_real_intersects
 
-   subroutine init(this, path, comm)
+   subroutine init(this, path_str, comm)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
-      character(:), allocatable, intent(in) :: path
+      character(:), allocatable, intent(in) :: path_str
       type(type_comm), target, intent(inout):: comm
 
       character(:), allocatable :: err
       class(type_node), pointer :: root
+      type(type_path) :: path
       character(MESSAGE_SIZE) :: message
       logical :: file_exist
-
-      if (.not. comm%is_io_node()) return
 
       log_buff = comm%get_logger(log_label)
       this%log => log_buff
       this%comm => comm
 
-      inquire (file=path, exist=file_exist)
+      path = type_path(path_str)
 
-      if (.not. file_exist) then
-         message = "Input file does not exists, got: "//trim(path)
+      if (.not. comm%is_io_node()) then
+         this%root => null()
+         return
+      end if
+
+      if (.not. path%is_file()) then
+         message = "Input file does not exists, got: "//trim(path_str)
          call this%log%exit_on_error(message)
       end if
 
-      call this%file%parse(trim(path), err)
+      if (path%file_size() .eq. 0) then
+         message = "Input file is empty: "//trim(path_str)
+         call this%log%exit_on_error(message)
+      end if
+
+      call this%file%parse(path%path(), err)
 
       if (allocated(err)) then
          call this%log%exit_on_error(err)
       end if
 
       root => this%file%root
-
       select type (root)
       class is (type_dictionary)
          this%root => root
 
       class default
-         call this%log%exit_on_error('Input file does not appear to be a dictionary')
+         call this%log%exit_on_error('Input file does not appear to be a valid YAML file.')
       end select
 
    end subroutine init
 
-   subroutine cast_dictionary(this, key, child)
+   function is_dictionary(this, key, is_empty) result(val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      logical, optional, intent(out) :: is_empty
+      logical :: val
+
+      class(type_node), pointer :: node
+      character(:), allocatable :: buff
+
+      if (this%comm%is_io_node()) then
+
+         node => this%root%get(key)
+
+         if (associated(node)) then
+            select type (node)
+            class is (type_dictionary)
+               val = .true.
+            class default
+               val = .false.
+            end select
+            if (present(is_empty)) is_empty = .false.
+         else
+            if (present(is_empty)) then
+               is_empty = .true.
+               val = .false.
+            else
+               ! buff = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+               call this%log%exit_on_error(key)
+            end if
+
+         end if
+      end if
+
+      call this%comm%bcast_logical(val)
+      if (present(is_empty)) call this%comm%bcast_logical(is_empty)
+
+   end function is_dictionary
+
+   function has_key(this, key, is_empty) result(val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      logical, optional, intent(out) :: is_empty
+      logical :: val
+
+      class(type_node), pointer :: node
+      character(:), allocatable :: buff
+
+      val = associated(this%root%get(key))
+
+   end function has_key
+
+   subroutine cast_dictionary(this, key, child, is_empty)
       !----------------------------------------------------------
       !
       ! Subroutine type casting child dictionary to current class
@@ -593,44 +656,60 @@ contains
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       type(type_yaml_reader), intent(inout) :: child
+      logical, optional, intent(out) :: is_empty
+      type(type_yaml_reader), target :: dummy
       type(type_dictionary), pointer :: node
       type(type_error), allocatable :: io_err
 
       logical, parameter :: is_required = .true.
+      logical :: flag
 
-      node => this%root%get_dictionary(key, is_required, io_err)
-
-      if (allocated(io_err)) then
-         call this%log%exit_on_error(io_err%message)
+      if (this%comm%is_io_node()) then
+         node => this%root%get_dictionary(key, is_required, io_err)
+      else
+         node => null()
       end if
 
-      call child%copy_node(node)
+      if (.not. allocated(io_err)) then
+         if (present(is_empty)) is_empty = .false.
+      else
+         if (present(is_empty)) then
+            flag = .not. is_no_key_err(io_err)
+            is_empty = .true.
+         else
+            flag = .true.
+         end if
+         if (flag) call this%log%exit_on_error(io_err%message)
+      end if
+
+      call child%copy_node(node, this%comm)
 
    end subroutine cast_dictionary
 
-   subroutine copy_node(this, node)
+   subroutine copy_node(this, node, comm)
       !----------------------------------------------------------
       ! Mediator routine for sharing private variables
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       type(type_dictionary), target, intent(inout):: node
+      type(type_comm), target, intent(inout):: comm
       this%log => log_buff
       this%root => node
-
+      this%comm => comm
    end subroutine copy_node
 
-   subroutine read_real_node(this, key, default_val, is_empty, &
+   subroutine read_real_node(this, key, default, is_empty, &
                              range, inclusive, &
                              recommended_range, recommended_inclusive, &
                              val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       character(*), dimension(2), optional, intent(in) :: range, recommended_range
       logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
-      real(sp), intent(out) :: val
+      real(SP), intent(out) :: val
 
       type(type_range_real) :: req_range, rec_range
       type(type_error), allocatable :: io_err
@@ -638,7 +717,7 @@ contains
       logical, dimension(2) :: is_err_exit
 
       val = this%root%get_real(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default_val, is_empty)
+      is_default = this%parse_error_message(key, io_err, default, is_empty)
 
       ! Parsing default value string
       if (is_default) then
@@ -671,7 +750,7 @@ contains
       call req_range%intersects(rec_range)
    end subroutine read_real_node
 
-   subroutine read_real(this, key, default_val, is_empty, &
+   subroutine read_real(this, key, default, is_empty, &
                         range, inclusive, &
                         recommended_range, recommended_inclusive, &
                         val)
@@ -681,32 +760,34 @@ contains
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       character(*), dimension(2), optional, intent(in) :: range, recommended_range
       logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
-      real(sp), intent(out) :: val
+      real(SP), intent(out) :: val
 
       if (this%comm%is_io_node()) then
-         call this%read_real_node(key, default_val, is_empty, &
+         call this%read_real_node(key, default, is_empty, &
                                   range, inclusive, &
                                   recommended_range, recommended_inclusive, &
                                   val)
       end if
 
+      call this%comm%bcast_real(val)
+
    end subroutine read_real
 
-   subroutine read_positive_real(this, key, default_val, is_empty, include_zero, &
+   subroutine read_positive_real(this, key, default, is_empty, include_zero, &
                                  recommended_range, recommended_inclusive, val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       logical, optional, intent(in) :: include_zero
       character(*), dimension(2), optional, intent(in) :: recommended_range
       logical, dimension(2), optional, intent(in) :: recommended_inclusive
-      real(sp), intent(out) :: val
+      real(SP), intent(out) :: val
 
       logical :: is_error, is_include_zero
       character(len=:), allocatable :: message
@@ -722,16 +803,74 @@ contains
             inclusive = [.false., .true.]
          end if
 
-         call this%read_real_node(key, default_val, is_empty, &
+         call this%read_real_node(key, default, is_empty, &
                                   range, inclusive, &
                                   recommended_range, recommended_inclusive, &
                                   val)
 
       end if
 
+      call this%comm%bcast_real(val)
+
    end subroutine read_positive_real
 
-   subroutine read_integer_node(this, key, default_val, is_empty, &
+   subroutine read_time(this, key, default, is_empty, include_zero, &
+                        recommended_range, recommended_inclusive, val)
+      !----------------------------------------------------------
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: is_empty
+      logical, optional, intent(in) :: include_zero
+      character(*), dimension(2), optional, intent(in) :: recommended_range
+      logical, dimension(2), optional, intent(in) :: recommended_inclusive
+      real(SP), intent(out) :: val
+
+      logical :: is_dict
+      type(type_yaml_reader) :: child
+      character(len=5), dimension(4) ::  utypes
+      character(:), allocatable :: unit, ckey
+
+      data utypes/'sec', 'min', 'hour', 'hertz'/
+
+      is_dict = this%is_dictionary(key)
+      if (is_dict) then
+         unit = ""
+         print *, "HERE"
+         print *, unit
+         call this%cast_dictionary(key, child)
+         print *, "HERE"
+         print *, unit
+         call child%read_enum("units", utypes, val=unit)
+         print *, "HERE"
+         print *, unit
+         ckey = 'value'
+      else
+         child = this
+         ckey = key
+      end if
+
+      call child%read_positive_real(ckey, default, &
+                                    is_empty, include_zero, &
+                                    recommended_range, &
+                                    recommended_inclusive, val)
+
+      if (is_dict) then
+         select case (unit)
+         case ('min')
+            val = val*60_SP
+         case ('hour')
+            val = val*3600_SP
+         case ('hert')
+            val = 1.0_SP/val
+         end select
+
+         deallocate (unit)
+      end if
+
+   end subroutine read_time
+
+   subroutine read_integer_node(this, key, default, is_empty, &
                                 range, inclusive, &
                                 recommended_range, recommended_inclusive, &
                                 val)
@@ -739,7 +878,7 @@ contains
       ! Read key from from root node and parse as integer
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       character(*), dimension(2), optional, intent(in) :: range, recommended_range
       logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
@@ -751,15 +890,16 @@ contains
       logical, dimension(2) :: is_err_exit
 
       val = this%root%get_integer(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default_val, is_empty)
+      is_default = this%parse_error_message(key, io_err, default, is_empty)
 
       ! Parsing default value string
       if (is_default) then
+
          val = this%root%get_integer(key, error=io_err)
 
          ! Safety check
          if (allocated(io_err)) then
-            call this%log%exit_on_fatal("Default value for /"//key//io_err%message, 1)
+            call this%log%exit_on_fatal("Default value for "//io_err%message, 1)
          end if
       end if
 
@@ -786,7 +926,7 @@ contains
 
    end subroutine read_integer_node
 
-   subroutine read_integer(this, key, default_val, is_empty, &
+   subroutine read_integer(this, key, default, is_empty, &
                            range, inclusive, &
                            recommended_range, recommended_inclusive, &
                            val)
@@ -798,27 +938,29 @@ contains
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       character(*), dimension(2), optional, intent(in) :: range, recommended_range
       logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
       integer, intent(out) :: val
 
       if (this%comm%is_io_node()) then
-         call this%read_integer_node(key, default_val, is_empty, &
+         call this%read_integer_node(key, default, is_empty, &
                                      range, inclusive, &
                                      recommended_range, recommended_inclusive, &
                                      val)
       end if
 
+      call this%comm%bcast_integer(val)
+
    end subroutine read_integer
 
-   subroutine read_positive_integer(this, key, default_val, is_empty, include_zero, &
+   subroutine read_positive_integer(this, key, default, is_empty, include_zero, &
                                     recommended_range, recommended_inclusive, val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       logical, optional, intent(in) :: include_zero
       character(*), dimension(2), optional, intent(in) :: recommended_range
@@ -838,20 +980,22 @@ contains
             inclusive = [.false., .true.]
          end if
 
-         call this%read_integer_node(key, default_val, is_empty, &
+         call this%read_integer_node(key, default, is_empty, &
                                      range, inclusive, &
                                      recommended_range, recommended_inclusive, &
                                      val)
 
       end if
 
+      call this%comm%bcast_integer(val)
+
    end subroutine read_positive_integer
 
-   subroutine read_logical_node(this, key, default_val, is_empty, val)
+   subroutine read_logical_node(this, key, default, is_empty, val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       logical, intent(out) :: val
 
@@ -859,7 +1003,7 @@ contains
       logical :: is_default
 
       val = this%root%get_logical(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default_val, is_empty)
+      is_default = this%parse_error_message(key, io_err, default, is_empty)
 
       ! Parsing default value string
       if (is_default) then
@@ -873,7 +1017,7 @@ contains
 
    end subroutine read_logical_node
 
-   subroutine read_logical(this, key, default_val, is_empty, val)
+   subroutine read_logical(this, key, default, is_empty, val)
       !----------------------------------------------------------
       !
       ! Wrapper subroutine around read_real_node for single node
@@ -882,73 +1026,81 @@ contains
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       logical, intent(out) :: val
 
       if (this%comm%is_io_node()) then
-         call this%read_logical_node(key, default_val, is_empty, val)
+         call this%read_logical_node(key, default, is_empty, val)
       end if
+
+      call this%comm%bcast_logical(val)
 
    end subroutine read_logical
 
-   subroutine read_string_node(this, key, default_val, is_empty, val)
+   subroutine read_string_node(this, key, default, is_empty, val)
       !----------------------------------------------------------
       ! Read key from from root node and parse as integer
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       character(:), allocatable, intent(inout) :: val
-      character(:), allocatable :: val_buff
+      !character(:), allocatable:: val
 
+      class(type_node), pointer :: node
       type(type_error), allocatable :: io_err
       logical :: is_default
 
-      val_buff = this%root%get_string(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default_val, is_empty)
+      node => this%root%get(key)
 
-      val_buff = trim(val_buff)
+      ! NOTE: get_string does not trigger no key error
+      if (associated(node)) then
+         val = trim(this%root%get_string(key, error=io_err))
+      else
+         allocate (io_err)
+         io_err%message = trim(this%path)//' does not contain key "'//trim(key)//'".'
+      end if
+
+      is_default = this%parse_error_message(key, io_err, default, is_empty)
+
       ! Parsing default value string
       if (is_default) then
-         !val_buff = TRIM(default_val)
-         val_buff = trim(this%root%get_string(key, error=io_err))
+         !val_buff = TRIM(default)
+         val = trim(this%root%get_string(key, error=io_err))
          ! Safety check
          if (allocated(io_err)) then
-            call this%log%exit_on_fatal("Default value for /"//key//io_err%message, 1)
+            call this%log%exit_on_fatal("Default value for "//io_err%message, 1)
          end if
       end if
 
-      val = TRIM(val_buff)
-
    end subroutine read_string_node
 
-   subroutine read_string(this, key, default_val, is_empty, val)
+   subroutine read_string(this, key, default, is_empty, val)
       !----------------------------------------------------------
       ! Read key from from root node and parse as integer
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       character(:), allocatable, intent(inout) :: val
-      character(:), allocatable :: val_buff
 
       if (this%comm%is_io_node()) then
-         call this%read_string_node(key, default_val=default_val, is_empty=is_empty, val=val_buff)
-         val = trim(val_buff)
+         call this%read_string_node(key, default=default, is_empty=is_empty, val=val)
+         val = trim(val)
       end if
 
+      call this%comm%bcast_string(val)
    end subroutine read_string
 
-   subroutine read_enum(this, key, values, default_val, is_empty, val)
+   subroutine read_enum(this, key, values, default, is_empty, val)
       !----------------------------------------------------------
 
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(len=*), dimension(:), intent(in) :: values
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
-      character(:), allocatable :: val_buff
       character(:), allocatable, intent(inout) :: val
 
       integer :: len, i
@@ -956,13 +1108,13 @@ contains
       character(len=:), allocatable :: msg
 
       if (this%comm%is_io_node()) then
-         is_found = .false.
 
-         call this%read_string_node(key, default_val, is_empty, val_buff)
+         call this%read_string_node(key, default, is_empty, val)
 
          len = size(values)
+         is_found = .false.
          do i = 1, len
-            if (val_buff .eq. values(i)) then
+            if (val .eq. values(i)) then
                is_found = .true.
                exit
             end if
@@ -971,7 +1123,6 @@ contains
          if (.not. is_found) then
 
             msg = "which is not in the allowable list of values. Valid values: "
-
             msg = msg//trim(values(1))
             do i = 2, len - 1
                msg = msg//', '//trim(values(i))
@@ -981,18 +1132,19 @@ contains
             msg = this%prep_msg_val(key, msg)
             call this%log%exit_on_error(msg)
          end if
-         val = TRIM(val_buff)
 
       end if
 
+      call this%comm%bcast_string(val)
+
    end subroutine read_enum
 
-   subroutine read_input_path(this, key, default_val, is_empty, val)
+   subroutine read_input_path(this, key, default, is_empty, val)
       !----------------------------------------------------------
       ! Read key from from root node and parse as integer
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default_val
+      character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
       type(type_path), intent(inout) :: val
 
@@ -1001,12 +1153,11 @@ contains
       character(len=:), allocatable :: msg
 
       if (this%comm%is_io_node()) then
-         call this%read_string_node(key, default_val=default_val, is_empty=is_empty, val=val_buff)
+         call this%read_string_node(key, default=default, is_empty=is_empty, val=val_buff)
 
-         val = type_path(trim(val_buff))
+         val = type_path(val_buff)
 
-
-         if (.not.val % is_file ()) then
+         if (.not. val%is_file()) then
             msg = "which is not a valid file path."
             msg = this%prep_msg_val(key, msg)
             call this%log%exit_on_error(msg)
@@ -1014,9 +1165,11 @@ contains
 
       end if
 
+      call this%comm%bcast_string(val_buff)
+      val = type_path(val_buff)
    end subroutine read_input_path
 
-   function parse_error_message(this, key, io_err, default_val, is_empty) result(is_default)
+   function parse_error_message(this, key, io_err, default, is_empty) result(is_default)
       ! Parses fortran-yaml-c error message and filters no key error from
       ! terminating program when optional arguments are provided
 
@@ -1024,54 +1177,53 @@ contains
 
       character(*), intent(in)::key
       type(type_error), allocatable, intent(inout) :: io_err
-      character(*), optional, intent(in):: default_val
+      character(*), optional, intent(in):: default
       logical, optional, intent(out) ::is_empty
       logical :: is_default
-
+      class(type_node), pointer:: node
       character(STRING_SIZE) :: buff
-      character(*), parameter:: nokey_err_msg = "does not contain key"
       integer :: err_id
 
       if (.not. allocated(io_err)) then
          is_default = .false.
+         buff = " read value "//this%root%get_string(key, error=io_err)
+         call this%log%debug(this%prep_msg(key, buff))
          return
       end if
 
-      ! TODO: Check for other error types
-      if (index(io_err%message, nokey_err_msg) .gt. 0) then
-         err_id = err_key
-      else
-         err_id = err_type
-      end if
+      if (present(default)) then
 
-      ! Removing  no key error from error checking if optional arguments
-      if (present(default_val)) then
-
-         if (err_id .eq. err_key) then
-
+         ! Ignoring no key error from error checking if optional arguments
+         if (is_no_key_err(io_err)) then
             is_default = .true.
-            buff = " not found, using default value "//trim(default_val)//'.'
-            call this%log%warning(this%prep_msg(key, buff))
+            buff = " not found, using default value "//trim(default)//'.'
+            call this%log%info(this%prep_msg(key, buff))
 
             ! Updating YAML with defaults for outputting full config, and
             ! parse string default values.
-            !
-            call this%root%set_string(key, default_val)
+            call this%root%set_string(key, default)
+
+            node => this%root%get(key)
+            node%path = this%root%path//"/"//key
+
          else
             is_default = .false.
             call this%log%exit_on_error(io_err%message)
          end if
 
       else if (present(is_empty)) then
-
+         ! Ignoring no key error if bypass value is given
+         is_empty = .true.
          is_default = .false.
-         if (err_id .ne. err_key) then
+         if (.not. is_no_key_err(io_err)) then
             call this%log%exit_on_error(io_err%message)
          end if
 
       else
+         ! Default behavior, exiting on normally on YAML error
          is_default = .false.
          call this%log%exit_on_error(io_err%message)
+
       end if
 
       deallocate (io_err)
@@ -1091,12 +1243,21 @@ contains
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in)::key, msg
       character(len=STRING_SIZE) :: new_msg
-      character(:), ALLOCATABLE :: val
-      type(type_error), ALLOCATABLE :: io_err
+      character(:), allocatable :: val
+      type(type_error), allocatable :: io_err
 
       val = this%root%get_string(key, error=io_err)
 
       new_msg = this%root%path//"/"//key//" is set to """//val//""", "//msg
    end function prep_msg_val
 
+   pure function is_no_key_err(io_err) result(val)
+
+      type(type_error), allocatable, intent(in) :: io_err
+      character(*), parameter:: NO_KEY_ERR = "does not contain key"
+      logical :: val
+
+      val = (index(io_err%message, NO_KEY_ERR) .gt. 0)
+
+   end function is_no_key_err
 end module yaml_file_mod

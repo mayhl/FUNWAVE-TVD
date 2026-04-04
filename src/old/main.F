@@ -160,16 +160,10 @@ Program FUNWAVE_TVD
    USE TIDE_MODULE
    USE TIME_SPECTRA_MODULE
 
-   use Constants, only: STRING_SIZE, MESSAGE_SIZE
+
    IMPLICIT NONE
 
-   CHARACTER(MESSAGE_SIZE) :: fpath
-   !CHARACTER(*), ALLOCATABLE :: err_msg
-   logical :: is_io_node
-
-   call comm%init()
-
-   call comm%init_logger(io_rank_id=0)
+    call model % init()
 
    CALL READ_INPUT
 

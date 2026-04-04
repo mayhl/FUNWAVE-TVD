@@ -1,24 +1,26 @@
 
 module misc_mod
-   use Constants, only: SP
 
+   use constants_mod, only: SP
+
+   implicit none(external)
+   public random2
 contains
 
-   function random() result(val)
+   function random2() result(val)
       real(SP) :: val
 
-# if defined (INTEL)
-      val = rand()
-# elif defined (CRAY)
-      val = rand()
-# else
+! # if defined (INTEL)
+!       val = rand()
+! # elif defined (CRAY)
+!       val = rand()
+! # else
       call random_number(val)
-# endif
+      !# endif
 
-   end function random
+   end function random2
 
    elemental subroutine str2int(str, int, stat, fmt, is_empty)
-      implicit none(external)
       character(len=*), intent(in) :: str
       integer, intent(out) :: int
       integer, intent(out) :: stat
@@ -42,7 +44,6 @@ contains
    end subroutine str2int
 
    elemental subroutine str2real(str, flt, stat, fmt, is_empty)
-      implicit none(external)
       character(len=*), intent(in) :: str
       real(sp), intent(out) :: flt
       integer, intent(out) :: stat

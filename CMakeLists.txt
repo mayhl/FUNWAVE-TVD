@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.22)
 
 # TODO::
 # cmake-format: off
@@ -20,66 +20,132 @@ cmake_minimum_required(VERSION 3.10)
 # Basic Setup
 # ------------
 project(
-  my_project
+  funwave
   VERSION 4.0.0
   DESCRIPTION "FUNWAVE-TVD"
   LANGUAGES Fortran C CXX)
 enable_language(Fortran)
 
-# ------------------
-# Build Requirements
-# ------------------
+set(project_name funwave)
+set(main_lib ${project_name})
+set(exe_name exe_${project_name})
+set(dep_targets flogging)
+# set(all_targets ${main_lib} ${exe_name})
+set(all_targets ${main_lib} ${dep_targets})
 
-find_package(MPI REQUIRED)
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+include(GNUInstallDirs)
+
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+
+include(intro_banner)
+
+option(ENABLE_TESTING "Enable testing for ${project_name}" ON)
+
+add_subdirectory(cmake)
+# file(DOWNLOAD
+# https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
+# ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake) include(cmake/CPM.cmake)
+
+find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
-# find_package(PFUNIT REQUIRED)
+# include(FetchContent) include(CTest)
 
-include(FetchContent)
-include(CTest)
+# Note: string point  to cmake/modules/Findxyz.cmake files
+message(STATUS "${CMAKE_MODULE_PATH}")
+find_package("face" REQUIRED)
+find_package("flogging" REQUIRED)
+find_package("ffilesystem" REQUIRED)
+find_package("fortran-yaml-c" REQUIRED)
 
-# Turn off yaml-lib testing
-
-# message(STATUS ${BUILD_TESTING}) set(BUILD_TESTING OFF) message(STATUS
-# ${BUILD_TESTING})
-# -----------------------
-# Setting Compiler Flags
-# -----------------------
-# Platform Specific Flags
-if(CMAKE_Fortran_COMPILER_ID MATCHES "GNU")
-  set(dialect "-ffree-form -fimplicit-none -fcheck=all")
-  set(bounds "-fbounds-check")
-endif()
-if(CMAKE_Fortran_COMPILER_ID MATCHES "Intel")
-  set(dialect "-stand -free") # -implicitnone")
-  list(APPEND _module_flags "INTEL")
-  # set(bounds "-check bounds")
-endif()
-if(CMAKE_Fortran_COMPILER_ID MATCHES "Cray")
-  set(dialect "-f free")
-  list(APPEND _module_flags "CRAY")
+set(libraries_to_link)
+# if(NOT TARGET test-drive::test-drive AND ENABLE_TESTING)
+if(ENABLE_TESTING)
+  enable_testing()
+  # find_package("test-drive" REQUIRED)
+  find_package(PFUNIT REQUIRED)
 endif()
 
-set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${bounds}")
-set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${dialect}")
+add_library(${main_lib} STATIC)
 
-# Linking MPI library
-add_definitions(${MPI_Fortran_COMPILE_FLAGS})
-include_directories(${MPI_Fortran_INCLUDE_PATH})
-set(CMAKE_EXE_LINKER_FLAGS "-static-libgcc -static-libstdc++")
+# Enable position-independent code for shared-library linking support
+set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
-# module directory is set before building
+add_subdirectory(src)
 
-# set(CMAKE_Fortran_MODULE_DIRECTORY ${PROJECT_BINARY_DIR}/modules)
+if(ENABLE_TESTING)
+  add_subdirectory(tests)
+endif()
 
-# set(CMAKE_Fortran_MODULE_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})
+set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
+                                             ${CMAKE_BINARY_DIR}/modules)
 
-# Path for external libraries
-set(EXTERNAL_DIR ${PROJECT_SOURCE_DIR}/ext)
+target_link_libraries(flogging PRIVATE face)
+target_link_libraries(${main_lib} PRIVATE flogging ffilesystem::ffilesystem
+                                          fortran-yaml-c::fortran-yaml-c)
 
-# Adding main FUNWAVE code
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
+# cmake-format: off
 
-# Adding tests
-if(BUILD_TESTING)
-  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/tests)
+# add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
+# target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
+# target_link_libraries(${exe_name} PRIVATE ${main_lib})
+#
+foreach(tgt ${all_targets})
+  message(STATUS "${tgt}")
+  install(
+    TARGETS ${tgt}
+    EXPORT ${project_name}Targets
+    ARCHIVE DESTINATION lib
+    INCLUDES
+    DESTINATION include/${project_name})
+endforeach()
+
+# install(
+#   DIRECTORY ${CMAKE_BINARY_DIR}/modules/
+#   DESTINATION include/${project_name}
+#   FILES_MATCHING
+#   PATTERN "*.mod")
+#
+# install(
+#   EXPORT ${project_name}Targets
+#   FILE ${project_name}Targets.cmake
+#   NAMESPACE ${project_name}::
+#   DESTINATION lib/cmake/${project_name})
+
+# cmake-format: on
+#
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+  "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${project_name}Config.cmake.in"
+  "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Config.cmake"
+  INSTALL_DESTINATION lib/cmake/${project_name})
+
+write_basic_package_version_file(
+  "${CMAKE_CURRENT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
+  VERSION ${PROJECT_VERSION}
+  COMPATIBILITY AnyNewerVersion)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Config.cmake"
+              "${CMAKE_CURRENT_BINARY_DIR}/${project_name}ConfigVersion.cmake"
+        DESTINATION lib/cmake/${project_name})
+
+install(
+  FILES "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Config.cmake"
+  DESTINATION lib/cmake/${project_name}
+  RENAME ${project_name}-config.cmake)
+
+print_summary()
+
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
+  add_custom_target(
+    coverage
+    COMMAND ${CMAKE_CTEST_COMMAND} --output-on-failure
+    COMMAND ${CMAKE_COMMAND} -E remove -f coverage.info
+    COMMAND lcov --directory . --capture --output-file coverage.info
+    COMMAND lcov --ignore-errors unused --remove coverage.info '/usr/*'
+            '*/build/*' --output-file coverage_filtered.info
+    COMMAND genhtml coverage_filtered.info --output-directory coverage_report
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+    COMMENT "Generating code coverage report")
 endif()

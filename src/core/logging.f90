@@ -19,7 +19,7 @@
 !-------------------------------------------------
 
 module log_io_mod
-   use Constants, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE
+   use constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE
    use logger_mod, only: logger_init => logger_init, logger => master_logger
    use throw_mod, only: throw_exception, set_error_code
 

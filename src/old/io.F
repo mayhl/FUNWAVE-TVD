@@ -153,8 +153,8 @@ SUBROUTINE READ_INPUT
 # endif
    use yaml_file_mod, only: type_yaml_reader
    use log_io_mod, only: type_log_writer
-   use Constants, only: LABEL_SIZE
-   use misc_mod, only: random
+   use constants_mod, only: LABEL_SIZE
+   use misc_mod, only: random2
    use model_grid_mod, only: type_model_grid
 !jychoi 14.12.23]
    IMPLICIT NONE
@@ -166,7 +166,8 @@ SUBROUTINE READ_INPUT
    LOGICAL :: INPUT_PHASE = .FALSE.
 
    character(256) :: my_path
-   character(2048) :: error_msg, log_path, yaml_path
+   character(2048) :: error_msg, log_path
+   character(:), allocatable :: yaml_path
    !>by Zhouteng Ye
    CHARACTER(LEN=80)::INPUT_NAME = ''
 
@@ -179,6 +180,7 @@ SUBROUTINE READ_INPUT
    type(type_log_writer), target :: log
    type(type_model_grid), target :: grid
    character(LABEL_SIZE) :: log_label = 'config'
+   integer(MPI_ADDRESS_KIND):: address
    ! NOTE: --- MY VARIABLES -------
 
    ! NOTE: --- BELOW TO BE REMOVED -------
@@ -186,7 +188,7 @@ SUBROUTINE READ_INPUT
    FDIR = TRIM(RESULT_FOLDER)
    OPEN (10000, FILE='time_dt.out', STATUS='UNKNOWN')
    OPEN (3, FILE='LOG.txt')
-   CALL getcwd(error_msg)
+   ! CALL getcwd(error_msg)
    WRITE (*, *) TRIM(error_msg)
 
    !>by Zhouteng Ye
@@ -202,7 +204,7 @@ SUBROUTINE READ_INPUT
    INPUT_FILE_NAME = FILE_NAME
 
 ! title
-   CALL READ_STRING(TITLE, FILE_NAME, 'TITLE', ierr)
+   !CALL READ_STRING(TITLE, FILE_NAME, 'TITLE', ierr)
    IF (ierr == 1) THEN
       !write(*,*) 'No TITLE in ', FILE_NAME, 'use default'
       TITLE = '---TEST RUN---'
@@ -218,419 +220,42 @@ SUBROUTINE READ_INPUT
    WRITE (3, *) '                                         '
 # endif
 
-   nprocs = comm%size
-   myid = comm%rank_id
-   ! NOTE: --- TO BE REMOVED -------
-
-   log = comm%get_logger(log_label)
-   yaml_path = "../test.yaml"
-
-   call yaml_reader%init(yaml_path, 100, log, comm)
-
-   call MPI_Barrier(MPI_COMM_WORLD, ierr)
-
-   call grid%validate_yaml(yaml_reader, log)
-
-   call MPI_Barrier(MPI_COMM_WORLD, ierr)
+   call model%read_input()
 
    stop
 
-! # if defined (PARALLEL)
-!    CALL MPI_COMM_SIZE(MPI_COMM_WORLD, nprocs, ier)   !ykchoi(04/May/2017)
-!    CALL MPI_COMM_RANK(MPI_COMM_WORLD, myid, ier)
-! # endif
+   myid = model%comm%rank_id
 
-   ! allocate (yaml_reader)
-   !
-   ! write (*, *) 'id', myid, myid .eq. 0
-   ! call yaml_reader%init(yaml_path, 100, log_path, MPI_COMM_WORLD, myid .eq. 0)
+   PX = model%grid%nx_proc
+   PY = model%grid%ny_proc
 
-!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-!    Old COde
-!!!!!!!!!!!!!!!!!!!!!!!!
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, *) '                                         '
-   if (myid .eq. 0) WRITE (3, *) '-------------- PARALLEL -----------------'
-# endif
+   Mglob = model%grid%nx
+   Nglob = model%grid%ny
 
-# if defined (PARALLEL)
-! parallel info
-   CALL READ_INTEGER(PX, FILE_NAME, 'PX', ierr)
-   IF (ierr == 1) THEN
-      PX = 1
-      if (myid .eq. 0) write (*, *) 'No PX sepecified ', 'use PX=1'
-      if (myid .eq. 0) WRITE (3, '(A20,A20)') 'No PX sepecified ', 'use PX=1'
-   END IF
-   CALL READ_INTEGER(PY, FILE_NAME, 'PY', ierr)
-   IF (ierr == 1) THEN
-      PY = 1
-      if (myid .eq. 0) write (*, *) 'No PY sepecified ', 'use PY=1'
-      if (myid .eq. 0) WRITE (3, '(A20,A20)') 'No PY sepecified ', 'use PY=1'
-   END IF
-   if (myid .eq. 0) WRITE (3, '(A7,I3,A7,I3)') 'PX   =', PX, 'PY   =', PY
-# endif
+#if defined (CARTESIAN)
 
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, *) '                                         '
-   if (myid .eq. 0) WRITE (3, *) '-------------- GRID INFO -----------------'
-# else
-   WRITE (3, *) '                                         '
-   WRITE (3, *) '-------------- GRID INFO -----------------'
-# endif
+   dx = model%grid%dx
+   dy = model%grid%dy
 
-! dimension
-   CALL READ_INTEGER(Mglob, FILE_NAME, 'Mglob', ierr)
-   IF (ierr == 1) THEN
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40,A40)') 'Mglob:', 'NOT DEFINED, STOP'
-         WRITE (3, '(A40,A40)') 'Mglob:', 'NOT DEFINED, STOP'
-      end if
-      call MPI_FINALIZE(ier)
-# else
-      WRITE (*, '(A40,A40)') 'Mglob:', 'NOT DEFINED, STOP'
-      WRITE (3, '(A40,A40)') 'Mglob:', 'NOT DEFINED, STOP'
-# endif
-      STOP
-   END IF
+#else
+   ! StretchGrid | StretchGrid | bool
+! ! TRUE | DX_FILE | string
+! ! TRUE | DY_FILE | string
+! ! TRUE | Coriolis_FILE | string
+! ! FALSE | Lon_West | float
+! ! FALSE | Lat_South | float
+! ! FALSE | Dphi | float
+! ! FALSE | Dtheta | float
+! ! FALSE | | float
+! ! FALSE | | float
+#endif
 
-   CALL READ_INTEGER(Nglob, FILE_NAME, 'Nglob', ierr)
-   IF (ierr == 1) THEN
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40,A40)') 'Nglob:', 'NOT DEFINED, STOP'
-         WRITE (3, '(A40,A40)') 'Nglob:', 'NOT DEFINED, STOP'
-      end if
-      call MPI_FINALIZE(ier)
-# else
-      WRITE (*, '(A40,A40)') 'Nglob:', 'NOT DEFINED, STOP'
-      WRITE (3, '(A40,A40)') 'Nglob:', 'NOT DEFINED, STOP'
-# endif
-      STOP
-   END IF
-
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, '(A7,I8,A7,I8)') 'Mglob=', Mglob, 'Nglob=', Nglob
-# else
-   WRITE (3, '(A7,I8,A7,I8)') 'Mglob=', Mglob, 'Nglob=', Nglob
-# endif
-! grid
-# if defined (CARTESIAN)
-
-   CALL READ_FLOAT(DX, FILE_NAME, 'DX', ierr)
-
-   IF (ierr == 1) THEN
-      PRINT *, "Did you intend to use Spherical Coordinates?"
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40,A40)') 'DX:', 'NOT DEFINED, STOP'
-         WRITE (3, '(A40,A40)') 'DX:', 'NOT DEFINED, STOP'
-      end if
-      call MPI_FINALIZE(ier)
-# else
-      WRITE (*, '(A40,A40)') 'DX:', 'NOT DEFINED, STOP'
-      WRITE (3, '(A40,A40)') 'DX:', 'NOT DEFINED, STOP'
-# endif
-      STOP
-   END IF
-
-   CALL READ_FLOAT(DY, FILE_NAME, 'DY', ierr)
-
-   IF (ierr == 1) THEN
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40,A40)') 'DY:', 'NOT DEFINED, STOP'
-         WRITE (3, '(A40,A40)') 'DY:', 'NOT DEFINED, STOP'
-      end if
-      call MPI_FINALIZE(ier)
-# else
-      WRITE (*, '(A40,A40)') 'DY:', 'NOT DEFINED, STOP'
-      WRITE (3, '(A40,A40)') 'DY:', 'NOT DEFINED, STOP'
-# endif
-      STOP
-   END IF
-
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, '(A4,F12.2,A4,F12.2)') 'DX=', DX, 'DY=', DY
-# else
-   WRITE (3, '(A4,F12.2,A4,F12.2)') 'DX=', DX, 'DY=', DY
-# endif
-
-# else
-   CALL READ_LOGICAL(StretchGrid, FILE_NAME, 'StretchGrid', ierr)
-   IF (ierr == 1) THEN
-      StretchGrid = .FALSE.
-   END IF
-   if (StretchGrid) then
-      CALL READ_STRING(DX_FILE, FILE_NAME, 'DX_FILE', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use StretchGrid ', 'but no DX_FILE found, STOP'
-            WRITE (3, '(A40,A40)') 'You use StretchGrid ', 'but no DX_FILE found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use StretchGrid ', 'but no DX_FILE found, STOP'
-         WRITE (3, '(A40,A40)') 'You use StretchGrid ', 'but no DX_FILE found, STOP'
-# endif
-         STOP
-      END IF
-
-      CALL READ_STRING(DY_FILE, FILE_NAME, 'DY_FILE', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use StretchGrid ', 'but no DY_FILE found, STOP'
-            WRITE (3, '(A40,A40)') 'You use StretchGrid ', 'but no DY_FILE found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use StretchGrid ', 'but no DY_FILE found, STOP'
-         WRITE (3, '(A40,A40)') 'You use StretchGrid ', 'but no DY_FILE found, STOP'
-# endif
-         STOP
-      END IF
-
-      CALL READ_STRING(Coriolis_FILE, FILE_NAME, 'CORIOLIS_FILE', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-            WRITE (3, '(A40,A40)') 'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-         WRITE (3, '(A40,A40)') 'You use StretchGrid ', 'but no CORIOLIS_FILE found, STOP'
-# endif
-         STOP
-      END IF
-
-   else  ! not stretch
-
-      CALL READ_FLOAT(Lon_West, FILE_NAME, 'Lon_West', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Lon_West found, STOP'
-            WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Lon_West found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Lon_West found, STOP'
-         WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Lon_West found, STOP'
-# endif
-         STOP
-      END IF
-
-      CALL READ_FLOAT(Lat_South, FILE_NAME, 'Lat_South', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Lat_South found, STOP'
-            WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Lat_South found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Lat_South found, STOP'
-         WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Lat_South found, STOP'
-# endif
-         STOP
-      END IF
-
-      CALL READ_FLOAT(Dphi, FILE_NAME, 'Dphi', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Dphi found, STOP'
-            WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Dphi found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Dphi found, STOP'
-         WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Dphi found, STOP'
-# endif
-         STOP
-      END IF
-
-      CALL READ_FLOAT(Dtheta, FILE_NAME, 'Dtheta', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Dtheta found, STOP'
-            WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Dtheta found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use Spherical mode ', 'but no Dtheta found, STOP'
-         WRITE (3, '(A40,A40)') 'You use Spherical mode ', 'but no Dtheta found, STOP'
-# endif
-         STOP
-      END IF
-
-   end if  ! endif stretch
-
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, '(A10,F12.2)') 'Lon_West=', Lon_West
-   if (myid .eq. 0) WRITE (3, '(A11,F12.2)') 'Lat_South=', Lat_South
-   if (myid .eq. 0) WRITE (3, '(A11,F12.2)') 'Dphi     =', Dphi
-   if (myid .eq. 0) WRITE (3, '(A11,F12.2)') 'Dtheta   =', Dtheta
-# else
-   WRITE (3, '(A10,F12.2)') 'Lon_West=', Lon_West
-   WRITE (3, '(A11,F12.2)') 'Lat_South=', Lat_South
-   WRITE (3, '(A11,F12.2)') 'Dphi     =', Dphi
-   WRITE (3, '(A11,F12.2)') 'Dtheta   =', Dtheta
-# endif
-
-# endif
-   ! end spherical
-
-! depth
-   CALL READ_STRING(DEPTH_TYPE, FILE_NAME, 'DEPTH_TYPE', ierr)
-
-   IF (ierr == 1) THEN
-      DEPTH_TYPE = 'FLAT'
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40)') 'You dont specify DEPTH_TYPE, use FLAT.'
-         WRITE (3, '(A40)') 'You dont specify DEPTH_TYPE, use FLAT.'
-      end if
-# else
-      WRITE (*, '(A40)') 'You dont specify DEPTH_TYPE, use FLAT.'
-      WRITE (3, '(A40)') 'You dont specify DEPTH_TYPE, use FLAT.'
-# endif
-   END IF
-
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, '(A12,A50)') 'DEPTH_TYPE:', DEPTH_TYPE
-# else
-   WRITE (3, '(A12,A50)') 'DEPTH_TYPE:', DEPTH_TYPE
-# endif
-
-   IF (DEPTH_TYPE(1:3) == 'DAT') THEN
-      CALL READ_STRING(DEPTH_FILE, FILE_NAME, 'DEPTH_FILE', ierr)
-# if defined (PARALLEL)
-      if (myid .eq. 0) WRITE (3, '(A12,A50)') 'DEPTH_FILE:', DEPTH_FILE
-# else
-      WRITE (3, '(A12,A50)') 'DEPTH_FILE:', DEPTH_FILE
-# endif
-   END IF  ! end type=data
-
-   IF (DEPTH_TYPE(1:3) == 'FLA') THEN
-      CALL READ_FLOAT(DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT', ierr)
-
-      IF (ierr == 1) THEN
-         DEPTH_FLAT = 10.0_SP
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-            WRITE (3, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-         end if
-# else
-         WRITE (*, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-         WRITE (3, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-# endif
-      END IF
-
-# if defined (PARALLEL)
-      if (myid .eq. 0) WRITE (3, '(A10,F12.2)') 'DEPTH_FLAT=', DEPTH_FLAT
-# else
-      WRITE (3, '(A10,F12.2)') 'DEPTH_FLAT=', DEPTH_FLAT
-# endif
-   END IF ! endif type=flat
-
-   IF (DEPTH_TYPE(1:3) == 'SLO') THEN
-      CALL READ_FLOAT(DEPTH_FLAT, FILE_NAME, 'DEPTH_FLAT', ierr)
-
-      IF (ierr == 1) THEN
-         DEPTH_FLAT = 10.0_SP
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-            WRITE (3, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-         end if
-# else
-         WRITE (*, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-         WRITE (3, '(A40)') 'You dont specify DEPTH_FLAT, use 10 m.'
-# endif
-      END IF
-
-      CALL READ_FLOAT(SLP, FILE_NAME, 'SLP', ierr)
-
-      IF (ierr == 1) THEN
-         SLP = 0.1_SP
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'You dont specify SLP, use 0.1'
-            WRITE (3, '(A40)') 'You dont specify SLP, use 0.1'
-         end if
-# else
-         WRITE (*, '(A40)') 'You dont specify SLP, use 0.1'
-         WRITE (3, '(A40)') 'You dont specify SLP, use 0.1'
-# endif
-      END IF
-
-      CALL READ_FLOAT(Xslp, FILE_NAME, 'Xslp', ierr)
-
-      IF (ierr == 1) THEN
-         Xslp = 0.0_SP
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'You dont specify Xslp, use 0.0'
-            WRITE (3, '(A40)') 'You dont specify Xslp, use 0.0'
-         end if
-# else
-         WRITE (*, '(A40)') 'You dont specify Xslp, use 0.0'
-         WRITE (3, '(A40)') 'You dont specify Xslp, use 0.0'
-# endif
-      END IF
-
-# if defined (PARALLEL)
-      if (myid .eq. 0) WRITE (3, '(A10,F12.2)') 'DEPTH_FLAT=', DEPTH_FLAT
-      if (myid .eq. 0) WRITE (3, '(A5,F12.2)') 'SLP=', SLP
-      if (myid .eq. 0) WRITE (3, '(A6,F12.2)') 'Xslp=', Xslp
-# else
-      WRITE (3, '(A10,F12.2)') 'DEPTH_FLAT=', DEPTH_FLAT
-      WRITE (3, '(A5,F12.2)') 'SLP=', SLP
-      WRITE (3, '(A6,F12.2)') 'Xslp=', Xslp
-# endif
-   END IF  ! endif type=slope
-
-! depth correction
-
-   CALL READ_LOGICAL(BATHY_CORRECTION, FILE_NAME, 'BATHY_CORRECTION', ierr)
-   IF (ierr == 1) THEN
-      BATHY_CORRECTION = .FALSE.
-   END IF
-   IF (BATHY_CORRECTION) THEN
-# if defined (PARALLEL)
-      if (myid .eq. 0) then
-         WRITE (3, '(A40)') 'Bathymetry is corrected !'
-         WRITE (*, '(A40)') 'Bathymetry is corrected !'
-      end if
-# else
-      WRITE (3, '(A40)') 'Bathymetry is corrected !'
-      WRITE (*, '(A40)') 'Bathymetry is corrected !'
-# endif
-   END IF
-
-! time
-
-# if defined (PARALLEL)
-   if (myid .eq. 0) WRITE (3, *) '                                         '
-   if (myid .eq. 0) WRITE (3, *) '-------------- TIME INFO -----------------'
-# else
-   WRITE (3, *) '                                         '
-   WRITE (3, *) '-------------- TIME INFO -----------------'
-# endif
+   DEPTH_TYPE = model%grid%ftype
+   DEPTH_FILE = model%grid%fpath%path()
+   DEPTH_FLAT = model%grid%depth_flat
+   SLP = model%grid%slope_m
+   Xslp = model%grid%slope_x0
+   BATHY_CORRECTION = model%grid%apply_correction
 
    CALL READ_FLOAT(TOTAL_TIME, FILE_NAME, 'TOTAL_TIME', ierr)
 
@@ -2076,7 +1701,7 @@ SUBROUTINE READ_INPUT
                IF (INPUT_PHASE) THEN
                   Phase_LEFT(J, I) = Phase_LEFT(J, I)*3.1415926/180.0_SP
                ELSE
-                  Phase_LEFT(J, I) = random()*2.0_SP*3.1415926
+                  Phase_LEFT(J, I) = random2()*2.0_SP*3.1415926
                END IF
 
             END DO

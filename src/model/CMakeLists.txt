@@ -1,5 +1,5 @@
-add_library(central interface.F grid.F)
-target_link_libraries(central PRIVATE core)
-
-# set_target_properties(central PROPERTIES Fortran_MODULE_DIRECTORY
-# ${CMAKE_CURRENT_BINARY_DIR})
+target_sources(${main_lib} PRIVATE grid.f90)
+target_sources(${main_lib} PRIVATE interface.f90)
+target_sources(${main_lib} PRIVATE main.f90)
+target_sources(${main_lib} PRIVATE stations.f90)
+target_sources(${main_lib} PRIVATE time.f90)
