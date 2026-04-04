@@ -2,13 +2,12 @@ cmake_minimum_required(VERSION 3.22)
 
 # TODO::
 # cmake-format: off
-#   [x] Cray/Intel HPC support
+#   [] Cray pfUnit Support 
 #   [?] Windows Support: Issues linking Microsoft MPI library
 #   []  Preprocessor flag selection
 #   []  Figure out why YAML tests' Makefile not be called by CMake.
 #   []  Try to get fortran-yaml-c tests working 
 #       make test works if tests' Makefile is called manually
-#   []  Add backtrace? https://github.com/SINTEF/fortran-error-handling
 #   [?]  Fix newunit issue => use 2023 standards. 
 #          Note 1: Temporary hack hard-coding unit in flogging.
 #          Note 2: Current FUNWAVE code not compatible with 2023
@@ -29,9 +28,9 @@ enable_language(Fortran)
 set(project_name funwave)
 set(main_lib ${project_name})
 set(exe_name exe_${project_name})
-set(dep_targets flogging)
-# set(all_targets ${main_lib} ${exe_name})
-set(all_targets ${main_lib} ${dep_targets})
+set(project_targets ${main_lib} ${exe_name})
+set(ext_libs "")
+set(ext_targets "")
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
@@ -58,6 +57,8 @@ find_package("flogging" REQUIRED)
 find_package("ffilesystem" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
+set(all_targets ${project_targets} ${ext_targets})
+
 set(libraries_to_link)
 # if(NOT TARGET test-drive::test-drive AND ENABLE_TESTING)
 if(ENABLE_TESTING)
@@ -74,22 +75,22 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_subdirectory(src)
 
 if(ENABLE_TESTING)
-  add_subdirectory(tests)
+  add_subdirectory(test)
 endif()
 
 set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
                                              ${CMAKE_BINARY_DIR}/modules)
 
 target_link_libraries(flogging PRIVATE face)
-target_link_libraries(${main_lib} PRIVATE flogging ffilesystem::ffilesystem
-                                          fortran-yaml-c::fortran-yaml-c)
+target_link_libraries(${main_lib} PRIVATE ${ext_libs})
 
-# cmake-format: off
+add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
+target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
+target_link_libraries(${exe_name} PRIVATE ${main_lib})
 
-# add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
-# target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
-# target_link_libraries(${exe_name} PRIVATE ${main_lib})
-#
+# Intel needs linker_language Fortran else error "undefined reference to `main'"
+set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
+
 foreach(tgt ${all_targets})
   message(STATUS "${tgt}")
   install(
@@ -100,17 +101,17 @@ foreach(tgt ${all_targets})
     DESTINATION include/${project_name})
 endforeach()
 
-# install(
-#   DIRECTORY ${CMAKE_BINARY_DIR}/modules/
-#   DESTINATION include/${project_name}
-#   FILES_MATCHING
-#   PATTERN "*.mod")
-#
-# install(
-#   EXPORT ${project_name}Targets
-#   FILE ${project_name}Targets.cmake
-#   NAMESPACE ${project_name}::
-#   DESTINATION lib/cmake/${project_name})
+install(
+  DIRECTORY ${CMAKE_BINARY_DIR}/modules/
+  DESTINATION include/${project_name}
+  FILES_MATCHING
+  PATTERN "*.mod")
+
+install(
+  EXPORT ${project_name}Targets
+  FILE ${project_name}Targets.cmake
+  NAMESPACE ${project_name}::
+  DESTINATION lib/cmake/${project_name})
 
 # cmake-format: on
 #
