@@ -28,11 +28,10 @@ module model_stations_mod
 
    type, extends(type_model_interface) :: type_model_stations
 
-      real(SP) :: total
-      real(SP) :: start
-      real(SP) :: plot_dt
-      real(SP) :: log_dt
-      integer :: start_index
+      real(SP) :: dt
+      character(:), allocatable :: path
+      integer :: n
+      integer :: buffer_size
 
    contains
       procedure :: read_input => read_input

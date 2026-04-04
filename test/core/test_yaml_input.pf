@@ -391,13 +391,20 @@ contains
       type(type_comm) :: comm
       real(SP) :: val
 
-      ! call open_yaml(this, reader, comm)
+      call open_yaml(this, reader, comm)
+
+      call reader%read_time('time_simple', val=val)
+      @assertEqual(100.0_SP, val)
       !
-      ! call reader%read_time('time_simple', val=val)
-      ! @assertEqual(100.0_SP, val)
-      !
-      !call reader%read_time('time_mins', val=val)
-      !@assertEqual(60.0_SP, val)
+      call reader%read_time('time_mins', val=val)
+      @assertEqual(60.0_SP, val)
+
+      call reader%read_time('time_hrs', val=val)
+      @assertEqual(3600.0_SP, val)
+
+      call reader%read_time('time_hertz', val=val)
+      @assertEqual(10.0_SP, val)
+
       call dummy_fix_lint()
 
    end subroutine test_time

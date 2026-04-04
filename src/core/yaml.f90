@@ -62,32 +62,25 @@
 !--------------------------------------------------
 module yaml_file_mod
 
-   use constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
-   use log_io_mod, only: type_log_writer
    use comm_mod, only: type_comm
-   use misc_mod, only: str2int, str2real
+   use constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
    use filesystem, only: type_path => path_t
+   use log_io_mod, only: type_log_writer
+   use misc_mod, only: str2int, str2real
+   use range_parse_mod, only: type_integer_range, type_real_range
 
-   !use Constants, only: STRING_SIZE
    use fortran_yaml_c, only: YamlFile, dp, &
                              type_node, type_dictionary, type_error, &
                              type_list, type_list_item, type_scalar
    implicit none(external)
 
    private
-   public :: type_yaml_reader, err_key, ERR_NONE, ERR_TYPE, ERR_RANGE, type_path
+   public :: type_yaml_reader, type_path
 
-   character(*), parameter:: NO_KEY_ERR = "does not contain key"
-   integer, parameter :: ERR_NONE = 0
-   integer, parameter :: err_key = 1
-   integer, parameter :: ERR_TYPE = 2
-   integer, parameter :: ERR_RANGE = 3
    type(type_log_writer), TARGET :: log_buff
-
    character(LABEL_SIZE), parameter :: log_label = "config"
 
    type type_yaml_reader
-      private
       logical :: is_io_node = .False.
       character(MESSAGE_SIZE):: path = ""
       type(type_log_writer), pointer, public :: log
@@ -97,7 +90,6 @@ module yaml_file_mod
 
    contains
 
-      private
       procedure, public :: init
       procedure, public :: cast_dictionary
       procedure, public :: is_dictionary
@@ -122,426 +114,10 @@ module yaml_file_mod
 
    end type type_yaml_reader
 
-   type type_range
-
-      private
-      character(:), allocatable :: key
-      character(:), allocatable :: prefix
-      logical :: is_recommended, is_skip_checks
-      logical, dimension(2) :: is_inclusive
-      logical, dimension(2) :: is_out_bound
-      logical, dimension(2) :: is_empty
-      character(24), dimension(2) :: range_str(2)
-      integer, dimension(2) :: iostat
-      type(type_yaml_reader), pointer :: reader
-
-      logical :: is_range_err, is_zero
-   contains
-      private
-      procedure, public :: initialize => range_initialize
-      procedure :: finalize => range_finalize
-      procedure :: range2str => range_range2str
-
-   end type type_range
-
-   type, extends(type_range) :: type_range_integer
-      private
-      integer, dimension(2) :: range
-   contains
-      private
-      procedure, public :: parse => range_integer_parse
-      procedure, public :: intersects => range_integer_intersects
-
-   end type type_range_integer
-
-   type, extends(type_range) :: type_range_real
-      private
-      real(SP), dimension(2) :: range
-   contains
-      private
-      procedure, public :: parse => range_real_parse
-      procedure, public :: intersects => range_real_intersects
-
-   end type type_range_real
 contains
-   function range_initialize(this, reader, key, is_recommended, range, inclusive) result(is_error_exit)
-      !----------------------------------------------------------
 
-      class(type_range), intent(inout) :: this
-      class(type_yaml_reader), intent(inout), target :: reader
-      character(*), intent(in) :: key
-      logical, intent(in) :: is_recommended
-      character(*), dimension(2), optional, intent(in) :: range
-      logical, dimension(2), optional, intent(in) :: inclusive
-
-      logical :: is_error_exit
-      character(:), allocatable :: msg, prefix
-
-      this%range_str = range
-      this%is_recommended = is_recommended
-      this%key = key
-      this%reader => reader
-
-      if (is_recommended) then
-         this%prefix = "recommended_"
-      else
-         this%prefix = ""
-      end if
-
-      if (.not. present(range)) then
-         if (present(inclusive)) then
-            msg = " can not specify "//this%prefix//"inclusive without also specifying "//this%prefix//"range."
-            call reader%log%exit_on_fatal(reader%prep_msg(key, msg))
-            is_error_exit = .true.
-         else
-            is_error_exit = .false.
-         end if
-
-         this%is_skip_checks = .true.
-         return
-      end if
-
-      if (present(inclusive)) then
-         this%is_inclusive = inclusive
-      else
-         this%is_inclusive = [.true., .true.]
-      end if
-      this%is_skip_checks = .false.
-      is_error_exit = .false.
-
-   end function range_initialize
-
-   function range_range2str(this) result(range)
-      !----------------------------------------------------------
-      class(type_range), intent(inout) :: this
-      character :: left, right
-
-      character(:), allocatable :: range
-
-      ! Custom messages for lower and upper bound
-      ! Using () brackets for exclusive bounds &
-      !       [] brackets for inclusive bounds
-      if (this%is_inclusive(1)) then
-         left = '['
-      else
-         left = '('
-      end if
-
-      if (this%is_inclusive(2)) then
-         right = ']'
-      else
-         right = ')'
-      end if
-
-      range = left//trim(this%range_str(1))//", "//trim(this%range_str(2))//right
-
-   end function range_range2str
-
-   subroutine range_finalize(this, type_noun)
-      !----------------------------------------------------------
-
-      class(type_range), intent(inout) :: this
-      character(*), intent(in) :: type_noun
-
-      character(:), allocatable :: msg, prefix
-      character :: left, right
-
-      if (this%is_range_err) then
-         msg = " "//this%range2str()//" is not a valid "//this%prefix//"range."
-      end if
-
-      if ((.not. this%is_empty(1)) .and. &
-          (this%iostat(1) /= 0)) then
-         msg = " lower value of "//this%prefix//"range, '"//trim(this%range_str(1))//"' can not be interperted as "//type_noun//"."
-      end if
-
-      if ((.not. this%is_empty(2)) .and. &
-          (this%iostat(2) /= 0)) then
-         msg = " upper value of "//this%prefix//"range, '"//trim(this%range_str(2))//"' can not be interperted as "//type_noun//"."
-      end if
-
-      if (allocated(msg)) then
-         msg = this%reader%prep_msg(this%key, msg)
-         call this%reader%log%exit_on_fatal(msg)
-         deallocate (msg)
-         return
-      end if
-
-      ! Exiting on no out of bounds errors
-      if (.not. (this%is_out_bound(1) .or. this%is_out_bound(2))) then
-         return
-      end if
-
-      if (this%is_recommended) then
-         this%prefix = 'recommmend'
-      else
-         this%prefix = 'required'
-      end if
-
-      if ((.not. this%is_empty(1)) .and. (.not. this%is_empty(2))) then
-
-         msg = "which is not in the "//this%prefix//" range "//this%range2str()//"."
-
-      else if (.not. this%is_empty(1)) then
-         ! Custom messages for only lower bound
-         if (this%is_inclusive(1)) then
-            if (this%is_zero) then
-               msg = "zero"
-            else
-               msg = this%range_str(1)
-            end if
-            msg = "which is "//this%prefix//" to be greater than or equal to "//msg//"."
-         else
-            if (this%is_zero) then
-               msg = "which is "//this%prefix//" to be a positive number."
-            else
-               msg = "which is "//this%prefix//" to be greater than "//this%range_str(1)//"."
-            end if
-         end if
-
-      else if (.not. this%is_empty(2)) then
-         ! Custom messages for only upper bound
-         if (this%is_inclusive(2)) then
-            if (this%is_zero) then
-               msg = "zero"
-            else
-               msg = this%range_str(2)
-            end if
-            msg = " is "//this%prefix//" to be less than or equal to "//msg//"."
-         else
-            if (this%is_zero) then
-               msg = "which is "//this%prefix//" to be a negative number."
-            else
-               msg = "which is "//this%prefix//" to be less than "//this%range_str(2)//"."
-            end if
-         end if
-
-      else
-         ! Safety check, code should not be reached
-         msg = " in an unexepected state."
-         msg = this%reader%prep_msg(this%key, msg)
-         call this%reader%log%exit_on_fatal(msg)
-
-      end if
-
-      msg = this%reader%prep_msg_val(this%key, msg)
-      if (this%is_recommended) then
-         call this%reader%log%warning(msg)
-      else
-         call this%reader%log%exit_on_error(msg)
-      end if
-
-   end subroutine range_finalize
-
-   subroutine range_integer_parse(this, val)
-      !----------------------------------------------------------
-      class(type_range_integer), intent(inout) :: this
-      integer, intent(in) :: val
-
-      if (this%is_skip_checks) return
-
-      call str2int(this%range_str, this%range, this%iostat, is_empty=this%is_empty)
-
-      if (this%is_empty(1)) then
-         this%is_out_bound(1) = .false.
-      else
-         if (this%iostat(1) == 0) then
-            if (this%is_inclusive(1)) then
-               this%is_out_bound(1) = val < this%range(1)
-            else
-               this%is_out_bound(1) = val <= this%range(1)
-            end if
-         else
-            this%is_out_bound(1) = .true.
-         end if
-      end if
-
-      if (this%is_empty(2)) then
-         this%is_out_bound(2) = .false.
-      else
-         if (this%iostat(2) == 0) then
-            if (this%is_inclusive(2)) then
-               this%is_out_bound(2) = val > this%range(2)
-            else
-               this%is_out_bound(2) = val >= this%range(2)
-            end if
-         else
-            this%is_out_bound(2) = .true.
-         end if
-      end if
-
-      if ((.not. this%is_empty(1)) .and. &
-          (.not. this%is_empty(2))) then
-
-         this%is_range_err = this%range(2) <= this%range(1)
-      else
-         this%is_range_err = .false.
-      end if
-      ! Flag for custom error messages
-      this%is_zero = (this%range(1) == 0) .or. (this%range(2) == 0)
-
-      call this%finalize("an integer")
-
-   end subroutine range_integer_parse
-
-   subroutine range_integer_intersects(this, other)
-      !----------------------------------------------------------
-      class(type_range_integer), intent(inout) :: this
-      class(type_range_integer), intent(inout) :: other
-
-      character(:), allocatable :: msg
-      logical, dimension(2) :: is_error
-
-      is_error = [.false., .false.]
-      if (this%is_skip_checks) return
-      if (other%is_skip_checks) return
-
-      if ((.not. this%is_empty(1)) .and. &
-          (.not. other%is_empty(1))) then
-
-         if (this%is_inclusive(1) .eqv. other%is_inclusive(1)) then
-            is_error(1) = other%range(1) < this%range(1)
-         else
-
-            if (this%is_inclusive(1)) then
-               is_error(1) = other%range(1) < this%range(1)
-            else
-               is_error(1) = other%range(1) <= this%range(1)
-            end if
-
-         end if
-
-      end if
-
-      if ((.not. this%is_empty(2)) .and. &
-          (.not. other%is_empty(2))) then
-
-         if (this%is_inclusive(2) .eqv. other%is_inclusive(2)) then
-            is_error(2) = other%range(2) > this%range(2)
-         else
-
-            if (this%is_inclusive(2)) then
-               is_error(2) = other%range(2) > this%range(2)
-            else
-               is_error(2) = other%range(2) >= this%range(2)
-            end if
-
-         end if
-
-      end if
-
-      if (is_error(1) .or. is_error(2)) then
-         msg = " recommended_range, "//other%range2str()//", is not a subinterval of range, "//this%range2str()//"."
-         msg = this%reader%prep_msg(this%key, msg)
-         call this%reader%log%exit_on_fatal(msg)
-      end if
-
-   end subroutine range_integer_intersects
-
-   subroutine range_real_parse(this, val)
-      !----------------------------------------------------------
-      class(type_range_real), intent(inout) :: this
-      real(SP), intent(in) :: val
-
-      if (this%is_skip_checks) return
-
-      call str2real(this%range_str, this%range, this%iostat, is_empty=this%is_empty)
-
-      if (this%is_empty(1)) then
-         this%is_out_bound(1) = .false.
-      else
-         if (this%iostat(1) == 0) then
-            if (this%is_inclusive(1)) then
-               this%is_out_bound(1) = val < this%range(1)
-            else
-               this%is_out_bound(1) = val <= this%range(1)
-            end if
-         else
-            this%is_out_bound(1) = .true.
-         end if
-      end if
-
-      if (this%is_empty(2)) then
-         this%is_out_bound(2) = .false.
-      else
-         if (this%iostat(2) == 0) then
-            if (this%is_inclusive(2)) then
-               this%is_out_bound(2) = val > this%range(2)
-            else
-               this%is_out_bound(2) = val >= this%range(2)
-            end if
-         else
-            this%is_out_bound(2) = .true.
-         end if
-      end if
-
-      if ((.not. this%is_empty(1)) .and. &
-          (.not. this%is_empty(2))) then
-
-         this%is_range_err = this%range(2) <= this%range(1)
-      else
-         this%is_range_err = .false.
-      end if
-      ! Flag for custom error messages
-      this%is_zero = (this%range(1) == 0) .or. (this%range(2) == 0)
-
-      call this%finalize("a real number")
-
-   end subroutine range_real_parse
-
-   subroutine range_real_intersects(this, other)
-      !----------------------------------------------------------
-      class(type_range_real), intent(inout) :: this
-      class(type_range_real), intent(inout) :: other
-
-      character(:), allocatable :: msg
-      logical, dimension(2) :: is_error
-
-      is_error = [.false., .false.]
-      if (this%is_skip_checks) return
-      if (other%is_skip_checks) return
-
-      if ((.not. this%is_empty(1)) .and. &
-          (.not. other%is_empty(1))) then
-
-         if (this%is_inclusive(1) .eqv. other%is_inclusive(1)) then
-            is_error(1) = other%range(1) < this%range(1)
-         else
-
-            if (this%is_inclusive(1)) then
-               is_error(1) = other%range(1) < this%range(1)
-            else
-               is_error(1) = other%range(1) <= this%range(1)
-            end if
-
-         end if
-
-      end if
-
-      if ((.not. this%is_empty(2)) .and. &
-          (.not. other%is_empty(2))) then
-
-         if (this%is_inclusive(2) .eqv. other%is_inclusive(2)) then
-            is_error(2) = other%range(2) > this%range(2)
-         else
-
-            if (this%is_inclusive(2)) then
-               is_error(2) = other%range(2) > this%range(2)
-            else
-               is_error(2) = other%range(2) >= this%range(2)
-            end if
-
-         end if
-
-      end if
-
-      if (is_error(1) .or. is_error(2)) then
-         msg = " recommended_range, "//other%range2str()//", is not a subinterval of range, "//this%range2str()//"."
-         msg = this%reader%prep_msg(this%key, msg)
-         call this%reader%log%exit_on_fatal(msg)
-      end if
-
-   end subroutine range_real_intersects
+   subroutine _dummy()
+   end subroutine _dummy
 
    subroutine init(this, path_str, comm)
       !----------------------------------------------------------
@@ -619,13 +195,14 @@ contains
                is_empty = .true.
                val = .false.
             else
-               ! buff = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
-               call this%log%exit_on_error(key)
+               buff = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+               call this%log%exit_on_error(buff)
             end if
 
          end if
       end if
 
+      call this%comm%barrier()
       call this%comm%bcast_logical(val)
       if (present(is_empty)) call this%comm%bcast_logical(is_empty)
 
@@ -699,22 +276,31 @@ contains
    end subroutine copy_node
 
    subroutine read_real_node(this, key, default, is_empty, &
-                             range, inclusive, &
-                             recommended_range, recommended_inclusive, &
+                             require_range, recommend_range, &
                              val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
+
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      character(*), dimension(2), optional, intent(in) :: range, recommended_range
-      logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
+      character(*), optional, intent(in) :: require_range, recomend_range
       real(SP), intent(out) :: val
+      logical, optional, intent(out) :: is_empty
+      type(type_real_range) :: rq_range, rd_range
 
-      type(type_range_real) :: req_range, rec_range
-      type(type_error), allocatable :: io_err
-      logical :: is_default
-      logical, dimension(2) :: is_err_exit
+      if (present(require_range)) then
+         call rq_range%parse(require_range)
+         if (.not. rq_range%is_valid()) then
+            call this%log%exit_on_fatal("")
+         end if
+      end if
+
+      if (present(recomend_range)) then
+         call rd_range%parse(recomend_range)
+         if (.not. rd_range%is_valid()) then
+            call this%log%exit_on_fatal("")
+         end if
+      end if
 
       val = this%root%get_real(key, error=io_err)
       is_default = this%parse_error_message(key, io_err, default, is_empty)
@@ -728,32 +314,10 @@ contains
          end if
       end if
 
-      is_err_exit(1) = req_range%initialize( &
-                       this, &
-                       key, &
-                       is_recommended=.false., &
-                       range=range, &
-                       inclusive=inclusive)
-
-      is_err_exit(2) = rec_range%initialize( &
-                       this, &
-                       key, &
-                       is_recommended=.true., &
-                       range=recommended_range, &
-                       inclusive=recommended_inclusive)
-
-      if (is_err_exit(1)) return
-      call req_range%parse(val)
-      if (is_err_exit(2)) return
-      call rec_range%parse(val)
-
-      call req_range%intersects(rec_range)
    end subroutine read_real_node
 
    subroutine read_real(this, key, default, is_empty, &
-                        range, inclusive, &
-                        recommended_range, recommended_inclusive, &
-                        val)
+                        require_range, recomend_range, val)
       !----------------------------------------------------------
       ! Wrapper method around read_real_node for single node
       ! MPI I/O and broadcasting to other nodes
@@ -761,16 +325,19 @@ contains
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      character(*), dimension(2), optional, intent(in) :: range, recommended_range
-      logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
+      character(*), optional, intent(in) :: required_range, recomend_range
       real(SP), intent(out) :: val
+      logical, optional, intent(out) :: is_empty
+      !type(type_real_range) :: rq_range, rd_range
 
       if (this%comm%is_io_node()) then
-         call this%read_real_node(key, default, is_empty, &
-                                  range, inclusive, &
-                                  recommended_range, recommended_inclusive, &
-                                  val)
+
+         call this%read_real_node(key, default=default, &
+                                  is_empty=is_empty, &
+                                  required_range=required_range, &
+                                  recomend_range=recomend_range, &
+                                  val=val)
+
       end if
 
       call this%comm%bcast_real(val)
@@ -826,36 +393,22 @@ contains
       logical, dimension(2), optional, intent(in) :: recommended_inclusive
       real(SP), intent(out) :: val
 
-      logical :: is_dict
+      !  logical :: is_dict
       type(type_yaml_reader) :: child
+      character(:), allocatable :: unit
       character(len=5), dimension(4) ::  utypes
-      character(:), allocatable :: unit, ckey
-
       data utypes/'sec', 'min', 'hour', 'hertz'/
 
-      is_dict = this%is_dictionary(key)
-      if (is_dict) then
-         unit = ""
-         print *, "HERE"
-         print *, unit
+      if (this%is_dictionary(key)) then
+
          call this%cast_dictionary(key, child)
-         print *, "HERE"
-         print *, unit
          call child%read_enum("units", utypes, val=unit)
-         print *, "HERE"
-         print *, unit
-         ckey = 'value'
-      else
-         child = this
-         ckey = key
-      end if
 
-      call child%read_positive_real(ckey, default, &
-                                    is_empty, include_zero, &
-                                    recommended_range, &
-                                    recommended_inclusive, val)
+         call child%read_positive_real("value", default=default, &
+                                       is_empty=is_empty, include_zero=include_zero, &
+                                       recommended_range=recommended_range, &
+                                       recommended_inclusive=recommended_inclusive, val=val)
 
-      if (is_dict) then
          select case (unit)
          case ('min')
             val = val*60_SP
@@ -866,6 +419,12 @@ contains
          end select
 
          deallocate (unit)
+      else
+         call this%read_positive_real(key, default=default, &
+                                      is_empty=is_empty, include_zero=include_zero, &
+                                      recommended_range=recommended_range, &
+                                      recommended_inclusive=recommended_inclusive, val=val)
+
       end if
 
    end subroutine read_time

@@ -32,7 +32,7 @@ contains
       if (present(fmt)) then
          fmt_ = fmt
       else
-         fmt_ = "(I8)"
+         fmt_ = "(I20)"
       end if
 
       if (present(is_empty)) then
@@ -62,4 +62,20 @@ contains
 
    end subroutine str2real
 
+   function count_char(string, char) result(count)
+
+      character(len=*), intent(in) :: string
+      character(len=1), intent(in) :: char
+      integer :: count, pos, start_pos
+
+      count = 0
+      start_pos = 1
+      do
+         pos = index(string(start_pos:), char)
+         if (pos == 0) exit
+         count = count + 1
+         start_pos = start_pos + pos
+
+      end do
+   end function count_char
 end module misc_mod

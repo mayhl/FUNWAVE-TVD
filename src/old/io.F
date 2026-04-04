@@ -257,51 +257,11 @@ SUBROUTINE READ_INPUT
    Xslp = model%grid%slope_x0
    BATHY_CORRECTION = model%grid%apply_correction
 
-   CALL READ_FLOAT(TOTAL_TIME, FILE_NAME, 'TOTAL_TIME', ierr)
+   TOTAL_TIME = model%time%total
+   PLOT_START_TIME = model%time%start
+   PLOT_INTV = model%time%plot_dt
 
-   IF (ierr == 1) THEN
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40,A40)') 'TOTAL_TIME:', 'NOT FOUND, STOP'
-         WRITE (3, '(A40,A40)') 'TOTAL_TIME:', 'NOT FOUND, STOP'
-      end if
-      call MPI_FINALIZE(ier)
-# else
-      WRITE (*, '(A40,A40)') 'TOTAL_TIME:', 'NOT FOUND, STOP'
-      WRITE (3, '(A40,A40)') 'TOTAL_TIME:', 'NOT FOUND, STOP'
-# endif
-      STOP
-   END IF
-
-   CALL READ_FLOAT(PLOT_START_TIME, FILE_NAME, 'PLOT_START_TIME', ierr)
-
-   IF (ierr == 1) THEN
-      PLOT_START_TIME = 0.0
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40)') 'PLOT_START_TIME Default:  0.0 s'
-         WRITE (3, '(A40)') 'PLOT_START_TIME Default:  0.0 s'
-      end if
-# else
-      WRITE (*, '(A40)') 'PLOT_START_TIME Default:  0.0 s'
-      WRITE (3, '(A40)') 'PLOT_START_TIME Default:  0.0 s'
-# endif
-   END IF
-
-   CALL READ_FLOAT(PLOT_INTV, FILE_NAME, 'PLOT_INTV', ierr)
-
-   IF (ierr == 1) THEN
-      PLOT_INTV = 1.0
-# if defined (PARALLEL)
-      if (myid .eq. 0) THEN
-         WRITE (*, '(A40)') 'PLOT_INTV Default:  1.0 s'
-         WRITE (3, '(A40)') 'PLOT_INTV Default:  1.0 s'
-      end if
-# else
-      WRITE (*, '(A40)') 'PLOT_INTV Default:  1.0 s'
-      WRITE (3, '(A40)') 'PLOT_INTV Default:  1.0 s'
-# endif
-   END IF
+   PLOT_INTV_STATION = model%stations%dt
 
    CALL READ_FLOAT(PLOT_INTV_STATION, FILE_NAME, 'PLOT_INTV_STATION', ierr)
 

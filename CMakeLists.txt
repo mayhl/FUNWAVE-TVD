@@ -83,9 +83,12 @@ set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
 
 target_link_libraries(flogging PRIVATE face)
 target_link_libraries(${main_lib} PRIVATE ${ext_libs})
+target_include_directories(${main_lib}
+                           PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc")
 
 add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
 target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
+
 target_link_libraries(${exe_name} PRIVATE ${main_lib})
 
 # Intel needs linker_language Fortran else error "undefined reference to `main'"
@@ -113,8 +116,6 @@ install(
   NAMESPACE ${project_name}::
   DESTINATION lib/cmake/${project_name})
 
-# cmake-format: on
-#
 include(CMakePackageConfigHelpers)
 
 configure_package_config_file(

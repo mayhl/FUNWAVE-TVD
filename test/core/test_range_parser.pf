@@ -1,0 +1,113 @@
+
+! allow(E001)
+module test_range_parser
+
+   use pFUnit
+
+   use constants_mod, only: SP
+   use range_parse_mod, only: type_integer_range, type_real_range
+   implicit none(external)
+
+contains
+
+   @test
+   subroutine test_integer_range_parser()
+
+      type(type_integer_range) :: range
+      character(len=:), allocatable ::str
+
+      str = "[2,3,1]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[,]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[,1]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[3,]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[2,3]"
+      call range%parse(str)
+      @assertEqual(.true., range%is_valid())
+      @assertEqual(.true., range%is_inc_low())
+      @assertEqual(.true., range%is_inc_upp())
+      @assertEqual(2, range%get_lower())
+      @assertEqual(3, range%get_upper())
+
+      str = "   (   -5   ,   -1   ]    "
+      call range%parse(str)
+      @assertEqual(.true., range%is_valid())
+      @assertEqual(.false., range%is_inc_low())
+      @assertEqual(.true., range%is_inc_upp())
+      @assertEqual(-5, range%get_lower())
+      @assertEqual(-1, range%get_upper())
+
+      str = "[1, 10.11)"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "(a, 5.1)"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "(-1,-5)"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+   end subroutine test_integer_range_parser
+
+   @test
+   subroutine test_real_range_parser()
+
+      type(type_real_range) :: range
+      character(len=:), allocatable ::str
+
+      str = "[2.2,0.3,1.1]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[,]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[,12.2]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[3.2,]"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "[1.2,3.33]"
+      call range%parse(str)
+      @assertEqual(.true., range%is_valid())
+      @assertEqual(.true., range%is_inc_low())
+      @assertEqual(.true., range%is_inc_upp())
+      @assertEqual(1.2_SP, range%get_lower())
+      @assertEqual(3.33_SP, range%get_upper())
+
+      str = "   (   -4   ,   -1.2   ]    "
+      call range%parse(str)
+      @assertEqual(.true., range%is_valid())
+      @assertEqual(.false., range%is_inc_low())
+      @assertEqual(.true., range%is_inc_upp())
+      @assertEqual(-4.0_SP, range%get_lower())
+      @assertEqual(-1.2_SP, range%get_upper())
+
+      str = "(a, 5.1)"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+      str = "(-1, -4.0)"
+      call range%parse(str)
+      @assertEqual(.false., range%is_valid())
+
+   end subroutine test_real_range_parser
+
+end module test_range_parser

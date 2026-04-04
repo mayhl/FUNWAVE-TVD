@@ -54,6 +54,10 @@ contains
       call this%yaml%comm%barrier()
 
       call this%yaml%read_time('total', val=this%total)
+      call this%yaml%read_time('start', default="0.0", val=this%start)
+      call this%yaml%read_time('plot', val=this%plot_dt)
+      call this%yaml%read_time('log', val=this%log_dt)
+      call this%yaml%read_positive_integer('start index', val=this%start_index)
 
       this%log => log
 

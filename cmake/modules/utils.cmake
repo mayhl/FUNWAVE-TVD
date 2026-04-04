@@ -50,6 +50,14 @@ endmacro()
 
 macro("qadd_pfunit_ctest" name)
 
+  set(_extra_args ${ARGN})
+  list(LENGTH _extra_args _extra_count)
+
+  if(${_extra_count} GREATER 0)
+    list(GET _extra_args 0 _max_pes)
+    set(_extra_args MAX_PES ${_max_pes})
+  endif()
+
   add_pfunit_ctest(
     ${name}
     TEST_SOURCES
@@ -63,12 +71,13 @@ macro("qadd_pfunit_ctest" name)
     throw_with_pfunit_mod
     EXTRA_INITIALIZE
     initialize_throw
-    MAX_PES
-    16)
+    ${_extra_args})
 
   set_target_properties(${name} PROPERTIES Fortran_MODULE_DIRECTORY
                                            ${CMAKE_BINARY_DIR}/modules)
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE Fortran)
+
+  unset(_extra_args)
 endmacro()
