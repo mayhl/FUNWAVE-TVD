@@ -675,6 +675,15 @@ SUBROUTINE READ_INPUT
 # endif
       ENDIF
 
+
+      CALL READ_LOGICAL(STATIONS_BINARY_IO,FILE_NAME,'STATIONS_BINARY_IO',ierr)
+      IF(ierr==1)THEN
+        STATIONS_BINARY_IO = .FALSE.
+      ENDIF
+
+      write(*,*) "STATIONS_BINARY_IO", STATIONS_BINARY_IO
+
+
       CALL READ_FLOAT(SCREEN_INTV,FILE_NAME,'SCREEN_INTV',ierr)
       IF(ierr==1)THEN
         SCREEN_INTV = 1.0
@@ -3852,10 +3861,20 @@ SUBROUTINE STATIONS
           if ((ista(i).ge.Ibeg).and.(ista(i).le.Iend).and.&
               (jsta(i).ge.Jbeg).and.(jsta(i).le.Jend)) then
              nsta(i) = 1
-             write(file_name(1:4),'(I4.4)') i
-             TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
+
+             if (STATIONS_BINARY_IO) then 
+              write(file_name(1:5),'(I5.5)') i 
+            else
+              write(file_name(1:4),'(I4.4)') i 
+            end if 
+            TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
              iunit=100+i
-             open(iunit,FILE=TMP_NAME)
+
+            !  if (STATIONS_BINARY_IO) then 
+            !   open(iunit,FILE=TMP_NAME, ACCESS='stream', FORM='unformatted', STATUS='replace')
+            ! else
+            !   open(iunit,FILE=TMP_NAME)
+            ! end if 
           else
              nsta(i) = 0
           endif
@@ -3866,10 +3885,19 @@ SUBROUTINE STATIONS
           if ((ista(i).ge.Ibeg).and.(ista(i).le.Iend).and.&
               (jsta(i).ge.Jbeg).and.(jsta(i).le.Jend)) then
              nsta(i) = 1
-             write(file_name(1:4),'(I4.4)') i
+
+             if (STATIONS_BINARY_IO) then 
+              write(file_name(1:5),'(I5.5)') i
+            else
+              write(file_name(1:4),'(I4.4)') i 
+            end if 
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
              iunit=100+i
-             open(iunit,FILE=TMP_NAME)
+            !  if (STATIONS_BINARY_IO) then 
+            !   open(iunit,FILE=TMP_NAME, ACCESS='stream', FORM='unformatted', STATUS='replace')
+            ! else
+            !   open(iunit,FILE=TMP_NAME)
+            ! end if 
           else
              nsta(i) = 0
           endif
@@ -3914,13 +3942,32 @@ SUBROUTINE STATIONS
               ZUV_BUFFER(BufferCount(i),i,7)=EtaFoamMax_sta
 # endif
             ELSE
-              DO j=1,StationOutputBuffer
+
+            !  if (STATIONS_BINARY_IO) then 
+            !   open(iunit,FILE=TMP_NAME, ACCESS='stream', FORM='unformatted', STATUS='replace')
+            ! else
+            !   open(iunit,FILE=TMP_NAME)
+            ! end if 
+              IF (STATIONS_BINARY_IO) THEN
+               open(iunit,FILE=TMP_NAME, ACCESS='stream', FORM='unformatted', STATUS='replace')
+                DO j=1,StationOutputBuffer
 # if defined (FOAM)
-                write (iunit,'(E21.10E4, 6E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,7)
+                  write (iunit) (ZUV_BUFFER(j,i,k),k=1,7)
 # else
-                write (iunit,'(E21.10E4, 3E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,4)
+                  write (iunit) (ZUV_BUFFER(j,i,k),k=1,4)
 # endif
-              ENDDO              
+                ENDDO
+            ELSE
+               open(iunit,FILE=TMP_NAME)
+                DO j=1,StationOutputBuffer
+# if defined (FOAM)
+                  write (iunit,'(E21.10E4, 6E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,7)
+# else
+                  write (iunit,'(E21.10E4, 3E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,4)
+# endif
+                ENDDO
+            END IF 
+            close(iunit)
               BufferCount(i) = 0
               ZUV_BUFFER(:,i,1)=TOTAL_TIME
 # if defined (FOAM)
@@ -3929,11 +3976,11 @@ SUBROUTINE STATIONS
               ZUV_BUFFER(:,i,2:4)=ZERO
 # endif
 
-# if defined (PARALLEL)
-      if (myid.eq.0) WRITE(*,*) 'WRITE OUT STATION ...'
-# else
-      WRITE(*,*) 'WRITE OUT STATIONS ...'
-# endif
+! # if defined (PARALLEL)
+!       if (myid.eq.0) WRITE(*,*) 'WRITE OUT STATION ...'
+! # else
+!       WRITE(*,*) 'WRITE OUT STATIONS ...'
+! # endif
 
 
             ENDIF ! end buffer
@@ -3946,7 +3993,7 @@ SUBROUTINE STATIONS
        do i=1,NumberStations
           if (nsta(i).eq.1) then
              iunit=100+i
-             close(iunit)
+        !     close(iunit)
           endif
        enddo
      endif
@@ -4020,7 +4067,12 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
           if ((ista(i).ge.Ibeg).and.(ista(i).le.Iend).and.&
               (jsta(i).ge.Jbeg).and.(jsta(i).le.Jend)) then
              nsta(i) = 1
-             write(file_name(1:4),'(I4.4)') i
+
+             if (STATIONS_BINARY_IO) then 
+              write(file_name(1:5),'(I5.5)') i
+            else
+              write(file_name(1:4),'(I4.4)') i
+            end if 
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
              iunit=100+i
              open(iunit,FILE=TMP_NAME)
@@ -4034,7 +4086,11 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
           if ((ista(i).ge.Ibeg).and.(ista(i).le.Iend).and.&
               (jsta(i).ge.Jbeg).and.(jsta(i).le.Jend)) then
              nsta(i) = 1
-             write(file_name(1:4),'(I4.4)') i
+             if (STATIONS_BINARY_IO) then 
+              write(file_name(1:5),'(I5.5)') i
+            else
+              write(file_name(1:4),'(I4.4)') i
+            end if 
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
              iunit=100+i
              open(iunit,FILE=TMP_NAME)
@@ -4082,13 +4138,23 @@ SUBROUTINE STATIONS_SPHERICAL_IJ
               ZUV_BUFFER(BufferCount(i),i,7)=EtaFoamMax_sta
 # endif
             ELSE
-              DO j=1,StationOutputBuffer
+              IF (STATIONS_BINARY_IO) THEN
+                DO j=1,StationOutputBuffer
 # if defined (FOAM)
-                write (iunit,'(E21.10E4, 6E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,7)
+                  write (iunit) (ZUV_BUFFER(j,i,k),k=1,7)
 # else
-                write (iunit,'(E21.10E4, 3E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,4)
+                  write (iunit) (ZUV_BUFFER(j,i,k),k=1,4)
 # endif
-              ENDDO              
+                ENDDO
+            ELSE
+                DO j=1,StationOutputBuffer
+# if defined (FOAM)
+                  write (iunit,'(E21.10E4, 6E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,7)
+# else
+                  write (iunit,'(E21.10E4, 3E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,4)
+# endif
+                ENDDO
+            END IF 
               BufferCount(i) = 0
               ZUV_BUFFER(:,i,1)=TOTAL_TIME
 # if defined (FOAM)
@@ -4186,7 +4252,11 @@ SUBROUTINE STATIONS
           if ((ista(i).ge.Ibeg).and.(ista(i).le.Iend).and.&
               (jsta(i).ge.Jbeg).and.(jsta(i).le.Jend)) then
              nsta(i) = 1
-             write(file_name(1:4),'(I4.4)') i
+             if (STATIONS_BINARY_IO) then 
+              write(file_name(1:5),'(I5.5)') i
+            else
+              write(file_name(1:4),'(I4.4)') i
+            end if 
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
              iunit=100+i
              open(iunit,FILE=TMP_NAME)
@@ -4199,7 +4269,12 @@ SUBROUTINE STATIONS
           if ((ista(i).ge.Ibeg).and.(ista(i).le.Iend).and.&
               (jsta(i).ge.Jbeg).and.(jsta(i).le.Jend)) then
              nsta(i) = 1
-             write(file_name(1:4),'(I4.4)') i
+
+             if (STATIONS_BINARY_IO) then 
+              write(file_name(1:5),'(I5.5)') i
+            else
+              write(file_name(1:4),'(I4.4)') i
+            end if 
              TMP_NAME = TRIM(FDIR)//'sta_'//TRIM(FILE_NAME)
              iunit=100+i
              open(iunit,FILE=TMP_NAME)
@@ -4249,13 +4324,23 @@ SUBROUTINE STATIONS
               ZUV_BUFFER(BufferCount(i),i,7)=EtaFoamMax_sta
 # endif
             ELSE
-              DO j=1,StationOutputBuffer
+              IF (STATIONS_BINARY_IO) THEN
+                DO j=1,StationOutputBuffer
 # if defined (FOAM)
-                write (iunit,'(E21.10E4, 6E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,7)
+                  write (iunit) (ZUV_BUFFER(j,i,k),k=1,7)
 # else
-                write (iunit,'(E21.10E4, 3E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,4)
+                  write (iunit) (ZUV_BUFFER(j,i,k),k=1,4)
 # endif
-              ENDDO              
+                ENDDO
+            ELSE
+                DO j=1,StationOutputBuffer
+# if defined (FOAM)
+                  write (iunit,'(E21.10E4, 6E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,7)
+# else
+                  write (iunit,'(E21.10E4, 3E16.5E4)') (ZUV_BUFFER(j,i,k),k=1,4)
+# endif
+                ENDDO
+            END IF 
               BufferCount(i) = 0
               ZUV_BUFFER(:,i,1)=TOTAL_TIME
 # if defined (FOAM)

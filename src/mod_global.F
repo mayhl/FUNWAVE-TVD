@@ -142,6 +142,7 @@ MODULE GLOBAL
        REAL(SP)::  DT,TIME,TOTAL_TIME,PLOT_INTV,PLOT_COUNT,&
                   SCREEN_INTV,SCREEN_COUNT, &
                    DT_fixed,PLOT_START_TIME
+       LOGICAL :: STATIONS_BINARY_IO
        REAL(SP) :: HOTSTART_INTV,HOTSTART_COUNT
        INTEGER :: icount=-1  ! for output file number
        INTEGER :: icount_mean=0  ! for output mean file number
