@@ -1,3 +1,10 @@
+# Setting general build options defaults
+if(CMAKE_INSTALL_PREFIX_INITIALIZED_TO_DEFAULT)
+  set(CMAKE_INSTALL_PREFIX
+      "${CMAKE_BINARY_DIR}/installed"
+      CACHE PATH "default install path" FORCE)
+endif()
+
 set_property(CACHE CMAKE_BUILD_TYPE PROPERTY STRINGS "Debug" "Release"
                                              "RelWithDebInfo Coverage")
 
@@ -13,12 +20,8 @@ endif()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
-# Compiler-specific configurations
+# Selecting vendor specific FORTRAN compiler flags
 if(CMAKE_Fortran_COMPILER_ID MATCHES "^GNU$")
-
-  # set(standard_compile_flags "-ffree-line-length-none -fbacktrace -free -stand
-  # -fpp")
-
   set(standard_compile_flags
       "-ffree-form -fimplicit-none -fcheck=all -fbacktrace -cpp -fallow-argument-mismatch -w"
   )
@@ -46,7 +49,7 @@ else()
     FATAL_ERROR "Unsupported FORTRAN compiler ID: ${CMAKE_Fortran_COMPILER_ID}")
 endif()
 
-# Customize compiler flags
+# Applying FORTRAN compiler flags
 set(CMAKE_Fortran_FLAGS_DEBUG
     "${CMAKE_Fortran_FLAGS_DEBUG} ${fpe}"
     PARENT_SCOPE)
@@ -54,6 +57,7 @@ set(CMAKE_Fortran_FLAGS
     "${CMAKE_Fortran_FLAGS} ${standard_compile_flags}"
     PARENT_SCOPE)
 
+# Setting up coverage flags
 set(CMAKE_Fortran_FLAGS_COVERAGE
     "-O0 -g -coverage -fprofile-arcs -ftest-coverage")
 if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
@@ -62,12 +66,16 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
       PARENT_SCOPE)
 endif()
 
-# Compile Options
+# ##############################################################################
+# FUNWAVE Options #
+# ##############################################################################
+
+# Required options
 option(USE_DOUBLE "Build with double precision" ON)
 option(USE_SPHERICAL "Build with spherical coordinate module" OFF)
 option(USE_MPI "Build with MPI parallel processing" ON)
 
-# Modules
+# Optional FUNWAVE Modules
 option(USE_FOAM "Build with foam module" OFF)
 option(USE_METEO "Build with meteo module" OFF)
 option(USE_PERCIPITATION "Build with percipitation module" OFF)
@@ -75,7 +83,11 @@ option(USE_SEDIMENT "Build with sediment module" OFF)
 option(USE_SUBGRID "Build with subgrid module" OFF)
 option(USE_TRACKING "Build with tracking module" OFF)
 option(USE_VESSEL "Build FUNWAVE with vessel module" OFF)
+option(USE_DEEP_DRAFT
+       "Build FUNWAVE with vessel module with deep draft modfication." OFF)
 
+# include(CMakeDependentOption) cmake_dependent_option(USE_FOO "Use Foo" ON
+# "USE_A AND (USE_B OR USE_C)" OFF) Linking CMake options with FUNWAVE flags
 if(USE_MPI)
   list(APPEND module_flags "PARALLEL")
 endif()
@@ -116,12 +128,15 @@ if(USE_PERCIPITATION)
   list(APPEND module_flags "PERCIPITATION")
 endif()
 
+# Exporting to parent
 set(module_flags
     ${module_flags}
     PARENT_SCOPE)
+
+# Example of inter-dependences
+
 # include(CMakeDependentOption)
 
-# cmake_dependent_option( USE_FOO "Use Foo" ON "USE_A AND (USE_B OR USE_C)" OFF
-# )
+# cmake_dependent_option(USE_FOO "Use Foo" ON "USE_A AND (USE_B OR USE_C)" OFF)
 
 # mark_as_advanced(MY_VAR)
