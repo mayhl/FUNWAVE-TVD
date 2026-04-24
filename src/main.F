@@ -271,6 +271,10 @@ Program FUNWAVE_TVD
 #    endif
 # endif
 
+      sta_buff = stations_type(RESULT_FOLDER, STATIONS_FILE, NumberStations, &
+                            StationOutputBuffer, STATIONS_BINARY_IO, &
+                            Ibeg, Iend, iista, Jbeg, Jend, jjsta, Nghost)
+
 ! time integration
 
      ! record wall time
@@ -534,14 +538,21 @@ Program FUNWAVE_TVD
   
    END DO
 
-   IF(NumberStations>0)THEN
-# if defined (SPHERICAL_IJ_STATION)
-       ! use IJ for coupling purpose
-       CALL STATIONS_SPHERICAL_IJ
-# else
-       CALL STATIONS
-# endif
-   ENDIF
+
+
+  call sta_buff % flush()
+  !IF(NumberStations>0)THEN
+      ! sta_buff = stations_type(RESULT_FOLDER, STATIONS_FILE, NumberStations, &
+      !                       StationOutputBuffer, STATIONS_BINARY_IO, &
+      !                       Ibeg, Iend, iista, Jbeg, Jend, jjsta, Nghost)
+
+! # if defined (SPHERICAL_IJ_STATION)
+!        ! use IJ for coupling purpose
+!        CALL STATIONS_SPHERICAL_IJ
+! # else
+!        CALL STATIONS
+! # endif
+   !ENDIF
 
 
 # if defined (COUPLING)

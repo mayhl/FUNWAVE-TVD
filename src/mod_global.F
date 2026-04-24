@@ -51,6 +51,7 @@
 ! --------------------------------------------------
 MODULE GLOBAL
        USE PARAM
+       use stations_mod, only : stations_type
        IMPLICIT NONE
        SAVE
 
@@ -76,6 +77,7 @@ MODULE GLOBAL
        INTEGER :: px,py
 
 ! station data
+       type(stations_type) :: sta_buff
        INTEGER :: NumberStations
        INTEGER,DIMENSION(:),ALLOCATABLE :: ista,jsta,nsta
        REAL(SP):: PLOT_INTV_STATION,PLOT_COUNT_STATION
