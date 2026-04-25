@@ -96,28 +96,43 @@ module yaml_file_mod
       procedure, public :: has_key
       procedure, public :: read_enum
       procedure, public :: read_input_path
-      procedure, public :: read_integer
-      procedure, public :: read_logical
-      procedure, public :: read_positive_integer
-      procedure, public :: read_positive_real
-      procedure, public :: read_real
       procedure, public :: read_time
-      procedure, public :: read_string
       procedure :: copy_node
       procedure :: parse_error_message
       procedure :: prep_msg
       procedure :: prep_msg_val
-      procedure :: read_integer_node
-      procedure :: read_logical_node
-      procedure :: read_real_node
-      procedure :: read_string_node
+
+      procedure, public :: read_integer
+      procedure, public :: read_integer_node
+      procedure, public :: read_positive_integer
+      procedure, public :: read_negative_integer
+      procedure, public :: read_nonnegative_integer
+      procedure, public :: read_nonpositive_integer
+
+      procedure, public :: read_real
+      procedure, public :: read_real_node
+      procedure, public :: read_positive_real
+      procedure, public :: read_negative_real
+      procedure, public :: read_nonnegative_real
+      procedure, public :: read_nonpositive_real
+
+      procedure, public :: read_logical
+      procedure, public :: read_logical_node
+
+      procedure, public :: read_string
+      procedure, public :: read_string_node
+
+      generic, public :: read => read_integer, read_real, read_logical, &
+                                 read_string, read_enum, read_input_path
+
+      generic, public :: read_positive => read_positive_integer, read_positive_real
+      generic, public :: read_negative => read_negative_integer, read_negative_real
+      generic, public :: read_nonnegative => read_nonnegative_integer, read_nonnegative_real
+      generic, public :: read_nonpositive => read_nonpositive_integer, read_nonpositive_real
 
    end type type_yaml_reader
 
 contains
-
-   subroutine _dummy()
-   end subroutine _dummy
 
    subroutine init(this, path_str, comm)
       !----------------------------------------------------------
@@ -275,122 +290,86 @@ contains
       this%comm => comm
    end subroutine copy_node
 
-   subroutine read_real_node(this, key, default, is_empty, &
-                             require_range, recommend_range, &
-                             val)
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
+#include "core/prep.inc"
 
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      character(*), optional, intent(in) :: require_range, recomend_range
-      real(SP), intent(out) :: val
-      logical, optional, intent(out) :: is_empty
-      type(type_real_range) :: rq_range, rd_range
+#define _NAME integer
+#define _CLASS integer
+#define _GET this%root%get_integer
+#define _BCAST(x) call this%comm%bcast_integer(x)
+#define _RANGE type_integer_range
+#define _HAS_RANGE 1
 
-      if (present(require_range)) then
-         call rq_range%parse(require_range)
-         if (.not. rq_range%is_valid()) then
-            call this%log%exit_on_fatal("")
-         end if
-      end if
+#define _READ                _PASTE(read_,_NAME)
+#define _READ_NODE           _PASTE(_READ,_node)
+#define _READ_POSITIVE       _PASTE(read_positive_,_NAME)
+#define _READ_NEGATIVE       _PASTE(read_negative_,_NAME)
+#define _READ_NONNEGATIVE    _PASTE(read_nonnegative_,_NAME)
+#define _READ_NONPOSITIVE       _PASTE(read_nonpositive_,_NAME)
 
-      if (present(recomend_range)) then
-         call rd_range%parse(recomend_range)
-         if (.not. rd_range%is_valid()) then
-            call this%log%exit_on_fatal("")
-         end if
-      end if
+#include "core/yaml_body.inc"
 
-      val = this%root%get_real(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default, is_empty)
+#undef _READ
+#undef _READ_NODE
+#undef _READ_POSITIVE
+#undef _READ_NEGATIVE
+#undef _READ_NONNEGATIVE
+#undef _READ_NONPOSITIVE
 
-      ! Parsing default value string
-      if (is_default) then
-         val = this%root%get_real(key, error=io_err)
-         ! Safety check
-         if (allocated(io_err)) then
-            call this%log%exit_on_fatal("Default value for "//io_err%message)
-         end if
-      end if
+#define _NAME real
+#define _CLASS real(SP)
+#define _GET this%root%get_real
+#define _BCAST(x) call this%comm%bcast_real(x)
+#define _RANGE type_real_range
+#define _HAS_RANGE 1
 
-   end subroutine read_real_node
+#define _READ                _PASTE(read_,_NAME)
+#define _READ_NODE           _PASTE(_READ,_node)
+#define _READ_POSITIVE       _PASTE(read_positive_,_NAME)
+#define _READ_NEGATIVE       _PASTE(read_negative_,_NAME)
+#define _READ_NONNEGATIVE    _PASTE(read_nonnegative_,_NAME)
+#define _READ_NONPOSITIVE       _PASTE(read_nonpositive_,_NAME)
 
-   subroutine read_real(this, key, default, is_empty, &
-                        require_range, recomend_range, val)
-      !----------------------------------------------------------
-      ! Wrapper method around read_real_node for single node
-      ! MPI I/O and broadcasting to other nodes
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      character(*), optional, intent(in) :: required_range, recomend_range
-      real(SP), intent(out) :: val
-      logical, optional, intent(out) :: is_empty
-      !type(type_real_range) :: rq_range, rd_range
+#include "core/yaml_body.inc"
 
-      if (this%comm%is_io_node()) then
+#undef _READ
+#undef _READ_NODE
+#undef _READ_POSITIVE
+#undef _READ_NEGATIVE
+#undef _READ_NONNEGATIVE
+#undef _READ_NONPOSITIVE
 
-         call this%read_real_node(key, default=default, &
-                                  is_empty=is_empty, &
-                                  required_range=required_range, &
-                                  recomend_range=recomend_range, &
-                                  val=val)
+#define _NAME logical
+#define _CLASS logical
+#define _GET this%root%get_logical
+#define _BCAST(x) call this%comm%bcast_logical(x)
 
-      end if
+#define _READ                _PASTE(read_,_NAME)
+#define _READ_NODE           _PASTE(_READ,_node)
 
-      call this%comm%bcast_real(val)
+#include "core/yaml_body.inc"
 
-   end subroutine read_real
+#undef _READ
+#undef _READ_NODE
 
-   subroutine read_positive_real(this, key, default, is_empty, include_zero, &
-                                 recommended_range, recommended_inclusive, val)
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      logical, optional, intent(in) :: include_zero
-      character(*), dimension(2), optional, intent(in) :: recommended_range
-      logical, dimension(2), optional, intent(in) :: recommended_inclusive
-      real(SP), intent(out) :: val
+#define _NAME string
+#define _CLASS character(:), allocatable
+#define _GET this%root%get_string
+#define _BCAST(x) call this%comm%bcast_string(x)
 
-      logical :: is_error, is_include_zero
-      character(len=:), allocatable :: message
-      character(1), parameter, dimension(2) :: range = ["0", " "]
-      logical, dimension(2) :: inclusive
+#define _READ                _PASTE(read_,_NAME)
+#define _READ_NODE           _PASTE(_READ,_node)
 
-      if (this%comm%is_io_node()) then
+#include "core/yaml_body.inc"
 
-         ! Note: 2nd boolean is a dummy value
-         if (present(include_zero)) then
-            inclusive = [include_zero, .true.]
-         else
-            inclusive = [.false., .true.]
-         end if
+#undef _READ
+#undef _READ_NODE
 
-         call this%read_real_node(key, default, is_empty, &
-                                  range, inclusive, &
-                                  recommended_range, recommended_inclusive, &
-                                  val)
-
-      end if
-
-      call this%comm%bcast_real(val)
-
-   end subroutine read_positive_real
-
-   subroutine read_time(this, key, default, is_empty, include_zero, &
-                        recommended_range, recommended_inclusive, val)
+   subroutine read_time(this, key, default, is_empty, val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: is_empty
-      logical, optional, intent(in) :: include_zero
-      character(*), dimension(2), optional, intent(in) :: recommended_range
-      logical, dimension(2), optional, intent(in) :: recommended_inclusive
       real(SP), intent(out) :: val
 
       !  logical :: is_dict
@@ -405,252 +384,25 @@ contains
          call child%read_enum("units", utypes, val=unit)
 
          call child%read_positive_real("value", default=default, &
-                                       is_empty=is_empty, include_zero=include_zero, &
-                                       recommended_range=recommended_range, &
-                                       recommended_inclusive=recommended_inclusive, val=val)
+                                       is_empty=is_empty, val=val)
 
          select case (unit)
          case ('min')
             val = val*60_SP
          case ('hour')
             val = val*3600_SP
-         case ('hert')
+         case ('hertz')
             val = 1.0_SP/val
          end select
 
-         deallocate (unit)
+         if (allocated(unit)) deallocate (unit)
       else
          call this%read_positive_real(key, default=default, &
-                                      is_empty=is_empty, include_zero=include_zero, &
-                                      recommended_range=recommended_range, &
-                                      recommended_inclusive=recommended_inclusive, val=val)
+                                      is_empty=is_empty, val=val)
 
       end if
 
    end subroutine read_time
-
-   subroutine read_integer_node(this, key, default, is_empty, &
-                                range, inclusive, &
-                                recommended_range, recommended_inclusive, &
-                                val)
-      !----------------------------------------------------------
-      ! Read key from from root node and parse as integer
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      character(*), dimension(2), optional, intent(in) :: range, recommended_range
-      logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
-      integer, intent(out) :: val
-
-      type(type_range_integer) :: req_range, rec_range
-      type(type_error), allocatable :: io_err
-      logical :: is_default
-      logical, dimension(2) :: is_err_exit
-
-      val = this%root%get_integer(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default, is_empty)
-
-      ! Parsing default value string
-      if (is_default) then
-
-         val = this%root%get_integer(key, error=io_err)
-
-         ! Safety check
-         if (allocated(io_err)) then
-            call this%log%exit_on_fatal("Default value for "//io_err%message, 1)
-         end if
-      end if
-
-      is_err_exit(1) = req_range%initialize( &
-                       this, &
-                       key, &
-                       is_recommended=.false., &
-                       range=range, &
-                       inclusive=inclusive)
-
-      is_err_exit(2) = rec_range%initialize( &
-                       this, &
-                       key, &
-                       is_recommended=.true., &
-                       range=recommended_range, &
-                       inclusive=recommended_inclusive)
-
-      if (is_err_exit(1)) return
-      call req_range%parse(val)
-      if (is_err_exit(2)) return
-      call rec_range%parse(val)
-
-      call req_range%intersects(rec_range)
-
-   end subroutine read_integer_node
-
-   subroutine read_integer(this, key, default, is_empty, &
-                           range, inclusive, &
-                           recommended_range, recommended_inclusive, &
-                           val)
-      !----------------------------------------------------------
-      !
-      ! Wrapper subroutine around read_real_node for single node
-      ! MPI I/O and broadcasting to other nodes
-      !
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      character(*), dimension(2), optional, intent(in) :: range, recommended_range
-      logical, dimension(2), optional, intent(in) :: inclusive, recommended_inclusive
-      integer, intent(out) :: val
-
-      if (this%comm%is_io_node()) then
-         call this%read_integer_node(key, default, is_empty, &
-                                     range, inclusive, &
-                                     recommended_range, recommended_inclusive, &
-                                     val)
-      end if
-
-      call this%comm%bcast_integer(val)
-
-   end subroutine read_integer
-
-   subroutine read_positive_integer(this, key, default, is_empty, include_zero, &
-                                    recommended_range, recommended_inclusive, val)
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      logical, optional, intent(in) :: include_zero
-      character(*), dimension(2), optional, intent(in) :: recommended_range
-      logical, dimension(2), optional, intent(in) :: recommended_inclusive
-      integer, intent(out) :: val
-      logical :: is_error, is_include_zero
-
-      character(1), parameter, dimension(2) :: range = ["0", " "]
-      logical, dimension(2) :: inclusive
-
-      if (this%comm%is_io_node()) then
-
-         ! Note: 2nd boolean is a dummy value
-         if (present(include_zero)) then
-            inclusive = [include_zero, .true.]
-         else
-            inclusive = [.false., .true.]
-         end if
-
-         call this%read_integer_node(key, default, is_empty, &
-                                     range, inclusive, &
-                                     recommended_range, recommended_inclusive, &
-                                     val)
-
-      end if
-
-      call this%comm%bcast_integer(val)
-
-   end subroutine read_positive_integer
-
-   subroutine read_logical_node(this, key, default, is_empty, val)
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      logical, intent(out) :: val
-
-      type(type_error), allocatable :: io_err
-      logical :: is_default
-
-      val = this%root%get_logical(key, error=io_err)
-      is_default = this%parse_error_message(key, io_err, default, is_empty)
-
-      ! Parsing default value string
-      if (is_default) then
-         val = this%root%get_logical(key, error=io_err)
-
-         ! Safety check
-         if (allocated(io_err)) then
-            call this%log%exit_on_fatal("Default value for /"//key//io_err%message, 1)
-         end if
-      end if
-
-   end subroutine read_logical_node
-
-   subroutine read_logical(this, key, default, is_empty, val)
-      !----------------------------------------------------------
-      !
-      ! Wrapper subroutine around read_real_node for single node
-      ! MPI I/O and broadcasting to other nodes
-      !
-      !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      logical, intent(out) :: val
-
-      if (this%comm%is_io_node()) then
-         call this%read_logical_node(key, default, is_empty, val)
-      end if
-
-      call this%comm%bcast_logical(val)
-
-   end subroutine read_logical
-
-   subroutine read_string_node(this, key, default, is_empty, val)
-      !----------------------------------------------------------
-      ! Read key from from root node and parse as integer
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      character(:), allocatable, intent(inout) :: val
-      !character(:), allocatable:: val
-
-      class(type_node), pointer :: node
-      type(type_error), allocatable :: io_err
-      logical :: is_default
-
-      node => this%root%get(key)
-
-      ! NOTE: get_string does not trigger no key error
-      if (associated(node)) then
-         val = trim(this%root%get_string(key, error=io_err))
-      else
-         allocate (io_err)
-         io_err%message = trim(this%path)//' does not contain key "'//trim(key)//'".'
-      end if
-
-      is_default = this%parse_error_message(key, io_err, default, is_empty)
-
-      ! Parsing default value string
-      if (is_default) then
-         !val_buff = TRIM(default)
-         val = trim(this%root%get_string(key, error=io_err))
-         ! Safety check
-         if (allocated(io_err)) then
-            call this%log%exit_on_fatal("Default value for "//io_err%message, 1)
-         end if
-      end if
-
-   end subroutine read_string_node
-
-   subroutine read_string(this, key, default, is_empty, val)
-      !----------------------------------------------------------
-      ! Read key from from root node and parse as integer
-      class(type_yaml_reader), intent(inout) :: this
-      character(*), intent(in) :: key
-      character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
-      character(:), allocatable, intent(inout) :: val
-
-      if (this%comm%is_io_node()) then
-         call this%read_string_node(key, default=default, is_empty=is_empty, val=val)
-         val = trim(val)
-      end if
-
-      call this%comm%bcast_string(val)
-   end subroutine read_string
 
    subroutine read_enum(this, key, values, default, is_empty, val)
       !----------------------------------------------------------

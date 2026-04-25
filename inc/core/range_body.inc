@@ -1,14 +1,15 @@
 #include "prep.inc"
 
-#define _IN_RANGE      _PASTE(_RANGE, _in_range)
-#define _CAST_RANGE    _PASTE(_RANGE, _cast_range)
+#define _IN_RANGE      _PASTE(_RANGE,_in_range)
+#define _CAST_RANGE    _PASTE(_RANGE,_cast_range)
 
-#define _GET_UPPER     _PASTE(_RANGE, _get_upper)
-#define _GET_LOWER     _PASTE(_RANGE, _get_lower)
-#define _IS_VALID      _PASTE(_RANGE, _is_valid)
-#define _IS_INC_LOW    _PASTE(_RANGE, _is_inc_low)
-#define _IS_INC_UP     _PASTE(_RANGE, _is_inc_upp)
-#define _RANGE_PARSE   _PASTE(_RANGE, _range_parse)
+#define _GET_UPPER     _PASTE(_RANGE,_get_upper)
+#define _GET_LOWER     _PASTE(_RANGE,_get_lower)
+#define _IS_VALID      _PASTE(_RANGE,_is_valid)
+#define _IS_INC_LOW    _PASTE(_RANGE,_is_inc_low)
+#define _IS_INC_UPP    _PASTE(_RANGE,_is_inc_upp)
+#define _RANGE_PARSE   _PASTE(_RANGE,_range_parse)
+#define _INIT          _PASTE(_RANGE,_init)
 
    function _GET_UPPER(this) result(val)
       class(_RANGE), intent(inout) :: this
@@ -81,8 +82,8 @@
       this%lower_str = trim(adjustl(this%lower_str(2:count)))
 
       if (len_trim(this%lower_str) == 0) then
-         this%p_is_valid = .false.
-         return
+         ! this%p_is_valid = .false.
+         ! return
       end if
 
       select case (ubound)
@@ -99,8 +100,8 @@
       this%upper_str = trim(adjustl(this%upper_str(1:count - 1)))
 
       if (len_trim(this%upper_str) == 0) then
-         this%p_is_valid = .false.
-         return
+         ! this%p_is_valid = .false.
+         ! return
       end if
 
       this%p_is_valid = .true.
@@ -112,8 +113,32 @@
       class(_RANGE), intent(inout) :: this
       logical:: val
       type(_CLASS), intent(in) :: x
-      val = .true.
-      this%lower = x
+      logical :: lower_ok, upper_ok
+
+      if (.not. this%p_is_valid) then
+         val = .false.
+         return
+      end if
+
+      lower_ok = .true.
+      if (len_trim(this%lower_str) > 0) then
+         if (this%p_is_inc_low) then
+            lower_ok = (x >= this%lower)
+         else
+            lower_ok = (x > this%lower)
+         end if
+      end if
+
+      upper_ok = .true.
+      if (len_trim(this%upper_str) > 0) then
+         if (this%p_is_inc_upp) then
+            upper_ok = (x <= this%upper)
+         else
+            upper_ok = (x < this%upper)
+         end if
+      end if
+
+      val = lower_ok .and. upper_ok
 
    end function _IN_RANGE
 
@@ -123,24 +148,38 @@
 
       if (.not. this%p_is_valid) return
 
-      read (this%lower_str, _FMT, iostat=stat) this%lower
-      if (stat /= 0) then
-         this%p_is_valid = .false.
-         return
+      if (len_trim(this%lower_str) > 0) then
+         read (this%lower_str, _FMT, iostat=stat) this%lower
+         if (stat /= 0) then
+            this%p_is_valid = .false.
+            return
+         end if
       end if
 
-      read (this%upper_str, _FMT, iostat=stat) this%upper
-      if (stat /= 0) then
-         this%p_is_valid = .false.
-         return
+      if (len_trim(this%upper_str) > 0) then
+         read (this%upper_str, _FMT, iostat=stat) this%upper
+         if (stat /= 0) then
+            this%p_is_valid = .false.
+            return
+         end if
       end if
 
-      if (this%lower >= this%upper) then
-         this%p_is_valid = .false.
-         return
+      if (len_trim(this%lower_str) > 0 .and. len_trim(this%upper_str) > 0) then
+         if (this%lower >= this%upper) then
+            this%p_is_valid = .false.
+            return
+         end if
       end if
 
    end subroutine _CAST_RANGE
+
+   subroutine _INIT(this)
+      class(_RANGE), intent(inout) :: this
+      this%is_set = .false.
+      this%p_is_valid = .false.
+      this%lower_str = ""
+      this%upper_str = ""
+   end subroutine _INIT
 
 #undef _RANGE
 #undef _CLASS

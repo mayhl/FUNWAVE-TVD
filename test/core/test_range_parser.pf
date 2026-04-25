@@ -22,15 +22,15 @@ contains
 
       str = "[,]"
       call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      @assertEqual(.true., range%is_valid())
 
       str = "[,1]"
       call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      @assertEqual(.true., range%is_valid())
 
       str = "[3,]"
       call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      @assertEqual(.true., range%is_valid())
 
       str = "[2,3]"
       call range%parse(str)
@@ -74,15 +74,15 @@ contains
 
       str = "[,]"
       call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      @assertEqual(.true., range%is_valid())
 
       str = "[,12.2]"
       call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      @assertEqual(.true., range%is_valid())
 
       str = "[3.2,]"
       call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      @assertEqual(.true., range%is_valid())
 
       str = "[1.2,3.33]"
       call range%parse(str)
@@ -109,5 +109,60 @@ contains
       @assertEqual(.false., range%is_valid())
 
    end subroutine test_real_range_parser
+
+   @test
+   subroutine test_range_in_range()
+      type(type_integer_range) :: irange
+      type(type_real_range) :: rrange
+
+      ! Integer range [2, 5)
+      call irange%parse("[2, 5)")
+      @assertTrue(irange%is_valid())
+      @assertFalse(irange%in_range(1))
+      @assertTrue(irange%in_range(2))
+      @assertTrue(irange%in_range(3))
+      @assertTrue(irange%in_range(4))
+      @assertFalse(irange%in_range(5))
+
+      ! Integer range (2, 5]
+      call irange%parse("(2, 5]")
+      @assertTrue(irange%is_valid())
+      @assertFalse(irange%in_range(2))
+      @assertTrue(irange%in_range(3))
+      @assertTrue(irange%in_range(5))
+      @assertFalse(irange%in_range(6))
+
+      ! Real range [1.0, 2.0]
+      call rrange%parse("[1.0, 2.0]")
+      @assertTrue(rrange%is_valid())
+      @assertFalse(rrange%in_range(0.9_SP))
+      @assertTrue(rrange%in_range(1.0_SP))
+      @assertTrue(rrange%in_range(1.5_SP))
+      @assertTrue(rrange%in_range(2.0_SP))
+      @assertFalse(rrange%in_range(2.1_SP))
+
+      ! Real range (1.0, 2.0)
+      call rrange%parse("(1.0, 2.0)")
+      @assertTrue(rrange%is_valid())
+      @assertFalse(rrange%in_range(1.0_SP))
+      @assertTrue(rrange%in_range(1.1_SP))
+      @assertTrue(rrange%in_range(1.9_SP))
+      @assertFalse(rrange%in_range(2.0_SP))
+
+      ! Open-ended range [0, )
+      call irange%parse("[0, )")
+      @assertTrue(irange%is_valid())
+      @assertFalse(irange%in_range(-1))
+      @assertTrue(irange%in_range(0))
+      @assertTrue(irange%in_range(1000))
+
+      ! Open-ended range ( , 0]
+      call rrange%parse("( , 0.0]")
+      @assertTrue(rrange%is_valid())
+      @assertTrue(rrange%in_range(-100.0_SP))
+      @assertTrue(rrange%in_range(0.0_SP))
+      @assertFalse(rrange%in_range(0.0001_SP))
+
+   end subroutine test_range_in_range
 
 end module test_range_parser

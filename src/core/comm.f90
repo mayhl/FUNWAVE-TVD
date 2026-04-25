@@ -86,11 +86,16 @@ contains
       integer :: ierr
       ! TODO: Add error checking
       !
+      logical :: is_mpi_initialized
+
       if (present(comm_id)) then
          this%id = comm_id
       else
          this%id = MPI_COMM_WORLD
-         call MPI_Init(ierr)
+         call MPI_Initialized(is_mpi_initialized, ierr)
+         if (.not. is_mpi_initialized) then
+            call MPI_Init(ierr)
+         end if
       end if
       call MPI_Comm_rank(this%id, this%rank_id, ierr)
       call MPI_Comm_size(this%id, this%size, ierr)

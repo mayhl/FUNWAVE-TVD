@@ -1,0 +1,538 @@
+
+! TODO: Add dict tests
+
+! allow(E001)
+module test_yaml_input_serial
+
+   use pFUnit
+
+   use constants_mod, only: SP, MESSAGE_SIZE
+   use yaml_file_mod, only: type_yaml_reader, type_path
+   use log_io_mod, only: type_log_writer, initialize_logger
+   use comm_mod, only: type_comm
+   use misc_mod, only: str2int
+   use iso_fortran_env, only: error_unit
+   !use filesystem, only: path_t
+
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+      ! Dummy function to fix linter, seems to reset @ errors
+   end subroutine dummy_fix_lint
+
+   subroutine open_yaml(reader, comm)
+
+      type(type_yaml_reader), intent(inout) :: reader
+      type(type_comm), intent(inout) :: comm
+      character(:), allocatable :: yaml_path
+      character(:), allocatable :: log_path
+
+      log_path = "./new.log"
+      yaml_path = "test.yaml"
+
+      call initialize_logger(log_path, 0, 0, 100)
+
+      call comm%init(io_rank_id=0)
+      call reader%init(yaml_path, comm)
+
+   end subroutine open_yaml
+
+   @test
+   subroutine test_integer()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(reader, comm)
+
+      val = 10
+      call reader%read('integer', val=val)
+      @assertEqual(1, val)
+
+      val = 1
+      call reader%read('dummy_int', default="10", val=val)
+      @assertEqual(10, val)
+
+      ! TODO: Fix error
+      val = 1
+      call reader%read('dummy_real', default="10.5", val=val)
+      @assertExceptionRaised('Default value for /dummy_real is set to "10.5", which cannot be interpreted as an integer.')
+
+      val = 1
+      call reader%read('real', val=val)
+      @assertExceptionRaised('/real is set to "0.1", which cannot be interpreted as an integer.')
+
+      val = 1
+      call reader%read('string1', val=val)
+      @assertExceptionRaised('/string1 is set to "test string 1", which cannot be interpreted as an integer.')
+
+      call dummy_fix_lint()
+   end subroutine test_integer
+
+   @test
+   subroutine test_range_integer()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read('integer', &
+                               required_range="[0, 1)", &
+                               val=val)
+
+      @assertExceptionRaised('/integer is set to "1", which is out of the required range: [0, 1)')
+
+      call reader%read('integer', &
+                               required_range="[0, 1]", &
+                               val=val)
+      @assertEqual(1, val)
+
+      call reader%read('integer', &
+                               required_range="[0, 1]", &
+                               recommend_range="[0, 1)", &
+                               val=val)
+      @assertEqual(1, val)
+      ! Note: Warning is logged but doesn't raise exception in pFUnit unless we check logs
+
+      call reader%read('integer', &
+                               required_range="[0, 2]", &
+                               val=val)
+      @assertEqual(1, val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_range_integer
+
+   @test
+   subroutine test_positive_integer()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_positive('positive_integer', val=val)
+      @assertEqual(5, val)
+
+      call reader%read_positive('negative_integer', val=val)
+      @assertExceptionRaised('/negative_integer is set to "-3", which must be positive.')
+
+      call reader%read_positive('zero_integer', val=val)
+      @assertExceptionRaised('/zero_integer is set to "0", which must be positive.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_positive_integer
+
+   @test
+   subroutine test_negative_integer()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_negative('negative_integer', val=val)
+      @assertEqual(-3, val)
+
+      call reader%read_negative('positive_integer', val=val)
+      @assertExceptionRaised('/positive_integer is set to "5", which must be negative.')
+
+      call reader%read_negative('zero_integer', val=val)
+      @assertExceptionRaised('/zero_integer is set to "0", which must be negative.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_negative_integer
+
+   @test
+   subroutine test_nonnegative_integer()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_nonnegative('positive_integer', val=val)
+      @assertEqual(5, val)
+
+      call reader%read_nonnegative('zero_integer', val=val)
+      @assertEqual(0, val)
+
+      call reader%read_nonnegative('negative_integer', val=val)
+      @assertExceptionRaised('/negative_integer is set to "-3", which must be non-negative.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_nonnegative_integer
+
+   @test
+   subroutine test_nonpositive_integer()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_nonpositive('negative_integer', val=val)
+      @assertEqual(-3, val)
+
+      call reader%read_nonpositive('zero_integer', val=val)
+      @assertEqual(0, val)
+
+      call reader%read_nonpositive('positive_integer', val=val)
+      @assertExceptionRaised('/positive_integer is set to "5", which must be non-positive.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_nonpositive_integer
+
+   @test
+   subroutine test_real()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      val = 10.0_SP
+      call reader%read('integer', val=val)
+      @assertEqual(1.0_SP, val)
+
+      val = 10.0_SP
+      call reader%read('real', val=val)
+      @assertEqual(0.1_sp, val)
+
+      val = 1.0_SP
+      call reader%read('dummy_int', default="10", val=val)
+      @assertEqual(10.0_SP, val)
+
+      val = 1.0_SP
+      call reader%read('dummy_real', default="10.5", val=val)
+      @assertEqual(10.5_sp, val)
+
+      val = 1.0_SP
+      call reader%read('string1', val=val)
+      @assertExceptionRaised('/string1 is set to "test string 1", which cannot be interpreted as a real number.')
+
+      call dummy_fix_lint()
+   end subroutine test_real
+
+   @test
+   subroutine test_range_real()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read('real', &
+                            required_range="[0, 0.1)", &
+                            val=val)
+
+      @assertExceptionRaised('/real is set to "0.1", which is out of the required range: [0, 0.1)')
+
+      call reader%read('real', &
+                            required_range="[0, 0.1]", &
+                            val=val)
+      @assertEqual(0.1_sp, val)
+
+      call reader%read('real', &
+                            required_range="[0, 0.1]", &
+                            recommend_range="[0, 0.1)", &
+                            val=val)
+      @assertEqual(0.1_sp, val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_range_real
+
+   @test
+   subroutine test_positive_real()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_positive('positive_real', val=val)
+      @assertEqual(0.5, val)
+
+      call reader%read_positive('negative_real', val=val)
+      @assertExceptionRaised('/negative_real is set to "-0.3", which must be positive.')
+
+      call reader%read_positive('zero_real', val=val)
+      @assertExceptionRaised('/zero_real is set to "0.0", which must be positive.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_positive_real
+
+   @test
+   subroutine test_negative_real()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_negative('negative_real', val=val)
+      @assertEqual(-0.3_SP, val)
+
+      call reader%read_negative('positive_real', val=val)
+      @assertExceptionRaised('/positive_real is set to "0.5", which must be negative.')
+
+      call reader%read_negative('zero_real', val=val)
+      @assertExceptionRaised('/zero_real is set to "0.0", which must be negative.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_negative_real
+
+   @test
+   subroutine test_nonnegative_real()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_nonnegative('positive_real', val=val)
+      @assertEqual(0.5_SP, val)
+
+      call reader%read_nonnegative('zero_real', val=val)
+      @assertEqual(0.0_SP, val)
+
+      call reader%read_nonnegative('negative_real', val=val)
+      @assertExceptionRaised('/negative_real is set to "-0.3", which must be non-negative.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_nonnegative_real
+
+   @test
+   subroutine test_nonpositive_real()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_nonpositive('negative_real', val=val)
+      @assertEqual(-0.3_SP, val)
+
+      call reader%read_nonpositive('zero_real', val=val)
+      @assertEqual(0.0_SP, val)
+
+      call reader%read_nonpositive('positive_real', val=val)
+      @assertExceptionRaised('/positive_real is set to "0.5", which must be non-positive.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_nonpositive_real
+
+   @test
+   subroutine test_time()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read_time('time_simple', val=val)
+      @assertEqual(100.0_SP, val)
+      !
+      call reader%read_time('time_mins', val=val)
+      @assertEqual(60.0_SP, val)
+
+      call reader%read_time('time_hrs', val=val)
+      @assertEqual(3600.0_SP, val)
+
+      call reader%read_time('time_hertz', val=val)
+      @assertEqual(0.1_SP, val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_time
+
+   @test
+   subroutine test_logical()
+
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      logical :: val
+
+      call open_yaml(reader, comm)
+
+      call reader%read('logical_true', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_True', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_TRUE', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_on', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_On', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_ON', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_y', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_Y', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_yes', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_Yes', val=val)
+      @assertEqual(.true., val)
+
+      call reader%read('logical_YES', val=val)
+      @assertEqual(.true., val)
+
+      ! False Tests
+      call reader%read('logical_false', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_False', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_False', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_off', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_Off', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_OFF', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_n', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_N', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_no', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_No', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_NO', val=val)
+      @assertEqual(.false., val)
+
+      call reader%read('logical_t', val=val)
+      @assertExceptionRaised('/logical_t is set to "t", which cannot be interpreted as a Boolean value.')
+
+      call reader%read('logical_T', val=val)
+      @assertExceptionRaised('/logical_T is set to "T", which cannot be interpreted as a Boolean value.')
+
+      call reader%read('logical_f', val=val)
+      @assertExceptionRaised('/logical_f is set to "f", which cannot be interpreted as a Boolean value.')
+
+      call reader%read('logical_F', val=val)
+      @assertExceptionRaised('/logical_F is set to "F", which cannot be interpreted as a Boolean value.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_logical
+
+   @test
+   subroutine test_string()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), ALLOCATABLE :: val, val2
+
+      call open_yaml(reader, comm)
+
+      call reader%read('string1', val=val)
+      @assertEqual('test string 1', val)
+
+      call reader%read('dummy_string', default="dummy string", val=val)
+      @assertEqual('dummy string', val)
+
+      call reader%read('string2', val=val)
+      @assertEqual('test string 2', val)
+
+      call dummy_fix_lint()
+
+   end subroutine test_string
+
+   @test
+   subroutine test_enum()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: val
+      character(len=6), dimension(3) :: words
+
+      data words/'item1', 'item2', 'item3'/
+      call open_yaml(reader, comm)
+
+      call reader%read('enum1', words, val=val)
+      @assertEqual('item1', val)
+
+      call reader%read('dummy_enum', words, default='item3', val=val)
+      @assertEqual('item3', val)
+
+      call reader%read('enum2', words, val=val)
+      @assertEqual('item2', val)
+
+      call reader%read('enum_error', words, val=val)
+      @assertExceptionRaised('/enum_error is set to "item5", which is not in the allowable list of values. Valid values: item1, item2, & item3.')
+
+      call dummy_fix_lint()
+
+   end subroutine test_enum
+
+   @test
+   subroutine test_path()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: test !, file_path
+      type(type_path):: file_path, val
+      integer :: unit, iostat
+      call open_yaml(reader, comm)
+
+      call reader%read('invalid_file_path', val=val)
+      @assertExceptionRaised('/invalid_file_path is set to "invalid_file_path.txt", which is not a valid file path.')
+
+      file_path = type_path('valid_file_path.txt')
+      call file_path%touch()
+      call reader%read('valid_file_path', val=val)
+      @assertEqual(file_path%path(), val%path())
+      call file_path%remove()
+
+      call dummy_fix_lint()
+
+   end subroutine test_path
+end module test_yaml_input_serial

@@ -1,0 +1,107 @@
+
+! allow(E001)
+module test_yaml_input_parallel
+
+   use mpi_f08
+   use pFUnit
+
+   use constants_mod, only: SP, MESSAGE_SIZE
+   use yaml_file_mod, only: type_yaml_reader, type_path
+   use log_io_mod, only: type_log_writer, initialize_logger
+   use comm_mod, only: type_comm
+   use misc_mod, only: str2int
+   use iso_fortran_env, only: error_unit
+
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+      ! Dummy function to fix linter, seems to reset @ errors
+   end subroutine dummy_fix_lint
+
+   subroutine open_yaml(this, reader, comm)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader), intent(inout) :: reader
+      type(type_comm), intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+      character(:), allocatable :: yaml_path
+      character(:), allocatable :: log_path
+
+      log_path = "./parallel.log"
+      yaml_path = "test.yaml"
+
+      call initialize_logger(log_path, 0, 0, 100)
+
+      mcomm = this%getMpiCommunicator()
+      call comm%init(io_rank_id=0, comm_id=mcomm)
+      call reader%init(yaml_path, comm)
+
+   end subroutine open_yaml
+
+   @test(npes=[2])
+   subroutine test_integer_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_integer('integer', val=val)
+      @assertEqual(1, val)
+
+      call dummy_fix_lint()
+   end subroutine test_integer_broadcast
+
+   @test(npes=[2])
+   subroutine test_real_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_real('real', val=val)
+      @assertEqual(0.1_sp, val)
+
+      call dummy_fix_lint()
+   end subroutine test_real_broadcast
+
+   @test(npes=[2])
+   subroutine test_logical_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      logical :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_logical('logical_true', val=val)
+      @assertEqual(.true., val)
+
+      call dummy_fix_lint()
+   end subroutine test_logical_broadcast
+
+   @test(npes=[2])
+   subroutine test_string_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_string('string1', val=val)
+      @assertEqual('test string 1', val)
+
+      call dummy_fix_lint()
+   end subroutine test_string_broadcast
+
+end module test_yaml_input_parallel
