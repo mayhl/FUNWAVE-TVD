@@ -1,5 +1,7 @@
 # Compiled source #
 ###################
+build/*
+
 *.o
 *.f90
 *.mod

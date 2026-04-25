@@ -8,14 +8,13 @@ project(
   VERSION 3.4
   DESCRIPTION "FUNWAVE-TVD"
   LANGUAGES Fortran)
-enable_language(Fortran)
 
 set(project_name funwave)
 set(main_lib lib${project_name})
 set(exe_name ${project_name})
 set(all_targets ${main_lib} ${exe_name})
-
 set(module_flags "")
+
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
@@ -23,6 +22,8 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 include(intro_banner)
 
 add_subdirectory(cmake)
+# Note: Fortran comes after cmake for MacOS override
+enable_language(Fortran)
 
 if(USE_MPI)
   find_package(MPI REQUIRED COMPONENTS Fortran)
