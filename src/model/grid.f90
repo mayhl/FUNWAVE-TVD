@@ -17,6 +17,7 @@ module model_grid_mod
    use core_comm_mod, only: type_comm
    use core_yaml_file_mod, only: type_yaml_reader, type_path
    use core_log_io_mod, only: type_log_writer
+   use core_env_mod, only: type_env
    use model_interface_mod, only: type_model_interface
 
    implicit none(external)
@@ -55,12 +56,10 @@ contains
 
    end subroutine finalize
 
-   subroutine read_input(this, comm, yaml, log)
+   subroutine read_input(this, env)
 
       class(type_model_grid), intent(inout) :: this
-      class(type_comm), intent(inout) :: comm
-      type(type_yaml_reader), intent(inout), target :: yaml
-      type(type_log_writer), intent(inout), target :: log
+      type(type_env), intent(inout), target :: env
 
       integer :: err
       integer(MPI_ADDRESS_KIND) ::address
@@ -69,27 +68,29 @@ contains
 
       character(:), allocatable :: msg, submsg
 
-      call yaml%cast_dictionary('grid', this%yaml)
-      call this%yaml%comm%barrier()
-      this%log => log
+      this%yaml = env%yaml
+      this%log => env%log
+      this%is_activated = .true.
 
-      call this%yaml%read_enum('type', gtypes, val=this%gtype, default='file')
+      call env%yaml%cast_dictionary('grid', this%yaml)
+      call env%comm%barrier()
+      call this%yaml%read('type', gtypes, val=this%gtype, default='file')
       !this%gtype = 'slope'
       call this%yaml%comm%barrier()
       select case (this%gtype)
 
       case ('file')
-         call this%yaml%read_enum('file type', ftypes, val=this%ftype, default='ascii')
-         call this%yaml%read_input_path('file path', val=this%fpath)
-         call this%yaml%read_logical('slope correction', val=this%apply_correction, default='NO')
+         call this%yaml%read('file type', ftypes, val=this%ftype, default='ascii')
+         call this%yaml%read('file path', val=this%fpath)
+         call this%yaml%read('slope correction', val=this%apply_correction, default='NO')
 
       case ('flat')
-         call this%yaml%read_positive_real('flat depth', val=this%depth_flat)
+         call this%yaml%read_positive('flat depth', val=this%depth_flat)
 
       case ('slope')
-         call this%yaml%read_positive_real('flat depth', val=this%depth_flat)
-         call this%yaml%read_real('slope x0', val=this%slope_x0)
-         call this%yaml%read_real('slope m', val=this%slope_m)
+         call this%yaml%read_positive('flat depth', val=this%depth_flat)
+         call this%yaml%read('slope x0', val=this%slope_x0)
+         call this%yaml%read('slope m', val=this%slope_m)
 
       end select
 
@@ -98,11 +99,11 @@ contains
       ! TODO:
       ! ! Stretched & spherical grid
       !
-      call this%yaml%read_positive_integer('nx', val=this%nx)
-      call this%yaml%read_positive_integer('ny', val=this%ny)
+      call this%yaml%read_positive('nx', val=this%nx)
+      call this%yaml%read_positive('ny', val=this%ny)
 
-      call this%yaml%read_positive_integer('x_proc', val=this%nx_proc, is_empty=is_px_empty)
-      call this%yaml%read_positive_integer('y_proc', val=this%ny_proc, is_empty=is_py_empty)
+      call this%yaml%read_positive('x_proc', val=this%nx_proc, is_empty=is_px_empty)
+      call this%yaml%read_positive('y_proc', val=this%ny_proc, is_empty=is_py_empty)
 
       call this%yaml%comm%barrier()
 
@@ -114,11 +115,11 @@ contains
             submsg = "grid/nx_proc"
          end if
          msg = "both grid/nx_proc and grid/ny_proc required, only "//submsg//" found."
-         call log%exit_on_error(msg)
+         call env%log%exit_on_error(msg)
       end if
 
-      !call comm%barrier()
-      !call comm%create_2d(this%nx_proc, this%ny_proc, this%nx, this%ny, is_p_empty)
+      !call env%comm%barrier()
+      !call env%comm%create_2d(this%nx_proc, this%ny_proc, this%nx, this%ny, is_p_empty)
 
       ! TODO: Add spherical compiler flags => dx float vs array + Coriolis?
       !       Generalization to curve-linear coordinates via array dx, dy?
@@ -129,7 +130,7 @@ contains
       call this%yaml%read_real('x0', val=this%x0, default='0.0')
       call this%yaml%read_real('y0', val=this%y0, default='0.0')
 
-      call comm%barrier()
+      call env%comm%barrier()
    end subroutine read_input
 
 end module model_grid_mod

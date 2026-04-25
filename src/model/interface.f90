@@ -15,13 +15,14 @@ module model_interface_mod
    use core_comm_mod, only: type_comm
    use core_yaml_file_mod, only: type_yaml_reader
    use core_log_io_mod, only: type_log_writer
+   use core_env_mod, only: type_env
 
    implicit none(external)
 
    type, abstract :: type_model_interface
 
-      type(type_yaml_reader):: yaml
-      type(type_log_writer), pointer :: log
+      type(type_yaml_reader) :: yaml
+      type(type_log_writer), pointer :: log => null()
       logical :: is_activated = .false.
 
    contains
@@ -31,16 +32,12 @@ module model_interface_mod
    end type
 
    interface
-      subroutine model_read_input(this, comm, yaml, log)
+      subroutine model_read_input(this, env)
          import :: type_model_interface
-         import :: type_comm
-         import :: type_yaml_reader
-         import :: type_log_writer
+         import :: type_env
          implicit none(external)
          class(type_model_interface), intent(inout) :: this
-         class(type_comm), intent(inout) :: comm
-         type(type_yaml_reader), intent(inout), target :: yaml
-         type(type_log_writer), intent(inout), target :: log
+         type(type_env), intent(inout), target :: env
       end subroutine model_read_input
    end interface
 contains

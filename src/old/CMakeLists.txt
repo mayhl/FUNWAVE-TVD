@@ -2,7 +2,7 @@
 # FUNWAVE Central Dependencies
 # ----------------------------
 #
-list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN" "INTEL")
+list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
 
 # add_compile_definitions(DEBUG ${_module_flags})
 
@@ -10,8 +10,7 @@ list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN" "INTEL")
 # ${_module_flags})
 
 target_compile_definitions(${main_lib} PRIVATE ${_module_flags})
-list(APPEND CMAKE_Fortran_FLAGS_DEBUG "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN"
-     "INTEL")
+list(APPEND CMAKE_Fortran_FLAGS_DEBUG "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
 target_sources(${main_lib} PRIVATE mod_param.F)
 target_sources(${main_lib} PRIVATE mod_global.F)
 target_sources(${main_lib} PRIVATE mod_input.F)

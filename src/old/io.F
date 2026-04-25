@@ -151,7 +151,7 @@ SUBROUTINE READ_INPUT
 # if defined(INTEL)
    USE IFPORT
 # endif
-   use yaml_file_mod, only: type_yaml_reader
+   use core_yaml_file_mod, only: type_yaml_reader
    use core_log_io_mod, only: type_log_writer
    use core_constants_mod, only: LABEL_SIZE
    use core_misc_mod, only: random2
@@ -220,11 +220,11 @@ SUBROUTINE READ_INPUT
    WRITE (3, *) '                                         '
 # endif
 
-   call model%read_input()
+   call model%init()
 
    stop
 
-   myid = model%comm%rank_id
+   myid = model%env%comm%rank_id
 
    PX = model%grid%nx_proc
    PY = model%grid%ny_proc

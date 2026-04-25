@@ -45,10 +45,9 @@ contains
 
       ! Read component inputs using environment resources
       call this%env%comm%barrier()
-      call this%grid%read_input(this%env%comm, this%env%yaml, this%env%log)
-      call this%time%read_input(this%env%comm, this%env%yaml, this%env%log)
-      call this%stations%read_input(this%env%comm, this%env%yaml, this%env%log)
-
+      call this%grid%read_input(this%env)
+      call this%time%read_input(this%env)
+      call this%stations%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 

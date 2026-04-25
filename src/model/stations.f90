@@ -15,6 +15,7 @@ module model_stations_mod
    use core_comm_mod, only: type_comm
    use core_yaml_file_mod, only: type_yaml_reader, type_path
    use core_log_io_mod, only: type_log_writer
+   use core_env_mod, only: type_env
    use model_interface_mod, only: type_model_interface
 
    implicit none(external)
@@ -37,19 +38,17 @@ module model_stations_mod
 
 contains
 
-   subroutine read_input(this, comm, yaml, log)
+   subroutine read_input(this, env)
 
       class(type_model_stations), intent(inout) :: this
-      class(type_comm), intent(inout) :: comm
-      type(type_yaml_reader), intent(inout), target :: yaml
-      type(type_log_writer), intent(inout), target :: log
+      type(type_env), intent(inout), target :: env
 
       character(:), allocatable :: msg, submsg
       logical:: is_empty
 
-      call yaml%cast_dictionary('stations', this%yaml, is_empty)
-      call this%yaml%comm%barrier()
-      this%log => log
+      call env%yaml%cast_dictionary('stations', this%yaml, is_empty)
+      call env%comm%barrier()
+      this%log => env%log
       this%is_activated = .not. is_empty
       if (is_empty) return
 

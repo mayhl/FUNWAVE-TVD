@@ -15,6 +15,7 @@ module model_time_mod
    use core_comm_mod, only: type_comm
    use core_yaml_file_mod, only: type_yaml_reader, type_path
    use core_log_io_mod, only: type_log_writer
+   use core_env_mod, only: type_env
    use model_interface_mod, only: type_model_interface
 
    implicit none(external)
@@ -37,26 +38,24 @@ module model_time_mod
 
 contains
 
-   subroutine read_input(this, comm, yaml, log)
+   subroutine read_input(this, env)
 
       class(type_model_time), intent(inout) :: this
-      class(type_comm), intent(inout) :: comm
-      type(type_yaml_reader), intent(inout), target :: yaml
-      type(type_log_writer), intent(inout), target :: log
+      type(type_env), intent(inout), target :: env
 
       character(:), allocatable :: msg, submsg
 
-      call yaml%cast_dictionary('time', this%yaml)
+      call env%yaml%cast_dictionary('time', this%yaml)
 
-      call this%yaml%comm%barrier()
+      call env%comm%barrier()
 
-      call this%yaml%read_time('total', val=this%total)
-      call this%yaml%read_time('start', default="0.0", val=this%start)
-      call this%yaml%read_time('plot', val=this%plot_dt)
-      call this%yaml%read_time('log', val=this%log_dt)
-      call this%yaml%read_positive_integer('start index', val=this%start_index)
+      call this%yaml%read('total', val=this%total)
+      call this%yaml%read('start', default="0.0", val=this%start)
+      call this%yaml%read('plot', val=this%plot_dt)
+      call this%yaml%read('log', val=this%log_dt)
+      call this%yaml%read_positive('start index', val=this%start_index)
 
-      this%log => log
+      this%log => env%log
 
    end subroutine read_input
 

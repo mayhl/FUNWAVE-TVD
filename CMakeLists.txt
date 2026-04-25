@@ -1,3 +1,4 @@
+set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 cmake_minimum_required(VERSION 3.22)
 
 # TODO::
@@ -23,11 +24,10 @@ project(
   VERSION 4.0.0
   DESCRIPTION "FUNWAVE-TVD"
   LANGUAGES Fortran C CXX)
-enable_language(Fortran)
 
 set(project_name funwave)
 set(main_lib ${project_name})
-# set(exe_name exe_${project_name})
+set(exe_name exe_${project_name})
 set(project_targets ${main_lib})
 set(ext_libs "")
 set(ext_targets "")
@@ -39,16 +39,18 @@ list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(intro_banner)
 
-option(ENABLE_TESTING "Enable testing for ${project_name}" ON)
-
 add_subdirectory(cmake)
+# file(DOWNLOAD Note: Fortran comes after cmake for MacOS override
+enable_language(Fortran)
 # file(DOWNLOAD
 # https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
 # ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake) include(cmake/CPM.cmake)
 
 find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
-# include(FetchContent) include(CTest)
+set(PFUNIT_DIR
+    "/Users/rdchlmyl/repos/pfUnit/build/installed/PFUNIT-4.16/cmake"
+    CACHE PATH "Path to PFUNIT")
 
 # Note: string point  to cmake/modules/Findxyz.cmake files
 message(STATUS "${CMAKE_MODULE_PATH}")
@@ -60,12 +62,6 @@ find_package("fortran-yaml-c" REQUIRED)
 set(all_targets ${project_targets} ${ext_targets})
 
 set(libraries_to_link)
-# if(NOT TARGET test-drive::test-drive AND ENABLE_TESTING)
-if(ENABLE_TESTING)
-  enable_testing()
-  # find_package("test-drive" REQUIRED)
-  find_package(PFUNIT REQUIRED)
-endif()
 
 add_library(${main_lib} STATIC)
 
@@ -74,26 +70,33 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(src)
 
-if(ENABLE_TESTING)
-  add_subdirectory(test)
+option(ENABLE_TESTING "Enable testing for ${project_name}" ON)
+option(ENABLE_REGRESSION_TESTING "Enable regression testing for ${project_name}" OFF)
+
+if(ENABLE_TESTING OR ENABLE_REGRESSION_TESTING)
+    enable_testing()
+    find_package(PFUNIT REQUIRED)
 endif()
+
+add_subdirectory(test)
 
 set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
                                              ${CMAKE_BINARY_DIR}/modules)
 
 target_link_libraries(flogging PRIVATE face)
 target_link_libraries(${main_lib} PRIVATE ${ext_libs})
-target_include_directories(${main_lib}
-                           PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>"
-                           PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc")
+target_include_directories(
+  ${main_lib}
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>"
+  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc")
 
-# add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
-# target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
+add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
+target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
 
-# target_link_libraries(${exe_name} PRIVATE ${main_lib})
+target_link_libraries(${exe_name} PRIVATE ${main_lib})
 
 # Intel needs linker_language Fortran else error "undefined reference to `main'"
-# set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
+set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
 
 foreach(tgt ${all_targets})
   message(STATUS "${tgt}")

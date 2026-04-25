@@ -3,8 +3,8 @@
 O_DPATH=../../funwave-work
 O_ENAME=funwave-central
 
-N_DPATH=../../build/
-N_ENAME=exe
+N_DPATH=.
+N_ENAME=exe_funwave
 
 OUT_DPATH=./outputs
 

@@ -10,7 +10,14 @@ endif()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
-# Compiler-specific configurations
+# Hack fix for MacOS MPI
+if(APPLE)
+  set(CMAKE_Fortran_COMPILER "mpif90" CACHE FILEPATH "MPI Fortran Compiler" FORCE)
+  set(CMAKE_C_COMPILER "mpicc" CACHE FILEPATH "MPI C Compiler" FORCE)
+  set(CMAKE_CXX_COMPILER "mpic++" CACHE FILEPATH "MPI C++ Compiler" FORCE)
+  message(STATUS "macOS detected: Forcing MPI compiler wrappers")
+endif()
+
 if(CMAKE_Fortran_COMPILER_ID MATCHES "^GNU$")
 
   # set(standard_compile_flags "-ffree-line-length-none -fbacktrace -free -stand
