@@ -15,19 +15,18 @@
 !          the module is updated corresponding to modifications in subroutines
 !-------------------------------------------------
 
-module constants_mod
+module core_constants_mod
    use mpi_f08, only: MPI_DOUBLE_PRECISION, MPI_Datatype
 
-   implicit none(external)
+   use, intrinsic :: iso_fortran_env, only: real64
 
-   ! TODO: Switch data types to standard
-   ! use, intrinsic :: iso_fortran_env
+   implicit none(external)
 
    public
    ! -------------------
    ! Numerical Constants
    ! -------------------
-   integer, parameter::SP = 8
+   integer, parameter::SP = real64
    type(MPI_Datatype), parameter::MPI_SP = MPI_DOUBLE_PRECISION
    real(SP), parameter::SMALL = 0.000001_SP
    real(SP), parameter::LARGE = 999999.0_SP
@@ -61,5 +60,5 @@ module constants_mod
    integer, parameter :: err_no_file = 29
 
    !integer, parameter ::
-end module constants_mod
+end module core_constants_mod
 

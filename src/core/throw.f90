@@ -1,7 +1,7 @@
 
 ! Dummy module for pfUnit testing of errors
 
-module throw_mod
+module core_throw_mod
    implicit none(external)
    private
 
@@ -78,4 +78,4 @@ contains
 
    end subroutine terminate
 
-end module throw_mod
+end module core_throw_mod

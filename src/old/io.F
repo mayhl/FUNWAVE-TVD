@@ -152,9 +152,9 @@ SUBROUTINE READ_INPUT
    USE IFPORT
 # endif
    use yaml_file_mod, only: type_yaml_reader
-   use log_io_mod, only: type_log_writer
-   use constants_mod, only: LABEL_SIZE
-   use misc_mod, only: random2
+   use core_log_io_mod, only: type_log_writer
+   use core_constants_mod, only: LABEL_SIZE
+   use core_misc_mod, only: random2
    use model_grid_mod, only: type_model_grid
 !jychoi 14.12.23]
    IMPLICIT NONE

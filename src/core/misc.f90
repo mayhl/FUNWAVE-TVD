@@ -1,7 +1,6 @@
+module core_misc_mod
 
-module misc_mod
-
-   use constants_mod, only: SP
+   use core_constants_mod, only: SP
 
    implicit none(external)
    public random2
@@ -78,4 +77,4 @@ contains
 
       end do
    end function count_char
-end module misc_mod
+end module core_misc_mod

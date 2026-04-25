@@ -60,14 +60,14 @@
 !     Extra Argument
 !       values - list of value string values for enumeration
 !--------------------------------------------------
-module yaml_file_mod
+module core_yaml_file_mod
 
-   use comm_mod, only: type_comm
-   use constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
+   use core_comm_mod, only: type_comm
+   use core_constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
    use filesystem, only: type_path => path_t
-   use log_io_mod, only: type_log_writer
-   use misc_mod, only: str2int, str2real
-   use range_parse_mod, only: type_integer_range, type_real_range
+   use core_log_io_mod, only: type_log_writer
+   use core_misc_mod, only: str2int, str2real
+   use core_range_parse_mod, only: type_integer_range, type_real_range
 
    use fortran_yaml_c, only: YamlFile, dp, &
                              type_node, type_dictionary, type_error, &
@@ -121,6 +121,8 @@ module yaml_file_mod
 
       procedure, public :: read_string
       procedure, public :: read_string_node
+
+      procedure, public :: finalize
 
       generic, public :: read => read_integer, read_real, read_logical, &
                                  read_string, read_enum, read_input_path
@@ -274,7 +276,9 @@ contains
          if (flag) call this%log%exit_on_error(io_err%message)
       end if
 
-      call child%copy_node(node, this%comm)
+      if (associated(node)) then
+         call child%copy_node(node, this%comm)
+      end if
 
    end subroutine cast_dictionary
 
@@ -571,4 +575,13 @@ contains
       val = (index(io_err%message, NO_KEY_ERR) .gt. 0)
 
    end function is_no_key_err
-end module yaml_file_mod
+
+   subroutine finalize(this)
+      class(type_yaml_reader), intent(inout) :: this
+      if (associated(this%root)) then
+         call this%root%finalize()
+         nullify (this%root)
+      end if
+   end subroutine finalize
+
+end module core_yaml_file_mod

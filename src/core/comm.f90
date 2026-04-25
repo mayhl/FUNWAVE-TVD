@@ -10,11 +10,11 @@
 !
 !-------------------------------------------------
 
-module comm_mod
+module core_comm_mod
 
    use mpi_f08
-   use constants_mod, only: n_ghost, LABEL_SIZE, SP, MPI_SP
-   use log_io_mod, only: type_log_writer
+   use core_constants_mod, only: n_ghost, LABEL_SIZE, SP, MPI_SP
+   use core_log_io_mod, only: type_log_writer, new_log_writer
 
    implicit none(external)
 
@@ -22,7 +22,11 @@ module comm_mod
    integer, parameter :: param_buff_max = 30
 
    private
-   public :: type_comm
+   public :: type_comm, new_comm
+
+   interface new_comm
+      module procedure type_comm_initialize
+   end interface new_comm
 
    type dummy
 
@@ -61,7 +65,6 @@ module comm_mod
       logical, public :: is_back_boundry
 
    contains
-      procedure, public :: init
       procedure, public :: get_logger
       procedure, public :: is_io_node
       procedure, public :: create_2d
@@ -76,16 +79,14 @@ module comm_mod
 
 contains
 
-   subroutine init(this, io_rank_id, comm_id)
+   function type_comm_initialize(io_rank_id, comm_id) result(this)
 
-      use mpi_f08, only: MPI_COMM_WORLD
-      class(type_comm), intent(inout) :: this
+      use mpi_f08, only: MPI_COMM_WORLD, MPI_SUCCESS
       integer, intent(in) :: io_rank_id
       type(MPI_Comm), intent(in), optional :: comm_id
+      type(type_comm) :: this
 
       integer :: ierr
-      ! TODO: Add error checking
-      !
       logical :: is_mpi_initialized
 
       if (present(comm_id)) then
@@ -93,19 +94,34 @@ contains
       else
          this%id = MPI_COMM_WORLD
          call MPI_Initialized(is_mpi_initialized, ierr)
+         if (ierr .ne. MPI_SUCCESS) then
+            error stop "Failed to check if MPI is initialized."
+         end if
+
          if (.not. is_mpi_initialized) then
             call MPI_Init(ierr)
+            if (ierr .ne. MPI_SUCCESS) then
+               error stop "Failed to initialize MPI."
+            end if
          end if
       end if
+
       call MPI_Comm_rank(this%id, this%rank_id, ierr)
+      if (ierr .ne. MPI_SUCCESS) then
+         error stop "Failed to get MPI rank."
+      end if
+
       call MPI_Comm_size(this%id, this%size, ierr)
+      if (ierr .ne. MPI_SUCCESS) then
+         error stop "Failed to get MPI size."
+      end if
 
       this%p_is_io_node = this%rank_id .eq. io_rank_id
       this%io_node_id = io_rank_id
 
-      call this%log%get(log_key, this%p_is_io_node)
+      this%log = new_log_writer(log_key, this%p_is_io_node)
 
-   end subroutine init
+   end function type_comm_initialize
 
    function get_logger(this, label) result(logger)
 
@@ -113,7 +129,7 @@ contains
       character(LABEL_SIZE), intent(in) :: label
       type(type_log_writer) :: logger
 
-      call logger%get(label, this%p_is_io_node)
+      logger = new_log_writer(label, this%p_is_io_node)
 
    end function get_logger
 
@@ -127,7 +143,7 @@ contains
 
       class(type_comm), intent(inout) :: this
       integer, intent(in) :: nx_global, ny_global
-      integer, intent(inout) :: nx_proc, ny_proc
+      integer, intent(out) :: nx_proc, ny_proc
       logical, intent(in) :: create_partition
       integer, parameter  :: n_dims = 2
       integer, dimension(n_dims) :: dims, coords
@@ -327,5 +343,4 @@ contains
       integer :: ierr
       call MPI_Finalize(ierr)
    end subroutine finalize
-end module comm_mod
-
+end module core_comm_mod

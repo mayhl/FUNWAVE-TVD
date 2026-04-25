@@ -85,7 +85,7 @@ MODULE TIME_SPECTRA_MODULE
    USE GLOBAL, ONLY: myid, ier, npx, npy, PX, PY, iista, jjsta
    USE MPI
 # endif
-   use misc_mod, only: random2
+   use core_misc_mod, only: random2
    IMPLICIT NONE
    SAVE
    REAL(SP), DIMENSION(:, :), ALLOCATABLE :: AmpData1, AmpData2

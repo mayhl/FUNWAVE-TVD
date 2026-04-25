@@ -1,9 +1,9 @@
-module range_parse_mod
+module core_range_parse_mod
 
-   use constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
-   use log_io_mod, only: type_log_writer
-   use comm_mod, only: type_comm
-   use misc_mod, only: str2int, str2real, count_char
+   use core_constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
+   use core_log_io_mod, only: type_log_writer
+   use core_comm_mod, only: type_comm
+   use core_misc_mod, only: str2int, str2real, count_char
    use filesystem, only: type_path => path_t
 
    implicit none(external)
@@ -32,4 +32,4 @@ contains
 #define _FMT *
 #include "core/range_body.inc"
 
-end module range_parse_mod
+end module core_range_parse_mod

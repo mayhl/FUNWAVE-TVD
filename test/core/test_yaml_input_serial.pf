@@ -6,11 +6,11 @@ module test_yaml_input_serial
 
    use pFUnit
 
-   use constants_mod, only: SP, MESSAGE_SIZE
-   use yaml_file_mod, only: type_yaml_reader, type_path
-   use log_io_mod, only: type_log_writer, initialize_logger
-   use comm_mod, only: type_comm
-   use misc_mod, only: str2int
+   use core_constants_mod, only: SP, MESSAGE_SIZE
+   use core_yaml_file_mod, only: type_yaml_reader, type_path
+   use core_log_io_mod, only: type_log_writer, new_log_writer
+   use core_comm_mod, only: type_comm, new_comm
+   use core_misc_mod, only: str2int
    use iso_fortran_env, only: error_unit
    !use filesystem, only: path_t
 
@@ -28,18 +28,17 @@ contains
       type(type_comm), intent(inout) :: comm
       character(:), allocatable :: yaml_path
       character(:), allocatable :: log_path
+      type(type_log_writer) :: log_dummy
 
       log_path = "./new.log"
       yaml_path = "test.yaml"
 
-      call initialize_logger(log_path, 0, 0, 100)
+      log_dummy = new_log_writer('test', .true., log_path, 0, 0, 100)
 
-      call comm%init(io_rank_id=0)
+      comm = new_comm(io_rank_id=0)
       call reader%init(yaml_path, comm)
 
    end subroutine open_yaml
-
-   @test
    subroutine test_integer()
 
       type(type_yaml_reader) :: reader
@@ -535,4 +534,35 @@ contains
       call dummy_fix_lint()
 
    end subroutine test_path
+
+   @test
+   subroutine test_dict()
+
+      type(type_yaml_reader) :: reader, child
+      type(type_comm) :: comm
+      integer :: val_int
+      real(SP) :: val_real
+      logical :: is_empty
+
+      call open_yaml(reader, comm)
+
+      ! Test existing dictionary
+      call reader%cast_dictionary('dict', child)
+      call child%read('positive_integer', val=val_int)
+      @assertEqual(5, val_int)
+      call child%read('positive_real', val=val_real)
+      @assertEqual(0.5_SP, val_real)
+
+      ! Test missing dictionary (optional)
+      call reader%cast_dictionary('missing_dict', child, is_empty=is_empty)
+      @assertTrue(is_empty)
+
+      ! Test missing dictionary (required)
+      call reader%cast_dictionary('missing_dict', child)
+      @assertExceptionRaised(' does not contain key "missing_dict".')
+
+      call dummy_fix_lint()
+
+   end subroutine test_dict
+
 end module test_yaml_input_serial

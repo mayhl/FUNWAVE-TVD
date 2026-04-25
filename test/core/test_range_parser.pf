@@ -4,8 +4,8 @@ module test_range_parser
 
    use pFUnit
 
-   use constants_mod, only: SP
-   use range_parse_mod, only: type_integer_range, type_real_range
+   use core_constants_mod, only: SP
+   use core_range_parse_mod, only: type_integer_range, type_real_range
    implicit none(external)
 
 contains

@@ -67,6 +67,7 @@ macro("qadd_pfunit_ctest" name)
     # test_yaml.pf
     LINK_LIBRARIES
     ${main_lib}
+    PFUNIT::pfunit
     EXTRA_USE
     throw_with_pfunit_mod
     EXTRA_INITIALIZE
@@ -74,7 +75,7 @@ macro("qadd_pfunit_ctest" name)
     ${_extra_args})
 
   set_target_properties(${name} PROPERTIES Fortran_MODULE_DIRECTORY
-                                           ${CMAKE_BINARY_DIR}/modules)
+                                           ${CMAKE_CURRENT_BINARY_DIR}/mod/${name})
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE Fortran)

@@ -1,0 +1,120 @@
+
+! allow(E001)
+module test_logging
+
+   use pFUnit
+   use core_log_io_mod, only: type_log_writer, new_log_writer, finalize_logger
+   use core_constants_mod, only: LABEL_SIZE
+
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+      ! Dummy function to fix linter, seems to reset @ errors
+   end subroutine dummy_fix_lint
+
+   @test
+   subroutine test_constructor()
+      type(type_log_writer) :: log
+
+      log = new_log_writer(label='TEST', is_io_node=.true.)
+      @assertTrue(.true.)
+   end subroutine test_constructor
+
+   @test
+   subroutine test_constructor_with_init()
+      type(type_log_writer) :: log
+      character(:), allocatable :: log_path
+
+      log_path = "test_logging.log"
+      log = new_log_writer(label='INIT', is_io_node=.true., path=log_path, &
+                           std_err_threshold=0, std_out_threshold=0, logfile_threshold=0)
+      @assertTrue(.true.)
+   end subroutine test_constructor_with_init
+
+   @test
+   subroutine test_logging_methods()
+      type(type_log_writer) :: log
+
+      log = new_log_writer(label='LOG', is_io_node=.true.)
+
+      call log%debug("Debug message")
+      call log%trivia("Trivia message")
+      call log%info("Info message")
+      call log%warning("Warning message")
+
+      @assertTrue(.true.)
+   end subroutine test_logging_methods
+
+   @test
+   subroutine test_exit_on_error()
+      type(type_log_writer) :: log
+
+      log = new_log_writer(label='ERR', is_io_node=.true.)
+
+      call log%exit_on_error("Testing exit on error")
+      @assertExceptionRaised("Testing exit on error")
+   end subroutine test_exit_on_error
+
+   @test
+   subroutine test_exit_on_fatal()
+      type(type_log_writer) :: log
+
+      log = new_log_writer(label='FATAL', is_io_node=.true.)
+
+      call log%exit_on_fatal("Testing exit on fatal")
+      @assertExceptionRaised("Testing exit on fatal")
+   end subroutine test_exit_on_fatal
+
+   @test
+   subroutine test_non_io_node()
+      type(type_log_writer) :: log
+
+      log = new_log_writer(label='SILENT', is_io_node=.false.)
+
+      ! These should NOT raise exceptions even if they usually would
+      call log%debug("Should be silent")
+      call log%exit_on_error("Should NOT throw")
+      call log%exit_on_fatal("Should NOT throw")
+
+      @assertTrue(.true.)
+   end subroutine test_non_io_node
+
+   @test
+   subroutine test_file_output()
+      type(type_log_writer) :: log
+      character(:), allocatable :: log_path
+      character(len=256) :: line
+      integer :: u, iostatus
+      logical :: found_label, found_message
+
+      log_path = "test_file.log"
+      log = new_log_writer(label='FILE_TEST', is_io_node=.true., path=log_path, &
+                           logfile_threshold=0)
+
+      call log%info("Secret message 123")
+
+      ! Close file
+      call log%finalize()
+
+      open(newunit=u, file=log_path, status='old', action='read')
+
+      found_label = .false.
+      found_message = .false.
+
+      do
+         read(u, '(A)', iostat=iostatus) line
+         if (iostatus /= 0) exit
+         if (index(line, 'FILE_TEST') > 0) found_label = .true.
+         if (index(line, 'Secret message 123') > 0) found_message = .true.
+      end do
+
+      close(u)
+
+      @assertTrue(found_label)
+      @assertTrue(found_message)
+
+   end subroutine test_file_output
+
+   end module test_logging

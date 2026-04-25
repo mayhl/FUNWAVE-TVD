@@ -1,5 +1,5 @@
 module throw_with_pfunit_mod
-   use throw_mod, only: set_throw_method
+   use core_throw_mod, only: set_throw_method
    implicit none(external)
    private
 

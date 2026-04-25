@@ -12,9 +12,9 @@
 
 module model_interface_mod
 
-   use comm_mod, only: type_comm
-   use yaml_file_mod, only: type_yaml_reader
-   use log_io_mod, only: type_log_writer
+   use core_comm_mod, only: type_comm
+   use core_yaml_file_mod, only: type_yaml_reader
+   use core_log_io_mod, only: type_log_writer
 
    implicit none(external)
 
