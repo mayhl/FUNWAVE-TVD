@@ -1,3 +1,7 @@
+# ==============================================================================
+# 1. PROJECT INITIALIZATION
+# ==============================================================================
+
 set(CMAKE_POLICY_VERSION_MINIMUM 3.5)
 cmake_minimum_required(VERSION 3.22)
 
@@ -38,19 +42,16 @@ include(GNUInstallDirs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(intro_banner)
-
 add_subdirectory(cmake)
-# file(DOWNLOAD Note: Fortran comes after cmake for MacOS override
+# Fortran comes after cmake for MacOS override
 enable_language(Fortran)
-# file(DOWNLOAD
-# https://github.com/cpm-cmake/CPM.cmake/releases/download/v0.38.3/CPM.cmake
-# ${CMAKE_CURRENT_BINARY_DIR}/cmake/CPM.cmake) include(cmake/CPM.cmake)
+
+# ==============================================================================
+# 1. DEPENDENCIES
+# ==============================================================================
 
 find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
-set(PFUNIT_DIR
-    "/Users/rdchlmyl/repos/pfUnit/build/installed/PFUNIT-4.16/cmake"
-    CACHE PATH "Path to PFUNIT")
 
 # Note: string point  to cmake/modules/Findxyz.cmake files
 message(STATUS "${CMAKE_MODULE_PATH}")
@@ -63,22 +64,16 @@ set(all_targets ${project_targets} ${ext_targets})
 
 set(libraries_to_link)
 
+# ==============================================================================
+# 1. BUILD TARGETS
+# ==============================================================================
+
 add_library(${main_lib} STATIC)
 
 # Enable position-independent code for shared-library linking support
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(src)
-
-option(ENABLE_TESTING "Enable testing for ${project_name}" ON)
-option(ENABLE_REGRESSION_TESTING "Enable regression testing for ${project_name}" OFF)
-
-if(ENABLE_TESTING OR ENABLE_REGRESSION_TESTING)
-    enable_testing()
-    find_package(PFUNIT REQUIRED)
-endif()
-
-add_subdirectory(test)
 
 set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
                                              ${CMAKE_BINARY_DIR}/modules)
@@ -97,6 +92,59 @@ target_link_libraries(${exe_name} PRIVATE ${main_lib})
 
 # Intel needs linker_language Fortran else error "undefined reference to `main'"
 set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
+
+# ==============================================================================
+# 1. TESTING CONFIGURATION
+# ==============================================================================
+
+option(ENABLE_TESTING "Enable unit testing" OFF)
+option(ENABLE_REGRESSION_TESTING "Enable regression testing" OFF)
+option(ENABLE_VALIDATION_TESTING "Enable validation testing" OFF)
+
+# Enable CTest globally if ANY testing is enabled
+if(ENABLE_TESTING
+   OR ENABLE_REGRESSION_TESTING
+   OR ENABLE_VALIDATION_TESTING)
+  enable_testing()
+endif()
+
+# Only require PFUNIT for unit testing
+if(ENABLE_TESTING)
+  if(NOT PFUNIT_DIR)
+    file(GLOB PFUNIT_DIRS
+         "${CMAKE_CURRENT_SOURCE_DIR}/extern/pfunit/installed/PFUNIT-*")
+
+    list(LENGTH PFUNIT_DIRS PFUNIT_COUNT)
+    if(PFUNIT_COUNT EQUAL 0)
+      message(
+        FATAL_ERROR
+          "No pFUnit installation found in 'extern/pfunit/installed/'. Run 'install_deps.sh' first."
+      )
+    elseif(PFUNIT_COUNT GREATER 1)
+      list(SORT PFUNIT_DIRS)
+      list(REVERSE PFUNIT_DIRS)
+      list(GET PFUNIT_DIRS 0 LATEST_PFUNIT)
+      message(
+        WARNING "Multiple pFUnit versions found. Using latest: ${LATEST_PFUNIT}"
+      )
+      set(PFUNIT_DIR "${LATEST_PFUNIT}/cmake")
+    else()
+      set(PFUNIT_DIR "${PFUNIT_DIRS}/cmake")
+    endif()
+  endif()
+  find_package(PFUNIT REQUIRED PATHS "${PFUNIT_DIR}" NO_DEFAULT_PATH)
+endif()
+
+# Only include test subdirectory if testing is enabled
+if(ENABLE_TESTING
+   OR ENABLE_REGRESSION_TESTING
+   OR ENABLE_VALIDATION_TESTING)
+  add_subdirectory(test)
+endif()
+
+# ==============================================================================
+# 1. INSTALLATION
+# ==============================================================================
 
 foreach(tgt ${all_targets})
   message(STATUS "${tgt}")
@@ -141,23 +189,42 @@ install(
   DESTINATION lib/cmake/${project_name}
   RENAME ${project_name}-config.cmake)
 
-# --------------------
-# Doxygen Documentation
-# --------------------
-find_package(Doxygen)
-set(PREDEFINED_MACROS "")
-configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
-               ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile @ONLY)
+# ==============================================================================
+# 1. DOXYGEN DOCUMENTATION
+# ==============================================================================
 
-if(DOXYGEN_FOUND)
-  add_custom_target(
-    doc
-    COMMAND ${DOXYGEN_EXECUTABLE} ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile
-    WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Generating API documentation with Doxygen"
-    VERBATIM)
-else()
-  message(STATUS "Doxygen not found. 'doc' target will not be available.")
+option(ENABLE_DOCS "Enable Doxygen documentation generation" OFF)
+
+if(ENABLE_DOCS)
+  find_package(Doxygen)
+
+  if(DOXYGEN_FOUND)
+    include(FetchContent)
+    FetchContent_Declare(
+      doxygen-awesome-css
+      GIT_REPOSITORY https://github.com/jothepro/doxygen-awesome-css.git
+      GIT_TAG v2.3.0)
+    FetchContent_MakeAvailable(doxygen-awesome-css)
+
+    FetchContent_GetProperties(doxygen-awesome-css SOURCE_DIR AWESOME_CSS_DIR)
+
+    set(DOXYFILE_IN ${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in)
+    set(DOXYFILE_OUT ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile)
+    set(DOC_OUTPUT_DIR ${CMAKE_CURRENT_BINARY_DIR}/html)
+    set(DOC_INDEX ${DOC_OUTPUT_DIR}/index.html)
+
+    configure_file(${DOXYFILE_IN} ${DOXYFILE_OUT} @ONLY)
+
+    add_custom_command(
+      OUTPUT ${DOC_INDEX}
+      COMMAND ${DOXYGEN_EXECUTABLE} ${DOXYFILE_OUT}
+      DEPENDS ${DOXYFILE_OUT} ${AWESOME_CSS_DIR}/doxygen-awesome.css
+      WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
+      COMMENT "Generating HTML documentation with Doxygen"
+      VERBATIM)
+
+    add_custom_target(doc ALL DEPENDS ${DOC_INDEX})
+  endif()
 endif()
 
 print_summary()

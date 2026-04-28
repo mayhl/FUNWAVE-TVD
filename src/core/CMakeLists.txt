@@ -1,8 +1,10 @@
-target_sources(${main_lib} PRIVATE constants.f90)
-target_sources(${main_lib} PRIVATE logging.f90)
-target_sources(${main_lib} PRIVATE comm.f90)
-target_sources(${main_lib} PRIVATE misc.f90)
-target_sources(${main_lib} PRIVATE range.F90)
-target_sources(${main_lib} PRIVATE throw.f90)
-target_sources(${main_lib} PRIVATE yaml.F90)
-target_sources(${main_lib} PRIVATE env.f90)
+target_sources(funwave PRIVATE
+    constants.f90
+    logging.f90
+    comm.f90
+    misc.f90
+    range.F90
+    throw.f90
+    yaml.F90
+    env.f90
+)
