@@ -1,0 +1,34 @@
+name: Deploy Documentation
+on:
+  push:
+    branches:
+      - "**" # Triggers for any branch
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gfortran openmpi-bin libopenmpi-dev libyaml-dev doxygen lcov cmake
+
+      - name: Build Docs
+        run: |
+          mkdir -p build && cd build
+          cmake .. -DENABLE_DOCS:BOOL=ON
+          make doc
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./build/doc/html
+          # TODO: In the future, implement branch-specific subdirectories (e.g., /main, /develop)
+          destination_dir: ${{ github.ref_name }}
+          force_orphan: false

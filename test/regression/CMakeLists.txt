@@ -25,6 +25,6 @@ add_custom_target(
 )
 
 # Optional: Make it part of the default test suite if needed
-if(ENABLE_TESTING)
+if(ENABLE_REGRESSION_TESTING)
     add_test(NAME regression_tests COMMAND ${CMAKE_COMMAND} --build . --target regression_tests)
 endif()
