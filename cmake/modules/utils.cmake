@@ -82,3 +82,22 @@ macro("qadd_pfunit_ctest" name)
 
   unset(_extra_args)
 endmacro()
+
+function(add_funwave_variant TARGET_NAME)
+    set(options)
+    set(oneValueArgs)
+    set(multiValueArgs FLAGS)
+    cmake_parse_arguments(VARIANT "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+    # Create the executable for the current candidate build
+    add_executable(${TARGET_NAME} ${PROJECT_SOURCE_DIR}/app/main.f90)
+    
+    # Link it to your project library
+    target_link_libraries(${TARGET_NAME} PRIVATE funwave)
+    
+    # Apply the specific flags (MPI, Spherical, etc.)
+    target_compile_definitions(${TARGET_NAME} PRIVATE ${VARIANT_FLAGS})
+    
+    # Set standard Fortran properties
+    set_property(TARGET ${TARGET_NAME} PROPERTY LINKER_LANGUAGE Fortran)
+endfunction()
