@@ -23,6 +23,18 @@ module core_path_mod
          character(kind=c_char), intent(in) :: path(*)
          logical(c_bool) :: res
       end function is_regular_file
+
+      function mkdir_wrapper(path) bind(c, name="mkdir_wrapper") result(res)
+         import :: c_char, c_bool
+         character(kind=c_char), intent(in) :: path(*)
+         logical(c_bool) :: res
+      end function mkdir_wrapper
+
+      function rmdir_wrapper(path) bind(c, name="rmdir_wrapper") result(res)
+         import :: c_char, c_bool
+         character(kind=c_char), intent(in) :: path(*)
+         logical(c_bool) :: res
+      end function rmdir_wrapper
    end interface
 
    !> @brief Utility type for path manipulation
@@ -36,6 +48,7 @@ module core_path_mod
       procedure, public :: file_size => path_file_size
       procedure, public :: touch => path_touch
       procedure, public :: remove => path_remove
+      procedure, public :: mkdir => path_mkdir
       procedure, public :: get_filename => path_get_filename
       procedure, public :: get_parent => path_get_parent
       procedure, public :: get_suffix => path_get_suffix
@@ -57,28 +70,30 @@ contains
       this%root = trim(path_str)
    end function new_path
 
-   !> Check if file or directory exists
    function path_exists(this) result(exists)
       class(type_path), intent(in) :: this
       logical :: exists
       inquire (file=trim(this%root), exist=exists)
    end function path_exists
 
-   !> Check if path is a file
    function path_is_file(this) result(is_file)
       class(type_path), intent(in) :: this
       logical :: is_file
       is_file = is_regular_file(trim(this%root)//c_null_char)
    end function path_is_file
 
-   !> Check if path is a directory
    function path_is_dir(this) result(is_dir)
       class(type_path), intent(in) :: this
       logical :: is_dir
       is_dir = is_directory(trim(this%root)//c_null_char)
    end function path_is_dir
 
-   !> Join current path with a new component
+   function path_mkdir(this) result(success)
+      class(type_path), intent(in) :: this
+      logical :: success
+      success = mkdir_wrapper(trim(this%root)//c_null_char)
+   end function path_mkdir
+
    function path_join(this, subpath) result(new_path)
       class(type_path), intent(in) :: this
       character(len=*), intent(in) :: subpath
@@ -86,14 +101,12 @@ contains
       new_path%root = trim(this%root)//SEP//trim(subpath)
    end function path_join
 
-   !> Get file size
    function path_file_size(this) result(size)
       class(type_path), intent(in) :: this
       integer(8) :: size
       inquire (file=trim(this%root), size=size)
    end function path_file_size
 
-   !> Updates the file timestamp or creates an empty file
    subroutine path_touch(this)
       class(type_path), intent(in) :: this
       integer :: unit, stat
@@ -101,66 +114,63 @@ contains
       if (stat == 0) close (unit)
    end subroutine path_touch
 
-   !> Removes the file
+   !> Removes the file or directory
    subroutine path_remove(this)
       class(type_path), intent(in) :: this
       integer :: unit, stat
-      open (newunit=unit, file=trim(this%root), status='old', iostat=stat)
-      if (stat == 0) close (unit, status='delete')
+      logical :: success
+
+      if (this%is_dir()) then
+         success = rmdir_wrapper(trim(this%root)//c_null_char)
+      else
+         open (newunit=unit, file=trim(this%root), status='old', iostat=stat)
+         if (stat == 0) close (unit, status='delete')
+      end if
    end subroutine path_remove
 
-   !> Get filename from path
-   function path_get_filename(this, path_in) result(name)
+   function path_get_filename(this) result(name)
       class(type_path), intent(in) :: this
-      character(len=*), intent(in) :: path_in
-      character(len=len(path_in)) :: name
+      character(len=len(this%root)) :: name
       integer :: i
-      i = scan(path_in, "/\", back=.true.)
-      name = path_in(i + 1:)
+      i = scan(this%root, "/\", back=.true.)
+      name = this%root(i + 1:)
    end function path_get_filename
 
-   !> Get parent directory path
-   function path_get_parent(this, path_in) result(parent)
+   function path_get_parent(this) result(parent)
       class(type_path), intent(in) :: this
-      character(len=*), intent(in) :: path_in
-      character(len=len(path_in)) :: parent
+      character(len=len(this%root)) :: parent
       integer :: i
-      i = scan(path_in, "/\", back=.true.)
+      i = scan(this%root, "/\", back=.true.)
       if (i > 0) then
-         parent = path_in(1:i - 1)
+         parent = this%root(1:i - 1)
       else
          parent = "."
       end if
    end function path_get_parent
 
-   !> Extracts the file suffix
-   function path_get_suffix(this, path_in) result(ext)
+   function path_get_suffix(this) result(ext)
       class(type_path), intent(in) :: this
-      character(len=*), intent(in) :: path_in
-      character(len=len(path_in)) :: ext
+      character(len=len(this%root)) :: ext
       integer :: i
-      i = scan(path_in, ".", back=.true.)
+      i = scan(this%root, ".", back=.true.)
       if (i > 0) then
-         ext = path_in(i + 1:)
+         ext = this%root(i + 1:)
       else
          ext = ""
       end if
    end function path_get_suffix
 
-   !> Check if the file has a specific suffix
-   function path_has_suffix(this, path_in, ext) result(has_ext)
+   function path_has_suffix(this, ext) result(has_ext)
       class(type_path), intent(in) :: this
-      character(len=*), intent(in) :: path_in, ext
+      character(len=*), intent(in) :: ext
       logical :: has_ext
-      has_ext = (trim(this%get_suffix(path_in)) == trim(ext))
+      has_ext = (trim(this%get_suffix()) == trim(ext))
    end function path_has_suffix
 
-   !> Adds a suffix to a path
-   function path_add_suffix(this, path_in, ext) result(new_path)
-      class(type_path), intent(in) :: this
-      character(len=*), intent(in) :: path_in, ext
-      character(len=len(path_in) + len(ext) + 1) :: new_path
-      new_path = trim(path_in)//"."//trim(ext)
-   end function path_add_suffix
+   subroutine path_add_suffix(this, ext)
+      class(type_path), intent(inout) :: this
+      character(len=*), intent(in) :: ext
+      this%root = trim(this%root)//"."//trim(ext)
+   end subroutine path_add_suffix
 
 end module core_path_mod
