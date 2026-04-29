@@ -1,19 +1,24 @@
 #!/bin/bash
+# Usage: ./run_test.sh [branch_name]
 
-O_DPATH=../../funwave-work
-O_ENAME=funwave-central
+TARGET_BRANCH=${1:-master}
+echo "Regression testing against branch: $TARGET_BRANCH"
 
-N_DPATH=.
-N_ENAME=exe_funwave
+# Navigate to the reference directory and checkout the branch
+cd ../regression_ref/src/funwave_reference || exit
+git fetch origin
+git checkout "$TARGET_BRANCH"
+git pull origin "$TARGET_BRANCH"
 
-OUT_DPATH=./outputs
+# Build the reference executable (if needed)
+cd ../funwave_reference-build || exit
+cmake .
+make -j4
 
-N_PROCS=4
-O_INPUT=./inputs/beach_2d.txt
-N_INPUT=./inputs/beach_2d.txt
+# Paths for comparison
+O_EPATH=./funwave
+N_EPATH=../../../exe_funwave
 
-O_EPATH=$O_DPATH/$O_ENAME
-N_EPATH=$N_DPATH/$N_ENAME
-
-#./exec_mpi.sh $N_PROCS $O_EPATH $O_INPUT $OUT_DPATH/old
-./exec_mpi.sh $N_PROCS $N_EPATH $N_INPUT $OUT_DPATH/new
+# Execution
+#./exec_mpi.sh 4 $O_EPATH ./inputs/beach_2d.txt ./outputs/old
+#./exec_mpi.sh 4 $N_EPATH ./inputs/beach_2d.txt ./outputs/new

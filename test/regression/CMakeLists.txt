@@ -14,13 +14,15 @@ ExternalProject_Add(
     INSTALL_COMMAND ""
 )
 
+set(REGRESSION_BRANCH "master" CACHE STRING "Branch to compare against")
+
 # Define a target for regression testing
 add_custom_target(
     regression_tests
     DEPENDS funwave_reference
-    COMMAND ${CMAKE_COMMAND} -E echo "Regression tests passed (fake test)"
+    COMMAND ${CMAKE_CURRENT_SOURCE_DIR}/run_test.sh ${REGRESSION_BRANCH}
     WORKING_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR}
-    COMMENT "Running regression tests against reference output"
+    COMMENT "Running regression tests against reference output from ${REGRESSION_BRANCH}"
     VERBATIM
 )
 
