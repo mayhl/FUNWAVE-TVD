@@ -9,14 +9,10 @@
 !    11/23/2025  Michael-Angelo Y.H. Lam
 !
 !-------------------------------------------------
-
 module model_time_mod
-   use core_comm_mod, only: type_comm
+   use mpi_f08
    use core_constants_mod, only: SP
-   use core_env_mod, only: type_env
-   use core_log_io_mod, only: type_log_writer
-   use core_path_mod, only: type_path
-   use core_yaml_file_mod, only: type_yaml_reader
+   use core_env_mod, only: type_env, get_sub_env
    use model_interface_mod, only: type_model_interface
 
    implicit none(external)
@@ -44,19 +40,18 @@ contains
       class(type_model_time), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
-      character(:), allocatable :: msg, submsg
+      this%env = get_sub_env(env, 'time')
+      this%is_activated = .true.
 
-      call env%yaml%cast_dictionary('time', this%yaml)
+      call this%env%comm%barrier()
 
-      call env%comm%barrier()
+      call this%env%yaml%read('total', val=this%total)
+      call this%env%yaml%read('start', default="0.0", val=this%start)
+      call this%env%yaml%read('plot', val=this%plot_dt)
+      call this%env%yaml%read('log', val=this%log_dt)
+      call this%env%yaml%read_positive('start index', val=this%start_index)
 
-      call this%yaml%read('total', val=this%total)
-      call this%yaml%read('start', default="0.0", val=this%start)
-      call this%yaml%read('plot', val=this%plot_dt)
-      call this%yaml%read('log', val=this%log_dt)
-      call this%yaml%read_positive('start index', val=this%start_index)
-
-      this%log => env%log
+      call this%env%comm%barrier()
 
    end subroutine read_input
 

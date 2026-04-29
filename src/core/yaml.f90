@@ -238,25 +238,18 @@ contains
 
    end function has_key
 
-   subroutine cast_dictionary(this, key, child, is_empty)
+   function cast_dictionary(this, key, is_empty) result(child)
       !----------------------------------------------------------
-      !
-      ! Subroutine type casting child dictionary to current class
-      !
-      ! Note: Want to wrap logging & error checking but to lazy
-      ! to code garbage handling and reimplement the yaml code
-      !
+      ! Function to cast child dictionary to a new yaml reader
       !----------------------------------------------------------
-      class(type_yaml_reader), intent(inout) :: this
+      class(type_yaml_reader), intent(in) :: this
       character(*), intent(in) :: key
-      type(type_yaml_reader), intent(inout) :: child
       logical, optional, intent(out) :: is_empty
-      type(type_yaml_reader), target :: dummy
+      type(type_yaml_reader) :: child
       type(type_dictionary), pointer :: node
       type(type_error), allocatable :: io_err
 
       logical, parameter :: is_required = .true.
-      logical :: flag
 
       if (this%comm%is_io_node()) then
          node => this%root%get_dictionary(key, is_required, io_err)
@@ -264,23 +257,21 @@ contains
          node => null()
       end if
 
-      if (.not. allocated(io_err)) then
-         if (present(is_empty)) is_empty = .false.
-      else
+      if (allocated(io_err)) then
          if (present(is_empty)) then
-            flag = .not. is_no_key_err(io_err)
             is_empty = .true.
          else
-            flag = .true.
+            call this%log%exit_on_error(io_err%message)
          end if
-         if (flag) call this%log%exit_on_error(io_err%message)
+      else
+         if (present(is_empty)) is_empty = .false.
       end if
 
       if (associated(node)) then
          call child%copy_node(node, this%comm)
       end if
 
-   end subroutine cast_dictionary
+   end function cast_dictionary
 
    subroutine copy_node(this, node, comm)
       !----------------------------------------------------------
@@ -384,7 +375,7 @@ contains
 
       if (this%is_dictionary(key)) then
 
-         call this%cast_dictionary(key, child)
+         child = this%cast_dictionary(key)
          call child%read_enum("units", utypes, val=unit)
 
          call child%read_positive_real("value", default=default, &
