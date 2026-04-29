@@ -85,13 +85,13 @@ target_include_directories(
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>"
   PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc")
 
-add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
-target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
-
-target_link_libraries(${exe_name} PRIVATE ${main_lib})
-
-# Intel needs linker_language Fortran else error "undefined reference to `main'"
-set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
+if(NOT ENABLE_DEV_MODE)
+  add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
+  target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
+  target_link_libraries(${exe_name} PRIVATE ${main_lib})
+  # Intel needs linker_language Fortran else error "undefined reference to `main'"
+  set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
+endif()
 
 # ==============================================================================
 # 1. TESTING CONFIGURATION
@@ -100,6 +100,7 @@ set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
 option(ENABLE_TESTING "Enable unit testing" OFF)
 option(ENABLE_REGRESSION_TESTING "Enable regression testing" OFF)
 option(ENABLE_VALIDATION_TESTING "Enable validation testing" OFF)
+option(ENABLE_DEV_MODE "Enable development mode (skip executable)" OFF)
 
 # Enable CTest globally if ANY testing is enabled
 if(ENABLE_TESTING

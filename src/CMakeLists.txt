@@ -3,4 +3,6 @@ list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/core)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/model)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old)
+if(NOT ENABLE_DEV_MODE)
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old)
+endif()
