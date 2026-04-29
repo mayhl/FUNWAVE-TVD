@@ -64,7 +64,7 @@ module core_yaml_file_mod
 
    use core_comm_mod, only: type_comm
    use core_constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
-   use filesystem, only: type_path => path_t
+   use core_path_mod, only: type_path
    use core_log_io_mod, only: type_log_writer
    use core_misc_mod, only: str2int, str2real
    use core_range_parse_mod, only: type_integer_range, type_real_range
@@ -75,7 +75,7 @@ module core_yaml_file_mod
    implicit none(external)
 
    private
-   public :: type_yaml_reader, type_path
+   public :: type_yaml_reader
 
    type(type_log_writer), TARGET :: log_buff
    character(LABEL_SIZE), parameter :: log_label = "config"
@@ -125,7 +125,7 @@ module core_yaml_file_mod
       procedure, public :: finalize
 
       generic, public :: read => read_integer, read_real, read_logical, &
-                                 read_string, read_enum, read_input_path
+         read_string, read_enum, read_input_path
 
       generic, public :: read_positive => read_positive_integer, read_positive_real
       generic, public :: read_negative => read_negative_integer, read_negative_real
@@ -169,7 +169,7 @@ contains
          call this%log%exit_on_error(message)
       end if
 
-      call this%file%parse(path%path(), err)
+      call this%file%parse(path%root, err)
 
       if (allocated(err)) then
          call this%log%exit_on_error(err)

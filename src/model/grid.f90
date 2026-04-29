@@ -13,11 +13,12 @@
 module model_grid_mod
    use mpi_f08
 
-   use core_constants_mod, only: SP
    use core_comm_mod, only: type_comm
-   use core_yaml_file_mod, only: type_yaml_reader, type_path
-   use core_log_io_mod, only: type_log_writer
+   use core_constants_mod, only: SP
    use core_env_mod, only: type_env
+   use core_log_io_mod, only: type_log_writer
+   use core_path_mod, only: type_path
+   use core_yaml_file_mod, only: type_yaml_reader
    use model_interface_mod, only: type_model_interface
 
    implicit none(external)

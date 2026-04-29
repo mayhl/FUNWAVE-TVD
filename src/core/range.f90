@@ -10,7 +10,6 @@ module core_range_parse_mod
    use core_log_io_mod, only: type_log_writer
    use core_comm_mod, only: type_comm
    use core_misc_mod, only: str2int, str2real, count_char
-   use filesystem, only: type_path => path_t
 
    implicit none(external)
 
