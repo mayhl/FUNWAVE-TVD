@@ -23,17 +23,20 @@ module core_throw_mod
    integer, save :: error_code = 1
 contains
 
+   ! Entry point for PFUnit to intercept exception handling for testing
    subroutine set_throw_method(method)
       procedure(throw) :: method
       if (.not. initialized) call initialize()
       throw_method => method
    end subroutine set_throw_method
 
+   ! Set exception handling to normal behavior
    subroutine initialize()
       throw_method => terminate
       initialized = .true.
    end subroutine initialize
 
+   ! Wrapper method to switch between normal and PFUnit exception handling
    subroutine throw_exception(filename, line_number, message, errcode, comm_id)
       character(len=*), intent(in) :: filename
       integer, intent(in) :: line_number
@@ -48,6 +51,8 @@ contains
 
    end subroutine throw_exception
 
+   ! Hacky bypass to handle error_code while conforming
+   ! to function signature of PFUnit
    subroutine set_error_code(err_code)
 
       integer, INTENT(IN), OPTIONAL :: err_code
@@ -60,8 +65,8 @@ contains
 
    end subroutine set_error_code
 
+   ! Common method to gracefully exit MPI and FORTRAN
    subroutine terminate(filename, line, message)
-
       use MPI, only: MPI_Abort, MPI_COMM_WORLD
       character(*), intent(in) :: filename
       integer, intent(in) :: line

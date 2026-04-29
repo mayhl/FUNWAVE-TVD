@@ -17,7 +17,7 @@
 module core_env_mod
 
    use core_comm_mod, only: type_comm, new_comm
-   use core_log_io_mod, only: type_log_writer, new_log_writer, finalize_logger
+   use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_yaml_file_mod, only: type_yaml_reader
 
    implicit none(external)
