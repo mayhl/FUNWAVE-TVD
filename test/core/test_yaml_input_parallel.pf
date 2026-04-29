@@ -5,11 +5,12 @@ module test_yaml_input_parallel
    use mpi_f08
    use pFUnit
 
-   use core_constants_mod, only: SP, MESSAGE_SIZE
-   use core_yaml_file_mod, only: type_yaml_reader, type_path
-   use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP, MESSAGE_SIZE
+   use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_misc_mod, only: str2int
+   use core_path_mod, only: type_path
+   use core_yaml_file_mod, only: type_yaml_reader
    use iso_fortran_env, only: error_unit
 
    implicit none(external)

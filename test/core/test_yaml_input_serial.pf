@@ -6,13 +6,13 @@ module test_yaml_input_serial
 
    use pFUnit
 
-   use core_constants_mod, only: SP, MESSAGE_SIZE
-   use core_yaml_file_mod, only: type_yaml_reader, type_path
-   use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP, MESSAGE_SIZE
+   use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_misc_mod, only: str2int
+   use core_path_mod, only: type_path
+   use core_yaml_file_mod, only: type_yaml_reader
    use iso_fortran_env, only: error_unit
-   !use filesystem, only: path_t
 
    implicit none(external)
 
@@ -81,26 +81,26 @@ contains
       call open_yaml(reader, comm)
 
       call reader%read('integer', &
-                               required_range="[0, 1)", &
-                               val=val)
+                       required_range="[0, 1)", &
+                       val=val)
 
       @assertExceptionRaised('/integer is set to "1", which is out of the required range: [0, 1)')
 
       call reader%read('integer', &
-                               required_range="[0, 1]", &
-                               val=val)
+                       required_range="[0, 1]", &
+                       val=val)
       @assertEqual(1, val)
 
       call reader%read('integer', &
-                               required_range="[0, 1]", &
-                               recommend_range="[0, 1)", &
-                               val=val)
+                       required_range="[0, 1]", &
+                       recommend_range="[0, 1)", &
+                       val=val)
       @assertEqual(1, val)
       ! Note: Warning is logged but doesn't raise exception in pFUnit unless we check logs
 
       call reader%read('integer', &
-                               required_range="[0, 2]", &
-                               val=val)
+                       required_range="[0, 2]", &
+                       val=val)
       @assertEqual(1, val)
 
       call dummy_fix_lint()
@@ -237,20 +237,20 @@ contains
       call open_yaml(reader, comm)
 
       call reader%read('real', &
-                            required_range="[0, 0.1)", &
-                            val=val)
+                       required_range="[0, 0.1)", &
+                       val=val)
 
       @assertExceptionRaised('/real is set to "0.1", which is out of the required range: [0, 0.1)')
 
       call reader%read('real', &
-                            required_range="[0, 0.1]", &
-                            val=val)
+                       required_range="[0, 0.1]", &
+                       val=val)
       @assertEqual(0.1_sp, val)
 
       call reader%read('real', &
-                            required_range="[0, 0.1]", &
-                            recommend_range="[0, 0.1)", &
-                            val=val)
+                       required_range="[0, 0.1]", &
+                       recommend_range="[0, 0.1)", &
+                       val=val)
       @assertEqual(0.1_sp, val)
 
       call dummy_fix_lint()
@@ -372,7 +372,6 @@ contains
 
    @test
    subroutine test_logical()
-
 
       type(type_yaml_reader) :: reader
       type(type_comm) :: comm
@@ -528,7 +527,7 @@ contains
       file_path = type_path('valid_file_path.txt')
       call file_path%touch()
       call reader%read('valid_file_path', val=val)
-      @assertEqual(file_path%path(), val%path())
+      @assertEqual(file_path%root, val%root)
       call file_path%remove()
 
       call dummy_fix_lint()

@@ -57,7 +57,6 @@ find_package(Git REQUIRED)
 message(STATUS "${CMAKE_MODULE_PATH}")
 find_package("face" REQUIRED)
 find_package("flogging" REQUIRED)
-find_package("ffilesystem" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
 set(all_targets ${project_targets} ${ext_targets})

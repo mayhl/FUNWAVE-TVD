@@ -1,0 +1,79 @@
+! allow(E001)
+module test_path_mod
+
+   use pFUnit
+   use core_path_mod
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+      ! Dummy function to fix linter, seems to reset @ errors
+   end subroutine dummy_fix_lint
+
+   @test
+   subroutine test_path_join()
+      type(type_path) :: p
+      type(type_path) :: joined
+      p = type_path("dir")
+      joined = p%join("file.txt")
+      @assertEqual("dir/file.txt", trim(joined%root))
+   end subroutine test_path_join
+
+   @test
+   subroutine test_path_exists()
+      type(type_path) :: p
+      p = type_path("non_existent_file_12345.txt")
+      @assertFalse(p%exists())
+   end subroutine test_path_exists
+
+   @test
+   subroutine test_path_parent()
+      type(type_path) :: p
+      character(len=20) :: result
+      p = type_path("/path/to/file.txt")
+      result = p%get_parent("/path/to/file.txt")
+      @assertEqual("/path/to", trim(result))
+   end subroutine test_path_parent
+
+   @test
+   subroutine test_path_filename()
+      type(type_path) :: p
+      character(len=20) :: result
+      result = p%get_filename("/path/to/file.txt")
+      @assertEqual("file.txt", trim(result))
+   end subroutine test_path_filename
+
+   @test
+   subroutine test_path_suffix()
+      type(type_path) :: p
+      character(len=20) :: result
+
+      result = p%get_suffix("data.yaml")
+      @assertEqual("yaml", trim(result))
+
+      @assertTrue(p%has_suffix("data.yaml", "yaml"))
+      @assertFalse(p%has_suffix("data.txt", "yaml"))
+   end subroutine test_path_suffix
+
+   @test
+   subroutine test_path_add_suffix()
+      type(type_path) :: p
+      character(len=20) :: result
+      result = p%add_suffix("data", "yaml")
+      @assertEqual("data.yaml", trim(result))
+   end subroutine test_path_add_suffix
+
+   @test
+   subroutine test_path_is_file_dir()
+      type(type_path) :: p
+      p = type_path("CMakeLists.txt")
+      @assertTrue(p%is_file())
+      @assertFalse(p%is_dir())
+
+      p = type_path("src")
+      @assertTrue(p%is_dir())
+      @assertFalse(p%is_file())
+   end subroutine test_path_is_file_dir
+
+end module test_path_mod
