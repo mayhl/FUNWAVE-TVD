@@ -15,7 +15,6 @@
 !--------------------------------------------------
 
 module core_env_mod
-
    use core_comm_mod, only: type_comm, new_comm
    use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_yaml_file_mod, only: type_yaml_reader
@@ -23,12 +22,13 @@ module core_env_mod
    implicit none(external)
 
    private
-   public :: type_env, new_env
+   public :: type_env, new_env, get_sub_env
+   public :: type_comm, type_log_writer, type_yaml_reader
 
-   type type_env
-      type(type_comm)        :: comm
-      type(type_log_writer)  :: log
-      type(type_yaml_reader) :: yaml
+   type, public :: type_env
+      type(type_comm), pointer        :: comm => null()
+      type(type_log_writer), pointer  :: log => null()
+      type(type_yaml_reader)          :: yaml
    contains
       procedure :: finalize => env_finalize
    end type type_env
@@ -46,6 +46,10 @@ contains
       type(type_env) :: this
 
       character(:), allocatable :: log_fpath, yaml_fpath
+
+      ! Allocate components on the heap to satisfy pointer requirements
+      allocate (this%comm)
+      allocate (this%log)
 
       ! 1. Initialize Communicator
       this%comm = new_comm(io_rank_id=0)
@@ -65,12 +69,31 @@ contains
 
    end function env_initialize
 
+   !> Helper to create a sub-environment view for a YAML dictionary
+   function get_sub_env(parent_env, dict_name) result(sub_env)
+      class(type_env), intent(in), target :: parent_env
+      character(*), intent(in) :: dict_name
+      type(type_env) :: sub_env
+
+      ! Point to the SAME comm and log
+      sub_env%comm => parent_env%comm
+      sub_env%log => parent_env%log
+
+      ! Create a new yaml handle for the sub-dictionary using the new function-style cast
+      sub_env%yaml = parent_env%yaml%cast_dictionary(dict_name)
+   end function get_sub_env
+
    subroutine env_finalize(this)
       class(type_env), intent(inout) :: this
 
       ! Finalize infrastructure
-      call this%log%finalize()
-      call this%comm%finalize()
+      call this%yaml%finalize()
+      if (associated(this%log)) call this%log%finalize()
+      if (associated(this%comm)) call this%comm%finalize()
+
+      ! Deallocate pointers
+      if (associated(this%log)) deallocate (this%log)
+      if (associated(this%comm)) deallocate (this%comm)
 
    end subroutine env_finalize
 

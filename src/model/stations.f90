@@ -11,12 +11,8 @@
 !-------------------------------------------------
 
 module model_stations_mod
-   use core_comm_mod, only: type_comm
    use core_constants_mod, only: SP
-   use core_env_mod, only: type_env
-   use core_log_io_mod, only: type_log_writer
-   use core_path_mod, only: type_path
-   use core_yaml_file_mod, only: type_yaml_reader
+   use core_env_mod, only: type_env, get_sub_env
    use model_interface_mod, only: type_model_interface
 
    implicit none(external)
@@ -43,15 +39,20 @@ contains
 
       class(type_model_stations), intent(inout) :: this
       type(type_env), intent(inout), target :: env
+      logical :: is_empty
 
-      character(:), allocatable :: msg, submsg
-      logical:: is_empty
-
-      call env%yaml%cast_dictionary('stations', this%yaml, is_empty)
-      call env%comm%barrier()
-      this%log => env%log
+      this%env = get_sub_env(env, 'stations')
       this%is_activated = .not. is_empty
+
+      call this%env%comm%barrier()
       if (is_empty) return
+
+      call this%env%yaml%read_positive('dt', val=this%dt)
+      call this%env%yaml%read('file path', val=this%path)
+      call this%env%yaml%read_positive('number', val=this%n)
+      call this%env%yaml%read_positive('buffer size', val=this%buffer_size, default="1000")
+
+      call this%env%comm%barrier()
 
    end subroutine read_input
 

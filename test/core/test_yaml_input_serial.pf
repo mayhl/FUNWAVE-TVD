@@ -546,18 +546,18 @@ contains
       call open_yaml(reader, comm)
 
       ! Test existing dictionary
-      call reader%cast_dictionary('dict', child)
+      child = reader%cast_dictionary('dict')
       call child%read('positive_integer', val=val_int)
       @assertEqual(5, val_int)
       call child%read('positive_real', val=val_real)
       @assertEqual(0.5_SP, val_real)
 
       ! Test missing dictionary (optional)
-      call reader%cast_dictionary('missing_dict', child, is_empty=is_empty)
+      child = reader%cast_dictionary('missing_dict', is_empty=is_empty)
       @assertTrue(is_empty)
 
       ! Test missing dictionary (required)
-      call reader%cast_dictionary('missing_dict', child)
+      child = reader%cast_dictionary('missing_dict')
       @assertExceptionRaised(' does not contain key "missing_dict".')
 
       call dummy_fix_lint()
