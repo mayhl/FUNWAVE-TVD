@@ -31,11 +31,8 @@ set_target_properties(old_lib PROPERTIES Fortran_MODULE_DIRECTORY
                                          "${CMAKE_BINARY_DIR}/modules/old")
 target_include_directories(old_lib PUBLIC "${CMAKE_BINARY_DIR}/modules/old")
 
-target_compile_definitions(old_lib PRIVATE ${_module_flags})
+target_compile_definitions(old_lib PRIVATE ${MODULE_FLAGS})
 
-message(STATUS "===========================")
-message(STATUS ${_module_flags})
-message(STATUS "===========================")
 if(USE_VESSEL)
   target_sources(old_lib PRIVATE vessel.F)
 endif()
