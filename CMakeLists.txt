@@ -56,7 +56,6 @@ find_package(Git REQUIRED)
 # Note: string point  to cmake/modules/Findxyz.cmake files
 message(STATUS "${CMAKE_MODULE_PATH}")
 find_package("face" REQUIRED)
-find_package("flogging" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
 set(all_targets ${project_targets} ${ext_targets})
@@ -77,8 +76,7 @@ add_subdirectory(src)
 set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
                                              ${CMAKE_BINARY_DIR}/modules)
 
-target_link_libraries(flogging PRIVATE face)
-target_link_libraries(${main_lib} PRIVATE ${ext_libs})
+target_link_libraries(${main_lib} PRIVATE ${ext_libs} face)
 target_include_directories(
   ${main_lib}
   PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>"
@@ -88,7 +86,8 @@ if(NOT ENABLE_DEV_MODE)
   add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
   target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
   target_link_libraries(${exe_name} PRIVATE ${main_lib})
-  # Intel needs linker_language Fortran else error "undefined reference to `main'"
+  # Intel needs linker_language Fortran else error "undefined reference to
+  # `main'"
   set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
 endif()
 
