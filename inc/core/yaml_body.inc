@@ -1,8 +1,8 @@
    subroutine _READ_NODE(this, key, default, is_empty, &
 #ifdef _HAS_RANGE
-                             required_range, recommend_range, &
+                         required_range, recommend_range, &
 #endif
-                             val)
+                         val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
 
@@ -21,18 +21,15 @@
       character(len=:), allocatable :: msg
 
 #ifdef _HAS_RANGE
-      call rq_range%initialize()
-      call rd_range%initialize()
-
       if (present(required_range)) then
-         call rq_range%parse(required_range)
+         rq_range = _RANGE(required_range)
          if (.not. rq_range%is_valid()) then
             call this%log%exit_on_fatal("Invalid required range: "//required_range)
          end if
       end if
 
       if (present(recommend_range)) then
-         call rd_range%parse(recommend_range)
+         rd_range = _RANGE(recommend_range)
          if (.not. rd_range%is_valid()) then
             call this%log%exit_on_fatal("Invalid recommended range: "//recommend_range)
          end if
@@ -71,9 +68,9 @@
 
    subroutine _READ(this, key, default, is_empty, &
 #ifdef _HAS_RANGE
-                        required_range, recommend_range, &
+                    required_range, recommend_range, &
 #endif
-                        val)
+                    val)
       !----------------------------------------------------------
       ! Wrapper method around _READ_NODE for single node
       ! MPI I/O and broadcasting to other nodes
@@ -90,12 +87,12 @@
       if (this%comm%is_io_node()) then
 
          call this%_READ_NODE(key, default=default, &
-                                  is_empty=is_empty, &
+                              is_empty=is_empty, &
 #ifdef _HAS_RANGE
-                                  required_range=required_range, &
-                                  recommend_range=recommend_range, &
+                              required_range=required_range, &
+                              recommend_range=recommend_range, &
 #endif
-                                  val=val)
+                              val=val)
 
       end if
 

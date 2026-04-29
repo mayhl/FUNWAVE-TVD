@@ -1,113 +1,145 @@
-
 ! allow(E001)
 module test_range_parser
 
    use pFUnit
-
    use core_constants_mod, only: SP
-   use core_range_parse_mod, only: type_integer_range, type_real_range
+   use core_range_parse_mod
    implicit none(external)
 
 contains
 
    @test
    subroutine test_integer_range_parser()
-
-      type(type_integer_range) :: range
-      character(len=:), allocatable ::str
+      class(type_integer_range), allocatable :: range
+      character(len=:), allocatable :: str
 
       str = "[2,3,1]"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      range = type_integer_range(str)
+      @assertFalse(range%is_valid())
 
       str = "[,]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
+      range = type_integer_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
 
       str = "[,1]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
+      range = type_integer_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("1", range%get_upper())
+      @assertEqual(1, range%upper)
 
       str = "[3,]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
+      range = type_integer_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("3", range%get_lower())
+      @assertEqual(3, range%lower)
 
       str = "[2,3]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
-      @assertEqual(.true., range%is_inc_low())
-      @assertEqual(.true., range%is_inc_upp())
-      @assertEqual(2, range%get_lower())
-      @assertEqual(3, range%get_upper())
+      range = type_integer_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("2", range%get_lower())
+      @assertEqual(2, range%lower)
+      @assertEqual("3", range%get_upper())
+      @assertEqual(3, range%upper)
 
       str = "   (   -5   ,   -1   ]    "
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
-      @assertEqual(.false., range%is_inc_low())
-      @assertEqual(.true., range%is_inc_upp())
-      @assertEqual(-5, range%get_lower())
-      @assertEqual(-1, range%get_upper())
+      range = type_integer_range(str)
+      @assertTrue(range%is_valid())
+      @assertFalse(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("-5", range%get_lower())
+      @assertEqual(-5, range%lower)
+      @assertEqual("-1", range%get_upper())
+      @assertEqual(-1, range%upper)
 
       str = "[1, 10.11)"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      range = type_integer_range(str)
+      @assertFalse(range%is_valid())
 
       str = "(a, 5.1)"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      range = type_integer_range(str)
+      @assertFalse(range%is_valid())
 
       str = "(-1,-5)"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
-
+      range = type_integer_range(str)
+      @assertFalse(range%is_valid())
    end subroutine test_integer_range_parser
 
    @test
    subroutine test_real_range_parser()
-
-      type(type_real_range) :: range
-      character(len=:), allocatable ::str
+      class(type_real_range), allocatable :: range
+      character(len=:), allocatable :: str
 
       str = "[2.2,0.3,1.1]"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      range = type_real_range(str)
+      @assertFalse(range%is_valid())
 
       str = "[,]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
+      range = type_real_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
 
       str = "[,12.2]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
+      range = type_real_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("12.2", range%get_upper())
+      @assertEqual(12.2_SP, range%upper)
 
       str = "[3.2,]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
+      range = type_real_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("3.2", range%get_lower())
+      @assertEqual(3.2_SP, range%lower)
 
       str = "[1.2,3.33]"
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
-      @assertEqual(.true., range%is_inc_low())
-      @assertEqual(.true., range%is_inc_upp())
-      @assertEqual(1.2_SP, range%get_lower())
-      @assertEqual(3.33_SP, range%get_upper())
+      range = type_real_range(str)
+      @assertTrue(range%is_valid())
+      @assertTrue(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("1.2", range%get_lower())
+      @assertEqual(1.2_SP, range%lower)
+      @assertEqual("3.33", range%get_upper())
+      @assertEqual(3.33_SP, range%upper)
 
       str = "   (   -4   ,   -1.2   ]    "
-      call range%parse(str)
-      @assertEqual(.true., range%is_valid())
-      @assertEqual(.false., range%is_inc_low())
-      @assertEqual(.true., range%is_inc_upp())
-      @assertEqual(-4.0_SP, range%get_lower())
-      @assertEqual(-1.2_SP, range%get_upper())
+      range = type_real_range(str)
+      @assertTrue(range%is_valid())
+      @assertFalse(range%is_inc_low())
+      @assertTrue(range%is_inc_upp())
+      @assertEqual("-4", range%get_lower())
+      @assertEqual(-4.0_SP, range%lower)
+      @assertEqual("-1.2", range%get_upper())
+      @assertEqual(-1.2_SP, range%upper)
 
       str = "(a, 5.1)"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      range = type_real_range(str)
+      @assertFalse(range%is_valid())
 
       str = "(-1, -4.0)"
-      call range%parse(str)
-      @assertEqual(.false., range%is_valid())
+      range = type_real_range(str)
+      @assertFalse(range%is_valid())
+      @assertFalse(range%is_inc_low())
+      @assertFalse(range%is_inc_upp())
 
+      str = "(-1,)"
+      range = type_real_range(str)
+      @assertTrue(range%is_valid())
+      @assertFalse(range%is_inc_low())
+      @assertFalse(range%is_inc_upp())
+      @assertEqual("-1", range%get_lower())
+      @assertEqual(-1.0_SP, range%lower)
    end subroutine test_real_range_parser
 
    @test
@@ -116,7 +148,7 @@ contains
       type(type_real_range) :: rrange
 
       ! Integer range [2, 5)
-      call irange%parse("[2, 5)")
+      irange = type_integer_range("[2, 5)")
       @assertTrue(irange%is_valid())
       @assertFalse(irange%in_range(1))
       @assertTrue(irange%in_range(2))
@@ -125,7 +157,7 @@ contains
       @assertFalse(irange%in_range(5))
 
       ! Integer range (2, 5]
-      call irange%parse("(2, 5]")
+      irange = type_integer_range("(2, 5]")
       @assertTrue(irange%is_valid())
       @assertFalse(irange%in_range(2))
       @assertTrue(irange%in_range(3))
@@ -133,7 +165,7 @@ contains
       @assertFalse(irange%in_range(6))
 
       ! Real range [1.0, 2.0]
-      call rrange%parse("[1.0, 2.0]")
+      rrange = type_real_range("[1.0, 2.0]")
       @assertTrue(rrange%is_valid())
       @assertFalse(rrange%in_range(0.9_SP))
       @assertTrue(rrange%in_range(1.0_SP))
@@ -142,7 +174,7 @@ contains
       @assertFalse(rrange%in_range(2.1_SP))
 
       ! Real range (1.0, 2.0)
-      call rrange%parse("(1.0, 2.0)")
+      rrange = type_real_range("(1.0, 2.0)")
       @assertTrue(rrange%is_valid())
       @assertFalse(rrange%in_range(1.0_SP))
       @assertTrue(rrange%in_range(1.1_SP))
@@ -150,19 +182,18 @@ contains
       @assertFalse(rrange%in_range(2.0_SP))
 
       ! Open-ended range [0, )
-      call irange%parse("[0, )")
+      irange = type_integer_range("[0, )")
       @assertTrue(irange%is_valid())
       @assertFalse(irange%in_range(-1))
       @assertTrue(irange%in_range(0))
       @assertTrue(irange%in_range(1000))
 
       ! Open-ended range ( , 0]
-      call rrange%parse("( , 0.0]")
+      rrange = type_real_range("( , 0.0]")
       @assertTrue(rrange%is_valid())
       @assertTrue(rrange%in_range(-100.0_SP))
       @assertTrue(rrange%in_range(0.0_SP))
       @assertFalse(rrange%in_range(0.0001_SP))
-
    end subroutine test_range_in_range
 
 end module test_range_parser
