@@ -251,7 +251,7 @@ SUBROUTINE READ_INPUT
 #endif
 
    DEPTH_TYPE = model%grid%ftype
-   DEPTH_FILE = model%grid%fpath%path()
+   DEPTH_FILE = model%grid%fpath%root
    DEPTH_FLAT = model%grid%depth_flat
    SLP = model%grid%slope_m
    Xslp = model%grid%slope_x0

@@ -12,68 +12,57 @@ contains
    end subroutine dummy_fix_lint
 
    @test
-   subroutine test_path_join()
+   subroutine test_path_lifecycle()
+      type(type_path) :: sandbox
+      type(type_path) :: file_in_sandbox
+      integer :: stat
+
+      sandbox = type_path("sandbox_dir")
+
+      ! 1. Force Clean Setup: Ensure it does not exist using system command for robust cleanup
+      call execute_command_line("rm -rf sandbox_dir", exitstat=stat)
+      @assertFalse(sandbox%exists(), "Sandbox should not exist at start")
+
+      ! 2. Create directory
+      @assertTrue(sandbox%mkdir(), "mkdir failed")
+      @assertTrue(sandbox%exists(), "Dir should exist after mkdir")
+      @assertTrue(sandbox%is_dir(), "Dir path should report is_dir=true")
+
+      ! 3. Create file inside
+      file_in_sandbox = sandbox%join("test.txt")
+      call file_in_sandbox%touch()
+      @assertTrue(file_in_sandbox%exists(), "File should exist after touch")
+      @assertTrue(file_in_sandbox%is_file(), "File path should report is_file=true")
+
+      ! 4. Final Cleanup: Verify teardown
+      call file_in_sandbox%remove()
+      call sandbox%remove()
+
+      ! Verify final state
+      @assertFalse(sandbox%exists(), "Sandbox should be gone after remove")
+
+   end subroutine test_path_lifecycle
+
+   @test
+   subroutine test_path_utils()
       type(type_path) :: p
       type(type_path) :: joined
       p = type_path("dir")
       joined = p%join("file.txt")
       @assertEqual("dir/file.txt", trim(joined%root))
-   end subroutine test_path_join
 
-   @test
-   subroutine test_path_exists()
-      type(type_path) :: p
-      p = type_path("non_existent_file_12345.txt")
-      @assertFalse(p%exists())
-   end subroutine test_path_exists
-
-   @test
-   subroutine test_path_parent()
-      type(type_path) :: p
-      character(len=20) :: result
       p = type_path("/path/to/file.txt")
-      result = p%get_parent("/path/to/file.txt")
-      @assertEqual("/path/to", trim(result))
-   end subroutine test_path_parent
+      @assertEqual("file.txt", trim(p%get_filename()))
+      @assertEqual("/path/to", trim(p%get_parent()))
 
-   @test
-   subroutine test_path_filename()
-      type(type_path) :: p
-      character(len=20) :: result
-      result = p%get_filename("/path/to/file.txt")
-      @assertEqual("file.txt", trim(result))
-   end subroutine test_path_filename
+      p = type_path("data.yaml")
+      @assertEqual("yaml", trim(p%get_suffix()))
+      @assertTrue(p%has_suffix("yaml"))
+      @assertFalse(p%has_suffix("txt"))
 
-   @test
-   subroutine test_path_suffix()
-      type(type_path) :: p
-      character(len=20) :: result
-
-      result = p%get_suffix("data.yaml")
-      @assertEqual("yaml", trim(result))
-
-      @assertTrue(p%has_suffix("data.yaml", "yaml"))
-      @assertFalse(p%has_suffix("data.txt", "yaml"))
-   end subroutine test_path_suffix
-
-   @test
-   subroutine test_path_add_suffix()
-      type(type_path) :: p
-      character(len=20) :: result
-      result = p%add_suffix("data", "yaml")
-      @assertEqual("data.yaml", trim(result))
-   end subroutine test_path_add_suffix
-
-   @test
-   subroutine test_path_is_file_dir()
-      type(type_path) :: p
-      p = type_path("CMakeLists.txt")
-      @assertTrue(p%is_file())
-      @assertFalse(p%is_dir())
-
-      p = type_path("src")
-      @assertTrue(p%is_dir())
-      @assertFalse(p%is_file())
-   end subroutine test_path_is_file_dir
+      p = type_path("data")
+      call p%add_suffix('yaml')
+      @assertEqual("data.yaml", trim(p%root))
+   end subroutine test_path_utils
 
 end module test_path_mod
