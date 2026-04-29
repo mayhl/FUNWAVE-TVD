@@ -1,5 +1,5 @@
 target_sources(
-  funwave
+  ${main_lib}
   PRIVATE comm.f90
           constants.f90
           env.f90

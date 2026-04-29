@@ -50,13 +50,12 @@
 !      12/06/2017 Michael-Angelo Y.-H. Lam
 !-------------------------------------------------------------------------------------
 
-# if defined (PARALLEL)
-
 MODULE PARALLEL_FIELD_IO
    USE GLOBAL
 
 CONTAINS
 
+# if defined (PARALLEL)
    SUBROUTINE PutFileASCII(FILE, PHI)
 
       IMPLICIT NONE
@@ -214,7 +213,7 @@ CONTAINS
 
    END SUBROUTINE PutfileBinary
 
-END MODULE PARALLEL_FIELD_IO
-
 # endif
 ! end parallel
+END MODULE PARALLEL_FIELD_IO
+

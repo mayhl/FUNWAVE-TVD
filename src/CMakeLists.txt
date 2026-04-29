@@ -1,8 +1,11 @@
-# NOTE:: Temporarily hard-coded
-list(APPEND _module_flags "PARALLEL" "DOUBLE_PRECISION" "CARTESIAN")
+# Standard libraries add_library(${main_lib} STATIC)
 
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/core)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/model)
+# Add subdirectories
+add_subdirectory(core)
+add_subdirectory(model)
+
 if(NOT ENABLE_DEV_MODE)
-  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/old)
+  add_subdirectory(old)
+  target_link_libraries(old_lib PRIVATE ${main_lib})
+  list(APPEND all_targets old_lib)
 endif()
