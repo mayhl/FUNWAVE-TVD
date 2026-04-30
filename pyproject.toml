@@ -1,0 +1,21 @@
+[project]
+name = "mayhlfunwave"
+version = "0.1.0"
+description = "FUNWAVE-TVD Test Orchestration Engine"
+dependencies = [
+    "typer>=0.25.0",
+    "rich>=15.0.0",
+]
+
+[project.scripts]
+component = "test.framework.cli:component"
+regression = "test.framework.cli:regression"
+build = "test.framework.cli:build"
+clean = "test.framework.cli:clean"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+package = true
