@@ -1,7 +1,0 @@
-# The fortran modules provided by this target.
-provides
- model_grid_mod.mod
- model_interface_mod.mod
- model_main_mod.mod
- model_stations_mod.mod
- model_time_mod.mod

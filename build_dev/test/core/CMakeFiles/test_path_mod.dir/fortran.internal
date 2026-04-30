@@ -1,6 +1,0 @@
-# The fortran modules provided by this target.
-provides
- loader.mod
- test_path_mod.mod
- throw_with_pfunit_mod.mod
- wraptest_path_mod.mod

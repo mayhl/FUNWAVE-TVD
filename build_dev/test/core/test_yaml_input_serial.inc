@@ -1,1 +1,0 @@
-ADD_TEST_SUITE(test_yaml_input_serial_suite)

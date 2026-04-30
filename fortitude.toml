@@ -1,12 +1,31 @@
 [check]
+# Enable all categories: Conventions (C), Errors (E), Style (S)
 select = ["C", "E", "S"]
-ignore = ["S001", "S082", 'S091']
+
+# We ignore specific legacy-heavy checks for now, but keep them listed
+# so you can enable them one-by-one as you refactor src/old/
+ignore = [
+  "S001", # Ignore: archaic features (enable later)
+  "S082", # Ignore: legacy constructs
+  "S091"  # Ignore: fixed-form/legacy style
+]
+
+# Set a line length that accommodates modern wide monitors
+# but discourages "spaghetti" logic inside single lines
 line-length = 132
 
-# TODO: Remove
-# S091 => using .F file suffice
+[format]
+indentation = 2
+whitespace = true
+align-keywords = true
+# Ensure Fortran modules are always indented
+indent-modules = true
 
-#[check]
-#select = ["C", "E", "S"]
-#ignore = ['E001' 'S091']
-#line-length = 132
+[files]
+# Tell fortitude to focus on modern extensions 
+# and ignore the legacy files that are currently too messy
+exclude = [
+  "src/old/**/*.F",
+  "build_*/",
+  "test/regression/worktrees/"
+]

@@ -80,9 +80,10 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules" "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-include(intro_banner)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/internal/intro_banner.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/internal/utils.cmake)
 add_subdirectory(cmake)
 # Fortran comes after cmake for MacOS override
 enable_language(Fortran)

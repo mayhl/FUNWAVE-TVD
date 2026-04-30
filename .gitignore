@@ -53,3 +53,15 @@ build/
 build_curr/
 build_ref/
 test/regression/worktrees/
+build_*/
+build/
+__pycache__/
+*.py[cod]
+*.a
+*.o
+*.mod
+.venv/
+*.pyc
+.DS_Store
+extern/
+fun.env

@@ -1,2 +1,0 @@
-/usr/bin/ar qc libfortran-yaml-c.a "CMakeFiles/fortran-yaml-c.dir/fortran_yaml_c_types.f90.o" "CMakeFiles/fortran-yaml-c.dir/fortran_yaml_c_interface.f90.o" "CMakeFiles/fortran-yaml-c.dir/fortran_yaml_c.f90.o"
-/usr/bin/ranlib libfortran-yaml-c.a

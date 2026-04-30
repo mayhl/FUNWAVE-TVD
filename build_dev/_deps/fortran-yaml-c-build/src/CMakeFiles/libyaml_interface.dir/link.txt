@@ -1,2 +1,0 @@
-/usr/bin/ar qc liblibyaml_interface.a CMakeFiles/libyaml_interface.dir/libyaml_interface.c.o
-/usr/bin/ranlib liblibyaml_interface.a

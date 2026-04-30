@@ -1,2 +1,0 @@
-/usr/bin/ar qc libfunwave_model.a CMakeFiles/funwave_model.dir/model/grid.f90.o CMakeFiles/funwave_model.dir/model/interface.f90.o CMakeFiles/funwave_model.dir/model/main.f90.o CMakeFiles/funwave_model.dir/model/stations.f90.o CMakeFiles/funwave_model.dir/model/time.f90.o
-/usr/bin/ranlib libfunwave_model.a

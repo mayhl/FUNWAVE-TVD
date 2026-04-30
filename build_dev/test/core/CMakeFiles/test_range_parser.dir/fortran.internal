@@ -1,6 +1,0 @@
-# The fortran modules provided by this target.
-provides
- loader.mod
- test_range_parser.mod
- throw_with_pfunit_mod.mod
- wraptest_range_parser.mod

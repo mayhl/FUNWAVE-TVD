@@ -3,7 +3,7 @@ set(_pkg "fortran-yaml-c")
 set(_url "https://github.com/mayhl/fortran-yaml-c")
 set(_rev "HEAD")
 
-include("${CMAKE_CURRENT_LIST_DIR}/utils.cmake")
+include("${CMAKE_CURRENT_LIST_DIR}/../internal/utils.cmake")
 list(APPEND ext_targets "libyaml_interface")
 my_fetch_package("${_lib}" "${_url}" "${_rev}")
 

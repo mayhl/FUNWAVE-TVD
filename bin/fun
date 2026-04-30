@@ -6,16 +6,34 @@ import os
 # This acts as the "intermediate layer".
 # It delegates to the Typer CLI while being an executable itself.
 # It uses 'uv' to ensure the correct environment and dependencies.
-CLI_PATH = os.path.join(os.getcwd(), "test", "framework", "cli.py")
+import shutil
+
+# Get the directory where this script is located
+BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+# The CLI is in ../test/framework/cli.py relative to bin/
+CLI_PATH = os.path.join(BIN_DIR, "..", "test", "framework", "cli.py")
+SETUP_SCRIPT = os.path.join(BIN_DIR, "..", "scripts", "setup_cli.sh")
 
 def main():
-    # Construct the command: uv run python3 test/framework/cli.py [args...]
-    # sys.argv[1:] passes all arguments provided to 'fun' to the CLI
+    # 1. Basic-aware check: Is 'uv' initialized?
+    if not shutil.which("uv"):
+        print("FUNWAVE CLI tools are not initialized.")
+        response = input("Would you like to run 'scripts/setup_cli.sh' to install CLI features? [y/N]: ")
+        if response.lower() == 'y':
+            subprocess.run(["bash", SETUP_SCRIPT])
+            # Suggest restart after setup
+            print("Setup initiated. Please restart your terminal after completion.")
+        else:
+            print("CLI features skipped.")
+        sys.exit(0)
+
+    # 2. Proceed with full CLI
+    env = os.environ.copy()
+    env["PYTHONPATH"] = BIN_DIR + "/.."
     cmd = ["uv", "run", "python3", CLI_PATH] + sys.argv[1:]
     
-    # Run the command and pass the return code back to the shell
     try:
-        result = subprocess.run(cmd)
+        result = subprocess.run(cmd, env=env)
         sys.exit(result.returncode)
     except FileNotFoundError:
         print("Error: 'uv' not found. Please ensure it is installed.")
