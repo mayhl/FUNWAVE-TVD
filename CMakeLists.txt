@@ -9,12 +9,7 @@ cmake_minimum_required(VERSION 3.22)
 # cmake-format: off
 #   [] Cray pfUnit Support 
 #   [?] Windows Support: Issues linking Microsoft MPI library
-#   []  Preprocessor flag selection
-#   []  Figure out why YAML tests' Makefile not be called by CMake.
-#   []  Try to get fortran-yaml-c tests working 
-#       make test works if tests' Makefile is called manually
-#   [?]  Fix newunit issue => use 2023 standards. 
-#          Note 1: Temporary hack hard-coding unit in flogging.
+#   [?] Type enforce a standard
 #          Note 2: Current FUNWAVE code not compatible with 2023
 #          Note 3: While only 2008 standards are necessary, 2023 is what
 #                  works for external libraries.  
@@ -37,7 +32,7 @@ set(ext_libs "")
 set(ext_targets "")
 
 # ==============================================================================
-# 1. BUILD OPTIONS
+# 2. BUILD OPTIONS
 # ==============================================================================
 option(USE_MPI "Enable MPI support" ON)
 option(USE_DOUBLE "Enable double precision" ON)
@@ -93,14 +88,11 @@ add_subdirectory(cmake)
 enable_language(Fortran)
 
 # ==============================================================================
-# 1. DEPENDENCIES
+# 3. DEPENDENCIES
 # ==============================================================================
 
 find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
-
-# Note: string point  to cmake/modules/Findxyz.cmake files
-message(STATUS "${CMAKE_MODULE_PATH}")
 find_package("face" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
@@ -109,36 +101,27 @@ set(all_targets ${project_targets} ${ext_targets})
 set(libraries_to_link)
 
 # ==============================================================================
-# 1. BUILD TARGETS
+# 4. BUILD TARGETS
 # ==============================================================================
-
-add_library(${main_lib} STATIC)
 
 # Enable position-independent code for shared-library linking support
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 add_subdirectory(src)
 
-set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
-                                             ${CMAKE_BINARY_DIR}/modules)
-
-target_link_libraries(${main_lib} PRIVATE ${ext_libs} face)
-target_include_directories(
-  ${main_lib}
-  PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>"
-  PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/inc")
-
 if(NOT ENABLE_DEV_MODE)
   add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
-  target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
-  target_link_libraries(${exe_name} PRIVATE old_lib)
+  target_include_directories(
+    ${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules"
+                        "${CMAKE_BINARY_DIR}/modules/old")
+  target_link_libraries(${exe_name} PRIVATE ${main_lib} ${main_lib}_old)
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
 endif()
 
 # ==============================================================================
-# 1. TESTING CONFIGURATION
+# 5. TESTING CONFIGURATION
 # ==============================================================================
 
 option(ENABLE_TESTING "Enable unit testing" OFF)
@@ -188,9 +171,10 @@ if(ENABLE_TESTING
 endif()
 
 # ==============================================================================
-# 1. INSTALLATION
+# 6. INSTALLATION
 # ==============================================================================
 
+message(STATUS ${all_targets})
 foreach(tgt ${all_targets})
   install(
     TARGETS ${tgt}
@@ -234,7 +218,7 @@ install(
   RENAME ${project_name}-config.cmake)
 
 # ==============================================================================
-# 1. DOXYGEN DOCUMENTATION
+# 7. DOXYGEN DOCUMENTATION
 # ==============================================================================
 
 option(ENABLE_DOCS "Enable Doxygen documentation generation" OFF)

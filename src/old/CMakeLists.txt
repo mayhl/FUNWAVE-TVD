@@ -1,5 +1,5 @@
 add_library(
-  old_lib STATIC
+  ${main_lib}_old STATIC
   mod_param.F
   mod_global.F
   mod_input.F
@@ -27,36 +27,43 @@ add_library(
   nesting.F
   misc.F)
 
-set_target_properties(old_lib PROPERTIES Fortran_MODULE_DIRECTORY
-                                         "${CMAKE_BINARY_DIR}/modules/old")
-target_include_directories(old_lib PUBLIC "${CMAKE_BINARY_DIR}/modules/old")
+# Set module directory for old library
+set_target_properties(
+  ${main_lib}_old PROPERTIES Fortran_MODULE_DIRECTORY
+                             "${CMAKE_BINARY_DIR}/modules/old")
+target_include_directories(
+  ${main_lib}_old PRIVATE "${CMAKE_BINARY_DIR}/modules/old"
+                          "${CMAKE_BINARY_DIR}/src")
 
-target_compile_definitions(old_lib PRIVATE ${MODULE_FLAGS})
+# Apply compiler definitions
+target_compile_definitions(${main_lib}_old PRIVATE ${MODULE_FLAGS})
 
+# Explicitly link to model to inherit include paths for modules
+target_link_libraries(${main_lib}_old PRIVATE ${main_lib}_model)
 if(USE_VESSEL)
-  target_sources(old_lib PRIVATE vessel.F)
+  target_sources(${main_lib}_old PRIVATE vessel.F)
 endif()
 
 if(USE_METEO)
-  target_sources(old_lib PRIVATE mod_meteo.F)
+  target_sources(${main_lib}_old PRIVATE mod_meteo.F)
 endif()
 
 if(USE_SEDIMENT)
-  target_sources(old_lib PRIVATE mod_sediment.F)
+  target_sources(${main_lib}_old PRIVATE mod_sediment.F)
 endif()
 
 if(USE_FOAM)
-  target_sources(old_lib PRIVATE mod_foam.F)
+  target_sources(${main_lib}_old PRIVATE mod_foam.F)
 endif()
 
 if(USE_TRACKING)
-  target_sources(old_lib PRIVATE mod_tracer.F)
+  target_sources(${main_lib}_old PRIVATE mod_tracer.F)
 endif()
 
 if(USE_SUBGRID)
-  target_sources(old_lib PRIVATE mod_subgrid.F)
+  target_sources(${main_lib}_old PRIVATE mod_subgrid.F)
 endif()
 
 if(USE_PERCIPITATION)
-  target_sources(old_lib PRIVATE mod_percipitation.F)
+  target_sources(${main_lib}_old PRIVATE mod_percipitation.F)
 endif()

@@ -1,3 +1,10 @@
+# ==============================================================================
+# Helper Macros for Project Configuration
+# ==============================================================================
+
+# Macro: my_fetch_package Purpose: Wraps FetchContent to clone, register, and
+# link external dependencies like 'face' or 'fortran-yaml-c' into the project
+# build system.
 macro("my_fetch_package" package url rev)
 
   string(TOLOWER "${package}" _pkg_lc)
@@ -48,6 +55,9 @@ macro("my_fetch_package" package url rev)
   endif()
 endmacro()
 
+# Macro: qadd_pfunit_ctest Purpose: Simplifies pFUnit test registration by
+# linking against the core library and configuring the required Fortran module
+# search paths.
 macro("qadd_pfunit_ctest" name)
 
   set(_extra_args ${ARGN})
@@ -64,40 +74,25 @@ macro("qadd_pfunit_ctest" name)
     ${name}.pf
     OTHER_SOURCES
     ../throw_with_pfunit.F90
-    # test_yaml.pf
     LINK_LIBRARIES
-    ${main_lib}
-    PFUNIT::pfunit
+    ${main_lib}_core
     EXTRA_USE
     throw_with_pfunit_mod
     EXTRA_INITIALIZE
     initialize_throw
     ${_extra_args})
 
-  set_target_properties(${name} PROPERTIES Fortran_MODULE_DIRECTORY
-                                           ${CMAKE_CURRENT_BINARY_DIR}/mod/${name})
+  target_include_directories(
+    ${name}
+    PRIVATE "$<TARGET_PROPERTY:${main_lib}_core,INTERFACE_INCLUDE_DIRECTORIES>"
+            "${CMAKE_BINARY_DIR}/src")
+
+  set_target_properties(
+    ${name} PROPERTIES Fortran_MODULE_DIRECTORY
+                       ${CMAKE_CURRENT_BINARY_DIR}/mod/${name})
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE Fortran)
 
   unset(_extra_args)
 endmacro()
-
-function(add_funwave_variant TARGET_NAME)
-    set(options)
-    set(oneValueArgs)
-    set(multiValueArgs FLAGS)
-    cmake_parse_arguments(VARIANT "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-    # Create the executable for the current candidate build
-    add_executable(${TARGET_NAME} ${PROJECT_SOURCE_DIR}/app/main.f90)
-    
-    # Link it to your project library
-    target_link_libraries(${TARGET_NAME} PRIVATE funwave)
-    
-    # Apply the specific flags (MPI, Spherical, etc.)
-    target_compile_definitions(${TARGET_NAME} PRIVATE ${VARIANT_FLAGS})
-    
-    # Set standard Fortran properties
-    set_property(TARGET ${TARGET_NAME} PROPERTY LINKER_LANGUAGE Fortran)
-endfunction()
