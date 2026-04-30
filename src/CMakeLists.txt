@@ -1,11 +1,32 @@
-# Standard libraries add_library(${main_lib} STATIC)
+# Define libraries
+add_library(${main_lib}_core STATIC)
+add_library(${main_lib}_model STATIC)
 
-# Add subdirectories
-add_subdirectory(core)
-add_subdirectory(model)
+# Link model to core
+target_link_libraries(${main_lib}_model PRIVATE ${main_lib}_core)
 
-if(NOT ENABLE_DEV_MODE)
+set(_new_libs ${main_lib}_model ${main_lib}_core)
+
+set(_suffixes core model)
+set(_new_libs)
+
+foreach(_suffix IN LISTS _suffixes)
+  list(APPEND _new_libs "${main_lib}_${_suffix}")
+  add_subdirectory(${_suffix})
+endforeach()
+
+# Create an interface library to aggregate dependencies
+add_library(${main_lib} INTERFACE)
+
+list(APPEND all_targets ${_new_libs})
+if(ENABLE_DEV_MODE)
+  target_link_libraries(${main_lib} INTERFACE ${_new_libs})
+else()
   add_subdirectory(old)
-  target_link_libraries(old_lib PRIVATE ${main_lib})
-  list(APPEND all_targets old_lib)
+  target_link_libraries(${main_lib}_old PRIVATE ${_new_libs})
+  list(APPEND all_targets ${main_lib}_old)
 endif()
+
+set(all_targets
+    "${all_targets}"
+    PARENT_SCOPE)

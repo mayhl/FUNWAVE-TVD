@@ -1,5 +1,5 @@
 # ==============================================================================
-# COMPILER & BUILD ENVIRONMENT CONFIGURATION
+# 1. COMPILER & BUILD ENVIRONMENT CONFIGURATION
 # ==============================================================================
 
 # Set default build type
@@ -13,19 +13,16 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
 # ==============================================================================
-# MAC OS MPI OVERRIDES
+# 2. MAC OS MPI OVERRIDES
 # ==============================================================================
-# Force MPI compiler wrappers on macOS to ensure consistency across the project
-if(APPLE)
-  set(CMAKE_Fortran_COMPILER "mpif90" CACHE FILEPATH "MPI Fortran Compiler" FORCE)
-  set(CMAKE_C_COMPILER "mpicc" CACHE FILEPATH "MPI C Compiler" FORCE)
-  set(CMAKE_CXX_COMPILER "mpic++" CACHE FILEPATH "MPI C++ Compiler" FORCE)
-  message(STATUS "macOS detected: Forcing MPI compiler wrappers")
-endif()
+# Toolchain usage: cmake -DCMAKE_TOOLCHAIN_FILE=macos_mpi.cmake .
+
 
 # ==============================================================================
-# COMPILER-SPECIFIC FLAGS
+# 3. COMPILER-SPECIFIC FLAGS
 # ==============================================================================
+# We define compiler-specific standard flags and diagnostic "traps" (FPE) to
+# ensure code portability and early error detection during development.
 if(CMAKE_Fortran_COMPILER_ID MATCHES "^GNU$")
   # Strict flags for modern Fortran development
   set(standard_compile_flags "-ffree-form -fimplicit-none -fcheck=all -fbacktrace -cpp")
@@ -47,7 +44,8 @@ else()
   message(FATAL_ERROR "Unsupported FORTRAN compiler ID: ${CMAKE_Fortran_COMPILER_ID}")
 endif()
 
-# Apply flags to parent scope for general use
+# We propagate these flags to the PARENT_SCOPE so that they apply globally
+# across all project targets defined in the root CMakeLists.txt.
 set(CMAKE_Fortran_FLAGS_DEBUG "${CMAKE_Fortran_FLAGS_DEBUG} ${fpe}" PARENT_SCOPE)
 set(CMAKE_Fortran_FLAGS "${CMAKE_Fortran_FLAGS} ${standard_compile_flags}" PARENT_SCOPE)
 

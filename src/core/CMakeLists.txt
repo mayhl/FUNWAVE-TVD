@@ -1,5 +1,5 @@
 target_sources(
-  ${main_lib}
+  ${main_lib}_core
   PRIVATE comm.f90
           constants.f90
           env.f90
@@ -10,3 +10,13 @@ target_sources(
           range.F90
           throw.f90
           yaml.F90)
+
+# Link external dependencies privately
+target_link_libraries(${main_lib}_core PRIVATE ${ext_libs})
+
+# Expose local build directory for .mod files to other modules
+target_include_directories(
+  ${main_lib}_core
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
+         "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/inc>"
+         "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>")
