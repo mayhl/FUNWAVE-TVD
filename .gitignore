@@ -48,3 +48,8 @@ ext/*
 
 # debug information files
 *.dwo
+**/__pycache__/
+build/
+build_curr/
+build_ref/
+test/regression/worktrees/

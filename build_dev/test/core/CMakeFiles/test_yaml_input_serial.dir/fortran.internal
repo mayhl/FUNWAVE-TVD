@@ -1,0 +1,6 @@
+# The fortran modules provided by this target.
+provides
+ loader.mod
+ test_yaml_input_serial.mod
+ throw_with_pfunit_mod.mod
+ wraptest_yaml_input_serial.mod

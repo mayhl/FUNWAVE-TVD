@@ -1,0 +1,1 @@
+/usr/local/bin/mpif90  -ffree-form -fimplicit-none -fcheck=all -fbacktrace -cpp -O2 -g CMakeFiles/exe_funwave.dir/app/main.f90.o -o exe_funwave  src/old/libfunwave_old.a src/libfunwave_model.a src/libfunwave_core.a libface.a _deps/fortran-yaml-c-build/src/libfortran-yaml-c.a _deps/fortran-yaml-c-build/src/liblibyaml_interface.a _deps/libyaml-build/libyaml.a

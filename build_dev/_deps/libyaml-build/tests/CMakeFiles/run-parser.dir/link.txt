@@ -1,0 +1,1 @@
+/usr/local/bin/mpicc -O2 -g -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names "CMakeFiles/run-parser.dir/run-parser.c.o" -o ../run-parser  ../libyaml.a

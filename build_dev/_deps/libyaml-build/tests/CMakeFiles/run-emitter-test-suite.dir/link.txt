@@ -1,0 +1,1 @@
+/usr/local/bin/mpicc -O2 -g -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names "CMakeFiles/run-emitter-test-suite.dir/run-emitter-test-suite.c.o" -o ../run-emitter-test-suite  ../libyaml.a

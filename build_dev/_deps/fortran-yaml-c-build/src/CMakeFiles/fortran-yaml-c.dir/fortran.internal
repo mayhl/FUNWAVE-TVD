@@ -1,0 +1,5 @@
+# The fortran modules provided by this target.
+provides
+ fortran_yaml_c.mod
+ fortran_yaml_c_interface.mod
+ fortran_yaml_c_types.mod

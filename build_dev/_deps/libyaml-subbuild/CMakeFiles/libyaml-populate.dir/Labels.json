@@ -1,0 +1,46 @@
+{
+	"sources" : 
+	[
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/CMakeFiles/libyaml-populate"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/CMakeFiles/libyaml-populate.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/CMakeFiles/libyaml-populate-complete.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-build.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-configure.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-download.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-install.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-mkdir.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-patch.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-test.rule"
+		},
+		{
+			"file" : "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/_deps/libyaml-subbuild/libyaml-populate-prefix/src/libyaml-populate-stamp/libyaml-populate-update.rule"
+		}
+	],
+	"target" : 
+	{
+		"labels" : 
+		[
+			"libyaml-populate"
+		],
+		"name" : "libyaml-populate"
+	}
+}

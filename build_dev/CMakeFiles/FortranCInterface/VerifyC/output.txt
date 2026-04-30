@@ -1,0 +1,35 @@
+Change Dir: '/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC'
+
+Run Build Command(s): /usr/local/bin/cmake -E env VERBOSE=1 /usr/bin/make -f Makefile VerifyFortranC
+/usr/local/bin/cmake -S/usr/local/share/cmake/Modules/FortranCInterface/Verify -B/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC --check-build-system CMakeFiles/Makefile.cmake 0
+/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/Makefile2 VerifyFortranC
+/usr/local/bin/cmake -S/usr/local/share/cmake/Modules/FortranCInterface/Verify -B/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC --check-build-system CMakeFiles/Makefile.cmake 0
+/usr/local/bin/cmake -E cmake_progress_start /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles 5
+/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/Makefile2 CMakeFiles/VerifyFortranC.dir/all
+/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/VerifyFortran.dir/build.make CMakeFiles/VerifyFortran.dir/depend
+cd /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC && /usr/local/bin/cmake -E cmake_depends "Unix Makefiles" /usr/local/share/cmake/Modules/FortranCInterface/Verify /usr/local/share/cmake/Modules/FortranCInterface/Verify /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles/VerifyFortran.dir/DependInfo.cmake VerifyFortran
+Dependee "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles/VerifyFortran.dir/DependInfo.cmake" is newer than depender "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles/VerifyFortran.dir/depend.internal".
+Dependee "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles/CMakeDirectoryInformation.cmake" is newer than depender "/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles/VerifyFortran.dir/depend.internal".
+Scanning dependencies of target VerifyFortran
+/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/VerifyFortran.dir/build.make CMakeFiles/VerifyFortran.dir/build
+[ 20%] Building Fortran object CMakeFiles/VerifyFortran.dir/VerifyFortran.f.o
+/usr/local/bin/mpif90  -I/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC -ffree-form -fimplicit-none -fcheck=all -fbacktrace -cpp -O3 -c /usr/local/share/cmake/Modules/FortranCInterface/Verify/VerifyFortran.f -o CMakeFiles/VerifyFortran.dir/VerifyFortran.f.o
+[ 40%] Linking Fortran static library libVerifyFortran.a
+/usr/local/bin/cmake -P CMakeFiles/VerifyFortran.dir/cmake_clean_target.cmake
+/usr/local/bin/cmake -E cmake_link_script CMakeFiles/VerifyFortran.dir/link.txt --verbose=1
+/usr/bin/ar qc libVerifyFortran.a CMakeFiles/VerifyFortran.dir/VerifyFortran.f.o
+/usr/bin/ranlib libVerifyFortran.a
+[ 40%] Built target VerifyFortran
+/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/VerifyFortranC.dir/build.make CMakeFiles/VerifyFortranC.dir/depend
+cd /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC && /usr/local/bin/cmake -E cmake_depends "Unix Makefiles" /usr/local/share/cmake/Modules/FortranCInterface/Verify /usr/local/share/cmake/Modules/FortranCInterface/Verify /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles/VerifyFortranC.dir/DependInfo.cmake VerifyFortranC
+/Library/Developer/CommandLineTools/usr/bin/make  -f CMakeFiles/VerifyFortranC.dir/build.make CMakeFiles/VerifyFortranC.dir/build
+[ 60%] Building C object CMakeFiles/VerifyFortranC.dir/main.c.o
+/usr/local/bin/mpicc  -I/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC -O3 -DNDEBUG -MD -MT CMakeFiles/VerifyFortranC.dir/main.c.o -MF CMakeFiles/VerifyFortranC.dir/main.c.o.d -o CMakeFiles/VerifyFortranC.dir/main.c.o -c /usr/local/share/cmake/Modules/FortranCInterface/Verify/main.c
+[ 80%] Building C object CMakeFiles/VerifyFortranC.dir/VerifyC.c.o
+/usr/local/bin/mpicc  -I/Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC -O3 -DNDEBUG -MD -MT CMakeFiles/VerifyFortranC.dir/VerifyC.c.o -MF CMakeFiles/VerifyFortranC.dir/VerifyC.c.o.d -o CMakeFiles/VerifyFortranC.dir/VerifyC.c.o -c /usr/local/share/cmake/Modules/FortranCInterface/Verify/VerifyC.c
+[100%] Linking C executable VerifyFortranC
+/usr/local/bin/cmake -E cmake_link_script CMakeFiles/VerifyFortranC.dir/link.txt --verbose=1
+/usr/local/bin/mpicc -O3 -DNDEBUG -Wl,-search_paths_first -Wl,-headerpad_max_install_names CMakeFiles/VerifyFortranC.dir/main.c.o CMakeFiles/VerifyFortranC.dir/VerifyC.c.o -o VerifyFortranC   -L/usr/local/Cellar/gcc/15.2.0_1/lib/gcc/current/gcc/x86_64-apple-darwin25/15  -L/usr/local/Cellar/gcc/15.2.0_1/lib/gcc/current/gcc  -L/usr/local/Cellar/gcc/15.2.0_1/lib/gcc/current  libVerifyFortran.a -lemutls_w -lheapt_w -lmpi_usempif08 -lmpi_usempi_ignore_tkr -lmpi_mpifh -lgfortran -lgcc_s.1.1 -lgcc -lquadmath
+[100%] Built target VerifyFortranC
+/usr/local/bin/cmake -E cmake_progress_start /Users/rdchlmyl/repos/mayhlFUNWAVE/build_dev/CMakeFiles/FortranCInterface/VerifyC/CMakeFiles 0
+

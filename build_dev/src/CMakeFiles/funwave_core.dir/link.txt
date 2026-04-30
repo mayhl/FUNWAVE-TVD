@@ -1,0 +1,2 @@
+/usr/bin/ar qc libfunwave_core.a CMakeFiles/funwave_core.dir/core/comm.f90.o CMakeFiles/funwave_core.dir/core/constants.f90.o CMakeFiles/funwave_core.dir/core/env.f90.o CMakeFiles/funwave_core.dir/core/logging.f90.o CMakeFiles/funwave_core.dir/core/misc.f90.o CMakeFiles/funwave_core.dir/core/path.F90.o CMakeFiles/funwave_core.dir/core/path_utils.c.o CMakeFiles/funwave_core.dir/core/range.F90.o CMakeFiles/funwave_core.dir/core/throw.f90.o CMakeFiles/funwave_core.dir/core/yaml.F90.o
+/usr/bin/ranlib libfunwave_core.a

@@ -1,0 +1,11 @@
+# The fortran modules provided by this target.
+provides
+ core_comm_mod.mod
+ core_constants_mod.mod
+ core_env_mod.mod
+ core_log_io_mod.mod
+ core_misc_mod.mod
+ core_path_mod.mod
+ core_range_parse_mod.mod
+ core_throw_mod.mod
+ core_yaml_file_mod.mod

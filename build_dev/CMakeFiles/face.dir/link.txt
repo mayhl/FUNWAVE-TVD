@@ -1,0 +1,2 @@
+/usr/bin/ar qc libface.a "CMakeFiles/face.dir/_deps/face-src/src/lib/face.F90.o"
+/usr/bin/ranlib libface.a

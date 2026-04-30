@@ -1,0 +1,9 @@
+# The fortran modules provided by this target.
+provides
+ bathy_correction_module.mod
+ global.mod
+ input_read.mod
+ parallel_field_io.mod
+ param.mod
+ tide_module.mod
+ time_spectra_module.mod
