@@ -9,6 +9,7 @@ target_sources(${main_lib} PRIVATE mod_bathy_correction.F)
 target_sources(${main_lib} PRIVATE mod_parallel_field_io.F)
 target_sources(${main_lib} PRIVATE mod_tide.F)
 target_sources(${main_lib} PRIVATE mod_time_spectra.F)
+target_sources(${main_lib} PRIVATE parity_probe.F)
 
 if(USE_VESSEL)
   target_sources(${main_lib} PRIVATE mod_vessel.F)

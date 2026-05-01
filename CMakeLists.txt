@@ -11,8 +11,8 @@ project(
 
 set(project_name funwave)
 set(main_lib lib)
-set(exe_name)
-set(all_targets)
+set(exe_name funwave)
+set(all_targets ${main_lib} ${exe_name})
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
@@ -40,13 +40,10 @@ add_library(${main_lib} STATIC)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 add_subdirectory(src)
 
-# Define project-wide configuration flags as a CMake list. These flags control
-# parallelism, precision, and coordinate systems.
-set(module_flags PARALLEL DOUBLE_PRECISION CARTESIAN)
-
-# Apply global module flags to the main library target. Using PUBLIC ensures
-# that any executable or target linking against 'libfunwave' automatically
-# inherits these definitions without manual redeclaration.
+# Apply global module flags exported from cmake/CMakeLists.txt to the main
+# library target. Using PUBLIC ensures that any executable or target linking
+# against 'libfunwave' automatically inherits these definitions without manual
+# redeclaration.
 target_compile_definitions(${main_lib} PUBLIC ${module_flags})
 
 set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY

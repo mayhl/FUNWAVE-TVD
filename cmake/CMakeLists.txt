@@ -86,6 +86,10 @@ option(USE_VESSEL "Build FUNWAVE with vessel module" OFF)
 option(USE_DEEP_DRAFT
        "Build FUNWAVE with vessel module with deep draft modfication." OFF)
 
+if(ENABLE_INSTRUMENTATION)
+  list(APPEND module_flags "ENABLE_INSTRUMENTATION")
+endif()
+
 # include(CMakeDependentOption) cmake_dependent_option(USE_FOO "Use Foo" ON
 # "USE_A AND (USE_B OR USE_C)" OFF) Linking CMake options with FUNWAVE flags
 if(USE_MPI)
