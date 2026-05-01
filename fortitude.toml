@@ -12,7 +12,7 @@ ignore = [
 
 # Set a line length that accommodates modern wide monitors
 # but discourages "spaghetti" logic inside single lines
-line-length = 132
+line-length = 100
 
 [format]
 indentation = 2

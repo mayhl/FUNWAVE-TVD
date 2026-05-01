@@ -5,7 +5,7 @@ import sys
 
 # Since 'test' is now a proper package via pyproject.toml, 
 # imports should be absolute from the project root.
-from test.framework.runners import ComponentRunner
+from test.framework.runners import UnitTestRunner
 from test.framework.regression_runner import RegressionRunner
 from test.framework.reporters import ConsoleReporter
 from test.framework.providers.base import LocalProvider
@@ -15,9 +15,10 @@ app = typer.Typer(
     FUNWAVE Test Orchestration Engine.
     
     This CLI provides a unified interface for building the FUNWAVE-TVD model
-    and orchestrating various test tiers including component (pFUnit) and
+    and orchestrating various test tiers including unit (pFUnit) and
     regression testing.
-    """
+    """,
+    context_settings={"help_option_names": ["-h", "--help"]}
 )
 
 @app.callback()
@@ -26,10 +27,13 @@ def main():
     pass
 
 @app.command()
-def component():
-    """Run Component Tests (pFUnit) with a live dashboard."""
+def unit(
+    mode: str = typer.Option("dev", "--mode", "-m", help="Execution mode (ci/dev)"),
+    build_dir: str = typer.Option(None, "--build-dir", "-b", help="Override FUNWAVE_BUILD_DIR")
+):
+    """Run Unit Tests (pFUnit) with a live dashboard."""
     reporter = ConsoleReporter()
-    runner = ComponentRunner(reporter)
+    runner = UnitTestRunner(reporter, mode=mode, build_dir=build_dir)
     runner.run()
 
 @app.command()

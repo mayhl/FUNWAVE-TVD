@@ -73,7 +73,7 @@ macro("qadd_pfunit_ctest" name)
     TEST_SOURCES
     ${name}.pf
     OTHER_SOURCES
-    ../throw_with_pfunit.F90
+    ../../throw_with_pfunit.F90
     LINK_LIBRARIES
     ${main_lib}_core
     EXTRA_USE
@@ -87,6 +87,7 @@ macro("qadd_pfunit_ctest" name)
     PRIVATE "$<TARGET_PROPERTY:${main_lib}_core,INTERFACE_INCLUDE_DIRECTORIES>"
             "${CMAKE_BINARY_DIR}/src")
 
+  set_tests_properties(${name} PROPERTIES LABELS "unit")
   set_target_properties(
     ${name} PROPERTIES Fortran_MODULE_DIRECTORY
                        ${CMAKE_CURRENT_BINARY_DIR}/mod/${name})

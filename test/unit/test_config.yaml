@@ -1,0 +1,7 @@
+groups:
+  - name: I/O
+    tests: [test_yaml_input_serial, test_yaml_input_parallel]
+  - name: Math
+    tests: [test_path_mod, test_range_parser]
+  - name: Logging
+    tests: [test_logging]
