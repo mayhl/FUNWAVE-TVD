@@ -16,19 +16,6 @@ if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
     STATUS "Setting build type to '${CMAKE_BUILD_TYPE}' as none was specified.")
 endif()
 
-if(APPLE)
-  set(CMAKE_Fortran_COMPILER
-      "mpif90"
-      CACHE FILEPATH "MPI Fortran Compiler" FORCE)
-  set(CMAKE_C_COMPILER
-      "mpicc"
-      CACHE FILEPATH "MPI C Compiler" FORCE)
-  set(CMAKE_CXX_COMPILER
-      "mpic++"
-      CACHE FILEPATH "MPI C++ Compiler" FORCE)
-  message(STATUS "macOS detected: Forcing MPI compiler wrappers")
-endif()
-
 # specify module installation directory
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")

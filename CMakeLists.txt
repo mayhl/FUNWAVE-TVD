@@ -1,8 +1,8 @@
+# ==============================================================================
+# FUNWAVE-TVD Build System Configuration
+# ==============================================================================
 cmake_minimum_required(VERSION 3.22)
 
-# ------------
-# Basic Setup
-# ------------
 project(
   funwave
   VERSION 3.4
@@ -10,53 +10,61 @@ project(
   LANGUAGES Fortran)
 
 set(project_name funwave)
-set(main_lib lib${project_name})
-set(exe_name ${project_name})
-set(all_targets ${main_lib} ${exe_name})
-set(module_flags "")
+set(main_lib lib)
+set(exe_name)
+set(all_targets)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
 
 include(intro_banner)
-
 add_subdirectory(cmake)
-# Note: Fortran comes after cmake for MacOS override
 enable_language(Fortran)
 
 if(USE_MPI)
   find_package(MPI REQUIRED COMPONENTS Fortran)
 endif()
 
+# ------------
+# Dependencies & Modules
+# ------------
 find_package(Git REQUIRED)
-
 message(STATUS "${CMAKE_MODULE_PATH}")
 
+# ------------
+# Library Definitions
+# ------------
 set(libraries_to_link)
-
 add_library(${main_lib} STATIC)
-
-# Enable position-independent code for shared-library linking support
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
 add_subdirectory(src)
 
-target_compile_definitions(${main_lib} PRIVATE ${module_flags})
-# list(APPEND CMAKE_Fortran_FLAGS_DEBUG ${module_flags}) list(APPEND
-# CMAKE_Fortran_FLAGS ${module_flags})
+# Define project-wide configuration flags as a CMake list. These flags control
+# parallelism, precision, and coordinate systems.
+set(module_flags PARALLEL DOUBLE_PRECISION CARTESIAN)
+
+# Apply global module flags to the main library target. Using PUBLIC ensures
+# that any executable or target linking against 'libfunwave' automatically
+# inherits these definitions without manual redeclaration.
+target_compile_definitions(${main_lib} PUBLIC ${module_flags})
 
 set_target_properties(${main_lib} PROPERTIES Fortran_MODULE_DIRECTORY
                                              ${CMAKE_BINARY_DIR}/modules)
 
+# ------------
+# Executable Targets
+# ------------
 add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/src/main.F)
 target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules")
-
 target_link_libraries(${exe_name} PRIVATE ${main_lib})
 
 # Intel needs linker_language Fortran else error "undefined reference to `main'"
 set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
 
+# ------------
+# Installation & Packaging
+# ------------
 foreach(tgt ${all_targets})
   message(STATUS "${tgt}")
   install(
@@ -80,7 +88,6 @@ install(
   DESTINATION lib/cmake/${project_name})
 
 include(CMakePackageConfigHelpers)
-
 configure_package_config_file(
   "${CMAKE_CURRENT_SOURCE_DIR}/cmake/${project_name}Config.cmake.in"
   "${CMAKE_CURRENT_BINARY_DIR}/${project_name}Config.cmake"
@@ -100,6 +107,9 @@ install(
   DESTINATION lib/cmake/${project_name}
   RENAME ${project_name}-config.cmake)
 
+# ------------
+# Post-Build Tasks
+# ------------
 print_summary()
 
 if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
