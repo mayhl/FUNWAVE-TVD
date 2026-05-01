@@ -25,10 +25,14 @@ class RegressionRunner(BaseRunner):
             self.reporter.info("Reference branch is same as current. Using isolated directories.")
             self.worktree_path = self.repo_root
         else:
-            if not os.path.exists(self.worktree_path):
-                self.reporter.step(f"Creating isolated worktree for branch: {self.ref_branch}")
-                subprocess.run(["git", "worktree", "add", self.worktree_path, self.ref_branch], 
-                               check=True, capture_output=True)
+            if os.path.exists(self.worktree_path):
+                self.reporter.error(f"Worktree already exists at {self.worktree_path}.")
+                self.reporter.error("Please clean up existing worktrees using 'scripts/manage_worktrees.sh' before running regression tests.")
+                return False
+            
+            self.reporter.step(f"Creating isolated worktree for branch: {self.ref_branch}")
+            subprocess.run(["git", "worktree", "add", self.worktree_path, self.ref_branch], 
+                           check=True, capture_output=True)
         return True
 
     def _build(self, build_dir, source_dir):
