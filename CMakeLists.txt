@@ -25,8 +25,8 @@ project(
   LANGUAGES Fortran C CXX)
 
 set(project_name funwave)
-set(main_lib ${project_name})
-set(exe_name exe_${project_name})
+set(main_lib lib${project_name})
+set(exe_name ${project_name})
 set(project_targets ${main_lib})
 set(ext_libs "")
 set(ext_targets "")
@@ -98,7 +98,7 @@ find_package(Git REQUIRED)
 find_package("face" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
-set(all_targets ${project_targets} ${ext_targets})
+set(all_targets ${project_targets} ${ext_targets} probe)
 
 set(libraries_to_link)
 
