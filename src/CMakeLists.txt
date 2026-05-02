@@ -41,7 +41,7 @@ target_sources(${main_lib}_core PRIVATE $<TARGET_OBJECTS:probe_interface>)
 
 # Swap dummy implementation (empty) with probe
 if(ENABLE_INSTRUMENTATION)
-    add_library(probe STATIC probe/recorder.f90)
+    add_library(probe STATIC probe/recorder_interface.f90)
 else()
     add_library(probe STATIC probe/recorder_stub.f90)
 endif()

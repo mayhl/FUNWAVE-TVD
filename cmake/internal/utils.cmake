@@ -63,6 +63,21 @@ macro("qadd_pfunit_ctest" name)
   set(_extra_args ${ARGN})
   list(LENGTH _extra_args _extra_count)
 
+  set(_other_sources ../../throw_with_pfunit.F90)
+  set(_extra_use throw_with_pfunit_mod)
+  set(_extra_init initialize_throw)
+
+  if(${_extra_count} GREATER 0)
+    list(GET _extra_args 0 _first_arg)
+    if(_first_arg STREQUAL "NO_THROW")
+      set(_other_sources "")
+      set(_extra_use "")
+      set(_extra_init "")
+      list(REMOVE_AT _extra_args 0)
+      list(LENGTH _extra_args _extra_count)
+    endif()
+  endif()
+
   if(${_extra_count} GREATER 0)
     list(GET _extra_args 0 _max_pes)
     set(_extra_args MAX_PES ${_max_pes})
@@ -73,13 +88,13 @@ macro("qadd_pfunit_ctest" name)
     TEST_SOURCES
     ${name}.pf
     OTHER_SOURCES
-    ../../throw_with_pfunit.F90
+    ${_other_sources}
     LINK_LIBRARIES
     ${main_lib}_core
     EXTRA_USE
-    throw_with_pfunit_mod
+    ${_extra_use}
     EXTRA_INITIALIZE
-    initialize_throw
+    ${_extra_init}
     ${_extra_args})
 
   target_include_directories(

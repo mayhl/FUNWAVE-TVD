@@ -78,3 +78,17 @@ dev = [
 
 [tool.ruff.lint.isort]
 known-first-party = ["test"]
+
+[tool.fprettify]
+indent = 2
+whitespace = 2
+max-line-length = 132
+recursive = true
+
+[tool.cmake-format]
+line_width = 132
+tab_size = 2
+
+[tool.shfmt]
+indent = 2
+
