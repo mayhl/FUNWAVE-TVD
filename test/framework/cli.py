@@ -9,17 +9,16 @@ from test.framework.runners import UnitTestRunner
 from test.framework.regression_runner import RegressionRunner
 from test.framework.reporters import ConsoleReporter
 from test.framework.providers.base import LocalProvider
+from test.framework.dev_tool import app as dev_app
 
 app = typer.Typer(
     help="""
     FUNWAVE Test Orchestration Engine.
-    
-    This CLI provides a unified interface for building the FUNWAVE-TVD model
-    and orchestrating various test tiers including unit (pFUnit) and
-    regression testing.
     """,
     context_settings={"help_option_names": ["-h", "--help"]}
 )
+
+app.add_typer(dev_app, name="dev", help="Development and refactoring workflow tools.")
 
 @app.callback()
 def main():
@@ -46,12 +45,35 @@ def regression(
     runner = RegressionRunner(reporter, provider, ref_branch=branch)
     runner.run()
 
+from test.framework.workspace_utils import get_build_path, setup_workspace
+
+@app.command()
+def setup(workspace: str = typer.Argument("dev", help="Workspace name to initialize")):
+    """Initialize a workspace directory structure."""
+    path = setup_workspace(workspace)
+    typer.echo(f"Workspace '{workspace}' initialized at: {path}")
+
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
-def build(ctx: typer.Context):
-    """Wraps 'make' for building."""
-    command = ["make"] + ctx.args
-    print(f"Executing build: {' '.join(command)}")
-    subprocess.run(command)
+def build(
+    ctx: typer.Context,
+    workspace: str = typer.Option("dev", "--workspace", "-w", help="Workspace name to build in")
+):
+    """Wraps 'cmake' and 'make' for building."""
+    build_dir = get_build_path(workspace)
+    src_root = os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd())
+    
+    # Ensure workspace exists
+    os.makedirs(build_dir, exist_ok=True)
+    
+    # Configure command (simplified)
+    config_cmd = ["cmake", "-S", src_root, "-B", build_dir] + ctx.args
+    print(f"Configuring workspace '{workspace}': {' '.join(config_cmd)}")
+    subprocess.run(config_cmd)
+    
+    # Build command
+    build_cmd = ["make", "-C", build_dir, "-j8"]
+    print(f"Building workspace '{workspace}': {' '.join(build_cmd)}")
+    subprocess.run(build_cmd)
 
 @app.command(context_settings={"allow_extra_args": True, "ignore_unknown_options": True})
 def clean(ctx: typer.Context):

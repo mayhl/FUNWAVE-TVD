@@ -14,7 +14,7 @@ module model_main_mod
 
    use core_constants_mod, only: LABEL_SIZE
    use core_env_mod, only: type_env, new_env
-   use probe_recorder, only: dump_state, reset_state
+   use probe_mod, only: dump_state, reset_state
 
    use model_grid_mod, only: type_model_grid
    use model_time_mod, only: type_model_time

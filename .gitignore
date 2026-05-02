@@ -1,12 +1,3 @@
-
-
-# Ignoring build directory and external dependencies
-#  sepecs  dsad 
-build/*
-ext/*
-
-.DS_Store
-
 # Prerequisites
 *.d
 
@@ -48,21 +39,18 @@ ext/*
 
 # debug information files
 *.dwo
+
+# Project specific
 **/__pycache__/
 build/
 build_curr/
 build_ref/
-test/regression/worktrees/
 build_*/
-build/
-__pycache__/
-*.py[cod]
-*.a
-*.o
-*.mod
+workspaces/
+test/regression/worktrees/
 .venv/
-*.pyc
 .DS_Store
 extern/
 fun.env
 *.log
+.gemini_shared_memory.json
