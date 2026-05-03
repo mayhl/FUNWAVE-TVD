@@ -1,0 +1,68 @@
+! allow(E001)
+module test_path
+
+   use pFUnit
+   use core_path_mod
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+      ! Dummy function to fix linter, seems to reset @ errors
+   end subroutine dummy_fix_lint
+
+   @test
+   subroutine test_path_lifecycle()
+      type(type_path) :: sandbox
+      type(type_path) :: file_in_sandbox
+      integer :: stat
+
+      sandbox = type_path("sandbox_dir")
+
+      ! 1. Force Clean Setup: Ensure it does not exist using system command for robust cleanup
+      call execute_command_line("rm -rf sandbox_dir", exitstat=stat)
+      @assertFalse(sandbox%exists(), "Sandbox should not exist at start")
+
+      ! 2. Create directory
+      @assertTrue(sandbox%mkdir(), "mkdir failed")
+      @assertTrue(sandbox%exists(), "Dir should exist after mkdir")
+      @assertTrue(sandbox%is_dir(), "Dir path should report is_dir=true")
+
+      ! 3. Create file inside
+      file_in_sandbox = sandbox%join("test.txt")
+      call file_in_sandbox%touch()
+      @assertTrue(file_in_sandbox%exists(), "File should exist after touch")
+      @assertTrue(file_in_sandbox%is_file(), "File path should report is_file=true")
+
+      ! 4. Final Cleanup: Verify teardown
+      call file_in_sandbox%remove()
+      call sandbox%remove()
+
+      ! Verify final state
+      @assertFalse(sandbox%exists(), "Sandbox should be gone after remove")
+
+   end subroutine test_path_lifecycle
+
+   @test
+   subroutine test_path_utils()
+      type(type_path) :: p
+      type(type_path) :: joined
+      p = type_path("dir")
+      joined = p%join("file.txt")
+      @assertEqual("dir/file.txt", trim(joined%root))
+
+      p = type_path("/path/to/file.txt")
+      @assertEqual("file.txt", trim(p%get_filename()))
+      @assertEqual("/path/to", trim(p%get_parent()))
+
+      p = type_path("data.yaml")
+      @assertEqual("yaml", trim(p%get_suffix()))
+      @assertTrue(p%has_suffix("yaml"))
+      @assertFalse(p%has_suffix("txt"))
+
+      p = type_path("data")
+      call p%add_suffix('yaml')
+      @assertEqual("data.yaml", trim(p%root))
+   end subroutine test_path_utils
+
+end module test_path

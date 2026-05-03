@@ -25,14 +25,14 @@ project(
   LANGUAGES Fortran C CXX)
 
 set(project_name funwave)
-set(main_lib ${project_name})
-set(exe_name exe_${project_name})
+set(main_lib lib${project_name})
+set(exe_name ${project_name})
 set(project_targets ${main_lib})
 set(ext_libs "")
 set(ext_targets "")
 
 # ==============================================================================
-# 2. BUILD OPTIONS
+# 1. BUILD OPTIONS
 # ==============================================================================
 option(USE_MPI "Enable MPI support" ON)
 option(USE_DOUBLE "Enable double precision" ON)
@@ -80,15 +80,17 @@ endif()
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 include(GNUInstallDirs)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/modules"
+     "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-include(intro_banner)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/internal/intro_banner.cmake)
+include(${CMAKE_CURRENT_SOURCE_DIR}/cmake/internal/utils.cmake)
 add_subdirectory(cmake)
 # Fortran comes after cmake for MacOS override
 enable_language(Fortran)
 
 # ==============================================================================
-# 3. DEPENDENCIES
+# 1. DEPENDENCIES
 # ==============================================================================
 
 find_package(MPI REQUIRED COMPONENTS Fortran)
@@ -96,12 +98,12 @@ find_package(Git REQUIRED)
 find_package("face" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
-set(all_targets ${project_targets} ${ext_targets})
+set(all_targets ${project_targets} ${ext_targets} probe)
 
 set(libraries_to_link)
 
 # ==============================================================================
-# 4. BUILD TARGETS
+# 1. BUILD TARGETS
 # ==============================================================================
 
 # Enable position-independent code for shared-library linking support
@@ -121,7 +123,7 @@ if(NOT ENABLE_DEV_MODE)
 endif()
 
 # ==============================================================================
-# 5. TESTING CONFIGURATION
+# 1. TESTING CONFIGURATION
 # ==============================================================================
 
 option(ENABLE_TESTING "Enable unit testing" OFF)
@@ -171,7 +173,7 @@ if(ENABLE_TESTING
 endif()
 
 # ==============================================================================
-# 6. INSTALLATION
+# 1. INSTALLATION
 # ==============================================================================
 
 message(STATUS ${all_targets})
@@ -218,7 +220,7 @@ install(
   RENAME ${project_name}-config.cmake)
 
 # ==============================================================================
-# 7. DOXYGEN DOCUMENTATION
+# 1. DOXYGEN DOCUMENTATION
 # ==============================================================================
 
 option(ENABLE_DOCS "Enable Doxygen documentation generation" OFF)

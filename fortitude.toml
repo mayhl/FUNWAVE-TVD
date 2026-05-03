@@ -1,12 +1,5 @@
 [check]
 select = ["C", "E", "S"]
-ignore = ["S001", "S082", 'S091']
-line-length = 132
-
-# TODO: Remove
-# S091 => using .F file suffice
-
-#[check]
-#select = ["C", "E", "S"]
-#ignore = ['E001' 'S091']
-#line-length = 132
+ignore = ["S001", "S082", "S091"]
+line-length = 100
+exclude = ["src/old/**", "build_*/", "test/regression/worktrees/"]

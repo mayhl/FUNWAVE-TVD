@@ -1,24 +1,25 @@
-# Define libraries
+# ----------------------------
+# Main library
+# ----------------------------
+
 add_library(${main_lib}_core STATIC)
-add_library(${main_lib}_model STATIC)
+add_subdirectory(core)
+set(_new_libs ${main_lib}_core)
 
-# Link model to core
-target_link_libraries(${main_lib}_model PRIVATE ${main_lib}_core)
-
-set(_new_libs ${main_lib}_model ${main_lib}_core)
-
-set(_suffixes core model)
-set(_new_libs)
-
+# NOTE: May need to separate for interdependencies
+set(_suffixes model)
 foreach(_suffix IN LISTS _suffixes)
+  add_library(${main_lib}_${_suffix} STATIC)
   list(APPEND _new_libs "${main_lib}_${_suffix}")
+  target_link_libraries(${main_lib}_${_suffix} PRIVATE ${main_lib}_core)
   add_subdirectory(${_suffix})
 endforeach()
 
 # Create an interface library to aggregate dependencies
 add_library(${main_lib} INTERFACE)
-
 list(APPEND all_targets ${_new_libs})
+
+# NOTE: Temporary hack to not compile old code
 if(ENABLE_DEV_MODE)
   target_link_libraries(${main_lib} INTERFACE ${_new_libs})
 else()
@@ -30,3 +31,20 @@ endif()
 set(all_targets
     "${all_targets}"
     PARENT_SCOPE)
+
+# ----------------------------
+# Probe (Instrumentation)
+# ----------------------------
+
+add_library(probe_interface OBJECT probe/recorder_interface.f90)
+target_sources(${main_lib}_core PRIVATE $<TARGET_OBJECTS:probe_interface>)
+
+# Swap dummy implementation (empty) with probe
+if(ENABLE_INSTRUMENTATION)
+    add_library(probe STATIC probe/recorder_interface.f90)
+else()
+    add_library(probe STATIC probe/recorder_stub.f90)
+endif()
+
+add_dependencies(probe probe_interface)
+target_link_libraries(${main_lib}_core PRIVATE probe)

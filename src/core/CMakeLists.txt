@@ -1,14 +1,18 @@
 target_sources(
   ${main_lib}_core
-  PRIVATE comm.f90
+  PRIVATE accumulators.f90
+          comm.f90
           constants.f90
           env.f90
+          # interpolation.f90
           logging.f90
           misc.f90
           path.F90
           path_utils.c
           range.F90
           throw.f90
+          time_utils.f90
+          units.f90
           yaml.F90)
 
 # Link external dependencies privately

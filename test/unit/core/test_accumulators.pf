@@ -1,0 +1,40 @@
+! Test for core_accumulators_mod
+! allow(E001)
+module test_accumulator_utils_mod
+
+   use pFUnit
+   use core_accumulators_mod, only: type_accumulator
+   use core_constants_mod, only: SP
+   implicit none(external)
+   @test
+   subroutine test_accumulator_stats()
+      implicit none
+
+      type(type_accumulator) :: acc
+      real(SP) :: data(2, 1)
+      real(SP), allocatable :: result(:, :)
+
+      call acc%init(2, 1, "test_quant")
+      call acc%allocate_stat("min")
+      call acc%allocate_stat("max")
+
+      data(1, 1) = 1.0
+      data(2, 1) = 2.0
+      call acc%accumulate(data)
+
+      data(1, 1) = 3.0
+      data(2, 1) = 0.0
+      call acc%accumulate(data)
+
+      result = acc%get_stat("min")
+      @assertEqual(0.0, result(2, 1), 1.e-6)
+      @assertEqual(1.0, result(1, 1), 1.e-6)
+
+      result = acc%get_stat("max")
+      @assertEqual(3.0, result(1, 1), 1.e-6)
+      @assertEqual(2.0, result(2, 1), 1.e-6)
+
+      call acc%finalize()
+   end subroutine test_accumulator_stats
+
+end module test_accumulator_utils_mod

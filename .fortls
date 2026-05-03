@@ -1,0 +1,21 @@
+{
+  "lowercase_intrinsics": true,
+  "use_signature_help": true,
+  "sort_keywords": true,
+  "incremental_sync": true,
+  "hover_length": 100,
+  "sources": [
+    "src/core/**/*.f90",
+    "src/model/**/*.f90",
+    "src/old/**/*.F"
+  ],
+  "exclude_dirs": [
+    "build*",
+    "test/regression/worktrees/*",
+    ".venv",
+    "extern/*"
+  ],
+  "mod_dir": [
+    "build_dev/src"
+  ]
+}

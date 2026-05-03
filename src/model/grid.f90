@@ -91,8 +91,8 @@ contains
       call this%env%yaml%read_positive('nx', val=this%nx)
       call this%env%yaml%read_positive('ny', val=this%ny)
 
-      call this%env%yaml%read_positive('x_proc', val=this%nx_proc, is_empty=is_px_empty)
-      call this%env%yaml%read_positive('y_proc', val=this%ny_proc, is_empty=is_py_empty)
+      call this%env%yaml%read_positive('x_proc', val=this%nx_proc, silent=is_px_empty)
+      call this%env%yaml%read_positive('y_proc', val=this%ny_proc, silent=is_py_empty)
 
       call this%env%comm%barrier()
 

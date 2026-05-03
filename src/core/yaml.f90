@@ -63,11 +63,12 @@
 module core_yaml_file_mod
 
    use core_comm_mod, only: type_comm
-   use core_constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP
-   use core_path_mod, only: type_path
+   use core_constants_mod, only: MESSAGE_SIZE, STRING_SIZE, LABEL_SIZE, SP, type_string
    use core_log_io_mod, only: type_log_writer
    use core_misc_mod, only: str2int, str2real
+   use core_path_mod, only: type_path
    use core_range_parse_mod, only: type_integer_range, type_real_range
+   use core_units_mod, only: apply_unit_conversion, get_units_by_dim
 
    use fortran_yaml_c, only: YamlFile, dp, &
                              type_node, type_dictionary, type_error, &
@@ -91,17 +92,22 @@ module core_yaml_file_mod
    contains
 
       procedure, public :: init
-      procedure, public :: cast_dictionary
-      procedure, public :: is_dictionary
       procedure, public :: has_key
-      procedure, public :: read_enum
-      procedure, public :: read_input_path
-      procedure, public :: read_time
+      procedure, public :: finalize
+
       procedure :: copy_node
       procedure :: parse_error_message
       procedure :: prep_msg
       procedure :: prep_msg_val
+      procedure :: prep_extern_msg
+      procedure :: sanitize_path
 
+      procedure, public :: cast_dictionary
+      procedure, public :: is_dictionary
+      procedure, public :: is_dictionary_node
+      procedure, public :: read_time
+
+      ! Integers
       procedure, public :: read_integer
       procedure, public :: read_integer_node
       procedure, public :: read_positive_integer
@@ -109,6 +115,7 @@ module core_yaml_file_mod
       procedure, public :: read_nonnegative_integer
       procedure, public :: read_nonpositive_integer
 
+      ! Real
       procedure, public :: read_real
       procedure, public :: read_real_node
       procedure, public :: read_positive_real
@@ -116,16 +123,21 @@ module core_yaml_file_mod
       procedure, public :: read_nonnegative_real
       procedure, public :: read_nonpositive_real
 
+      ! Bool/Logical
       procedure, public :: read_logical
       procedure, public :: read_logical_node
 
+      ! Strings
       procedure, public :: read_string
       procedure, public :: read_string_node
+      procedure, public :: read_string_array
+      procedure, public :: read_enum
+      procedure, public :: read_enum_node
+      procedure, public :: read_input_path
 
-      procedure, public :: finalize
-
+      ! Interface overloads
       generic, public :: read => read_integer, read_real, read_logical, &
-         read_string, read_enum, read_input_path
+         read_string, read_enum, read_input_path, read_string_array
 
       generic, public :: read_positive => read_positive_integer, read_positive_real
       generic, public :: read_negative => read_negative_integer, read_negative_real
@@ -186,6 +198,38 @@ contains
 
    end subroutine init
 
+   function is_dictionary_node(this, key, silent) result(val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      logical, optional, intent(out) :: silent
+      logical :: val
+
+      class(type_node), pointer :: node
+      character(:), allocatable :: buff
+
+      node => this%root%get(key)
+
+      if (associated(node)) then
+         select type (node)
+         class is (type_dictionary)
+            val = .true.
+         class default
+            val = .false.
+         end select
+         if (present(silent)) silent = .false.
+      else
+         if (present(silent)) then
+            silent = .true.
+            val = .false.
+         else
+            buff = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+            call this%log%exit_on_error(buff)
+         end if
+
+      end if
+
+   end function is_dictionary_node
+
    function is_dictionary(this, key, is_empty) result(val)
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
@@ -196,27 +240,7 @@ contains
       character(:), allocatable :: buff
 
       if (this%comm%is_io_node()) then
-
-         node => this%root%get(key)
-
-         if (associated(node)) then
-            select type (node)
-            class is (type_dictionary)
-               val = .true.
-            class default
-               val = .false.
-            end select
-            if (present(is_empty)) is_empty = .false.
-         else
-            if (present(is_empty)) then
-               is_empty = .true.
-               val = .false.
-            else
-               buff = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
-               call this%log%exit_on_error(buff)
-            end if
-
-         end if
+         val = this%is_dictionary_node(key, is_empty)
       end if
 
       call this%comm%barrier()
@@ -289,8 +313,7 @@ contains
 
 #define _NAME integer
 #define _CLASS integer
-#define _GET this%root%get_integer
-#define _BCAST(x) call this%comm%bcast_integer(x)
+#define _GET get_integer
 #define _RANGE type_integer_range
 #define _HAS_RANGE 1
 
@@ -299,7 +322,7 @@ contains
 #define _READ_POSITIVE       _PASTE(read_positive_,_NAME)
 #define _READ_NEGATIVE       _PASTE(read_negative_,_NAME)
 #define _READ_NONNEGATIVE    _PASTE(read_nonnegative_,_NAME)
-#define _READ_NONPOSITIVE       _PASTE(read_nonpositive_,_NAME)
+#define _READ_NONPOSITIVE    _PASTE(read_nonpositive_,_NAME)
 
 #include "core/yaml_body.inc"
 
@@ -309,20 +332,21 @@ contains
 #undef _READ_NEGATIVE
 #undef _READ_NONNEGATIVE
 #undef _READ_NONPOSITIVE
+#undef _HAS_RANGE
 
 #define _NAME real
 #define _CLASS real(SP)
-#define _GET this%root%get_real
-#define _BCAST(x) call this%comm%bcast_real(x)
+#define _GET get_real
 #define _RANGE type_real_range
 #define _HAS_RANGE 1
+#define _HAS_UNITS 1
 
 #define _READ                _PASTE(read_,_NAME)
 #define _READ_NODE           _PASTE(_READ,_node)
 #define _READ_POSITIVE       _PASTE(read_positive_,_NAME)
 #define _READ_NEGATIVE       _PASTE(read_negative_,_NAME)
 #define _READ_NONNEGATIVE    _PASTE(read_nonnegative_,_NAME)
-#define _READ_NONPOSITIVE       _PASTE(read_nonpositive_,_NAME)
+#define _READ_NONPOSITIVE    _PASTE(read_nonpositive_,_NAME)
 
 #include "core/yaml_body.inc"
 
@@ -332,11 +356,12 @@ contains
 #undef _READ_NEGATIVE
 #undef _READ_NONNEGATIVE
 #undef _READ_NONPOSITIVE
+#undef _HAS_RANGE
+#undef _HAS_UNITS
 
 #define _NAME logical
 #define _CLASS logical
-#define _GET this%root%get_logical
-#define _BCAST(x) call this%comm%bcast_logical(x)
+#define _GET get_logical
 
 #define _READ                _PASTE(read_,_NAME)
 #define _READ_NODE           _PASTE(_READ,_node)
@@ -348,8 +373,7 @@ contains
 
 #define _NAME string
 #define _CLASS character(:), allocatable
-#define _GET this%root%get_string
-#define _BCAST(x) call this%comm%bcast_string(x)
+#define _GET get_string
 
 #define _READ                _PASTE(read_,_NAME)
 #define _READ_NODE           _PASTE(_READ,_node)
@@ -359,12 +383,12 @@ contains
 #undef _READ
 #undef _READ_NODE
 
-   subroutine read_time(this, key, default, is_empty, val)
+   subroutine read_time(this, key, default, silent, val)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
+      logical, optional, intent(out) :: silent
       real(SP), intent(out) :: val
 
       !  logical :: is_dict
@@ -379,7 +403,7 @@ contains
          call child%read_enum("units", utypes, val=unit)
 
          call child%read_positive_real("value", default=default, &
-                                       is_empty=is_empty, val=val)
+                                       silent=silent, val=val)
 
          select case (unit)
          case ('min')
@@ -393,65 +417,77 @@ contains
          if (allocated(unit)) deallocate (unit)
       else
          call this%read_positive_real(key, default=default, &
-                                      is_empty=is_empty, val=val)
+                                      silent=silent, val=val)
 
       end if
 
    end subroutine read_time
 
-   subroutine read_enum(this, key, values, default, is_empty, val)
+   subroutine read_enum_node(this, key, values, default, silent, val)
       !----------------------------------------------------------
 
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(len=*), dimension(:), intent(in) :: values
       character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
+      logical, optional, intent(out) :: silent
       character(:), allocatable, intent(inout) :: val
 
       integer :: len, i
       logical :: is_found
       character(len=:), allocatable :: msg
 
-      if (this%comm%is_io_node()) then
+      call this%read_string_node(key, default, silent, val)
 
-         call this%read_string_node(key, default, is_empty, val)
-
-         len = size(values)
-         is_found = .false.
-         do i = 1, len
-            if (val .eq. values(i)) then
-               is_found = .true.
-               exit
-            end if
-         end do
-
-         if (.not. is_found) then
-
-            msg = "which is not in the allowable list of values. Valid values: "
-            msg = msg//trim(values(1))
-            do i = 2, len - 1
-               msg = msg//', '//trim(values(i))
-            end do
-            msg = msg//', & '//trim(values(len))//"."
-
-            msg = this%prep_msg_val(key, msg)
-            call this%log%exit_on_error(msg)
+      len = size(values)
+      is_found = .false.
+      do i = 1, len
+         if (val .eq. values(i)) then
+            is_found = .true.
+            exit
          end if
+      end do
 
+      if (.not. is_found) then
+
+         msg = "which is not in the allowable list of values. Valid values: "
+         msg = msg//trim(values(1))
+         do i = 2, len - 1
+            msg = msg//', '//trim(values(i))
+         end do
+         msg = msg//', & '//trim(values(len))//"."
+
+         msg = this%prep_msg_val(key, msg)
+         call this%log%exit_on_error(msg)
+      end if
+
+   end subroutine read_enum_node
+
+   subroutine read_enum(this, key, values, default, silent, val)
+      !----------------------------------------------------------
+
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(len=*), dimension(:), intent(in) :: values
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      character(:), allocatable, intent(inout) :: val
+
+      if (this%comm%is_io_node()) then
+         call this%read_enum_node(key, values, default=default, silent=silent, val=val)
       end if
 
       call this%comm%bcast_string(val)
 
    end subroutine read_enum
 
-   subroutine read_input_path(this, key, default, is_empty, val)
+   subroutine read_input_path(this, key, default, silent, val)
       !----------------------------------------------------------
       ! Read key from from root node and parse as integer
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
-      logical, optional, intent(out) :: is_empty
+      logical, optional, intent(out) :: silent
       type(type_path), intent(inout) :: val
 
       character(:), allocatable :: val_buff
@@ -459,7 +495,7 @@ contains
       character(len=:), allocatable :: msg
 
       if (this%comm%is_io_node()) then
-         call this%read_string_node(key, default=default, is_empty=is_empty, val=val_buff)
+         call this%read_string_node(key, default=default, silent=silent, val=val_buff)
 
          val = type_path(val_buff)
 
@@ -475,7 +511,8 @@ contains
       val = type_path(val_buff)
    end subroutine read_input_path
 
-   function parse_error_message(this, key, io_err, default, is_empty) result(is_default)
+   function parse_error_message(this, key, io_err, default, silent) result(is_default)
+
       ! Parses fortran-yaml-c error message and filters no key error from
       ! terminating program when optional arguments are provided
 
@@ -484,7 +521,7 @@ contains
       character(*), intent(in)::key
       type(type_error), allocatable, intent(inout) :: io_err
       character(*), optional, intent(in):: default
-      logical, optional, intent(out) ::is_empty
+      logical, optional, intent(out) ::silent
       logical :: is_default
       class(type_node), pointer:: node
       character(STRING_SIZE) :: buff
@@ -492,7 +529,7 @@ contains
 
       if (.not. allocated(io_err)) then
          is_default = .false.
-         buff = " read value "//this%root%get_string(key, error=io_err)
+         buff = " read value '"//this%root%get_string(key, error=io_err)//"'."
          call this%log%debug(this%prep_msg(key, buff))
          return
       end if
@@ -514,21 +551,24 @@ contains
 
          else
             is_default = .false.
-            call this%log%exit_on_error(io_err%message)
+            buff = this%prep_extern_msg(key, io_err%message)
+            call this%log%exit_on_error(buff)
          end if
 
-      else if (present(is_empty)) then
+      else if (present(silent)) then
          ! Ignoring no key error if bypass value is given
-         is_empty = .true.
+         silent = .true.
          is_default = .false.
          if (.not. is_no_key_err(io_err)) then
-            call this%log%exit_on_error(io_err%message)
+            buff = this%prep_extern_msg(key, io_err%message)
+            call this%log%exit_on_error(buff)
          end if
 
       else
          ! Default behavior, exiting on normally on YAML error
          is_default = .false.
-         call this%log%exit_on_error(io_err%message)
+         buff = this%prep_extern_msg(key, io_err%message)
+         call this%log%exit_on_error(buff)
 
       end if
 
@@ -536,12 +576,40 @@ contains
 
    end function parse_error_message
 
+   function sanitize_path(this, key) result(new_path)
+
+      class(type_yaml_reader), intent(in) :: this
+      character(*), intent(in) :: key
+
+      character(len=:), allocatable :: new_path
+      integer :: i, n
+
+      new_path = adjustl(this%root%path)
+      n = len_trim(new_path)
+      do i = 1, n
+         if (new_path(i:i) == "/") then
+            new_path(i:i) = "."
+         end if
+      end do
+
+      if (n > 0) then
+         if (new_path(1:1) == '.') then
+            new_path = new_path(2:n)
+         end if
+         new_path = new_path//"."//key
+      else
+         new_path = key
+      end if
+
+      print *, new_path
+   end function sanitize_path
+
    function prep_msg(this, key, msg) result(new_msg)
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in)::key, msg
       character(len=STRING_SIZE) :: new_msg
-      new_msg = this%root%path//"/"//key//msg
+      new_msg = this%sanitize_path(key)//msg
    end function prep_msg
 
    function prep_msg_val(this, key, msg) result(new_msg)
@@ -553,9 +621,22 @@ contains
       type(type_error), allocatable :: io_err
 
       val = this%root%get_string(key, error=io_err)
-
-      new_msg = this%root%path//"/"//key//" is set to """//val//""", "//msg
+      new_msg = this%sanitize_path(key)//" is set to """//val//""", "//msg
    end function prep_msg_val
+
+   function prep_extern_msg(this, key, msg) result(new_msg)
+      !----------------------------------------------------------
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in)::key, msg
+      character(len=STRING_SIZE) :: new_msg
+
+      integer :: i0, i1
+
+      i0 = len_trim(this%root%path) + len_trim(key) + 2
+      i1 = len_trim(msg)
+      new_msg = this%sanitize_path(key)//msg(i0:i1)
+
+   end function prep_extern_msg
 
    pure function is_no_key_err(io_err) result(val)
 
@@ -566,6 +647,56 @@ contains
       val = (index(io_err%message, NO_KEY_ERR) .gt. 0)
 
    end function is_no_key_err
+
+   subroutine read_string_array(this, key, silent, val)
+      !----------------------------------------------------------
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      type(type_string), allocatable, intent(inout), dimension(:) :: val
+      logical, optional, intent(out) :: silent
+
+      class(type_node), pointer :: node
+      class(type_list), pointer :: list_node
+      type(type_list_item), pointer :: item
+      class(type_scalar), pointer :: item_scalar
+      integer :: n, i
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+
+      if (this%comm%is_io_node()) then
+         node => this%root%get(key)
+         ! Use helper to handle errors consistently
+         is_default = this%parse_error_message(key, io_err, silent=silent)
+
+         if (.not. is_default) then
+            select type (node)
+            class is (type_list)
+               list_node => node
+               n = list_node%size()
+               if (allocated(val)) deallocate (val)
+               allocate (val(n))
+               i = 1
+               item => list_node%first
+               do while (associated(item))
+                  select type (node_item => item%node)
+                  class is (type_scalar)
+                     item_scalar => node_item
+                     val(i)%s = item_scalar%string
+                  class default
+                     call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
+                  end select
+                  i = i + 1
+                  item => item%next
+               end do
+            class default
+               call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
+            end select
+         end if
+      end if
+
+      call this%comm%bcast(val)
+
+   end subroutine read_string_array
 
    subroutine finalize(this)
       class(type_yaml_reader), intent(inout) :: this

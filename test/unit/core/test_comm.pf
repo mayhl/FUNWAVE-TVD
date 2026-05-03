@@ -1,0 +1,128 @@
+! allow(E001)
+module test_comm
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP, type_string
+
+   implicit none(external)
+
+contains
+
+   subroutine open_comm(this, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm), intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+   end subroutine open_comm
+
+   @test(npes=[2])
+   subroutine test_bcast_integer(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      integer :: val
+
+      call open_comm(this, comm)
+
+      val = 0
+      if (comm%is_io_node()) val = 42
+
+      call comm%bcast(val)
+
+      @mpiAssertEqual(42, val)
+
+   end subroutine test_bcast_integer
+
+   @test(npes=[2])
+   subroutine test_bcast_real(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_comm(this, comm)
+
+      val = 0.0_SP
+      if (comm%is_io_node()) val = 3.14159_SP
+
+      call comm%bcast(val)
+
+      @mpiAssertEqual(3.14159_SP, val, tolerance=1e-6_SP)
+
+   end subroutine test_bcast_real
+
+   @test(npes=[2])
+   subroutine test_bcast_integer_array(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      integer, allocatable :: val(:)
+
+      call open_comm(this, comm)
+
+      if (comm%is_io_node()) then
+         allocate (val(3))
+         val = [1, 2, 3]
+      else
+         allocate (val(0))
+      end if
+
+      call comm%bcast(val)
+
+      @mpiAssertEqual(3, size(val))
+      @mpiAssertEqual(1, val(1))
+      @mpiAssertEqual(2, val(2))
+      @mpiAssertEqual(3, val(3))
+
+   end subroutine test_bcast_integer_array
+
+   @test(npes=[2])
+   subroutine test_bcast_real_array(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      real(SP), allocatable :: val(:)
+
+      call open_comm(this, comm)
+
+      if (comm%is_io_node()) then
+         allocate (val(3))
+         val = [1.1_SP, 2.2_SP, 3.3_SP]
+      else
+         allocate (val(0))
+      end if
+
+      call comm%bcast(val)
+
+      @mpiAssertEqual(3, size(val))
+      @mpiAssertEqual(1.1_SP, val(1), tolerance=1e-6_SP)
+      @mpiAssertEqual(2.2_SP, val(2), tolerance=1e-6_SP)
+      @mpiAssertEqual(3.3_SP, val(3), tolerance=1e-6_SP)
+
+   end subroutine test_bcast_real_array
+
+   @test(npes=[2])
+   subroutine test_bcast_string_array(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      type(type_string), allocatable :: list(:)
+
+      call open_comm(this, comm)
+
+      if (comm%is_io_node()) then
+         allocate (list(2))
+         list(1)%s = 'string1'
+         list(2)%s = 'string2'
+      else
+         allocate (list(0))
+      end if
+
+      call comm%bcast(list)
+
+      @mpiAssertEqual(2, size(list))
+      @mpiAssertEqual('string1', list(1)%s)
+      @mpiAssertEqual('string2', list(2)%s)
+
+   end subroutine test_bcast_string_array
+
+end module test_comm

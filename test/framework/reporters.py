@@ -4,11 +4,14 @@ class ConsoleReporter:
     def __init__(self):
         self.console = Console()
 
-    def info(self, message):
-        self.console.print(f"[blue]INFO:[/blue] {message}")
+    def info(self, msg):
+        self.console.print(f"[blue]INFO:[/blue] {msg}")
 
-    def success(self, message):
-        self.console.print(f"[green]SUCCESS:[/green] {message}")
+    def warn(self, msg):
+        self.console.print(f"[yellow]WARN:[/yellow] {msg}")
+
+    def success(self, msg):
+        self.console.print(f"[green]SUCCESS:[/green] {msg}")
 
     def error(self, message):
         self.console.print(f"[red]ERROR:[/red] {message}")

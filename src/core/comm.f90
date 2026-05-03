@@ -13,7 +13,7 @@
 module core_comm_mod
 
    use mpi_f08
-   use core_constants_mod, only: n_ghost, LABEL_SIZE, SP, MPI_SP
+   use core_constants_mod, only: n_ghost, LABEL_SIZE, SP, MPI_SP, type_string
    use core_log_io_mod, only: type_log_writer, new_log_writer
 
    implicit none(external)
@@ -71,9 +71,16 @@ module core_comm_mod
       procedure, public :: bcast_integer
       procedure, public :: bcast_logical
       procedure, public :: bcast_real
-      procedure, public :: bcast_string
+      procedure, public :: bcast_string => bcast_string
+      procedure, public :: bcast_string_array => bcast_string_array
+      procedure, public :: bcast_integer_array => bcast_integer_array
+      procedure, public :: bcast_real_array => bcast_real_array
+
+      generic, public :: bcast => bcast_integer, bcast_logical, bcast_real, &
+         bcast_string, bcast_integer_array, bcast_real_array, bcast_string_array
 
       procedure, public :: finalize
+
       procedure, public :: barrier
    end type type_comm
 
@@ -343,4 +350,90 @@ contains
       integer :: ierr
       call MPI_Finalize(ierr)
    end subroutine finalize
+
+   subroutine bcast_integer_array(this, val)
+      class(type_comm), intent(inout) :: this
+      integer, allocatable, intent(inout), dimension(:) :: val
+      integer :: n, ierr
+      if (this%is_io_node()) n = size(val)
+      call MPI_Bcast(n, 1, MPI_INTEGER, this%io_node_id, this%id, ierr)
+      call this%barrier()
+      if (.not. this%is_io_node()) then
+         if (allocated(val)) deallocate (val)
+         allocate (val(n))
+      end if
+      call MPI_Bcast(val, n, MPI_INTEGER, this%io_node_id, this%id, ierr)
+      call this%barrier()
+   end subroutine bcast_integer_array
+
+   subroutine bcast_real_array(this, val)
+      class(type_comm), intent(inout) :: this
+      real(SP), allocatable, intent(inout), dimension(:) :: val
+      integer :: n, ierr
+      if (this%is_io_node()) n = size(val)
+      call MPI_Bcast(n, 1, MPI_INTEGER, this%io_node_id, this%id, ierr)
+      call this%barrier()
+      if (.not. this%is_io_node()) then
+         if (allocated(val)) deallocate (val)
+         allocate (val(n))
+      end if
+      call MPI_Bcast(val, n, MPI_DOUBLE_PRECISION, this%io_node_id, this%id, ierr)
+      call this%barrier()
+   end subroutine bcast_real_array
+
+   subroutine bcast_string_array(this, list)
+
+      class(type_comm), intent(inout) :: this
+      type(type_string), allocatable, intent(inout), dimension(:) :: list
+
+      integer :: n, i, total_len, ierr
+      integer, allocatable :: lengths(:)
+      character(:), allocatable :: buffer
+
+      ! Get lengths of strings
+      n = size(list)
+      call this%bcast_integer(n)
+      allocate (lengths(n))
+      if (this%is_io_node()) then
+         total_len = 0
+         do i = 1, n
+            lengths(i) = len(list(i)%s)
+            total_len = total_len + lengths(i)
+         end do
+      end if
+
+      call this%bcast_integer(total_len)
+      call this%bcast_integer_array(lengths)
+
+      allocate (character(len=total_len) :: buffer)
+
+      ! Concatenating array of strings to single string
+      if (this%is_io_node()) then
+         total_len = 1
+         do i = 1, n
+            buffer(total_len:total_len + lengths(i) - 1) = list(i)%s
+            total_len = total_len + lengths(i)
+         end do
+      end if
+
+      call this%bcast_string(buffer)
+
+      ! Reconstructing array of strings
+      if (.not. this%is_io_node()) then
+         if (allocated(list)) deallocate (list)
+         allocate (list(n))
+
+         total_len = 1
+         do i = 1, n
+            allocate (character(len=lengths(i)) :: list(i)%s)
+            list(i)%s = buffer(total_len:total_len + lengths(i) - 1)
+            total_len = total_len + lengths(i)
+         end do
+
+      end if
+
+      deallocate (lengths, buffer)
+
+   end subroutine bcast_string_array
+
 end module core_comm_mod
