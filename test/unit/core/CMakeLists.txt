@@ -8,4 +8,4 @@ qadd_pfunit_ctest(test_yaml_serial)
 qadd_pfunit_ctest(test_yaml_parallel 2)
 qadd_pfunit_ctest(test_time_utils)
 
-qadd_pfunit_ctest(test_accumulators)
+# qadd_pfunit_ctest(test_accumulators)

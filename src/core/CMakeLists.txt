@@ -1,26 +1,26 @@
-target_sources(
-  ${main_lib}_core
-  PRIVATE accumulators.f90
-          comm.f90
-          constants.f90
-          env.f90
-          # interpolation.f90
-          logging.f90
-          misc.f90
-          path.F90
-          path_utils.c
-          range.F90
-          throw.f90
-          time_utils.f90
-          units.f90
-          yaml.F90)
+# Layered Core Build System Orchestrator
 
-# Link external dependencies privately
-target_link_libraries(${main_lib}_core PRIVATE ${ext_libs})
+# Layer 0: Base Utilities
+add_subdirectory(base)
 
-# Expose local build directory for .mod files to other modules
-target_include_directories(
-  ${main_lib}_core
-  PUBLIC "$<BUILD_INTERFACE:${CMAKE_CURRENT_BINARY_DIR}>"
-         "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/inc>"
-         "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules>")
+# Layer 1: Comms & I/O
+add_subdirectory(transport)
+
+# Layer 2: Time Management
+add_subdirectory(engine)
+
+# Layer 3: Basic Math/Physics
+add_subdirectory(physics)
+
+target_link_libraries(${main_lib}_core INTERFACE libcore_base libcore_transport
+                                                 libcore_engine libcore_physics)
+
+# target_link_libraries(libcore INTERFACE libcore_yaml)
+
+list(APPEND all_targets libcore_base libcore_transport libcore_engine
+     libcore_physics)
+# list(APPEND all_targets libcore_yaml)
+
+set(all_targets
+    "${all_targets}"
+    PARENT_SCOPE)

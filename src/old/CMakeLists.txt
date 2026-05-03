@@ -38,8 +38,8 @@ target_include_directories(
 # Apply compiler definitions
 target_compile_definitions(${main_lib}_old PRIVATE ${MODULE_FLAGS})
 
-# Explicitly link to model to inherit include paths for modules
-target_link_libraries(${main_lib}_old PRIVATE ${main_lib}_model)
+# Explicitly link to model and core libraries to inherit include paths for modules
+target_link_libraries(${main_lib}_old PRIVATE ${main_lib}_model core_all)
 if(USE_VESSEL)
   target_sources(${main_lib}_old PRIVATE vessel.F)
 endif()

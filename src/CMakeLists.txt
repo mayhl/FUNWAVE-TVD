@@ -6,15 +6,6 @@ add_library(${main_lib}_core STATIC)
 add_subdirectory(core)
 set(_new_libs ${main_lib}_core)
 
-# NOTE: May need to separate for interdependencies
-set(_suffixes model)
-foreach(_suffix IN LISTS _suffixes)
-  add_library(${main_lib}_${_suffix} STATIC)
-  list(APPEND _new_libs "${main_lib}_${_suffix}")
-  target_link_libraries(${main_lib}_${_suffix} PRIVATE ${main_lib}_core)
-  add_subdirectory(${_suffix})
-endforeach()
-
 # Create an interface library to aggregate dependencies
 add_library(${main_lib} INTERFACE)
 list(APPEND all_targets ${_new_libs})
@@ -41,10 +32,10 @@ target_sources(${main_lib}_core PRIVATE $<TARGET_OBJECTS:probe_interface>)
 
 # Swap dummy implementation (empty) with probe
 if(ENABLE_INSTRUMENTATION)
-    add_library(probe STATIC probe/recorder_interface.f90)
+  add_library(probe STATIC probe/recorder.f90)
 else()
-    add_library(probe STATIC probe/recorder_stub.f90)
+  add_library(probe STATIC probe/recorder_stub.f90)
 endif()
 
 add_dependencies(probe probe_interface)
-target_link_libraries(${main_lib}_core PRIVATE probe)
+target_link_libraries(${main_lib}_core INTERFACE probe)

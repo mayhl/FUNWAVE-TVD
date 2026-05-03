@@ -1,6 +1,5 @@
 module core_time_utils_mod
    use core_constants_mod, only: SP, type_string
-   use core_accumulators_mod, only: type_accumulator
    implicit none
 
    ! Abstract interface for the callback
@@ -22,7 +21,6 @@ module core_time_utils_mod
 
       ! Dynamic list of operations
       type(type_string), allocatable :: ops(:)
-      type(type_accumulator) :: stats
 
       procedure(callback_interface), pointer, nopass :: callback => null()
    contains

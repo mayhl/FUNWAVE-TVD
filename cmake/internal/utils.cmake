@@ -63,7 +63,7 @@ macro("qadd_pfunit_ctest" name)
   set(_extra_args ${ARGN})
   list(LENGTH _extra_args _extra_count)
 
-  set(_other_sources ../../throw_with_pfunit.F90)
+  set(_other_sources ../../throw_with_pfunit.f90)
   set(_extra_use throw_with_pfunit_mod)
   set(_extra_init initialize_throw)
 
@@ -100,7 +100,7 @@ macro("qadd_pfunit_ctest" name)
   target_include_directories(
     ${name}
     PRIVATE "$<TARGET_PROPERTY:${main_lib}_core,INTERFACE_INCLUDE_DIRECTORIES>"
-            "${CMAKE_BINARY_DIR}/src")
+            "${CMAKE_BINARY_DIR}/src" "${CMAKE_BINARY_DIR}/src/core/engine")
 
   set_tests_properties(${name} PROPERTIES LABELS "unit")
   set_target_properties(
