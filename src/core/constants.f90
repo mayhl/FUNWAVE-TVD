@@ -59,9 +59,10 @@ module core_constants_mod
    integer, parameter :: err_file_permission = 9
    integer, parameter :: err_no_file = 29
 
-   type :: type_string
+   type, public :: type_string
       character(:), allocatable :: s
    end type type_string
+
 
    !integer, parameter ::
 end module core_constants_mod

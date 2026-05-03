@@ -2,7 +2,7 @@
 ! TODO: Add dict tests
 
 ! allow(E001)
-module test_yaml_input_serial
+module test_yaml_serial
 
    use pFUnit
 
@@ -598,5 +598,5 @@ contains
       call dummy_fix_lint()
    end subroutine test_read_real_units
 
-end module test_yaml_input_serial
+end module test_yaml_serial
 

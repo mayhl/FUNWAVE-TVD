@@ -1,0 +1,2 @@
+qadd_pfunit_ctest(test_time)
+target_link_libraries(test_time libfunwave_model libfunwave_core)

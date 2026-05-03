@@ -1,5 +1,6 @@
 module core_time_utils_mod
    use core_constants_mod, only: SP, type_string
+   use core_accumulators_mod, only: type_accumulator
    implicit none
 
    ! Abstract interface for the callback
@@ -9,23 +10,27 @@ module core_time_utils_mod
    end interface
 
    type, public :: type_timing_control
-      ! NOTE: This module needs connection to core_comm_mod for parallel timing synchronization
-      ! and global clock consistency across MPI ranks.
+      ! Standard timing parameters
       character(:), allocatable :: id
       real(SP)      :: interval
       real(SP)      :: t_start = 0.0
+      real(SP)      :: t_end = 0.0
+      real(SP)      :: dt = 0.0
+      real(SP)      :: current_time = 0.0
       real(SP)      :: last_triggered = -1.0
+      integer       :: step = 0
 
-      ! Dynamic list of operations (e.g., ["min", "max", "rms"])
+      ! Dynamic list of operations
       type(type_string), allocatable :: ops(:)
+      type(type_accumulator) :: stats
 
-      ! Procedure pointer for the callback
       procedure(callback_interface), pointer, nopass :: callback => null()
    contains
       procedure, public :: should_trigger
       procedure, public :: init_from_yaml
+      procedure, public :: advance
+      procedure, public :: is_finished
    end type type_timing_control
-
 contains
 
    function should_trigger(this, current_time) result(trigger)
@@ -48,6 +53,18 @@ contains
       end if
    end function should_trigger
 
+   subroutine advance(this)
+      class(type_timing_control), intent(inout) :: this
+      this%current_time = this%current_time + this%dt
+      this%step = this%step + 1
+   end subroutine advance
+
+   function is_finished(this) result(finished)
+      class(type_timing_control), intent(in) :: this
+      logical :: finished
+      finished = (this%current_time >= this%t_end)
+   end function is_finished
+
    subroutine init_from_yaml(this, yaml_reader)
       use core_yaml_file_mod, only: type_yaml_reader
       class(type_timing_control), intent(inout) :: this
@@ -61,7 +78,7 @@ contains
 
       ! Dynamically load ops list if present
       if (yaml_reader%has_key("ops")) then
-         call yaml_reader%read("ops", val=this%ops)
+         call yaml_reader%read_string_array("ops", val=this%ops)
       end if
    end subroutine init_from_yaml
 

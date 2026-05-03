@@ -1,59 +1,67 @@
-!--------------------------------------------------
-!   This file is part of the FUNWAVE-TVD
-!   program under the Simplified BSD license
-!--------------------------------------------------
-!
-!  Component
-!
-!  HISTORY :
-!    11/23/2025  Michael-Angelo Y.H. Lam
-!
-!-------------------------------------------------
-module model_time_mod
-   use mpi_f08
+module core_simulation_time_mod
    use core_constants_mod, only: SP
-   use core_env_mod, only: type_env, get_sub_env
-   use model_interface_mod, only: type_model_interface
+   use core_yaml_file_mod, only: type_yaml_reader
+   use core_accumulators_mod, only: type_accumulator
+   implicit none
 
-   implicit none(external)
+   type, public :: type_simulation_control
+      ! --- Simulation State ---
+      real(SP) :: t_start = 0.0
+      real(SP) :: t_end = 0.0
+      real(SP) :: current_time = 0.0
+      integer  :: step = 0
 
-   private
-
-   public type_model_time
-
-   type, extends(type_model_interface) :: type_model_time
-
-      real(SP) :: total
-      real(SP) :: start
-      real(SP) :: plot_dt
-      real(SP) :: log_dt
-      integer :: start_index
+      ! --- Telemetry ---
+      type(type_accumulator) :: stats
 
    contains
-      procedure :: read_input => read_input
-   end type type_model_time
+      procedure :: init_from_yaml
+      procedure :: advance
+      procedure :: is_finished
+   end type type_simulation_control
 
-contains
+   contains
 
-   subroutine read_input(this, env)
+   subroutine init_from_yaml(this, reader)
+      class(type_simulation_control), intent(inout) :: this
+      type(type_yaml_reader), intent(inout) :: reader
 
-      class(type_model_time), intent(inout) :: this
-      type(type_env), intent(inout), target :: env
+      type(type_yaml_reader) :: time_reader
 
-      this%env = get_sub_env(env, 'time')
-      this%is_activated = .true.
+      if (reader%is_dictionary("time")) then
+         time_reader = reader%cast_dictionary("time")
+         call time_reader%read("start", default="0.0", val=this%t_start, dim="time")
+         call time_reader%read("end", val=this%t_end, dim="time")
+      else
+         call reader%log%exit_on_error("Missing 'time' configuration block")
+      end if
 
-      call this%env%comm%barrier()
+      this%current_time = this%t_start
+      this%step = 0
 
-      call this%env%yaml%read('total', val=this%total)
-      call this%env%yaml%read('start', default="0.0", val=this%start)
-      call this%env%yaml%read('plot', val=this%plot_dt)
-      call this%env%yaml%read('log', val=this%log_dt)
-      call this%env%yaml%read_positive('start index', val=this%start_index)
+      ! Initialize accumulator for DT tracking
+      call this%stats%init(1, 1, "dt")
+      call this%stats%allocate_stat("min")
+      call this%stats%allocate_stat("max")
+   end subroutine init_from_yaml
 
-      call this%env%comm%barrier()
+   subroutine advance(this, dt_in)
+      class(type_simulation_control), intent(inout) :: this
+      real(SP), intent(in) :: dt_in
+      real(SP), dimension(1, 1) :: dt_arr
 
-   end subroutine read_input
+      this%current_time = this%current_time + dt_in
+      this%step = this%step + 1
 
-end module model_time_mod
+      ! Track dt statistics
+      dt_arr(1, 1) = dt_in
+      call this%stats%accumulate(dt_arr, dt_in)
+   end subroutine advance
 
+   function is_finished(this) result(finished)
+      class(type_simulation_control), intent(in) :: this
+      logical :: finished
+      finished = (this%current_time >= this%t_end)
+   end function is_finished
+
+end module core_simulation_time_mod

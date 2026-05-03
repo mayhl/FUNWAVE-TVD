@@ -1,5 +1,5 @@
 ! allow(E001)
-module test_yaml_input_parallel
+module test_yaml_parallel
 
    use mpi_f08
    use pFUnit
@@ -106,4 +106,4 @@ contains
       call dummy_fix_lint()
    end subroutine test_string_broadcast
 
-end module test_yaml_input_parallel
+end module test_yaml_parallel

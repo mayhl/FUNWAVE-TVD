@@ -1,0 +1,40 @@
+module test_time
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_simulation_time_mod, only: type_simulation_control
+   implicit none(external)
+
+contains
+
+   @test
+   subroutine test_simulation_lifecycle()
+      type(type_simulation_control) :: sim
+      real(SP) :: dt = 0.1_SP
+      sim%t_end = 0.3_SP
+      sim%current_time = 0.0_SP
+
+      ! Check advance
+      call sim%advance(dt)
+      @assertEqual(0.1_SP, sim%current_time, tolerance=1e-6_SP)
+      @assertEqual(1, sim%step)
+
+      ! Check finished
+      call sim%advance(dt) ! 0.2
+      call sim%advance(dt) ! 0.3
+      @assertTrue(sim%is_finished())
+   end subroutine test_simulation_lifecycle
+
+   @test
+   subroutine test_exact_termination()
+      type(type_simulation_control) :: sim
+      real(SP) :: dt = 0.5_SP
+      sim%t_end = 0.5_SP
+      sim%current_time = 0.0_SP
+
+      call sim%advance(dt)
+      @assertTrue(sim%is_finished())
+   end subroutine test_exact_termination
+
+end module test_time
+
+

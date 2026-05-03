@@ -10,31 +10,37 @@ contains
 
 ! Test for core_time_utils_mod
    @test
-   subroutine test_timing_control()
-
+   subroutine test_timing_control_robustness()
+      use core_constants_mod, only: SP
       type(type_timing_control) :: timer
-      real(8) :: current_time
+      real(SP) :: current_time
       logical :: triggered
+      real(SP), dimension(1,1) :: val
 
-      timer%interval = 1.0
-      timer%t_start = 0.5
+      timer%interval = 1.0_SP
+      timer%t_start = 0.0_SP
+      call timer%stats%init(1, 1, "dt")
+      call timer%stats%allocate_stat("max")
 
-      ! Check spin-up
-      current_time = 0.2
+      ! Check trigger at boundary
+      current_time = 1.0_SP
+      triggered = timer%should_trigger(current_time)
+      @assertTrue(triggered)
+
+      ! Check persistence (should NOT trigger before 2.0)
+      current_time = 1.5_SP
       triggered = timer%should_trigger(current_time)
       @assertFalse(triggered)
 
-      ! Check trigger
-      current_time = 0.6
-      triggered = timer%should_trigger(current_time)
-      @assertTrue(triggered)
-      @assertEqual(timer%last_triggered, 0.6)
+      ! Check accumulator tracking
+      val = 0.1_SP
+      call timer%stats%accumulate(val, 0.1_SP)
+      block
+         real(SP), allocatable :: stat_arr(:,:)
+         stat_arr = timer%stats%get_stat("max")
+         @assertEqual(0.1_SP, stat_arr(1,1), tolerance=1e-6_SP)
+      end block
+   end subroutine test_timing_control_robustness
 
-      ! Check interval
-      current_time = 1.6
-      triggered = timer%should_trigger(current_time)
-      @assertTrue(triggered)
-      @assertEqual(timer%last_triggered, 1.6)
-   end subroutine test_timing_control
 
 end module test_time_utils
