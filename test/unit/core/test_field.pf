@@ -1,0 +1,28 @@
+module test_field
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_field_mod, only: type_field
+   implicit none(external)
+
+contains
+
+   @test
+   subroutine test_field_lifecycle()
+      type(type_field) :: field
+      real(SP), pointer :: ptr2d(:, :)
+      integer :: shape(2) = [10, 10]
+
+      ! Test Allocate
+      call field%allocate("test_field", 2, shape)
+      @assertEqual(2, field%rank)
+      
+      ! Test Access
+      call field%access_2d(ptr2d)
+      ptr2d = 1.0_SP
+      @assertEqual(1.0_SP, ptr2d(5, 5))
+
+      ! Test Finalize
+      call field%finalize()
+   end subroutine test_field_lifecycle
+
+end module test_field

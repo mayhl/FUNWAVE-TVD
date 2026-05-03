@@ -1,0 +1,26 @@
+module test_memory
+   use pFUnit
+   use iso_c_binding
+   use core_memory_mod, only: core_alloc_aligned, core_dealloc_aligned
+   implicit none
+
+contains
+
+   @test
+   subroutine test_alignment()
+      type(c_ptr) :: ptr
+      integer(c_size_t) :: size = 1024
+      integer(c_size_t) :: alignment = 64
+      integer(c_intptr_t) :: address
+
+      call core_alloc_aligned(ptr, size, alignment)
+      @assertTrue(c_associated(ptr))
+
+      ! Check alignment
+      address = transfer(ptr, address)
+      @assertEqual(0_c_intptr_t, mod(address, alignment))
+
+      call core_dealloc_aligned(ptr)
+   end subroutine test_alignment
+
+end module test_memory

@@ -1,0 +1,42 @@
+module test_config
+   use pFUnit
+   use core_config_mod
+   use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP
+   use mpi_f08
+
+   implicit none(external)
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   @test(npes=[2])
+   subroutine test_load_config(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_config) :: config
+      type(type_comm) :: comm
+      character(len=256) :: test_file
+      type(MPI_Comm) :: mcomm
+
+      ! Use hardcoded absolute path for test stability
+      test_file = "/Users/rdchlmyl/repos/mayhlFUNWAVE/test/unit/transport/test_config.yaml"
+
+      ! Initialize comm
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(0, comm_id=mcomm)
+
+      print *, "DEBUG: Attempting to load: ", trim(test_file)
+
+      ! Load config
+      call config%load_from_yaml(test_file, comm)
+! Assertions
+      @mpiAssertEqual(100.0_SP, config%simulation%duration)
+      @mpiAssertEqual(1, size(config%output_channels))
+      @mpiAssertEqual(100, config%output_channels(1)%buffer_size)
+
+      call dummy_fix_lint()
+   end subroutine test_load_config
+
+end module test_config

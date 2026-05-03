@@ -37,7 +37,6 @@
          if (.not. rq_range%is_valid()) then
             msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'required_range': "//required_range//"."
             call this%log%exit_on_fatal(msg)
-            return ! Testing bypass
          end if
       end if
 
@@ -46,7 +45,6 @@
          if (.not. rd_range%is_valid()) then
             msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'recommend_range': "//recommend_range//"."
             call this%log%exit_on_fatal(msg)
-            return ! Testing bypass
          end if
       end if
 #endif
@@ -92,6 +90,7 @@
       val = this%root%_GET(key, error=io_err)
       is_default = this%parse_error_message(key, io_err, default, silent)
 #endif
+
 ! Parsing default value string
       if (is_default) then
          val = this%root%_GET(key, error=io_err)
@@ -99,7 +98,6 @@
          if (allocated(io_err)) then
             msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
             call this%log%exit_on_fatal(msg)
-            return ! Testing bypass
          end if
       end if
 
@@ -108,7 +106,6 @@
          if (.not. rq_range%in_range(val)) then
             msg = "which is out of the required range: "//required_range//'.'
             call this%log%exit_on_error(this%prep_msg_val(key, msg))
-            return ! Testing bypass
          end if
       end if
 
@@ -146,22 +143,17 @@
       _CLASS, intent(out) :: val
       logical, optional, intent(out) :: silent
 
-      if (this%comm%is_io_node()) then
-
-         call this%_READ_NODE(key, default=default, &
-                              silent=silent, &
+      call this%_READ_NODE(key, default=default, &
+                           silent=silent, &
 #ifdef _HAS_RANGE
-                              required_range=required_range, &
-                              recommend_range=recommend_range, &
+                           required_range=required_range, &
+                           recommend_range=recommend_range, &
 #endif
 #ifdef _HAS_UNITS
-                              dim=dim, &
+                           dim=dim, &
 #endif
-                              val=val)
-
-      end if
-
-      call this%comm%bcast(val)
+                           val=val)
+      !call this%comm%bcast(val)
 
    end subroutine _READ
 
@@ -176,10 +168,8 @@
 
       call this%_READ(key, default=default, silent=silent, val=val)
 
-      if (this%comm%is_io_node()) then
-         if (.not. (val > 0)) then
-            call this%log%exit_on_error(this%prep_msg_val(key, "which must be positive."))
-         end if
+      if (.not. (val > 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be positive."))
       end if
 
    end subroutine _READ_POSITIVE
@@ -194,10 +184,8 @@
 
       call this%_READ(key, default=default, silent=silent, val=val)
 
-      if (this%comm%is_io_node()) then
-         if (.not. (val >= 0)) then
-            call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-negative."))
-         end if
+      if (.not. (val >= 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-negative."))
       end if
 
    end subroutine _READ_NONNEGATIVE
@@ -212,10 +200,8 @@
 
       call this%_READ(key, default=default, silent=silent, val=val)
 
-      if (this%comm%is_io_node()) then
-         if (.not. (val < 0)) then
-            call this%log%exit_on_error(this%prep_msg_val(key, "which must be negative."))
-         end if
+      if (.not. (val < 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be negative."))
       end if
 
    end subroutine _READ_NEGATIVE
@@ -230,10 +216,8 @@
 
       call this%_READ(key, default=default, silent=silent, val=val)
 
-      if (this%comm%is_io_node()) then
-         if (.not. (val <= 0)) then
-            call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-positive."))
-         end if
+      if (.not. (val <= 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-positive."))
       end if
 
    end subroutine _READ_NONPOSITIVE

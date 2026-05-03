@@ -1,22 +1,8 @@
 module core_grid_mod
    use core_constants_mod, only: SP
    use core_yaml_file_mod, only: type_yaml_reader
+   use core_grid_interface_mod, only: abstract_grid
    implicit none
-
-   ! Abstract base for spatial grids
-   type, abstract, public :: abstract_grid
-      integer :: n_points = 0
-   contains
-      procedure(get_indices_interface), deferred, public :: get_indices
-   end type abstract_grid
-
-   abstract interface
-      subroutine get_indices_interface(this, indices)
-         import :: abstract_grid
-         class(abstract_grid), intent(inout) :: this
-         integer, allocatable, intent(out) :: indices(:, :)
-      end subroutine get_indices_interface
-   end interface
 
    ! Concrete 2D Grid implementation
    type, extends(abstract_grid), public :: type_grid_2d

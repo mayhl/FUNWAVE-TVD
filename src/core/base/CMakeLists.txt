@@ -2,8 +2,7 @@
 add_library(
   libcore_base STATIC
   constants.f90 misc.f90 path.F90 path_utils.c units.f90
-  # time_utils.f90
-  throw.f90)
+  throw.f90 memory.f90 field.f90 grid_interface.f90)
 
 set_target_properties(
   libcore_base PROPERTIES Fortran_MODULE_DIRECTORY

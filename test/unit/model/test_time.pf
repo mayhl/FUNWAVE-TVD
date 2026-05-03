@@ -35,6 +35,18 @@ contains
       @assertTrue(sim%is_finished())
    end subroutine test_exact_termination
 
+   @test
+   subroutine test_is_finished_boundary()
+      type(type_simulation_control) :: sim
+      sim%t_end = 1.0_SP
+      sim%current_time = 0.99_SP
+      @assertFalse(sim%is_finished())
+      sim%current_time = 1.0_SP
+      @assertTrue(sim%is_finished())
+      sim%current_time = 1.01_SP
+      @assertTrue(sim%is_finished())
+   end subroutine test_is_finished_boundary
+
 end module test_time
 
 

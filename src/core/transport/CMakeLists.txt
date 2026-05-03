@@ -1,6 +1,7 @@
 # libcore_transport: Communication & Logging
-add_library(libcore_transport STATIC comm.f90 env.f90 logging.f90 range.f90
-                                     yaml.f90)
+add_library(
+  libcore_transport STATIC
+  comm.f90 env.f90 logging.f90 range.f90 yaml.f90 config.f90)
 
 # Set the module directory so dependents can find it
 set_target_properties(
