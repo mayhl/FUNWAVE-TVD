@@ -128,8 +128,7 @@
 #endif
                     val)
       !----------------------------------------------------------
-      ! Wrapper method around _READ_NODE for single node
-      ! MPI I/O and broadcasting to other nodes
+      ! IO node reads from YAML; all nodes receive via bcast.
       !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
@@ -142,18 +141,38 @@
 #endif
       _CLASS, intent(out) :: val
       logical, optional, intent(out) :: silent
+      logical :: p_silent
 
-      call this%_READ_NODE(key, default=default, &
-                           silent=silent, &
+      p_silent = .false.
+      if (this%comm%is_io_node()) then
+         if (present(silent)) then
+            call this%_READ_NODE(key, default=default, &
+                                 silent=p_silent, &
 #ifdef _HAS_RANGE
-                           required_range=required_range, &
-                           recommend_range=recommend_range, &
+                                 required_range=required_range, &
+                                 recommend_range=recommend_range, &
 #endif
 #ifdef _HAS_UNITS
-                           dim=dim, &
+                                 dim=dim, &
 #endif
-                           val=val)
-      !call this%comm%bcast(val)
+                                 val=val)
+         else
+            call this%_READ_NODE(key, default=default, &
+#ifdef _HAS_RANGE
+                                 required_range=required_range, &
+                                 recommend_range=recommend_range, &
+#endif
+#ifdef _HAS_UNITS
+                                 dim=dim, &
+#endif
+                                 val=val)
+         end if
+      end if
+      call this%comm%bcast(val)
+      if (present(silent)) then
+         call this%comm%bcast(p_silent)
+         silent = p_silent
+      end if
 
    end subroutine _READ
 

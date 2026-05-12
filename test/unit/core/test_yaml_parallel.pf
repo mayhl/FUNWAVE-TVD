@@ -106,4 +106,96 @@ contains
       call dummy_fix_lint()
    end subroutine test_string_broadcast
 
+   @test(npes=[2])
+   subroutine test_integer_array_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer, allocatable, dimension(:) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_integer_array('integer_array', val=val)
+      @mpiAssertEqual(3, size(val))
+      @mpiAssertEqual(1, val(1))
+      @mpiAssertEqual(2, val(2))
+      @mpiAssertEqual(3, val(3))
+
+      call dummy_fix_lint()
+   end subroutine test_integer_array_broadcast
+
+   @test(npes=[2])
+   subroutine test_real_array_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP), allocatable, dimension(:) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_real_array('real_array', val=val)
+      @mpiAssertEqual(3, size(val))
+      @mpiAssertEqual(0.1_SP, val(1), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.2_SP, val(2), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.3_SP, val(3), tolerance=1e-6_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_real_array_broadcast
+
+   @test(npes=[2])
+   subroutine test_string_array_broadcast(this)
+
+      use core_constants_mod, only: type_string
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      type(type_string), allocatable, dimension(:) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_string_array('string_array', val=val)
+      @mpiAssertEqual(3, size(val))
+      @mpiAssertEqual('a', val(1)%s)
+      @mpiAssertEqual('b', val(2)%s)
+      @mpiAssertEqual('c', val(3)%s)
+
+      call dummy_fix_lint()
+   end subroutine test_string_array_broadcast
+
+   @test(npes=[2])
+   subroutine test_enum_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: val
+      character(len=6), dimension(3) :: words
+
+      data words/'item1', 'item2', 'item3'/
+      call open_yaml(this, reader, comm)
+
+      call reader%read_enum('enum1', words, val=val)
+      @mpiAssertEqual('item1', val)
+
+      call dummy_fix_lint()
+   end subroutine test_enum_broadcast
+
+   @test(npes=[2])
+   subroutine test_time_broadcast(this)
+
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      real(SP) :: val
+
+      call open_yaml(this, reader, comm)
+
+      call reader%read_time('time_obj', val=val)
+      @mpiAssertEqual(120.0_SP, val, tolerance=1e-6_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_time_broadcast
+
 end module test_yaml_parallel

@@ -324,15 +324,25 @@ contains
 
       integer :: n
 
-      n = len(val)
+      if (this%is_io_node()) then
+         if (allocated(val)) then
+            n = len(val)
+         else
+            n = -1
+         end if
+      end if
       call MPI_Bcast(n, 1, MPI_INTEGER, this%io_node_id, this%id)
       call this%barrier()
 
-      if (.not. allocated(val)) then
-         allocate (character(n) :: val)
+      if (n >= 0) then
+         if (.not. this%is_io_node()) then
+            if (allocated(val)) deallocate (val)
+            allocate (character(n) :: val)
+         end if
+         call MPI_Bcast(val, n, MPI_CHARACTER, this%io_node_id, this%id)
+      else
+         if (allocated(val)) deallocate (val)
       end if
-
-      call MPI_Bcast(val, n, MPI_CHARACTER, this%io_node_id, this%id)
       call this%barrier()
 
    end subroutine bcast_string
@@ -390,8 +400,7 @@ contains
       integer, allocatable :: lengths(:)
       character(:), allocatable :: buffer
 
-      ! Get lengths of strings
-      n = size(list)
+      if (this%is_io_node()) n = size(list)
       call this%bcast_integer(n)
       allocate (lengths(n))
       if (this%is_io_node()) then
