@@ -41,7 +41,7 @@ contains
       type(type_env), intent(inout), target :: env
       logical :: is_empty
 
-      this%env = get_sub_env(env, 'stations')
+      this%env = get_sub_env(env, 'stations', is_empty)
       this%is_activated = .not. is_empty
 
       call this%env%comm%barrier()

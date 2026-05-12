@@ -1,0 +1,218 @@
+! allow(E001)
+module test_grid
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod,      only: type_comm, new_comm
+   use core_grid_mod,      only: type_grid_2d
+   use core_constants_mod, only: SP, N_GHOST
+
+   implicit none(external)
+
+   ! Test grid dimensions — chosen so M=10 splits evenly across 2 ranks in x
+   integer, parameter :: TEST_M = 10
+   integer, parameter :: TEST_N = 8
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine open_grid(this, grid, comm, nx_proc, ny_proc)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      integer,              intent(in)    :: nx_proc, ny_proc
+      type(MPI_Comm) :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+
+      grid%M       = TEST_M
+      grid%N       = TEST_N
+      grid%nx_proc = nx_proc
+      grid%ny_proc = ny_proc
+
+      call grid%setup(comm, create_partition=.false.)
+   end subroutine open_grid
+
+   ! ----------------------------------------------------------------
+   ! setup: Cart topology, local ranges, boundary flags, ghost indices
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_setup(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+
+      ! 2 ranks in x, 1 in y  →  each rank gets 5 columns, all 8 rows
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+
+      @mpiAssertEqual(5, grid%local_nx)
+      @mpiAssertEqual(8, grid%local_ny)
+
+      ! Ghost cell index ranges
+      @mpiAssertEqual(grid%ibegin - N_GHOST, grid%ig_begin)
+      @mpiAssertEqual(grid%istop  + N_GHOST, grid%ig_stop)
+      @mpiAssertEqual(grid%jbegin - N_GHOST, grid%jg_begin)
+      @mpiAssertEqual(grid%jstop  + N_GHOST, grid%jg_stop)
+
+      ! Rank 0 (iproc=0): left edge, back boundary
+      if (grid%iproc == 0) then
+         @mpiAssertEqual(1,  grid%ibegin)
+         @mpiAssertEqual(5,  grid%istop)
+         @assertTrue(grid%is_back_boundary)
+         @assertFalse(grid%is_shore_boundary)
+      end if
+
+      ! Rank 1 (iproc=1): right edge, shore boundary
+      if (grid%iproc == 1) then
+         @mpiAssertEqual(6,  grid%ibegin)
+         @mpiAssertEqual(10, grid%istop)
+         @assertFalse(grid%is_back_boundary)
+         @assertTrue(grid%is_shore_boundary)
+      end if
+
+      ! Both ranks: single proc in y — left and right boundaries
+      @assertTrue(grid%is_left_boundary)
+      @assertTrue(grid%is_right_boundary)
+      @mpiAssertEqual(1, grid%jbegin)
+      @mpiAssertEqual(8, grid%jstop)
+
+      call dummy_fix_lint()
+   end subroutine test_setup
+
+   ! ----------------------------------------------------------------
+   ! Uneven partition: M=10 across 2 ranks with ny_proc=1, M not even
+   ! Use M=9 to verify the load-balancing (5 + 4)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_setup_uneven(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(MPI_Comm)     :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+
+      grid%M = 9; grid%N = 4
+      grid%nx_proc = 2; grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+
+      ! n_min=4, n_left=1 → rank 0 gets 5, rank 1 gets 4
+      if (grid%iproc == 0) then
+         @mpiAssertEqual(5, grid%local_nx)
+         @mpiAssertEqual(1, grid%ibegin)
+         @mpiAssertEqual(5, grid%istop)
+      end if
+      if (grid%iproc == 1) then
+         @mpiAssertEqual(4, grid%local_nx)
+         @mpiAssertEqual(6, grid%ibegin)
+         @mpiAssertEqual(9, grid%istop)
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_setup_uneven
+
+   ! ----------------------------------------------------------------
+   ! init_spacing_uniform: array values, inv, and x/y coordinates
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_spacing_uniform(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      real(SP) :: expected_x1, expected_y1
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+      call grid%init_spacing(dx0=5.0_SP, dy0=10.0_SP, x0=0.0_SP, y0=0.0_SP)
+
+      ! Spacing and reciprocals
+      @mpiAssertEqual(5.0_SP,  grid%dx(1,1),     tolerance=1e-6_SP)
+      @mpiAssertEqual(10.0_SP, grid%dy(1,1),     tolerance=1e-6_SP)
+      @mpiAssertEqual(0.2_SP,  grid%inv_dx(1,1), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.1_SP,  grid%inv_dy(1,1), tolerance=1e-6_SP)
+
+      ! Uniform: all elements identical
+      @mpiAssertEqual(5.0_SP,  grid%dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.2_SP,  grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
+
+      ! Physical coordinates: x(1,1) = x0 + (ibegin - 1) * dx0
+      expected_x1 = real(grid%ibegin - 1, SP) * 5.0_SP
+      expected_y1 = real(grid%jbegin - 1, SP) * 10.0_SP
+      @mpiAssertEqual(expected_x1, grid%x(1,1), tolerance=1e-6_SP)
+      @mpiAssertEqual(expected_y1, grid%y(1,1), tolerance=1e-6_SP)
+
+      ! Coordinate at last local point
+      @mpiAssertEqual(expected_x1 + real(grid%local_nx-1, SP)*5.0_SP, &
+                      grid%x(grid%local_nx, 1), tolerance=1e-6_SP)
+
+      @assertTrue(grid%is_uniform)
+      @mpiAssertEqual(5.0_SP,  grid%dx0, tolerance=1e-6_SP)
+      @mpiAssertEqual(10.0_SP, grid%dy0, tolerance=1e-6_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_spacing_uniform
+
+   ! ----------------------------------------------------------------
+   ! init_spacing_variable: inv_dx = 1/dx, element-wise
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_spacing_variable(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      real(SP), allocatable :: local_dx(:,:), local_dy(:,:)
+      integer :: i, j
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+
+      ! Each rank builds a local dx array with varying values: dx(i,j) = ibegin+i-1
+      allocate(local_dx(grid%local_nx, grid%local_ny))
+      allocate(local_dy(grid%local_nx, grid%local_ny))
+      do j = 1, grid%local_ny
+         do i = 1, grid%local_nx
+            local_dx(i,j) = real(grid%ibegin + i - 1, SP)
+            local_dy(i,j) = real(grid%jbegin + j - 1, SP)
+         end do
+      end do
+
+      call grid%init_spacing(local_dx, local_dy)
+
+      ! inv_dx(i,j) = 1 / local_dx(i,j)
+      @mpiAssertEqual(1.0_SP / local_dx(1,1), grid%inv_dx(1,1), tolerance=1e-6_SP)
+      @mpiAssertEqual(1.0_SP / local_dx(grid%local_nx, grid%local_ny), &
+                      grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
+      @mpiAssertEqual(1.0_SP / local_dy(1,1), grid%inv_dy(1,1), tolerance=1e-6_SP)
+
+      @assertFalse(grid%is_uniform)
+
+      call dummy_fix_lint()
+   end subroutine test_spacing_variable
+
+   ! ----------------------------------------------------------------
+   ! finalize: deallocates spacing arrays cleanly
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_finalize(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+
+      @assertTrue(allocated(grid%dx))
+      @assertTrue(allocated(grid%inv_dx))
+
+      call grid%finalize()
+
+      @assertFalse(allocated(grid%dx))
+      @assertFalse(allocated(grid%inv_dx))
+      @assertFalse(allocated(grid%x))
+
+      call dummy_fix_lint()
+   end subroutine test_finalize
+
+end module test_grid

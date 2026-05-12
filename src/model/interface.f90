@@ -17,7 +17,7 @@ module model_interface_mod
 
    type, abstract, public :: type_model_interface
 
-      type(type_env), pointer :: env => null()
+      type(type_env), allocatable :: env
       logical :: is_activated = .false.
 
    contains

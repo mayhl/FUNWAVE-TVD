@@ -13,7 +13,7 @@
 module core_comm_mod
 
    use mpi_f08
-   use core_constants_mod, only: n_ghost, LABEL_SIZE, SP, MPI_SP, type_string
+   use core_constants_mod, only: LABEL_SIZE, SP, MPI_SP, type_string
    use core_log_io_mod, only: type_log_writer, new_log_writer
 
    implicit none(external)
@@ -42,32 +42,9 @@ module core_comm_mod
       integer, public :: rank_id, size
       type(type_log_writer) :: log
 
-      integer, dimension(:), allocatable :: blockcounts, types, offsets
-      integer :: param_type
-      integer, public :: param_size
-
-      integer, public :: iproc, jproc
-      integer, public :: nx_proc, ny_proc
-      ! cross, public-shore (x-)direction.
-      ! back , public=> shore <=> -x > + x
-      integer, public :: back_rank_id, shore_rank_id
-      ! along, publicshore (y-)direction.
-      ! right, public => left <=> -y > + y
-      integer, public :: left_rank_id, right_rank_id
-
-      integer, public :: ibegin, istop
-      integer, public :: jbegin, jstop
-      integer, public :: nx, ny
-      integer, public :: nx_global, ny_global
-      logical, public :: is_left_boundry
-      logical, public :: is_right_boundry
-      logical, public :: is_shore_boundry
-      logical, public :: is_back_boundry
-
    contains
       procedure, public :: get_logger
       procedure, public :: is_io_node
-      procedure, public :: create_2d
       procedure, public :: bcast_integer
       procedure, public :: bcast_logical
       procedure, public :: bcast_real
@@ -145,151 +122,6 @@ contains
       logical :: flag
       flag = this%p_is_io_node
    end function is_io_node
-
-   subroutine create_2d(this, nx_proc, ny_proc, nx_global, ny_global, create_partition)
-
-      class(type_comm), intent(inout) :: this
-      integer, intent(in) :: nx_global, ny_global
-      integer, intent(out) :: nx_proc, ny_proc
-      logical, intent(in) :: create_partition
-      integer, parameter  :: n_dims = 2
-      integer, dimension(n_dims) :: dims, coords
-      logical, dimension(n_dims)  :: periods
-      type(MPI_Comm) :: new_comm_id, old_comm_id
-      integer :: ier, old_rank_id
-      logical :: reorder
-      integer :: io
-
-      if (create_partition) then
-         call compute_optimal_grid_size(this%size, nx_global, ny_global, nx_proc, ny_proc)
-
-         print *, this%size, nx_proc, ny_proc
-      end if
-
-      reorder = .true.
-      coords = (/0, 0/)
-      periods = (/.false., .false./)
-      dims = (/nx_proc, ny_proc/)
-
-      call MPI_Cart_Create(this%id, 2, dims, periods, reorder, new_comm_id, ier)
-      ! NOTE: I don't I need to care about ID change with file/IO since flag in memory
-      this%id = new_comm_id
-
-      call MPI_Cart_coords(this%id, this%rank_id, n_dims, coords, ier)
-
-      ! print *, 'ID', this%rank_id, 'WR ID', this%io_node_id
-      this%iproc = coords(1)
-      this%jproc = coords(2)
-
-      ! TODO: Add rank id change check?
-
-      call MPI_Cart_shift(this%id, 0, 1, this%back_rank_id, this%shore_rank_id, ier)
-      call MPI_Cart_shift(this%id, 1, 1, this%right_rank_id, this%left_rank_id, ier)
-
-      call grid_range_per_procs(1, nx_global, nx_proc, this%iproc, this%ibegin, this%istop, this%nx)
-      call grid_range_per_procs(1, ny_global, ny_proc, this%jproc, this%jbegin, this%jstop, this%ny)
-
-   end subroutine create_2d
-
-   subroutine grid_range_per_procs(i1_global, i2_global, n_procs, rank_id, i1, i2, local_n)
-
-      integer, intent(in) :: i1_global, i2_global, n_procs, rank_id
-      integer, intent(out) :: i1, i2, local_n
-
-      integer :: n_min, n_left
-
-      ! Minimum about of points in each domain
-      n_min = int((i2_global - i1_global + 1)/n_procs)
-      ! Remainder
-      n_left = mod(i2_global - i1_global + 1, n_procs)
-
-      ! Adding additional point for first n_left slices
-      i1 = rank_id*n_min + i1_global + min(rank_id, n_left)
-      i2 = i1 + n_min - 1
-      ! Offsetting remaining slices to account for additional point
-      if (n_left > rank_id) i2 = i2 + 1
-      local_n = (i2 - i1 + 1) + 2*n_ghost
-
-   end subroutine grid_range_per_procs
-
-   subroutine compute_optimal_grid_size(nproc, nx, ny, px, py)
-
-      integer, intent(in) :: nx, ny, nproc
-      integer, intent(out) :: px, py
-
-      integer, allocatable :: factors(:)
-      integer :: nfactors, i, min_i
-
-      real(SP) :: ratio
-      real(SP) :: nx_loc, ny_loc, min_ratio
-
-      call get_factors(nproc, factors, nfactors)
-
-      min_ratio = 9e10_sp
-
-      do i = 1, nfactors
-
-         nx_loc = (1.0_sp*nx)/(1.0_sp*factors(i))
-         ny_loc = (1.0_sp*ny)/((1.0_sp*nproc)/(1.0_sp*factors(i)))
-
-         if (nx_loc > ny_loc) then
-            ratio = nx_loc/ny_loc
-         else
-            ratio = ny_loc/nx_loc
-         end if
-
-         if (ratio < min_ratio) then
-            min_i = i
-            min_ratio = ratio
-         end if
-
-      end do
-
-      px = factors(min_i)
-      py = nproc/factors(min_i)
-
-   end subroutine compute_optimal_grid_size
-
-   subroutine get_factors(n, factors, nfactors)
-      integer, intent(in) :: n
-      integer, allocatable, intent(out) :: factors(:)
-      integer, intent(out) :: nfactors
-
-      integer :: i, limit, count
-      integer, allocatable :: temp(:)
-
-      if (n <= 0) then
-         nfactors = 0
-         allocate (factors(0))
-         return
-      end if
-
-      limit = int(sqrt(real(n)))
-
-      ! Temporary array (max possible size = 2*limit)
-      allocate (temp(2*limit))
-      count = 0
-
-      do i = 1, limit
-         if (mod(n, i) == 0) then
-            count = count + 1
-            temp(count) = i
-
-            ! Adding other factor if not square root
-            if (i /= n/i) then
-               count = count + 1
-               temp(count) = n/i
-            end if
-         end if
-      end do
-
-      nfactors = count
-      allocate (factors(nfactors))
-      factors = temp(1:nfactors)
-
-      deallocate (temp)
-
-   end subroutine get_factors
 
    subroutine bcast_integer(this, val)
       class(type_comm), intent(inout) :: this
