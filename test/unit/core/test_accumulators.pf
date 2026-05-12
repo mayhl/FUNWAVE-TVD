@@ -6,66 +6,148 @@ module test_accumulators
 
 contains
 
+   ! ----------------------------------------------------------------
+   ! mean: time-weighted — (1.0*0.1 + 2.0*0.2) / 0.3 = 5/3
+   ! ----------------------------------------------------------------
    @test
-   subroutine test_cumulative_mean()
+   subroutine test_mean_adaptive_dt()
       type(type_accumulator) :: acc
       real(SP), dimension(1, 1) :: val
-      real(SP), allocatable :: stat(:, :)
+      real(SP), allocatable :: stat(:,:)
 
-      call acc%init(1, 1, "test_mean")
+      call acc%init(1, 1, "eta")
       call acc%allocate_stat("mean")
 
-      ! Mean: (1.0*0.1 + 2.0*0.2) / (0.1 + 0.2) = 0.3 / 0.3 = 1.6667
-      val(1, 1) = 1.0_SP
-      call acc%accumulate(val, 0.1_SP)
-      val(1, 1) = 2.0_SP
-      call acc%accumulate(val, 0.2_SP)
+      val(1,1) = 1.0_SP; call acc%accumulate(val, 0.1_SP)
+      val(1,1) = 2.0_SP; call acc%accumulate(val, 0.2_SP)
 
       stat = acc%get_stat("mean")
-      @assertEqual(1.666667_SP, stat(1, 1), tolerance=1e-5_SP)
-   end subroutine test_cumulative_mean
+      @assertEqual(5.0_SP/3.0_SP, stat(1,1), tolerance=1e-5_SP)
+   end subroutine test_mean_adaptive_dt
 
+   ! ----------------------------------------------------------------
+   ! reset clears sums and total_dt; next window starts fresh
+   ! ----------------------------------------------------------------
    @test
-   subroutine test_resetting_window()
+   subroutine test_reset_window()
       type(type_accumulator) :: acc
       real(SP), dimension(1, 1) :: val
-      real(SP), allocatable :: stat(:, :)
+      real(SP), allocatable :: stat(:,:)
 
-      call acc%init(1, 1, "test_reset")
+      call acc%init(1, 1, "eta")
       call acc%allocate_stat("mean")
 
-      val(1, 1) = 1.0_SP
-      call acc%accumulate(val, 1.0_SP)
-
+      val(1,1) = 1.0_SP; call acc%accumulate(val, 1.0_SP)
       call acc%reset()
-
-      val(1, 1) = 2.0_SP
-      call acc%accumulate(val, 1.0_SP)
+      val(1,1) = 2.0_SP; call acc%accumulate(val, 1.0_SP)
 
       stat = acc%get_stat("mean")
-      @assertEqual(2.0_SP, stat(1, 1), tolerance=1e-5_SP)
-   end subroutine test_resetting_window
+      @assertEqual(2.0_SP, stat(1,1), tolerance=1e-5_SP)
+   end subroutine test_reset_window
 
+   ! ----------------------------------------------------------------
+   ! var: E[x²] - E[x]² with non-uniform dt
+   !   x=0 @ dt=0.1, x=2 @ dt=0.9  (total_dt=1.0)
+   !   E[x]  = (0*0.1 + 2*0.9) = 1.8
+   !   E[x²] = (0*0.1 + 4*0.9) = 3.6
+   !   var   = 3.6 - 1.8² = 3.6 - 3.24 = 0.36
+   ! ----------------------------------------------------------------
    @test
-   subroutine test_ewma_mode()
+   subroutine test_var_adaptive_dt()
       type(type_accumulator) :: acc
       real(SP), dimension(1, 1) :: val
-      real(SP), allocatable :: stat(:, :)
+      real(SP), allocatable :: stat(:,:)
 
-      call acc%init(1, 1, "test_ewma")
-      acc%alpha = 0.5_SP
-      call acc%allocate_stat("ewma")
+      call acc%init(1, 1, "eta")
+      call acc%allocate_stat("var")
 
-      ! S_n = 0.5 * 10.0 + (1 - 0.5) * 0.0 = 5.0
-      val(1, 1) = 10.0_SP
-      call acc%accumulate(val, 0.1_SP)
+      val(1,1) = 0.0_SP; call acc%accumulate(val, 0.1_SP)
+      val(1,1) = 2.0_SP; call acc%accumulate(val, 0.9_SP)
 
-      ! S_n = 0.5 * 20.0 + (1 - 0.5) * 5.0 = 10.0 + 2.5 = 12.5
-      val(1, 1) = 20.0_SP
-      call acc%accumulate(val, 0.1_SP)
+      stat = acc%get_stat("var")
+      @assertEqual(0.36_SP, stat(1,1), tolerance=1e-5_SP)
+   end subroutine test_var_adaptive_dt
 
-      stat = acc%get_stat("ewma")
-      @assertEqual(12.5_SP, stat(1, 1), tolerance=1e-5_SP)
-   end subroutine test_ewma_mode
+   ! ----------------------------------------------------------------
+   ! hsig = 4*sqrt(var(eta))
+   !   symmetric wave: eta = +A, -A with equal dt → var = A², hsig = 4A
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_hsig()
+      type(type_accumulator) :: acc
+      real(SP), dimension(1, 1) :: val
+      real(SP), allocatable :: stat(:,:)
+      real(SP), parameter :: A = 0.5_SP
+
+      call acc%init(1, 1, "eta")
+      call acc%allocate_stat("hsig")
+
+      val(1,1) =  A; call acc%accumulate(val, 1.0_SP)
+      val(1,1) = -A; call acc%accumulate(val, 1.0_SP)
+
+      stat = acc%get_stat("hsig")
+      @assertEqual(4.0_SP * A, stat(1,1), tolerance=1e-5_SP)
+   end subroutine test_hsig
+
+   ! ----------------------------------------------------------------
+   ! total_dt is updated even when only max is allocated
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_total_dt_always_tracked()
+      type(type_accumulator) :: acc
+      real(SP), dimension(1, 1) :: val
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("max")
+
+      val(1,1) = 1.0_SP; call acc%accumulate(val, 0.3_SP)
+      val(1,1) = 2.0_SP; call acc%accumulate(val, 0.7_SP)
+
+      @assertEqual(1.0_SP, acc%total_dt, tolerance=1e-6_SP)
+   end subroutine test_total_dt_always_tracked
+
+   ! ----------------------------------------------------------------
+   ! rms: sqrt(E[x²]) with uniform dt
+   !   x = 3, 4 → rms = sqrt((9+16)/2) = sqrt(12.5)
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_rms()
+      type(type_accumulator) :: acc
+      real(SP), dimension(1, 1) :: val
+      real(SP), allocatable :: stat(:,:)
+
+      call acc%init(1, 1, "u")
+      call acc%allocate_stat("rms")
+
+      val(1,1) = 3.0_SP; call acc%accumulate(val, 1.0_SP)
+      val(1,1) = 4.0_SP; call acc%accumulate(val, 1.0_SP)
+
+      stat = acc%get_stat("rms")
+      @assertEqual(sqrt(12.5_SP), stat(1,1), tolerance=1e-5_SP)
+   end subroutine test_rms
+
+   ! ----------------------------------------------------------------
+   ! max/min: dt-independent running extrema
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_max_min()
+      type(type_accumulator) :: acc
+      real(SP), dimension(1, 1) :: val
+      real(SP), allocatable :: stat(:,:)
+
+      call acc%init(1, 1, "eta")
+      call acc%allocate_stat("max")
+      call acc%allocate_stat("min")
+
+      val(1,1) =  3.0_SP; call acc%accumulate(val, 0.05_SP)
+      val(1,1) = -1.0_SP; call acc%accumulate(val, 0.1_SP)
+      val(1,1) =  1.5_SP; call acc%accumulate(val, 0.025_SP)
+
+      stat = acc%get_stat("max")
+      @assertEqual(3.0_SP, stat(1,1), tolerance=1e-6_SP)
+
+      stat = acc%get_stat("min")
+      @assertEqual(-1.0_SP, stat(1,1), tolerance=1e-6_SP)
+   end subroutine test_max_min
 
 end module test_accumulators

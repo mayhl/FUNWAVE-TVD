@@ -1,7 +1,7 @@
 # libcore_physics: Simulation Context
 add_library(
-  libcore_physics STATIC # accumulators.f90
-  grid.f90 interpolation.f90
+  libcore_physics STATIC
+  accumulators.f90 crs.f90 grid.f90 interpolation.f90
 )
 
 set_target_properties(

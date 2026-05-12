@@ -1,0 +1,119 @@
+module test_crs
+   use pFUnit
+   use core_constants_mod, only: SP, PI, R_EARTH
+   use core_crs_mod, only: type_crs, CRS_LOCAL, CRS_PROJECTED, CRS_GEOGRAPHIC
+   implicit none(external)
+
+contains
+
+   ! ----------------------------------------------------------------
+   ! CRS_LOCAL: to_local is identity, to_external is identity
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_local_identity()
+      type(type_crs) :: crs
+      real(SP) :: x_loc(1), y_loc(1), x_ext(1), y_ext(1)
+
+      crs%mode = CRS_LOCAL
+      x_ext(1) = 100.0_SP; y_ext(1) = 200.0_SP
+      call crs%to_local(x_ext, y_ext, x_loc, y_loc)
+      @assertEqual(100.0_SP, x_loc(1), tolerance=1e-5_SP)
+      @assertEqual(200.0_SP, y_loc(1), tolerance=1e-5_SP)
+
+      call crs%to_external(x_loc, y_loc, x_ext, y_ext)
+      @assertEqual(100.0_SP, x_ext(1), tolerance=1e-5_SP)
+      @assertEqual(200.0_SP, y_ext(1), tolerance=1e-5_SP)
+   end subroutine test_local_identity
+
+   ! ----------------------------------------------------------------
+   ! CRS_PROJECTED: subtract/add origin, no rotation
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_projected_translate()
+      type(type_crs) :: crs
+      real(SP) :: x_loc(1), y_loc(1), x_ext(1), y_ext(1)
+
+      crs%mode = CRS_PROJECTED
+      crs%origin_x = 500000.0_SP
+      crs%origin_y = 2800000.0_SP
+      crs%theta = 0.0_SP
+
+      x_ext(1) = 500300.0_SP; y_ext(1) = 2800400.0_SP
+      call crs%to_local(x_ext, y_ext, x_loc, y_loc)
+      @assertEqual(300.0_SP, x_loc(1), tolerance=1e-3_SP)
+      @assertEqual(400.0_SP, y_loc(1), tolerance=1e-3_SP)
+
+      call crs%to_external(x_loc, y_loc, x_ext, y_ext)
+      @assertEqual(500300.0_SP, x_ext(1), tolerance=1e-3_SP)
+      @assertEqual(2800400.0_SP, y_ext(1), tolerance=1e-3_SP)
+   end subroutine test_projected_translate
+
+   ! ----------------------------------------------------------------
+   ! CRS_PROJECTED with rotation: roundtrip to_local → to_external = identity
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_projected_rotation_roundtrip()
+      type(type_crs) :: crs
+      real(SP) :: x_loc(1), y_loc(1), x_ext(1), y_ext(2), x_rt(1), y_rt(1)
+
+      crs%mode = CRS_PROJECTED
+      crs%origin_x = 0.0_SP
+      crs%origin_y = 0.0_SP
+      crs%theta = PI/4.0_SP  ! 45 degrees
+
+      x_ext(1) = 200.0_SP; y_ext(1) = 100.0_SP
+      call crs%to_local(x_ext, y_ext(1:1), x_loc, y_loc)
+      call crs%to_external(x_loc, y_loc, x_rt, y_rt)
+      @assertEqual(x_ext(1), x_rt(1), tolerance=1e-4_SP)
+      @assertEqual(y_ext(1), y_rt(1), tolerance=1e-4_SP)
+   end subroutine test_projected_rotation_roundtrip
+
+   ! ----------------------------------------------------------------
+   ! CRS_GEOGRAPHIC: flat-earth x-scale depends on cos(origin_lat)
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_geographic_x_scale()
+      type(type_crs) :: crs
+      real(SP) :: x_loc(1), y_loc(1), x_ext(1), y_ext(1)
+      real(SP) :: expected_x, expected_y, lat0
+
+      lat0 = 30.0_SP   ! 30° N
+      crs%mode = CRS_GEOGRAPHIC
+      crs%origin_x = 0.0_SP
+      crs%origin_y = lat0
+      crs%theta = 0.0_SP
+
+      ! 1 degree east at 30°N
+      x_ext(1) = 1.0_SP; y_ext(1) = lat0
+      call crs%to_local(x_ext, y_ext, x_loc, y_loc)
+
+      expected_x = R_EARTH*cos(lat0*PI/180.0_SP)*(PI/180.0_SP)
+      expected_y = 0.0_SP
+      @assertEqual(expected_x, x_loc(1), tolerance=1.0_SP)
+      @assertEqual(expected_y, y_loc(1), tolerance=1e-3_SP)
+   end subroutine test_geographic_x_scale
+
+   ! ----------------------------------------------------------------
+   ! CRS_GEOGRAPHIC: roundtrip lon/lat → local → lon/lat
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_geographic_roundtrip()
+      type(type_crs) :: crs
+      real(SP) :: x_loc(2), y_loc(2), x_ext(2), y_ext(2), x_rt(2), y_rt(2)
+
+      crs%mode = CRS_GEOGRAPHIC
+      crs%origin_x = -70.0_SP
+      crs%origin_y = 20.0_SP
+      crs%theta = 0.0_SP
+
+      x_ext(1) = -69.5_SP; y_ext(1) = 20.3_SP
+      x_ext(2) = -68.0_SP; y_ext(2) = 21.0_SP
+      call crs%to_local(x_ext, y_ext, x_loc, y_loc)
+      call crs%to_external(x_loc, y_loc, x_rt, y_rt)
+      @assertEqual(x_ext(1), x_rt(1), tolerance=1e-5_SP)
+      @assertEqual(y_ext(1), y_rt(1), tolerance=1e-5_SP)
+      @assertEqual(x_ext(2), x_rt(2), tolerance=1e-5_SP)
+      @assertEqual(y_ext(2), y_rt(2), tolerance=1e-5_SP)
+   end subroutine test_geographic_roundtrip
+
+end module test_crs

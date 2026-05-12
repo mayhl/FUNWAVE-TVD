@@ -5,7 +5,7 @@ module test_grid
    use pFUnit
    use core_comm_mod,      only: type_comm, new_comm
    use core_grid_mod,      only: type_grid_2d
-   use core_constants_mod, only: SP, N_GHOST
+   use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH
 
    implicit none(external)
 
@@ -148,7 +148,6 @@ contains
       @mpiAssertEqual(expected_x1 + real(grid%local_nx-1, SP)*5.0_SP, &
                       grid%x(grid%local_nx, 1), tolerance=1e-6_SP)
 
-      @assertTrue(grid%is_uniform)
       @mpiAssertEqual(5.0_SP,  grid%dx0, tolerance=1e-6_SP)
       @mpiAssertEqual(10.0_SP, grid%dy0, tolerance=1e-6_SP)
 
@@ -186,8 +185,6 @@ contains
                       grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
       @mpiAssertEqual(1.0_SP / local_dy(1,1), grid%inv_dy(1,1), tolerance=1e-6_SP)
 
-      @assertFalse(grid%is_uniform)
-
       call dummy_fix_lint()
    end subroutine test_spacing_variable
 
@@ -214,5 +211,236 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_finalize
+
+   ! ----------------------------------------------------------------
+   ! halo_exchange: 2 ranks in x, verify ghost cells after exchange.
+   !   Interior field value = global x-index (ibegin + local_i - 1).
+   !   After exchange:
+   !     Rank 0 high-x ghost: field(NG+local_nx+k, j) = 5+k  (rank 1's first NG cells)
+   !     Rank 1 low-x  ghost: field(k, j)             = k    (rank 0's last NG cells)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_halo_exchange_x(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)  :: grid
+      type(type_comm)     :: comm
+      real(SP), allocatable :: field(:,:)
+      integer :: i, j, ng, mloc_g, nloc_g
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+
+      ng     = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+
+      ! Set interior cells to global x-index
+      do j = 1, nloc_g
+         do i = 1, grid%local_nx
+            field(ng + i, j) = real(grid%ibegin + i - 1, SP)
+         end do
+      end do
+
+      call grid%halo_exchange(field, comm)
+
+      ! Rank 0 (iproc=0, ibegin=1): high-x ghost should contain rank 1's first NG interior values
+      if (grid%iproc == 0) then
+         do i = 1, ng
+            @assertEqual(real(grid%istop + i, SP), field(ng + grid%local_nx + i, ng + 1), tolerance=1e-6_SP)
+         end do
+      end if
+
+      ! Rank 1 (iproc=1, ibegin=6): low-x ghost should contain rank 0's last NG interior values
+      if (grid%iproc == 1) then
+         do i = 1, ng
+            @assertEqual(real(grid%ibegin - ng + i - 1, SP), field(i, ng + 1), tolerance=1e-6_SP)
+         end do
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_halo_exchange_x
+
+   ! ----------------------------------------------------------------
+   ! halo_exchange: 2 ranks in y (nx_proc=1, ny_proc=2).
+   !   Interior field value = global y-index (jbegin + local_j - 1).
+   !   After exchange:
+   !     Rank 0 high-y ghost: field(i, NG+local_ny+k) = 4+k  (rank 1's first NG cells)
+   !     Rank 1 low-y  ghost: field(i, k)             = k    (rank 0's last NG cells)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_halo_exchange_y(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)  :: grid
+      type(type_comm)     :: comm
+      type(MPI_Comm)      :: mcomm
+      real(SP), allocatable :: field(:,:)
+      integer :: i, j, ng, mloc_g, nloc_g
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M       = TEST_M
+      grid%N       = TEST_N
+      grid%nx_proc = 1
+      grid%ny_proc = 2
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+
+      ng     = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+
+      ! Set interior cells to global y-index
+      do j = 1, grid%local_ny
+         do i = 1, mloc_g
+            field(i, ng + j) = real(grid%jbegin + j - 1, SP)
+         end do
+      end do
+
+      call grid%halo_exchange(field, comm)
+
+      ! Rank 0 (jproc=0): high-y ghost should contain rank 1's first NG interior values
+      if (grid%jproc == 0) then
+         do j = 1, ng
+            @assertEqual(real(grid%jstop + j, SP), field(ng + 1, ng + grid%local_ny + j), tolerance=1e-6_SP)
+         end do
+      end if
+
+      ! Rank 1 (jproc=1): low-y ghost should contain rank 0's last NG interior values
+      if (grid%jproc == 1) then
+         do j = 1, ng
+            @assertEqual(real(grid%jbegin - ng + j - 1, SP), field(ng + 1, j), tolerance=1e-6_SP)
+         end do
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_halo_exchange_y
+
+   ! ----------------------------------------------------------------
+   ! init_spacing_spherical: dx varies with latitude, dy constant,
+   ! x/y coordinates consistent with flat-earth approximation.
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_spacing_spherical(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      real(SP) :: dlon, dlat, lat0, lon0
+      real(SP) :: expected_dx_j1, expected_dx_j2, expected_dy, expected_x1, expected_y1
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+
+      dlon = 0.01_SP;  dlat = 0.01_SP
+      lon0 = -70.0_SP; lat0 = 20.0_SP
+      call grid%init_spacing_spherical(dlon, dlat, lon0, lat0)
+
+      @assertTrue(grid%is_spherical)
+
+      ! dy is constant
+      expected_dy = R_EARTH * dlat * PI / 180.0_SP
+      @mpiAssertEqual(expected_dy, grid%dy(1,1), tolerance=1.0_SP)
+      @mpiAssertEqual(expected_dy, grid%dy(grid%local_nx, grid%local_ny), tolerance=1.0_SP)
+
+      ! dx at row j=1 and row j=2 differ (cos(lat) varies)
+      expected_dx_j1 = R_EARTH * cos((lat0 + real(grid%jbegin - 1, SP)*dlat) * PI/180.0_SP) &
+                       * dlon * PI / 180.0_SP
+      expected_dx_j2 = R_EARTH * cos((lat0 + real(grid%jbegin, SP)*dlat) * PI/180.0_SP) &
+                       * dlon * PI / 180.0_SP
+      @mpiAssertEqual(expected_dx_j1, grid%dx(1,1), tolerance=1.0_SP)
+      @mpiAssertEqual(expected_dx_j2, grid%dx(1,2), tolerance=1.0_SP)
+      @assertFalse(abs(grid%dx(1,1) - grid%dx(1,2)) < 1e-6_SP)
+
+      ! x(1,1) = 0 (ibegin=1, dx_ref at origin lat); y(1,1) = 0 for rank with jbegin=1
+      expected_x1 = real(grid%ibegin - 1, SP) * R_EARTH * cos(lat0*PI/180.0_SP) * dlon*PI/180.0_SP
+      expected_y1 = real(grid%jbegin - 1, SP) * expected_dy
+      @mpiAssertEqual(expected_x1, grid%x(1,1), tolerance=1.0_SP)
+      @mpiAssertEqual(expected_y1, grid%y(1,1), tolerance=1.0_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_spacing_spherical
+
+   ! ----------------------------------------------------------------
+   ! halo_exchange corner filling: 4 ranks (nx_proc=2, ny_proc=2).
+   !
+   ! Field initialised as 100*global_x + global_y for interior cells.
+   !
+   ! Two-phase (x then y) exchange propagates corner data correctly:
+   ! Phase 1 fills x-ghosts; Phase 2 y-sends include those x-ghosts,
+   ! so diagonal corners receive the correct values.
+   !
+   ! Convention: ghost index j=1 is innermost (global jbegin-1),
+   !             j=ng is outermost (global jbegin-ng).
+   !             Field index ng-j+1 maps j to the innermost-first order.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_corner_filling(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      real(SP), allocatable :: field(:,:)
+      integer :: i, j, k, ng, ny, mloc_g, nloc_g
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=2)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+
+      ng     = N_GHOST
+      ny     = grid%local_ny
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = ny + 2*ng
+      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+
+      do j = 1, ny
+         do i = 1, grid%local_nx
+            field(ng + i, ng + j) = 100.0_SP * real(grid%ibegin + i - 1, SP) &
+                                  +             real(grid%jbegin + j - 1, SP)
+         end do
+      end do
+
+      call grid%halo_exchange(field, comm)
+
+      ! Rank (iproc=0, jproc=0): high-x / high-y corner ← rank (1,1) data
+      if (grid%iproc == 0 .and. grid%jproc == 0) then
+         do k = 1, ng
+            do j = 1, ng
+               @assertEqual(100.0_SP * real(grid%istop + k, SP) + real(grid%jstop + j, SP), &
+                            field(ng + grid%local_nx + k, ny + ng + j), tolerance=1e-5_SP)
+            end do
+         end do
+      end if
+
+      ! Rank (iproc=1, jproc=1): low-x / low-y corner ← rank (0,0) data
+      ! j=1 innermost ghost → global y = jbegin-1; field index = ng-j+1 = ng
+      if (grid%iproc == 1 .and. grid%jproc == 1) then
+         do k = 1, ng
+            do j = 1, ng
+               @assertEqual(100.0_SP * real(grid%ibegin - k, SP) + real(grid%jbegin - j, SP), &
+                            field(ng - k + 1, ng - j + 1), tolerance=1e-5_SP)
+            end do
+         end do
+      end if
+
+      ! Rank (iproc=1, jproc=0): low-x / high-y corner ← rank (0,1) data
+      if (grid%iproc == 1 .and. grid%jproc == 0) then
+         do k = 1, ng
+            do j = 1, ng
+               @assertEqual(100.0_SP * real(grid%ibegin - k, SP) + real(grid%jstop + j, SP), &
+                            field(ng - k + 1, ny + ng + j), tolerance=1e-5_SP)
+            end do
+         end do
+      end if
+
+      ! Rank (iproc=0, jproc=1): high-x / low-y corner ← rank (1,0) data
+      if (grid%iproc == 0 .and. grid%jproc == 1) then
+         do k = 1, ng
+            do j = 1, ng
+               @assertEqual(100.0_SP * real(grid%istop + k, SP) + real(grid%jbegin - j, SP), &
+                            field(ng + grid%local_nx + k, ng - j + 1), tolerance=1e-5_SP)
+            end do
+         end do
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_corner_filling
 
 end module test_grid

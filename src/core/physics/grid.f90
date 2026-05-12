@@ -1,6 +1,7 @@
 module core_grid_mod
-   use core_constants_mod, only: SP, N_GHOST
-   use core_comm_mod, only: type_comm
+   use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH, MPI_SP
+   use core_comm_mod,      only: type_comm
+   use core_crs_mod,       only: type_crs, CRS_GEOGRAPHIC
    use core_grid_interface_mod, only: abstract_grid
    use mpi_f08
    implicit none
@@ -22,12 +23,14 @@ module core_grid_mod
       logical :: is_shore_boundary = .false.
       logical :: is_left_boundary  = .false.
       logical :: is_right_boundary = .false.
+      ! Coordinate system
+      logical         :: is_spherical = .false.
+      type(type_crs)  :: crs
       ! Grid spacing — always 2D arrays (local_nx x local_ny, no ghost cells)
-      logical  :: is_uniform = .false.
-      real(SP) :: dx0 = 0.0_SP, dy0 = 0.0_SP     ! scalar values when uniform (for reporting)
-      real(SP), allocatable :: dx(:,:), dy(:,:)     ! grid spacing
+      real(SP) :: dx0 = 0.0_SP, dy0 = 0.0_SP     ! scalar when uniform (for reporting)
+      real(SP), allocatable :: dx(:,:), dy(:,:)
       real(SP), allocatable :: inv_dx(:,:), inv_dy(:,:)  ! precomputed 1/dx, 1/dy
-      real(SP), allocatable :: x(:,:), y(:,:)       ! physical coordinates
+      real(SP), allocatable :: x(:,:), y(:,:)       ! physical coordinates (local metres)
    contains
       procedure, public :: get_indices => get_indices_2d
       procedure, public :: decompose
@@ -35,6 +38,7 @@ module core_grid_mod
       procedure, public :: halo_exchange
       procedure, public :: init_spacing_uniform
       procedure, public :: init_spacing_variable
+      procedure, public :: init_spacing_spherical
       generic,   public :: init_spacing => init_spacing_uniform, init_spacing_variable
       procedure, public :: finalize => grid_finalize
    end type type_grid_2d
@@ -87,11 +91,125 @@ contains
 
    end subroutine setup
 
+   ! Ghost-cell exchange for a ghost-inclusive field.
+   ! field must be allocated as (local_nx + 2*N_GHOST, local_ny + 2*N_GHOST).
+   ! Two-phase: x-direction first so corners are correct when y-strips are sent.
    subroutine halo_exchange(this, field, comm)
-      class(type_grid_2d), intent(in) :: this
-      real(SP), intent(inout) :: field(:,:)
-      type(type_comm), intent(inout) :: comm
-      ! TODO: ghost cell exchange using back/shore/left/right ranks
+      class(type_grid_2d), intent(in)    :: this
+      real(SP),            intent(inout) :: field(:,:)
+      type(type_comm),     intent(inout) :: comm
+
+      integer :: nx, ny, ng, mloc_g, nloc_g
+      integer :: nreq, ierr, i, j
+      type(MPI_Request) :: req(4)
+      type(MPI_Status)  :: stat(4)
+
+      ! x-direction send/recv buffers: (nloc_g, ng) — contiguous in memory
+      real(SP), allocatable :: sbuf_back(:,:), rbuf_back(:,:)
+      real(SP), allocatable :: sbuf_shore(:,:), rbuf_shore(:,:)
+      ! y-direction send/recv buffers: (mloc_g, ng)
+      real(SP), allocatable :: sbuf_right(:,:), rbuf_right(:,:)
+      real(SP), allocatable :: sbuf_left(:,:), rbuf_left(:,:)
+
+      nx     = this%local_nx
+      ny     = this%local_ny
+      ng     = N_GHOST
+      mloc_g = nx + 2*ng
+      nloc_g = ny + 2*ng
+
+      ! ---- Phase 1: x-direction (back / shore) ----
+      allocate(sbuf_back (nloc_g, ng), rbuf_back (nloc_g, ng))
+      allocate(sbuf_shore(nloc_g, ng), rbuf_shore(nloc_g, ng))
+
+      ! Pack: low-x interior strip → send to back_rank
+      do i = 1, ng
+         do j = 1, nloc_g
+            sbuf_back(j, i) = field(ng + i, j)
+         end do
+      end do
+      ! Pack: high-x interior strip → send to shore_rank
+      do i = 1, ng
+         do j = 1, nloc_g
+            sbuf_shore(j, i) = field(nx + i, j)
+         end do
+      end do
+
+      nreq = 0
+      if (this%back_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  0, comm%id, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  1, comm%id, req(nreq), ierr)
+      end if
+      if (this%shore_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 1, comm%id, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 0, comm%id, req(nreq), ierr)
+      end if
+      if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+
+      ! Unpack into ghost cells
+      if (this%back_rank /= MPI_PROC_NULL) then
+         do i = 1, ng
+            do j = 1, nloc_g
+               field(i, j) = rbuf_back(j, i)
+            end do
+         end do
+      end if
+      if (this%shore_rank /= MPI_PROC_NULL) then
+         do i = 1, ng
+            do j = 1, nloc_g
+               field(nx + ng + i, j) = rbuf_shore(j, i)
+            end do
+         end do
+      end if
+
+      deallocate(sbuf_back, rbuf_back, sbuf_shore, rbuf_shore)
+
+      ! ---- Phase 2: y-direction (right / left) ----
+      ! After phase 1, x ghost cells are filled — y-sends include correct corner data.
+      allocate(sbuf_right(mloc_g, ng), rbuf_right(mloc_g, ng))
+      allocate(sbuf_left (mloc_g, ng), rbuf_left (mloc_g, ng))
+
+      do j = 1, ng
+         do i = 1, mloc_g
+            sbuf_right(i, j) = field(i, ng + j)
+            sbuf_left (i, j) = field(i, ny + j)
+         end do
+      end do
+
+      nreq = 0
+      if (this%right_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 2, comm%id, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 3, comm%id, req(nreq), ierr)
+      end if
+      if (this%left_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  3, comm%id, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  2, comm%id, req(nreq), ierr)
+      end if
+      if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+
+      if (this%right_rank /= MPI_PROC_NULL) then
+         do j = 1, ng
+            do i = 1, mloc_g
+               field(i, j) = rbuf_right(i, j)
+            end do
+         end do
+      end if
+      if (this%left_rank /= MPI_PROC_NULL) then
+         do j = 1, ng
+            do i = 1, mloc_g
+               field(i, ny + ng + j) = rbuf_left(i, j)
+            end do
+         end do
+      end if
+
+      deallocate(sbuf_right, rbuf_right, sbuf_left, rbuf_left)
    end subroutine halo_exchange
 
    subroutine decompose(this, nprocs)
@@ -181,7 +299,6 @@ contains
       integer :: i, j
       real(SP) :: ox, oy
 
-      this%is_uniform = .true.
       this%dx0 = dx0
       this%dy0 = dy0
       ox = 0.0_SP; if (present(x0)) ox = x0
@@ -209,7 +326,6 @@ contains
       class(type_grid_2d), intent(inout) :: this
       real(SP), intent(in) :: dx(:,:), dy(:,:)
 
-      this%is_uniform = .false.
       this%dx0 = 0.0_SP
       this%dy0 = 0.0_SP
 
@@ -224,6 +340,54 @@ contains
       ! TODO: x/y coordinates require global cumulative sum + broadcast
 
    end subroutine init_spacing_variable
+
+   ! Spherical (lon/lat) grid spacing.
+   ! dx varies with latitude; dy is constant.
+   ! x/y stored in local metres using origin latitude as reference (flat-earth approx).
+   ! This keeps grid%x(:,1) monotonic for interpolator bisection — error is O(cos(lat+span)/cos(lat)-1).
+   subroutine init_spacing_spherical(this, dlon, dlat, lon0, lat0)
+      class(type_grid_2d), intent(inout) :: this
+      real(SP), intent(in) :: dlon, dlat   ! degrees per grid cell
+      real(SP), intent(in) :: lon0, lat0   ! southwest-corner origin, degrees
+
+      integer  :: i, j
+      real(SP) :: dlon_r, dlat_r, lat_j_r, lat_ref_r, dx_ref, dy0_val
+
+      this%dx0         = 0.0_SP
+      this%dy0         = 0.0_SP
+      this%is_spherical = .true.
+      this%crs%mode    = CRS_GEOGRAPHIC
+      this%crs%origin_x = lon0
+      this%crs%origin_y = lat0
+      this%crs%theta   = 0.0_SP
+
+      call grid_finalize(this)
+
+      dlon_r    = dlon * PI / 180.0_SP
+      dlat_r    = dlat * PI / 180.0_SP
+      lat_ref_r = lat0 * PI / 180.0_SP
+      dx_ref    = R_EARTH * cos(lat_ref_r) * dlon_r
+      dy0_val   = R_EARTH * dlat_r
+
+      allocate(this%dx    (this%local_nx, this%local_ny))
+      allocate(this%dy    (this%local_nx, this%local_ny))
+      allocate(this%inv_dx(this%local_nx, this%local_ny))
+      allocate(this%inv_dy(this%local_nx, this%local_ny))
+      allocate(this%x(this%local_nx, this%local_ny))
+      allocate(this%y(this%local_nx, this%local_ny))
+
+      do j = 1, this%local_ny
+         lat_j_r = lat_ref_r + real(this%jbegin + j - 2, SP) * dlat_r
+         do i = 1, this%local_nx
+            this%dx(i,j)     = R_EARTH * cos(lat_j_r) * dlon_r
+            this%dy(i,j)     = dy0_val
+            this%inv_dx(i,j) = 1.0_SP / this%dx(i,j)
+            this%inv_dy(i,j) = 1.0_SP / dy0_val
+            this%x(i,j)      = real(this%ibegin + i - 2, SP) * dx_ref
+            this%y(i,j)      = real(this%jbegin + j - 2, SP) * dy0_val
+         end do
+      end do
+   end subroutine init_spacing_spherical
 
    subroutine grid_finalize(this)
       class(type_grid_2d), intent(inout) :: this
