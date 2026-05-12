@@ -68,13 +68,16 @@ module core_yaml_file_mod
       procedure, public :: read_string
       procedure, public :: read_string_node
       procedure, public :: read_string_array
+   procedure, public :: read_integer_array
+   procedure, public :: read_real_array
       procedure, public :: read_enum
       procedure, public :: read_enum_node
       procedure, public :: read_input_path
 
       ! Interface overloads
       generic, public :: read => read_integer, read_real, read_logical, &
-         read_string, read_enum, read_input_path, read_string_array
+         read_string, read_enum, read_input_path, read_string_array, &
+         read_integer_array, read_real_array
 
       generic, public :: read_positive => read_positive_integer, read_positive_real
       generic, public :: read_negative => read_negative_integer, read_negative_real
@@ -503,6 +506,90 @@ contains
          end select
       end if
    end subroutine read_string_array
+
+   subroutine read_integer_array(this, key, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      integer, allocatable, intent(inout), dimension(:) :: val
+      logical, optional, intent(out) :: silent
+      class(type_node), pointer :: node
+      class(type_list), pointer :: list_node
+      type(type_list_item), pointer :: item
+      class(type_scalar), pointer :: item_scalar
+      integer :: n, i, stat
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+
+      node => this%root%get(key)
+      is_default = this%parse_error_message(key, io_err, silent=silent)
+      if (.not. is_default) then
+         select type (node)
+         class is (type_list)
+            list_node => node
+            n = list_node%size()
+            if (allocated(val)) deallocate (val)
+            allocate (val(n))
+            i = 1
+            item => list_node%first
+            do while (associated(item))
+               select type (node_item => item%node)
+               class is (type_scalar)
+                  item_scalar => node_item
+                  call str2int(item_scalar%string, val(i), stat)
+                  if (stat /= 0) call this%log%exit_on_error("Value '"//trim(item_scalar%string)//"' is not a valid integer.")
+               class default
+                  call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
+               end select
+               i = i + 1
+               item => item%next
+            end do
+         class default
+            call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
+         end select
+      end if
+   end subroutine read_integer_array
+
+   subroutine read_real_array(this, key, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      real(SP), allocatable, intent(inout), dimension(:) :: val
+      logical, optional, intent(out) :: silent
+      class(type_node), pointer :: node
+      class(type_list), pointer :: list_node
+      type(type_list_item), pointer :: item
+      class(type_scalar), pointer :: item_scalar
+      integer :: n, i, stat
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+
+      node => this%root%get(key)
+      is_default = this%parse_error_message(key, io_err, silent=silent)
+      if (.not. is_default) then
+         select type (node)
+         class is (type_list)
+            list_node => node
+            n = list_node%size()
+            if (allocated(val)) deallocate (val)
+            allocate (val(n))
+            i = 1
+            item => list_node%first
+            do while (associated(item))
+               select type (node_item => item%node)
+               class is (type_scalar)
+                  item_scalar => node_item
+                  call str2real(item_scalar%string, val(i), stat)
+                  if (stat /= 0) call this%log%exit_on_error("Value '"//trim(item_scalar%string)//"' is not a valid real.")
+               class default
+                  call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
+               end select
+               i = i + 1
+               item => item%next
+            end do
+         class default
+            call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
+         end select
+      end if
+   end subroutine read_real_array
 
    subroutine finalize(this)
       class(type_yaml_reader), intent(inout) :: this

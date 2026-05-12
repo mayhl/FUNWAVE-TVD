@@ -54,6 +54,10 @@ zero_real: 0.0
 valid_file_path: "valid_file_path.txt"
 invalid_file_path: "invalid_file_path.txt"
 
+integer_array: [1, 2, 3]
+real_array: [0.1, 0.2, 0.3]
+string_array: ["a", "b", "c"]
+
 dict:
   positive_integer: 5
   positive_real: 0.5

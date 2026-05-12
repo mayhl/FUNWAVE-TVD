@@ -7,7 +7,7 @@ module test_yaml_serial
    use pFUnit
 
    use core_comm_mod, only: type_comm, new_comm
-   use core_constants_mod, only: SP, MESSAGE_SIZE
+   use core_constants_mod, only: SP, MESSAGE_SIZE, type_string
    use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_misc_mod, only: str2int
    use core_path_mod, only: type_path
@@ -109,11 +109,13 @@ contains
                        val=val)
 
       @assertExceptionRaised('integer is set to "1", which is out of the required range: [-1, 0].')
-
+      !
       call reader%read('integer', &
                        required_range="[0, -1]", &
                        val=val)
+
       @assertExceptionRaised("Read method for 'integer' has an invalid 'required_range': [0, -1].")
+      @assertExceptionRaised('integer is set to "1", which is out of the required range: [0, -1].')
 
       call reader%read('integer', &
                        recommend_range="[0, -2]", &
@@ -212,7 +214,6 @@ contains
 
    end subroutine test_nonpositive_integer
 
-   @disable
    @test
    subroutine test_real()
 
@@ -245,7 +246,6 @@ contains
       call dummy_fix_lint()
    end subroutine test_real
 
-   @disable
    @test
    subroutine test_range_real()
 
@@ -276,7 +276,6 @@ contains
 
    end subroutine test_range_real
 
-   @disable
    @test
    subroutine test_positive_real()
 
@@ -299,7 +298,6 @@ contains
 
    end subroutine test_positive_real
 
-   @disable
    @test
    subroutine test_negative_real()
 
@@ -322,7 +320,6 @@ contains
 
    end subroutine test_negative_real
 
-   @disable
    @test
    subroutine test_nonnegative_real()
 
@@ -345,7 +342,6 @@ contains
 
    end subroutine test_nonnegative_real
 
-   @disable
    @test
    subroutine test_nonpositive_real()
 
@@ -368,7 +364,6 @@ contains
 
    end subroutine test_nonpositive_real
 
-   @disable
    @test
    subroutine test_logical()
 
@@ -461,7 +456,6 @@ contains
 
    end subroutine test_logical
 
-   @disable
    @test
    subroutine test_string()
 
@@ -484,7 +478,6 @@ contains
 
    end subroutine test_string
 
-   @disable
    @test
    subroutine test_enum()
 
@@ -512,7 +505,6 @@ contains
 
    end subroutine test_enum
 
-   @disable
    @test
    subroutine test_path()
 
@@ -536,7 +528,38 @@ contains
 
    end subroutine test_path
 
-   @disable
+   @test
+   subroutine test_array_readers()
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer, allocatable, dimension(:) :: val_int
+      real(SP), allocatable, dimension(:) :: val_real
+      type(type_string), allocatable, dimension(:) :: val_str
+
+      call open_yaml(reader, comm)
+
+      call reader%read_integer_array('integer_array', val=val_int)
+      @assertEqual(3, size(val_int))
+      @assertEqual(1, val_int(1))
+      @assertEqual(2, val_int(2))
+      @assertEqual(3, val_int(3))
+
+      call reader%read_real_array('real_array', val=val_real)
+      @assertEqual(3, size(val_real))
+      @assertEqual(0.1_SP, val_real(1), tolerance=1e-6_SP)
+      @assertEqual(0.2_SP, val_real(2), tolerance=1e-6_SP)
+      @assertEqual(0.3_SP, val_real(3), tolerance=1e-6_SP)
+
+      call reader%read_string_array('string_array', val=val_str)
+      @assertEqual(3, size(val_str))
+      @assertEqual('a', val_str(1)%s)
+      @assertEqual('b', val_str(2)%s)
+      @assertEqual('c', val_str(3)%s)
+
+      call dummy_fix_lint()
+   end subroutine test_array_readers
+
    @test
    subroutine test_dict()
 
@@ -565,7 +588,6 @@ contains
 
    end subroutine test_dict
 
-   @disable
    @test
    subroutine test_read_real_units()
       type(type_yaml_reader) :: reader, child
