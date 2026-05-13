@@ -7,14 +7,15 @@
 !
 !  YAML block: simulation:
 !    title: "..."
-!    total_time: <time>         required
-!    t_start: <time>            optional, default 0
-!    screen_interval: <time>    optional, default total_time
-!    hot_start: <bool>          optional, default false
-!    hot_start_file: <path>     required if hot_start: true
+!    total_time: <time>            required
+!    t_start: <time>              optional, default 0
+!    output_interval: <time>      required
+!    screen_interval: <time>      optional, default total_time
+!    plot_intv_station: <time>    station output interval (s), default 1.0  (pending deprecation)
+!    station_output_buffer: <int> station buffer size,         default 1000 (pending deprecation)
 !    time_stepping:
-!      fixed_dt: <bool>         optional, default false
-!      dt: <time>               required if fixed_dt: true
+!      fixed_dt: <bool>           optional, default false
+!      dt: <time>                 required if fixed_dt: true
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -37,10 +38,11 @@ module model_simulation_mod
       character(:), allocatable :: title
       real(SP) :: total_time = 0.0_SP
       real(SP) :: t_start = 0.0_SP
+      real(SP) :: plot_intv = 0.0_SP
       real(SP) :: screen_interval = 0.0_SP
-      logical :: hot_start = .false.
-      character(:), allocatable :: hot_start_file
-      logical :: fixed_dt = .false.
+      real(SP) :: plot_intv_station    = 1.0_SP
+      integer  :: station_output_buffer = 1000
+      logical  :: fixed_dt = .false.
       real(SP) :: dt_fixed = 0.0_SP
 
    contains
@@ -63,13 +65,13 @@ contains
       call sub_env%yaml%read('title', silent=no_title, val=this%title)
       call sub_env%yaml%read_positive('total_time', val=this%total_time)
       call sub_env%yaml%read('t_start', silent=no_tstart, val=this%t_start, default='0.0')
+      call sub_env%yaml%read_positive('output_interval', val=this%plot_intv)
       call sub_env%yaml%read('screen_interval', silent=no_screen, &
-                              val=this%screen_interval, default='0.0')
-
-      call sub_env%yaml%read('hot_start', val=this%hot_start, default='NO')
-      if (this%hot_start) then
-         call sub_env%yaml%read('hot_start_file', val=this%hot_start_file)
-      end if
+                              val=this%screen_interval, default='1.0')
+      call sub_env%yaml%read('plot_intv_station',     silent=no_ts, &
+                              val=this%plot_intv_station,    default='1.0')
+      call sub_env%yaml%read('station_output_buffer', silent=no_ts, &
+                              val=this%station_output_buffer, default='1000')
 
       ! Time stepping sub-block (optional)
       ts_yaml = sub_env%yaml%cast_dictionary('time_stepping', no_ts)
