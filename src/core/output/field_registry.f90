@@ -29,7 +29,7 @@ module core_field_registry_mod
       real(SP), pointer :: data(:,:) => null()
    end type type_field_entry
 
-   type, public :: type_field_registry
+   type :: type_field_registry
       type(type_field_entry) :: entries(REGISTRY_MAX)
       integer :: n = 0
    contains

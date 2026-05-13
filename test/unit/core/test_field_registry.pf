@@ -1,0 +1,82 @@
+module test_field_registry
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_field_registry_mod, only: type_field_registry
+   implicit none(external)
+
+contains
+
+   @test
+   subroutine test_has_before_and_after_register()
+      type(type_field_registry) :: reg
+      real(SP), target :: fld(3, 4)
+
+      @assertFalse(reg%has("eta"))
+      call reg%register("eta", fld)
+      @assertTrue(reg%has("eta"))
+   end subroutine test_has_before_and_after_register
+
+   ! get() must return a pointer that aliases the original — modifications
+   ! through the registry pointer must be visible in the source array.
+   @test
+   subroutine test_get_returns_alias()
+      type(type_field_registry) :: reg
+      real(SP), target  :: fld(2, 2)
+      real(SP), pointer :: ptr(:,:)
+
+      fld = 0.0_SP
+      call reg%register("u", fld)
+      ptr => reg%get("u")
+      ptr(1,1) = 99.0_SP
+
+      @assertEqual(99.0_SP, fld(1,1), tolerance=1e-6_SP)
+   end subroutine test_get_returns_alias
+
+   ! Re-registering the same name must update the pointer without
+   ! incrementing the entry count.
+   @test
+   subroutine test_reregister_updates_pointer()
+      type(type_field_registry) :: reg
+      real(SP), target  :: fld1(2, 2), fld2(2, 2)
+      real(SP), pointer :: ptr(:,:)
+
+      fld1 = 1.0_SP
+      fld2 = 2.0_SP
+
+      call reg%register("v", fld1)
+      call reg%register("v", fld2)
+      ptr => reg%get("v")
+
+      @assertEqual(1,      reg%n)
+      @assertEqual(2.0_SP, ptr(1,1), tolerance=1e-6_SP)
+   end subroutine test_reregister_updates_pointer
+
+   @test
+   subroutine test_multiple_fields_coexist()
+      type(type_field_registry) :: reg
+      real(SP), target :: eta(2,2), u(2,2), v(2,2)
+
+      call reg%register("eta", eta)
+      call reg%register("u",   u)
+      call reg%register("v",   v)
+
+      @assertEqual(3, reg%n)
+      @assertTrue(reg%has("eta"))
+      @assertTrue(reg%has("u"))
+      @assertTrue(reg%has("v"))
+      @assertFalse(reg%has("w"))
+   end subroutine test_multiple_fields_coexist
+
+   @test
+   subroutine test_finalize_clears_all()
+      type(type_field_registry) :: reg
+      real(SP), target :: fld(2, 2)
+
+      call reg%register("eta", fld)
+      call reg%finalize()
+
+      @assertEqual(0, reg%n)
+      @assertFalse(reg%has("eta"))
+   end subroutine test_finalize_clears_all
+
+end module test_field_registry

@@ -85,3 +85,6 @@ length_obj:
 length_err:
   value: 2
   units: error
+
+time:
+  total_time: 100.0

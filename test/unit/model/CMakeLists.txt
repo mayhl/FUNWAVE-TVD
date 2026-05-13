@@ -1,2 +1,0 @@
-qadd_pfunit_ctest(test_time)
-target_link_libraries(test_time libcore_engine libcore_base)

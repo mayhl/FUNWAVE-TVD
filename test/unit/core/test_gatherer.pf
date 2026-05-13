@@ -1,0 +1,92 @@
+! allow(E001)
+module test_gatherer
+   use mpi_f08
+   use pFUnit
+   use core_constants_mod,        only: SP
+   use core_comm_mod,             only: type_comm, new_comm
+   use core_output_gatherer_mod,  only: type_output_gatherer
+   implicit none(external)
+
+contains
+
+   subroutine open_comm(this, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm), intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+   end subroutine open_comm
+
+   ! Rank 0 owns 3 local points, rank 1 owns 2.
+   ! IO rank must build recv_counts=[3,2] and recv_displs=[0,3].
+   @test(npes=[2])
+   subroutine test_init_points_recv_layout(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      type(type_output_gatherer) :: g
+      integer :: n_local
+
+      call open_comm(this, comm)
+      n_local = merge(3, 2, comm%is_io_node())
+
+      call g%init_points(5, n_local, comm)
+
+      @assertTrue(allocated(g%recv_counts))
+      @assertTrue(allocated(g%recv_displs))
+
+      if (comm%is_io_node()) then
+         @assertEqual(3, g%recv_counts(1))
+         @assertEqual(2, g%recv_counts(2))
+         @assertEqual(0, g%recv_displs(1))
+         @assertEqual(3, g%recv_displs(2))
+      end if
+   end subroutine test_init_points_recv_layout
+
+   ! Rank 0 contributes [1,2,3], rank 1 contributes [4,5].
+   ! global_out on IO rank must be [1,2,3,4,5] in rank order.
+   @test(npes=[2])
+   subroutine test_gather_vals(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      type(type_output_gatherer) :: g
+      real(SP), allocatable :: local_vals(:), global_out(:)
+
+      call open_comm(this, comm)
+
+      if (comm%is_io_node()) then
+         allocate(local_vals(3));  local_vals = [1.0_SP, 2.0_SP, 3.0_SP]
+         allocate(global_out(5))
+         call g%init_points(5, 3, comm)
+      else
+         allocate(local_vals(2));  local_vals = [4.0_SP, 5.0_SP]
+         allocate(global_out(1))   ! dummy on non-IO rank
+         call g%init_points(5, 2, comm)
+      end if
+
+      call g%gather_vals(local_vals, global_out, comm)
+
+      if (comm%is_io_node()) then
+         @assertEqual(1.0_SP, global_out(1), tolerance=1e-6_SP)
+         @assertEqual(2.0_SP, global_out(2), tolerance=1e-6_SP)
+         @assertEqual(3.0_SP, global_out(3), tolerance=1e-6_SP)
+         @assertEqual(4.0_SP, global_out(4), tolerance=1e-6_SP)
+         @assertEqual(5.0_SP, global_out(5), tolerance=1e-6_SP)
+      end if
+   end subroutine test_gather_vals
+
+   @test(npes=[2])
+   subroutine test_finalize_deallocates(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm) :: comm
+      type(type_output_gatherer) :: g
+
+      call open_comm(this, comm)
+      call g%init_points(4, 2, comm)
+      call g%finalize()
+
+      @assertFalse(allocated(g%recv_counts))
+      @assertFalse(allocated(g%recv_displs))
+      @assertEqual(0, g%n_global)
+   end subroutine test_finalize_deallocates
+
+end module test_gatherer

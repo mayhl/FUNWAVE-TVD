@@ -1,0 +1,92 @@
+module test_misc
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_misc_mod, only: str2int, str2real, count_char
+   implicit none(external)
+
+contains
+
+   @test
+   subroutine test_str2int_valid()
+      integer :: val, stat
+      call str2int("42", val, stat)
+      @assertEqual(0, stat)
+      @assertEqual(42, val)
+   end subroutine test_str2int_valid
+
+   @test
+   subroutine test_str2int_negative()
+      integer :: val, stat
+      call str2int("-7", val, stat)
+      @assertEqual(0, stat)
+      @assertEqual(-7, val)
+   end subroutine test_str2int_negative
+
+   ! The verify() guard was added because ifx silently parses "10.5" as 10
+   ! without setting iostat — this pins that fix.
+   @test
+   subroutine test_str2int_rejects_float()
+      integer :: val, stat
+      call str2int("10.5", val, stat)
+      @assertTrue(stat /= 0)
+   end subroutine test_str2int_rejects_float
+
+   @test
+   subroutine test_str2int_empty_flag()
+      integer :: val, stat
+      logical :: is_empty
+      call str2int("", val, stat, is_empty=is_empty)
+      @assertTrue(is_empty)
+   end subroutine test_str2int_empty_flag
+
+   @test
+   subroutine test_str2real_valid()
+      real(SP) :: val
+      integer :: stat
+      call str2real("3.14", val, stat)
+      @assertEqual(0, stat)
+      @assertEqual(3.14_SP, val, tolerance=1e-4_SP)
+   end subroutine test_str2real_valid
+
+   @test
+   subroutine test_str2real_negative()
+      real(SP) :: val
+      integer :: stat
+      call str2real("-2.5", val, stat)
+      @assertEqual(0, stat)
+      @assertEqual(-2.5_SP, val, tolerance=1e-6_SP)
+   end subroutine test_str2real_negative
+
+   @test
+   subroutine test_str2real_invalid()
+      real(SP) :: val
+      integer :: stat
+      call str2real("abc", val, stat)
+      @assertTrue(stat /= 0)
+   end subroutine test_str2real_invalid
+
+   @test
+   subroutine test_str2real_empty_flag()
+      real(SP) :: val
+      integer :: stat
+      logical :: is_empty
+      call str2real("", val, stat, is_empty=is_empty)
+      @assertTrue(is_empty)
+   end subroutine test_str2real_empty_flag
+
+   @test
+   subroutine test_count_char_multiple()
+      @assertEqual(2, count_char("a/b/c", "/"))
+   end subroutine test_count_char_multiple
+
+   @test
+   subroutine test_count_char_none()
+      @assertEqual(0, count_char("abc", "/"))
+   end subroutine test_count_char_none
+
+   @test
+   subroutine test_count_char_all()
+      @assertEqual(3, count_char("///", "/"))
+   end subroutine test_count_char_all
+
+end module test_misc

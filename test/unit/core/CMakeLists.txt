@@ -13,3 +13,12 @@ qadd_pfunit_ctest(test_interpolation 2)
 
 qadd_pfunit_ctest(test_accumulators)
 qadd_pfunit_ctest(test_crs)
+
+qadd_pfunit_ctest(test_misc)
+qadd_pfunit_ctest(test_units)
+
+qadd_pfunit_ctest(test_time)
+target_link_libraries(test_time libcore_engine libcore_infra libcore_base)
+
+qadd_pfunit_ctest(test_field_registry)
+qadd_pfunit_ctest(test_gatherer 2)

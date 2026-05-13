@@ -45,7 +45,7 @@ module core_output_channel_mod
    integer, parameter :: VARS_MAX     = 16
    integer, parameter :: STATS_MAX    = 4
 
-   type, public :: type_output_channel
+   type :: type_output_channel
       character(ID_LEN)              :: id       = ''
       character(ID_LEN)              :: geom_type = ''  ! 'field', 'station', 'transect'
       character(8)                   :: format   = 'ascii'

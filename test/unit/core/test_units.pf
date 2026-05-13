@@ -1,0 +1,110 @@
+module test_units
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_units_mod, only: get_factor, get_units_by_dim, apply_unit_conversion
+   implicit none(external)
+
+contains
+
+   @test
+   subroutine test_get_factor_known()
+      @assertEqual(1.0_SP,    get_factor("sec",  "time"),   tolerance=1e-6_SP)
+      @assertEqual(60.0_SP,   get_factor("min",  "time"),   tolerance=1e-6_SP)
+      @assertEqual(3600.0_SP, get_factor("hour", "time"),   tolerance=1e-6_SP)
+      @assertEqual(1.0_SP,    get_factor("m",    "length"), tolerance=1e-6_SP)
+      @assertEqual(1000.0_SP, get_factor("km",   "length"), tolerance=1e-6_SP)
+      @assertEqual(0.01_SP,   get_factor("cm",   "length"), tolerance=1e-7_SP)
+   end subroutine test_get_factor_known
+
+   @test
+   subroutine test_get_factor_unknown_unit()
+      @assertEqual(-1.0_SP, get_factor("furlongs", "length"), tolerance=1e-6_SP)
+   end subroutine test_get_factor_unknown_unit
+
+   @test
+   subroutine test_get_factor_wrong_dim()
+      ! "min" exists in time but not in length
+      @assertEqual(-1.0_SP, get_factor("min", "length"), tolerance=1e-6_SP)
+   end subroutine test_get_factor_wrong_dim
+
+   @test
+   subroutine test_apply_unit_conversion_linear()
+      real(SP) :: val
+      character(:), allocatable :: err
+      logical :: has_err
+      call apply_unit_conversion(2.0_SP, "min", "time", val, err)
+      has_err = allocated(err)
+      @assertFalse(has_err)
+      @assertEqual(120.0_SP, val, tolerance=1e-5_SP)
+   end subroutine test_apply_unit_conversion_linear
+
+   @test
+   subroutine test_apply_unit_conversion_km()
+      real(SP) :: val
+      character(:), allocatable :: err
+      logical :: has_err
+      call apply_unit_conversion(3.0_SP, "km", "length", val, err)
+      has_err = allocated(err)
+      @assertFalse(has_err)
+      @assertEqual(3000.0_SP, val, tolerance=1e-4_SP)
+   end subroutine test_apply_unit_conversion_km
+
+   ! hertz is inverted: period = 1 / frequency
+   @test
+   subroutine test_apply_unit_conversion_hertz()
+      real(SP) :: val
+      character(:), allocatable :: err
+      logical :: has_err
+      call apply_unit_conversion(10.0_SP, "hertz", "time", val, err)
+      has_err = allocated(err)
+      @assertFalse(has_err)
+      @assertEqual(0.1_SP, val, tolerance=1e-6_SP)
+   end subroutine test_apply_unit_conversion_hertz
+
+   @test
+   subroutine test_apply_unit_conversion_bad_unit()
+      real(SP) :: val
+      character(:), allocatable :: err
+      logical :: has_err
+      call apply_unit_conversion(1.0_SP, "furlongs", "length", val, err)
+      has_err = allocated(err)
+      @assertTrue(has_err)
+   end subroutine test_apply_unit_conversion_bad_unit
+
+   @test
+   subroutine test_get_units_by_dim_time()
+      character(16), allocatable :: units(:)
+      character(:), allocatable :: err
+      logical :: has_err
+      integer :: n
+      call get_units_by_dim("time", units, err)
+      has_err = allocated(err)
+      @assertFalse(has_err)
+      n = size(units)
+      @assertEqual(4, n)
+   end subroutine test_get_units_by_dim_time
+
+   @test
+   subroutine test_get_units_by_dim_length()
+      character(16), allocatable :: units(:)
+      character(:), allocatable :: err
+      logical :: has_err
+      integer :: n
+      call get_units_by_dim("length", units, err)
+      has_err = allocated(err)
+      @assertFalse(has_err)
+      n = size(units)
+      @assertEqual(3, n)
+   end subroutine test_get_units_by_dim_length
+
+   @test
+   subroutine test_get_units_by_dim_unknown()
+      character(16), allocatable :: units(:)
+      character(:), allocatable :: err
+      logical :: has_err
+      call get_units_by_dim("mass", units, err)
+      has_err = allocated(err)
+      @assertTrue(has_err)
+   end subroutine test_get_units_by_dim_unknown
+
+end module test_units

@@ -30,7 +30,7 @@ module core_output_manager_mod
    private
    public :: type_output_manager
 
-   type, public :: type_output_manager
+   type :: type_output_manager
       type(type_output_channel), allocatable :: channels(:)
       integer :: n_channels = 0
    contains

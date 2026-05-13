@@ -31,7 +31,7 @@ module core_output_gatherer_mod
    private
    public :: type_output_gatherer
 
-   type, public :: type_output_gatherer
+   type :: type_output_gatherer
       integer :: n_global = 0
       integer :: n_local  = 0
       integer :: io_rank  = 0

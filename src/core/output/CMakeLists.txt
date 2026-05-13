@@ -13,4 +13,4 @@ target_include_directories(
   libcore_output PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/core>")
 
-target_link_libraries(libcore_output PUBLIC libcore_physics libcore_engine)
+target_link_libraries(libcore_output PUBLIC libcore_numerics libcore_engine)

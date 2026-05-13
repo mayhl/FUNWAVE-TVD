@@ -1,6 +1,8 @@
 module test_time
    use pFUnit
    use core_constants_mod, only: SP
+   use core_comm_mod,           only: type_comm, new_comm
+   use core_yaml_file_mod,      only: type_yaml_reader
    use core_simulation_time_mod, only: type_simulation_control
    implicit none(external)
 
@@ -46,6 +48,26 @@ contains
       sim%current_time = 1.01_SP
       @assertTrue(sim%is_finished())
    end subroutine test_is_finished_boundary
+
+   ! init_from_yaml reads total_time from the 'time:' block;
+   ! t_start defaults to 0.0 when absent.
+   @test
+   subroutine test_init_from_yaml()
+      type(type_simulation_control) :: sim
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      character(:), allocatable :: yaml_path
+
+      comm = new_comm(io_rank_id=0)
+      yaml_path = "test.yaml"
+      call reader%init(yaml_path, comm)
+      call sim%init_from_yaml(reader)
+
+      @assertEqual(0.0_SP,   sim%t_start,      tolerance=1e-6_SP)
+      @assertEqual(100.0_SP, sim%t_end,        tolerance=1e-5_SP)
+      @assertEqual(0.0_SP,   sim%current_time, tolerance=1e-6_SP)
+      @assertEqual(0,        sim%step)
+   end subroutine test_init_from_yaml
 
 end module test_time
 

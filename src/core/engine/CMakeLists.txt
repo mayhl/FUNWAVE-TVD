@@ -1,4 +1,4 @@
-# libcore_physics: Simulation Context
+# libcore_engine: Engine — time control, stepper
 add_library(
   libcore_engine STATIC
   # stepper_engine.f90
@@ -8,7 +8,7 @@ set_target_properties(
   libcore_engine PROPERTIES Fortran_MODULE_DIRECTORY
                              "${CMAKE_BINARY_DIR}/modules/core")
 
-target_link_libraries(libcore_engine PUBLIC libcore_transport libcore_base)
+target_link_libraries(libcore_engine PUBLIC libcore_infra libcore_base)
 
 target_include_directories(
   libcore_engine
