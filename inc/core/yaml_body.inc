@@ -87,18 +87,43 @@
       end if
 
 #else
-      val = this%root%_GET(key, error=io_err)
+      ! Pre-check key existence before calling _GET. On ifx, allocatable
+      ! error dummy args without explicit intent do not propagate back through
+      ! the fortran-yaml-c call chain, so io_err may stay unallocated for a
+      ! missing key. For character(:) return types this causes a crash when
+      ! parse_error_message tries to concatenate the unallocated result.
+      if (associated(this%root%get(key))) then
+         val = this%root%_GET(key, error=io_err)
+      else
+         allocate(io_err)
+         io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+      end if
       is_default = this%parse_error_message(key, io_err, default, silent)
 #endif
 
 ! Parsing default value string
       if (is_default) then
+#ifdef _STR2VAL
+         ! For numeric types (integer, real), validate the default string directly
+         ! using str2int / str2real rather than going through get_integer / get_real.
+         ! Both gfortran and ifx silently partially-parse "10.5" into an integer
+         ! with I20 or * format (ios=0), so the library cannot be relied upon here.
+         ! str2int uses verify() to reject non-integer characters before reading.
+         block
+            integer :: ios_dflt
+            call _STR2VAL(default, val, ios_dflt)
+            if (ios_dflt /= 0) then
+               msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
+               call this%log%exit_on_fatal(msg)
+            end if
+         end block
+#else
          val = this%root%_GET(key, error=io_err)
-         ! Safety check
          if (allocated(io_err)) then
             msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
             call this%log%exit_on_fatal(msg)
          end if
+#endif
       end if
 
 #ifdef _HAS_RANGE

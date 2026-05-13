@@ -74,6 +74,7 @@ contains
       class(type_path), intent(in) :: this
       logical :: exists
       inquire (file=trim(this%root), exist=exists)
+      if (.not. exists) exists = is_directory(trim(this%root)//c_null_char)
    end function path_exists
 
    function path_is_file(this) result(is_file)

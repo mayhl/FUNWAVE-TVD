@@ -6,11 +6,12 @@ module core_memory_mod
    public :: core_alloc_aligned, core_dealloc_aligned
 
    interface
-      function c_malloc(size) bind(c, name="malloc")
+      function c_aligned_alloc(alignment, size) bind(c, name="aligned_alloc")
          import
-         type(c_ptr) :: c_malloc
+         type(c_ptr) :: c_aligned_alloc
+         integer(c_size_t), value :: alignment
          integer(c_size_t), value :: size
-      end function c_malloc
+      end function c_aligned_alloc
 
       subroutine c_free(ptr) bind(c, name="free")
          import
@@ -20,13 +21,15 @@ module core_memory_mod
 
 contains
 
-   ! Simple wrapper for aligned allocation
    subroutine core_alloc_aligned(ptr, size, alignment)
       type(c_ptr), intent(out) :: ptr
       integer(c_size_t), intent(in) :: size
       integer(c_size_t), intent(in) :: alignment
-      
-      ptr = c_malloc(size)
+      integer(c_size_t) :: rounded_size
+
+      ! aligned_alloc requires size to be a multiple of alignment
+      rounded_size = ((size + alignment - 1_c_size_t) / alignment) * alignment
+      ptr = c_aligned_alloc(alignment, rounded_size)
    end subroutine core_alloc_aligned
 
    subroutine core_dealloc_aligned(ptr)

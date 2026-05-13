@@ -42,8 +42,13 @@ class UnitTestRunner(BaseRunner):
         self.reporter.step("")
         if self.mode == "ci":
             self.reporter.info("CI Mode: Performing full build...")
-            subprocess.run(["cmake", "-S", ".", "-B", self.build_dir], check=True)
-            subprocess.run(["make", "-C", self.build_dir, "-j8"], check=True)
+            subprocess.run([
+                "cmake", "-S", ".", "-B", self.build_dir,
+                "-DENABLE_TESTING=ON", "-DENABLE_DEV_MODE=ON",
+                "-DCMAKE_BUILD_TYPE=Debug",
+            ], check=True)
+            nproc = os.cpu_count() or 4
+            subprocess.run(["cmake", "--build", self.build_dir, f"-j{nproc}"], check=True)
 
         # Load test groups from YAML configuration
         config_path = os.path.join(os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd()), "test/unit/test_config.yaml")

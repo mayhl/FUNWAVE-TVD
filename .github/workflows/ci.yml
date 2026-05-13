@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [master, "release/**", "temp/**"]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build-test:
+    name: ${{ matrix.compiler }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { compiler: gfortran,  dockerfile: docker/gfortran/Dockerfile }
+          - { compiler: ifx,       dockerfile: docker/intel/Dockerfile }
+          - { compiler: flang-new, dockerfile: docker/flang/Dockerfile }
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # BuildKit GHA cache: same layer cache logic as local Docker layer cache
+      - name: Build
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ${{ matrix.dockerfile }}
+          push: false
+          load: true
+          tags: funwave-${{ matrix.compiler }}:test
+          cache-from: type=gha,scope=${{ matrix.compiler }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.compiler }}
+
+      - name: Test
+        run: docker run --rm funwave-${{ matrix.compiler }}:test

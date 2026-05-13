@@ -20,8 +20,7 @@ contains
       character(len=256) :: test_file
       type(MPI_Comm) :: mcomm
 
-      ! Use hardcoded absolute path for test stability
-      test_file = "/Users/rdchlmyl/repos/mayhlFUNWAVE/test/unit/transport/test_config.yaml"
+      test_file = "test_config.yaml"
 
       ! Initialize comm
       mcomm = this%getMpiCommunicator()

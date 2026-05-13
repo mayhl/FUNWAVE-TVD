@@ -44,11 +44,10 @@ module core_field_mod
       this%name = name
       this%rank = rank
       this%shape = shape
-      
-      ! Calculate total size in bytes (assuming SP = 4 bytes)
-      total_size = 4
+
+      total_size = int(storage_size(0.0_SP) / 8, c_size_t)
       do i = 1, rank
-         total_size = total_size * shape(i)
+         total_size = total_size * int(shape(i), c_size_t)
       end do
 
       call core_alloc_aligned(this%host_ptr, total_size, 64_c_size_t)

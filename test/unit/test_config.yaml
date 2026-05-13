@@ -1,9 +1,11 @@
 groups:
   - name: I/O
-    tests: [test_yaml_input_serial, test_yaml_input_parallel]
+    tests: [test_yaml_serial, test_yaml_parallel, test_config]
   - name: Math
-    tests: [test_path_mod, test_range_parser]
+    tests: [test_path, test_range_parser, test_interpolation, test_crs]
   - name: Logging
     tests: [test_logging, test_probe]
   - name: Core
-    tests: [test_time_utils, test_accumulators]
+    tests: [test_time_utils, test_accumulators, test_comm, test_grid, test_field, test_memory]
+  - name: Model
+    tests: [test_time]

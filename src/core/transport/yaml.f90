@@ -68,8 +68,8 @@ module core_yaml_file_mod
       procedure, public :: read_string
       procedure, public :: read_string_node
       procedure, public :: read_string_array
-   procedure, public :: read_integer_array
-   procedure, public :: read_real_array
+      procedure, public :: read_integer_array
+      procedure, public :: read_real_array
       procedure, public :: read_enum
       procedure, public :: read_enum_node
       procedure, public :: read_input_path
@@ -223,6 +223,7 @@ contains
 #define _GET get_integer
 #define _RANGE type_integer_range
 #define _HAS_RANGE 1
+#define _STR2VAL str2int
 #define _READ _PASTE(read_,_NAME)
 #define _READ_NODE _PASTE(_READ,_node)
 #define _READ_POSITIVE _PASTE(read_positive_,_NAME)
@@ -237,6 +238,7 @@ contains
 #undef _READ_NONNEGATIVE
 #undef _READ_NONPOSITIVE
 #undef _HAS_RANGE
+#undef _STR2VAL
 
 #define _NAME real
 #define _CLASS real(SP)
@@ -244,6 +246,7 @@ contains
 #define _RANGE type_real_range
 #define _HAS_RANGE 1
 #define _HAS_UNITS 1
+#define _STR2VAL str2real
 #define _READ _PASTE(read_,_NAME)
 #define _READ_NODE _PASTE(_READ,_node)
 #define _READ_POSITIVE _PASTE(read_positive_,_NAME)
@@ -259,6 +262,7 @@ contains
 #undef _READ_NONPOSITIVE
 #undef _HAS_RANGE
 #undef _HAS_UNITS
+#undef _STR2VAL
 
 #define _NAME logical
 #define _CLASS logical

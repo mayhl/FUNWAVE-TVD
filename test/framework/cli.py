@@ -1,15 +1,16 @@
+import glob
 import typer
 import subprocess
 import os
 import sys
 
-# Since 'test' is now a proper package via pyproject.toml, 
-# imports should be absolute from the project root.
 from test.framework.runners import UnitTestRunner
 from test.framework.regression_runner import RegressionRunner
 from test.framework.reporters import ConsoleReporter
 from test.framework.providers.base import LocalProvider
 from test.framework.dev_tool import app as dev_app
+
+PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 app = typer.Typer(
     help="""
@@ -46,6 +47,22 @@ def regression(
     runner.run()
 
 from test.framework.workspace_utils import get_build_path, setup_workspace
+
+@app.command()
+def install():
+    """Install all build dependencies (uv Python env + pFUnit)."""
+    typer.echo("Syncing Python environment...")
+    subprocess.run(["uv", "sync", "-q"], cwd=PROJ_ROOT, check=True)
+
+    pfunit_pattern = os.path.join(PROJ_ROOT, "extern", "pfunit", "installed", "PFUNIT-*")
+    if glob.glob(pfunit_pattern):
+        typer.echo("pFUnit already installed — skipping.")
+    else:
+        typer.echo("Building pFUnit...")
+        script = os.path.join(PROJ_ROOT, "scripts", "install_deps.sh")
+        subprocess.run(["bash", script], cwd=PROJ_ROOT, check=True)
+
+    typer.echo("All dependencies ready.")
 
 @app.command()
 def setup(workspace: str = typer.Argument("dev", help="Workspace name to initialize")):

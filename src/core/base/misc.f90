@@ -38,6 +38,13 @@ contains
          is_empty = len(trim(str)) == 0
       end if
 
+      ! Reject strings with non-integer characters before reading; ifx's I20
+      ! silently accepts "10.5" as 10 (partial parse) rather than setting iostat.
+      if (verify(trim(adjustl(str)), ' +-0123456789') > 0) then
+         stat = 1
+         return
+      end if
+
       read (str, fmt_, iostat=stat) int
 
    end subroutine str2int
