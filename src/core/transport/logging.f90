@@ -7,7 +7,7 @@ module core_log_io_mod
    implicit none
    private
 
-   public :: type_log_writer, new_log_writer, format_log_line
+   public :: new_log_writer, format_log_line
 
    !> @brief Log levels
    integer, parameter, public :: log_level_debug = 1

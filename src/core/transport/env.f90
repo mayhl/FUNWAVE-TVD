@@ -22,7 +22,7 @@ module core_env_mod
    implicit none(external)
 
    private
-   public :: type_env, new_env, get_sub_env
+   public :: new_env, get_sub_env
    public :: type_comm, type_log_writer, type_yaml_reader
 
    type, public :: type_env
