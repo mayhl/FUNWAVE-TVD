@@ -4,6 +4,10 @@ add_library(
   # stepper_engine.f90
   time.f90 time_utils.f90)
 
+set_target_properties(
+  libcore_engine PROPERTIES Fortran_MODULE_DIRECTORY
+                             "${CMAKE_BINARY_DIR}/modules/core")
+
 target_link_libraries(libcore_engine PUBLIC libcore_transport libcore_base)
 
 target_include_directories(

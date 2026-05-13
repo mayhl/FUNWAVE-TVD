@@ -46,48 +46,45 @@ contains
    end subroutine test_reset_window
 
    ! ----------------------------------------------------------------
-   ! var: E[x²] - E[x]² with non-uniform dt
+   ! rms with non-uniform dt:
    !   x=0 @ dt=0.1, x=2 @ dt=0.9  (total_dt=1.0)
-   !   E[x]  = (0*0.1 + 2*0.9) = 1.8
-   !   E[x²] = (0*0.1 + 4*0.9) = 3.6
-   !   var   = 3.6 - 1.8² = 3.6 - 3.24 = 0.36
+   !   E[x²] = (0*0.1 + 4*0.9) = 3.6  →  rms = sqrt(3.6)
    ! ----------------------------------------------------------------
    @test
-   subroutine test_var_adaptive_dt()
+   subroutine test_rms_adaptive_dt()
       type(type_accumulator) :: acc
       real(SP), dimension(1, 1) :: val
       real(SP), allocatable :: stat(:,:)
 
       call acc%init(1, 1, "eta")
-      call acc%allocate_stat("var")
+      call acc%allocate_stat("rms")
 
       val(1,1) = 0.0_SP; call acc%accumulate(val, 0.1_SP)
       val(1,1) = 2.0_SP; call acc%accumulate(val, 0.9_SP)
 
-      stat = acc%get_stat("var")
-      @assertEqual(0.36_SP, stat(1,1), tolerance=1e-5_SP)
-   end subroutine test_var_adaptive_dt
+      stat = acc%get_stat("rms")
+      @assertEqual(sqrt(3.6_SP), stat(1,1), tolerance=1e-5_SP)
+   end subroutine test_rms_adaptive_dt
 
    ! ----------------------------------------------------------------
-   ! hsig = 4*sqrt(var(eta))
-   !   symmetric wave: eta = +A, -A with equal dt → var = A², hsig = 4A
+   ! min tracking: running minimum over multiple steps
    ! ----------------------------------------------------------------
    @test
-   subroutine test_hsig()
+   subroutine test_min_running()
       type(type_accumulator) :: acc
       real(SP), dimension(1, 1) :: val
       real(SP), allocatable :: stat(:,:)
-      real(SP), parameter :: A = 0.5_SP
 
       call acc%init(1, 1, "eta")
-      call acc%allocate_stat("hsig")
+      call acc%allocate_stat("min")
 
-      val(1,1) =  A; call acc%accumulate(val, 1.0_SP)
-      val(1,1) = -A; call acc%accumulate(val, 1.0_SP)
+      val(1,1) =  5.0_SP; call acc%accumulate(val, 0.5_SP)
+      val(1,1) = -3.0_SP; call acc%accumulate(val, 0.5_SP)
+      val(1,1) =  2.0_SP; call acc%accumulate(val, 0.5_SP)
 
-      stat = acc%get_stat("hsig")
-      @assertEqual(4.0_SP * A, stat(1,1), tolerance=1e-5_SP)
-   end subroutine test_hsig
+      stat = acc%get_stat("min")
+      @assertEqual(-3.0_SP, stat(1,1), tolerance=1e-6_SP)
+   end subroutine test_min_running
 
    ! ----------------------------------------------------------------
    ! total_dt is updated even when only max is allocated

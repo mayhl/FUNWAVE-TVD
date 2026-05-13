@@ -4,7 +4,12 @@
 
 add_library(${main_lib}_core STATIC)
 add_subdirectory(core)
-set(_new_libs ${main_lib}_core)
+
+add_library(${main_lib}_model STATIC)
+add_subdirectory(model)
+target_link_libraries(${main_lib}_model PUBLIC ${main_lib}_core)
+
+set(_new_libs ${main_lib}_core ${main_lib}_model)
 
 # Create an interface library to aggregate dependencies
 add_library(${main_lib} INTERFACE)

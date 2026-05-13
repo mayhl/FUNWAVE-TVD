@@ -3,19 +3,21 @@
 !   program under the Simplified BSD license
 !--------------------------------------------------
 !
-!  Component
+!  NOTE: Superseded by geometry.f90 (type_model_geometry).
+!  Retained for legacy io.F compatibility during transition.
 !
 !  HISTORY :
 !    11/23/2025  Michael-Angelo Y.H. Lam
+!    05/13/2026  Fixed env storage UB; updated to use model_base_mod
 !
 !-------------------------------------------------
 
 module model_grid_mod
    use mpi_f08
    use core_constants_mod, only: SP
-   use core_env_mod, only: type_env
+   use core_env_mod, only: type_env, get_sub_env
    use core_path_mod, only: type_path
-   use model_interface_mod, only: type_model_interface
+   use model_base_mod, only: type_model_base
 
    implicit none(external)
 
@@ -27,7 +29,7 @@ module model_grid_mod
    data gtypes/'file', 'flat', 'slope'/
    data ftypes/'ascii'/
 
-   type, extends(type_model_interface) :: type_model_grid
+   type, extends(type_model_base) :: type_model_grid
 
       integer :: nx, ny
       integer :: nx_proc, ny_proc
@@ -43,58 +45,43 @@ module model_grid_mod
 
 contains
 
-   subroutine finalize(this)
-
-      class(type_model_grid), intent(inout) :: this
-
-      if (allocated(this%gtype)) deallocate (this%gtype)
-      !if (allocated(this%fpath)) deallocate (this%fpath)
-      if (allocated(this%ftype)) deallocate (this%ftype)
-
-   end subroutine finalize
-
    subroutine grid_read_input(this, env)
-
-      use core_env_mod, only: type_env, get_sub_env
       class(type_model_grid), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
-      integer :: err
-      integer(MPI_ADDRESS_KIND) :: address
-
+      type(type_env) :: sub_env
       logical :: is_px_empty, is_py_empty, is_p_empty
-
       character(:), allocatable :: msg, submsg
 
-      this%env = get_sub_env(env, 'grid')
+      sub_env = get_sub_env(env, 'grid')
       this%is_activated = .true.
 
-      call this%env%comm%barrier()
-      call this%env%yaml%read('type', gtypes, val=this%gtype, default='file')
-      call this%env%comm%barrier()
+      call sub_env%comm%barrier()
+      call sub_env%yaml%read_enum('type', gtypes, val=this%gtype, default='file')
+      call sub_env%comm%barrier()
 
       select case (this%gtype)
       case ('file')
-         call this%env%yaml%read('file type', ftypes, val=this%ftype, default='ascii')
-         call this%env%yaml%read('file path', val=this%fpath)
-         call this%env%yaml%read('slope correction', val=this%apply_correction, default='NO')
+         call sub_env%yaml%read_enum('file type', ftypes, val=this%ftype, default='ascii')
+         call sub_env%yaml%read_input_path('file path', val=this%fpath)
+         call sub_env%yaml%read('slope correction', val=this%apply_correction, default='NO')
       case ('flat')
-         call this%env%yaml%read_positive('flat depth', val=this%depth_flat)
+         call sub_env%yaml%read_positive('flat depth', val=this%depth_flat)
       case ('slope')
-         call this%env%yaml%read_positive('flat depth', val=this%depth_flat)
-         call this%env%yaml%read('slope x0', val=this%slope_x0)
-         call this%env%yaml%read('slope m', val=this%slope_m)
+         call sub_env%yaml%read_positive('flat depth', val=this%depth_flat)
+         call sub_env%yaml%read('slope x0', val=this%slope_x0)
+         call sub_env%yaml%read('slope m', val=this%slope_m)
       end select
 
-      call this%env%comm%barrier()
+      call sub_env%comm%barrier()
 
-      call this%env%yaml%read_positive('nx', val=this%nx)
-      call this%env%yaml%read_positive('ny', val=this%ny)
+      call sub_env%yaml%read_positive('nx', val=this%nx)
+      call sub_env%yaml%read_positive('ny', val=this%ny)
 
-      call this%env%yaml%read_positive('x_proc', val=this%nx_proc, silent=is_px_empty)
-      call this%env%yaml%read_positive('y_proc', val=this%ny_proc, silent=is_py_empty)
+      call sub_env%yaml%read_positive('x_proc', val=this%nx_proc, silent=is_px_empty)
+      call sub_env%yaml%read_positive('y_proc', val=this%ny_proc, silent=is_py_empty)
 
-      call this%env%comm%barrier()
+      call sub_env%comm%barrier()
 
       is_p_empty = is_py_empty .and. is_px_empty
       if (is_px_empty .neqv. is_py_empty) then
@@ -104,16 +91,15 @@ contains
             submsg = "grid/nx_proc"
          end if
          msg = "both grid/nx_proc and grid/ny_proc required, only "//submsg//" found."
-         call this%env%log%exit_on_error(msg)
+         call sub_env%log%exit_on_error(msg)
       end if
 
-      call this%env%yaml%read_real('dx', val=this%dx)
-      call this%env%yaml%read_real('dy', val=this%dy)
-      call this%env%yaml%read_real('x0', val=this%x0, default='0.0')
-      call this%env%yaml%read_real('y0', val=this%y0, default='0.0')
+      call sub_env%yaml%read_real('dx', val=this%dx)
+      call sub_env%yaml%read_real('dy', val=this%dy)
+      call sub_env%yaml%read_real('x0', val=this%x0, default='0.0')
+      call sub_env%yaml%read_real('y0', val=this%y0, default='0.0')
 
-      call this%env%comm%barrier()
+      call sub_env%comm%barrier()
    end subroutine grid_read_input
 
 end module model_grid_mod
-

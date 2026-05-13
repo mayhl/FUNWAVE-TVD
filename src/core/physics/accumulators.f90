@@ -45,7 +45,7 @@ contains
       case ("mean")
          if (.not. allocated(this%val_sum)) &
             allocate(this%val_sum(this%dim1, this%dim2), source=0.0_SP)
-      case ("rms", "var", "hsig")
+      case ("rms")
          if (.not. allocated(this%val_sum)) &
             allocate(this%val_sum(this%dim1, this%dim2), source=0.0_SP)
          if (.not. allocated(this%val_sum_sq)) &
@@ -71,7 +71,6 @@ contains
       class(type_accumulator), intent(in) :: this
       character(*), intent(in) :: op
       real(SP), allocatable :: stat(:,:)
-      real(SP), allocatable :: mean_sq(:,:), sq_mean(:,:)
 
       allocate(stat(this%dim1, this%dim2), source=0.0_SP)
 
@@ -86,20 +85,6 @@ contains
       case ("rms")
          if (allocated(this%val_sum_sq) .and. this%total_dt > 0.0_SP) &
             stat = sqrt(max(0.0_SP, this%val_sum_sq / this%total_dt))
-      case ("var")
-         if (allocated(this%val_sum_sq) .and. allocated(this%val_sum) &
-               .and. this%total_dt > 0.0_SP) then
-            mean_sq = (this%val_sum / this%total_dt)**2
-            sq_mean = this%val_sum_sq / this%total_dt
-            stat = max(0.0_SP, sq_mean - mean_sq)
-         end if
-      case ("hsig")
-         if (allocated(this%val_sum_sq) .and. allocated(this%val_sum) &
-               .and. this%total_dt > 0.0_SP) then
-            mean_sq = (this%val_sum / this%total_dt)**2
-            sq_mean = this%val_sum_sq / this%total_dt
-            stat = 4.0_SP * sqrt(max(0.0_SP, sq_mean - mean_sq))
-         end if
       case default
          error stop "Unknown statistic operation: " // trim(op)
       end select

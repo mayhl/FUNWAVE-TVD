@@ -57,6 +57,7 @@ module core_comm_mod
          bcast_string, bcast_integer_array, bcast_real_array, bcast_string_array
 
       procedure, public :: finalize
+      procedure, public :: get_io_rank
 
       procedure, public :: barrier
    end type type_comm
@@ -123,6 +124,12 @@ contains
       flag = this%p_is_io_node
    end function is_io_node
 
+   function get_io_rank(this) result(r)
+      class(type_comm), intent(in) :: this
+      integer :: r
+      r = this%io_node_id
+   end function get_io_rank
+
    subroutine bcast_integer(this, val)
       class(type_comm), intent(inout) :: this
       integer, intent(inout) :: val
@@ -188,9 +195,8 @@ contains
    end subroutine barrier
 
    subroutine finalize(this)
+      ! MPI_Finalize is intentionally NOT called here — only main() may finalize MPI.
       class(type_comm), intent(inout) :: this
-      integer :: ierr
-      call MPI_Finalize(ierr)
    end subroutine finalize
 
    subroutine bcast_integer_array(this, val)

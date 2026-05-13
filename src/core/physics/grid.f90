@@ -2,11 +2,10 @@ module core_grid_mod
    use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH, MPI_SP
    use core_comm_mod,      only: type_comm
    use core_crs_mod,       only: type_crs, CRS_GEOGRAPHIC
-   use core_grid_interface_mod, only: abstract_grid
    use mpi_f08
    implicit none
 
-   type, extends(abstract_grid), public :: type_grid_2d
+   type, public :: type_grid_2d
       integer :: M, N
       ! Domain decomposition
       integer :: nx_proc = 1, ny_proc = 1
@@ -32,7 +31,6 @@ module core_grid_mod
       real(SP), allocatable :: inv_dx(:,:), inv_dy(:,:)  ! precomputed 1/dx, 1/dy
       real(SP), allocatable :: x(:,:), y(:,:)       ! physical coordinates (local metres)
    contains
-      procedure, public :: get_indices => get_indices_2d
       procedure, public :: decompose
       procedure, public :: setup
       procedure, public :: halo_exchange
@@ -399,22 +397,5 @@ contains
       if (allocated(this%y))      deallocate(this%y)
    end subroutine grid_finalize
 
-   subroutine get_indices_2d(this, indices)
-      class(type_grid_2d), intent(inout) :: this
-      integer, allocatable, intent(out) :: indices(:,:)
-      integer :: i, j, k
-
-      allocate(indices(2, this%M*this%N))
-      k = 1
-      do j = 1, this%N
-         do i = 1, this%M
-            indices(1, k) = i
-            indices(2, k) = j
-            k = k + 1
-         end do
-      end do
-      this%n_points = k - 1
-
-   end subroutine get_indices_2d
 
 end module core_grid_mod
