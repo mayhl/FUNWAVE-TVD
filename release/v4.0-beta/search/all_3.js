@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['format_5flog_5fline_0',['format_log_line',['../namespacecore__log__io__mod.html#a9e517258c507e6795e7d20a8a1486545',1,'core_log_io_mod']]]
+  ['log_5flevel_5fdebug_0',['log_level_debug',['../namespacecore__log__io__mod.html#a8ded816c2bbbb9aa19da599c40cb99d2',1,'core_log_io_mod']]]
 ];

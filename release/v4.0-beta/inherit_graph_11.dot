@@ -5,7 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="core_grid_interface\l_mod::abstract_grid",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__grid__interface__mod_1_1abstract__grid.html",tooltip=" "];
-  Node0 -> Node1 [id="edge1_Node000000_Node000001",dir="back",color="steelblue1",style="solid",tooltip=" "];
-  Node1 [id="Node000001",label="core_grid_mod::type\l_grid_2d",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__grid__mod_1_1type__grid__2d.html",tooltip=" "];
+  Node0 [id="Node000000",label="core_log_io_mod::type\l_log_writer",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__log__io__mod_1_1type__log__writer.html",tooltip=" "];
 }

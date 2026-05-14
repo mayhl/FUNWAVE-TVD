@@ -1,0 +1,21 @@
+digraph "core_output_manager_mod::type_output_manager"
+{
+ // LATEX_PDF_SIZE
+  bgcolor="transparent";
+  edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
+  node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
+  rankdir="LR";
+  Node1 [id="Node000001",label="core_output_manager\l_mod::type_output_manager",height=0.2,width=0.4,color="gray40", fillcolor="grey60", style="filled", fontcolor="black",tooltip=" "];
+  Node2 -> Node1 [id="edge1_Node000001_Node000002",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" channels",fontcolor="grey" ];
+  Node2 [id="Node000002",label="core_output_channel\l_mod::type_output_channel",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__output__channel__mod_1_1type__output__channel.html",tooltip=" "];
+  Node3 -> Node2 [id="edge2_Node000002_Node000003",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" trigger",fontcolor="grey" ];
+  Node3 [id="Node000003",label="core_time_utils_mod\l::type_timing_control",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__time__utils__mod_1_1type__timing__control.html",tooltip=" "];
+  Node4 -> Node3 [id="edge3_Node000003_Node000004",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" ops",fontcolor="grey" ];
+  Node4 [id="Node000004",label="core_constants_mod\l::type_string",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__constants__mod_1_1type__string.html",tooltip=" "];
+  Node5 -> Node2 [id="edge4_Node000002_Node000005",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" interp",fontcolor="grey" ];
+  Node5 [id="Node000005",label="core_interpolation\l_mod::type_interpolator",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__interpolation__mod_1_1type__interpolator.html",tooltip=" "];
+  Node6 -> Node2 [id="edge5_Node000002_Node000006",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" accum",fontcolor="grey" ];
+  Node6 [id="Node000006",label="core_accumulators_mod\l::type_accumulator",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__accumulators__mod_1_1type__accumulator.html",tooltip=" "];
+  Node7 -> Node2 [id="edge6_Node000002_Node000007",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" gatherer",fontcolor="grey" ];
+  Node7 [id="Node000007",label="core_output_gatherer\l_mod::type_output_gatherer",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__output__gatherer__mod_1_1type__output__gatherer.html",tooltip=" "];
+}

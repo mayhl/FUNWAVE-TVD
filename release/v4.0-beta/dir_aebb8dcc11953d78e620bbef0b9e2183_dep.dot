@@ -12,8 +12,9 @@ digraph "/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core"
     dir_aebb8dcc11953d78e620bbef0b9e2183 [shape=plaintext, label="core"];
   dir_a74bb488207285314d55b30438bec1a4 [label="base", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_a74bb488207285314d55b30438bec1a4.html",tooltip=""];
   dir_fc7993cbe1342172a92fb9f06b7614fe [label="engine", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_fc7993cbe1342172a92fb9f06b7614fe.html",tooltip=""];
-  dir_61c866cab531bcee8768caca8cde906c [label="physics", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_61c866cab531bcee8768caca8cde906c.html",tooltip=""];
-  dir_79268b13b30141157b35932967b4e740 [label="transport", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_79268b13b30141157b35932967b4e740.html",tooltip=""];
+  dir_7af4f6d4b1d2c54f26342d45d887de4a [label="infra", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_7af4f6d4b1d2c54f26342d45d887de4a.html",tooltip=""];
+  dir_59d542e76b98e760b7373b87c536028a [label="numerics", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_59d542e76b98e760b7373b87c536028a.html",tooltip=""];
+  dir_7a6625ebe1d7a92e66d39a7f8785c026 [label="output", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_7a6625ebe1d7a92e66d39a7f8785c026.html",tooltip=""];
   }
   }
 }
