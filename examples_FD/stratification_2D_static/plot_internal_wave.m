@@ -1,0 +1,44 @@
+fdir = '/Users/fengyanshi/TMP/tmp3/';
+
+m=128;
+n=32;
+l=30;
+
+ns=input('ns=');
+ne=input('ne=');
+
+% Set up file and options for creating the movie
+vidObj = VideoWriter('movie.avi');  % Set filename to write video file
+vidObj.FrameRate=10;  % Define the playback framerate [frames/sec]
+open(vidObj);
+
+wid=8;
+len=10;
+set(gcf,'units','inches','paperunits','inches','papersize', [wid len],'position',[1 1 wid len],'paperposition',[0 0 wid len]);
+
+icount=0;
+for num=ns:1:ne
+
+icount=icount+1;
+
+fnum=sprintf('%.4d',num);
+sali=load([fdir 'sali_' fnum]);
+
+sali3d1=reshape(sali,[n,l,m]);
+sali3d=permute(sali3d1,[1 3 2]);
+nshow=floor(n/2);
+sali2d=squeeze(sali3d(nshow,:,:))';
+
+clf
+contourf(sali2d,10)
+%axis([0 128 73 83])
+
+    currframe=getframe(gcf);
+    writeVideo(vidObj,currframe); 
+
+pause(0.1)
+
+end
+close(vidObj)
+
+
