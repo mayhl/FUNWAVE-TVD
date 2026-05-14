@@ -52,10 +52,8 @@
 MODULE GLOBAL
    USE PARAM
 
-   use model_main_mod, only: type_model_main
    IMPLICIT NONE
    SAVE
-  type(type_model_main) :: model 
 # if defined (PARALLEL)
 ! MPI variables
    INTEGER :: myid, ier

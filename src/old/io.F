@@ -156,6 +156,7 @@ SUBROUTINE READ_INPUT
    use core_constants_mod, only: LABEL_SIZE
    use core_misc_mod, only: random2
    use model_grid_mod, only: type_model_grid
+   use model_main_mod, only: type_model_main
 !jychoi 14.12.23]
    IMPLICIT NONE
    CHARACTER(LEN=80) FILE_NAME
@@ -176,6 +177,7 @@ SUBROUTINE READ_INPUT
 !ykchoi]
 
    ! NOTE: --- MY VARIABLES -------
+   type(type_model_main) :: model
    type(type_yaml_reader), target :: yaml_reader
    type(type_log_writer), target :: log
    type(type_model_grid), target :: grid
@@ -210,7 +212,10 @@ SUBROUTINE READ_INPUT
    END IF
    call model%init()
 
-   myid = model%env%comm%rank_id
+# if defined (PARALLEL)
+   myid   = model%env%comm%rank_id
+   nprocs = model%env%comm%size
+# endif
 
    PX = model%geometry%nx_proc
    PY = model%geometry%ny_proc
@@ -231,7 +236,12 @@ SUBROUTINE READ_INPUT
    ! variable spacing: dx_file/dy_file applied later in init
 #endif
 
-   DEPTH_TYPE       = model%geometry%bathy_type
+   select case (trim(model%geometry%bathy_type))
+   case ('slope'); DEPTH_TYPE = 'SLOPE'
+   case ('flat');  DEPTH_TYPE = 'FLAT'
+   case ('file');  DEPTH_TYPE = 'DATA'
+   case default;   DEPTH_TYPE = trim(model%geometry%bathy_type)
+   end select
    DEPTH_FILE       = model%geometry%bathy_file%root
    Depth_Flat       = model%geometry%bathy_depth
    SLP              = model%geometry%bathy_slope
@@ -256,9 +266,9 @@ SUBROUTINE READ_INPUT
    NO_MASK_FILE   = model%hot_start%no_mask_file
    if (.not. NO_MASK_FILE) MASK_FILE = model%hot_start%mask_file%root
    HotStartTime   = model%hot_start%time
-   icount         = model%hot_start%output_start_number - 1
 
    IF (INI_UVZ) THEN
+      icount = model%hot_start%output_start_number - 1
       IF (BED_DEFORMATION) THEN
       END IF
    END IF  ! end initial hot start

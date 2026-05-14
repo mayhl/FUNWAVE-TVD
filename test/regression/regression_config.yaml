@@ -1,0 +1,84 @@
+executables:
+  central: [ZERO_PHASE=ON]
+  vessel: [USE_VESSEL=ON, ZERO_PHASE=ON]
+  vessel-sediment: [USE_VESSEL=ON, USE_SEDIMENT=ON, ZERO_PHASE=ON]
+
+simulations:
+  # preprocess (optional): command run in dev run dir before simulation.
+  #   {input_file}  → the current txt file being processed
+  #   {curr_input}  → auto-derived yaml output name ({stem}.yaml)
+  #   {repo_root}   → absolute path to repo root
+  #   {run_dir}     → absolute path to the run directory
+  #   Use [uv, run, scripts/my_script.py, ...] for Python scripts.
+  - name: flume_1d
+    exe_type: central
+    np: 4
+    input: test/regression/inputs/flume_1d
+    input_files: [wk_irr.txt, wk_reg.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    binary: funwave
+    output_dir: output
+    tags: [flume, 1d, smoke]
+    postprocess:
+      field: test.regression.postproc.field_compare
+      statistics: test.regression.postproc.statistics_compare
+    tolerances:
+      # v, q omitted — near-zero in 1D periodic flume (Y-direction noise)
+      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4 }
+      # vmean, vlagm omitted — same reason as v/q above
+      # umean, ulagm, Havg raised: time-averaging amplifies the ~4e-6 branch divergence
+      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 1.0e-4, Hrms: 1.0e-4, Havg: 2.0e-4, Hsig: 1.0e-4 }
+
+  # jon_1d and tma_1d: T_INTV_mean raised to 300s (~25 peak periods) so spectral
+  # statistics converge across branches despite the ~1.6e-4 eta divergence.
+  # Field and statistics tolerances are wider than flume_1d to reflect that divergence.
+  - name: flume_1d_spectral
+    exe_type: central
+    np: 4
+    input: test/regression/inputs/flume_1d
+    input_files: [jon_1d.txt, tma_1d.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    binary: funwave
+    output_dir: output
+    tags: [flume, 1d, smoke]
+    postprocess:
+      field: test.regression.postproc.field_compare
+      statistics: test.regression.postproc.statistics_compare
+    tolerances:
+      field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4 }
+      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 5.0e-4, Hrms: 5.0e-4, Havg: 5.0e-4, Hsig: 5.0e-4 }
+
+  - name: flume_1d_strict
+    exe_type: central
+    np: 4
+    input: test/regression/inputs/flume_1d
+    input_files: [wk_irr_ascii.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    binary: funwave
+    output_dir: output
+    tags: [strict]
+    postprocess:
+      field: test.regression.postproc.field_compare
+    tolerances:
+      field: { eta: 1.0e-8 }

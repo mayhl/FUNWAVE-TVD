@@ -38,13 +38,18 @@ def unit(
 
 @app.command()
 def regression(
-    branch: str = typer.Option("feat/cmake", "--branch", "-b", help="Reference branch to compare against")
+    branch: str = typer.Option("feat/cmake", "--branch", "-b", help="Reference branch to compare against (must be CMake-based)"),
+    tags: list[str] = typer.Option(None, "--tag", "-t", help="Filter tests by tag (repeat for multiple)"),
+    force: bool = typer.Option(False, "--force", "-f", help="Force rebuild even if binaries are up to date"),
+    report: bool = typer.Option(False, "--report", "-r", help="Generate HTML report after run"),
+    pdf: bool = typer.Option(False, "--pdf", help="Generate PDF report after run (implies --report)"),
+    verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detail tables for all tests (default: only on failure)"),
 ):
     """Run Regression Tests."""
     reporter = ConsoleReporter()
     provider = LocalProvider()
     runner = RegressionRunner(reporter, provider, ref_branch=branch)
-    runner.run()
+    runner.run(filter_tags=tags or None, force=force, report=report, pdf=pdf, verbose=verbose)
 
 from test.framework.workspace_utils import get_build_path, setup_workspace
 

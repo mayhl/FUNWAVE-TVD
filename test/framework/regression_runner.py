@@ -1,99 +1,392 @@
+import math
 import time
 import os
 import shutil
 import subprocess
+import importlib
+from pathlib import Path
+import yaml
+from rich import box
+from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
 from test.framework.base_runner import BaseRunner
 from test.framework.workspace_utils import get_build_path
+from test.framework.results import SimResult, SubsectionResult
+from test.framework.html_report import generate as generate_html_report, generate_pdf as generate_pdf_report, ReportMeta
+
+STAMP_FILE = ".build_stamp"
+CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "regression", "regression_config.yaml")
 
 class RegressionRunner(BaseRunner):
+
     def __init__(self, reporter, provider, ref_branch="master"):
         super().__init__(reporter)
         self.provider = provider
         self.ref_branch = ref_branch
         self.repo_root = os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd())
-        
-        # Determine worktree path
         self.worktree_path = os.path.join(self.repo_root, "test", "regression", "worktrees", ref_branch)
+
+        config_path = os.environ.get("FUNWAVE_REGRESSION_CONFIG", CONFIG_PATH)
+        with open(config_path) as f:
+            config = yaml.safe_load(f)
+        self.executables = config["executables"]
+        self.simulations = config["simulations"]
 
     def _prepare_environment(self):
         try:
-            self.is_ref_same_as_head = (subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip() == self.ref_branch)
+            self.current_branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
+            self.is_ref_same_as_head = (self.current_branch == self.ref_branch)
         except:
+            self.current_branch = "dev"
             self.is_ref_same_as_head = False
-        
+
         if self.is_ref_same_as_head:
             self.reporter.info("Reference branch is same as current. Using isolated directories.")
             self.worktree_path = self.repo_root
         else:
-            if os.path.exists(self.worktree_path):
-                # We can safely use the existing worktree if it exists
-                self.reporter.info(f"Using existing worktree at {self.worktree_path}")
-            else:
-                self.reporter.step(f"Creating isolated worktree for branch: {self.ref_branch}")
-                subprocess.run(["git", "worktree", "add", self.worktree_path, self.ref_branch], 
+            if not os.path.exists(self.worktree_path):
+                self.reporter.step(f"Creating worktree for ref branch: {self.ref_branch}")
+                subprocess.run(["git", "worktree", "add", self.worktree_path, self.ref_branch],
                                check=True, capture_output=True)
         return True
 
-    def _build(self, build_dir, source_dir):
-        # We don't want to wipe the workspace build dir if it exists,
-        # but the current logic does. Let's keep it safe.
+    def _exe_build_dir(self, workspace, exe_type):
+        return os.path.join(get_build_path(workspace), exe_type)
+
+    def _git_hash(self, source_dir):
+        hash_ = subprocess.check_output(
+            ["git", "-C", source_dir, "rev-parse", "HEAD"],
+            stderr=subprocess.DEVNULL
+        ).decode().strip()
+        dirty = subprocess.call(
+            ["git", "-C", source_dir, "diff", "--quiet"],
+            stderr=subprocess.DEVNULL
+        ) != 0
+        return f"{hash_}-dirty" if dirty else hash_
+
+    def _is_build_current(self, build_dir, source_dir, binary_path):
+        if not os.path.exists(binary_path):
+            return False
+        stamp_path = os.path.join(build_dir, STAMP_FILE)
+        if not os.path.exists(stamp_path):
+            return False
+        try:
+            with open(stamp_path) as f:
+                return f.read().strip() == self._git_hash(source_dir)
+        except Exception:
+            return False
+
+    def _write_stamp(self, build_dir, source_dir):
+        try:
+            with open(os.path.join(build_dir, STAMP_FILE), "w") as f:
+                f.write(self._git_hash(source_dir))
+        except Exception:
+            pass
+
+    def _build(self, build_dir, source_dir, cmake_flags=None, binary_path=None, force=False, label=None):
+        """Build and return (full_hash, rebuilt: bool)."""
+        full_hash = self._git_hash(source_dir)
+        if not force and binary_path and self._is_build_current(build_dir, source_dir, binary_path):
+            return full_hash, False
+
+        tag = label or os.path.basename(build_dir)
         os.makedirs(build_dir, exist_ok=True)
-        
-        self.reporter.info(f"Building {source_dir} -> {build_dir}")
+
         toolchain_path = os.path.join(self.repo_root, "cmake", "toolchains", "macos_mpi.cmake")
-        cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir, f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}", "-DENABLE_TESTING=ON"]
-        
-        from rich.progress import Progress, SpinnerColumn, TextColumn, BarColumn, TaskProgressColumn
+        cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir,
+                     f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}", "-DENABLE_TESTING=ON"]
+        cmake_cmd += [f"-D{flag}" for flag in (cmake_flags or [])]
+
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
-            config_task = progress.add_task(f"Configuring {os.path.basename(build_dir)}...", total=None)
+            config_task = progress.add_task(f"cmake  {tag}  configuring...", total=None)
             subprocess.run(cmake_cmd, check=True, capture_output=True)
             progress.remove_task(config_task)
-            
-            build_task = progress.add_task(f"Compiling {os.path.basename(build_dir)}...", total=100)
-            make_proc = subprocess.Popen(["make", "-C", build_dir, "-j8"], 
+
+            build_task = progress.add_task(f"make   {tag}  compiling...  [dim]0%[/dim]", total=100)
+            make_proc = subprocess.Popen(["make", "-C", build_dir, "-j8"],
                                          stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-            
+
             while make_proc.poll() is None:
                 line = make_proc.stdout.readline()
                 if "[" in line and "%" in line:
                     try:
                         percent = int(line.split("[")[1].split("%")[0].strip())
-                        progress.update(build_task, completed=percent)
-                    except: pass
-            
+                        progress.update(build_task, completed=percent,
+                                        description=f"make   {tag}  compiling...  [dim]{percent}%[/dim]")
+                    except:
+                        pass
+
             if make_proc.returncode != 0:
                 raise subprocess.CalledProcessError(make_proc.returncode, "make")
-            
-        self.reporter.success(f"Build complete in {build_dir}")
 
-    def run(self):
-        self.reporter.step(f"Running Regression Tests (Ref: {self.ref_branch})")
-        if not self._prepare_environment(): return
+        self._write_stamp(build_dir, source_dir)
+        return full_hash, True
 
-        # Determine paths using workspace_utils
-        ref_build_dir = get_build_path(self.ref_branch)
-        curr_build_dir = get_build_path("dev")
-
-
-        self._build(ref_build_dir, self.worktree_path)
-        self._build(curr_build_dir, self.repo_root)
-
-        simulations = [
-            {"name": "wave_prop", "input": "input.yaml", "binary": "exe_funwave"}
-        ]
-
-        jobs = []
+    def _expand_simulations(self, simulations):
+        expanded = []
         for sim in simulations:
-            ref_bin = os.path.join(ref_build_dir, sim["binary"])
-            curr_bin = os.path.join(curr_build_dir, sim["binary"])
-            
-            ref_id = self.provider.submit(ref_bin, sim["input"], self.worktree_path)
-            curr_id = self.provider.submit(curr_bin, sim["input"], self.repo_root)
-            jobs.append({"name": sim["name"], "ref_id": ref_id, "curr_id": curr_id})
+            if 'input_files' in sim:
+                for ifile in sim['input_files']:
+                    stem = Path(ifile).stem
+                    s = {k: v for k, v in sim.items() if k != 'input_files'}
+                    s['input_file'] = ifile
+                    s['curr_input'] = f"{stem}.yaml"
+                    s['name'] = f"{sim['name']}_{stem}"
+                    expanded.append(s)
+            else:
+                expanded.append(sim)
+        return expanded
 
-        self.reporter.info("Monitoring simulation jobs...")
-        while any(self.provider.get_status(j["ref_id"]) not in ["COMPLETED", "FAILED"] or 
-                  self.provider.get_status(j["curr_id"]) not in ["COMPLETED", "FAILED"] for j in jobs):
-            time.sleep(2)
-        
-        self.reporter.success("Regression simulations complete.")
+    def _setup_run_dir(self, sim, run_dir):
+        os.makedirs(run_dir, exist_ok=True)
+        input_dir = os.path.join(self.repo_root, sim["input"])
+        for item in os.listdir(input_dir):
+            src = os.path.join(input_dir, item)
+            if os.path.isfile(src) and item.endswith('.txt'):
+                shutil.copy2(src, os.path.join(run_dir, item))
+        data_src = os.path.join(input_dir, 'data')
+        if os.path.isdir(data_src):
+            data_dst = os.path.join(run_dir, 'data')
+            if os.path.exists(data_dst):
+                shutil.rmtree(data_dst)
+            shutil.copytree(data_src, data_dst)
+
+    def _preprocess(self, sim, run_dir):
+        curr_input = sim.get("curr_input", sim["input_file"])
+        def subst(arg):
+            return (arg
+                    .replace("{input_file}", sim["input_file"])
+                    .replace("{curr_input}", curr_input)
+                    .replace("{repo_root}", self.repo_root)
+                    .replace("{run_dir}", run_dir))
+        cmd = [subst(a) for a in sim["preprocess"]]
+        subprocess.run(cmd, cwd=run_dir, check=True, capture_output=True)
+
+    def _run_postprocess(self, sim, ref_run_dir, curr_run_dir, ref_status, curr_status,
+                         verbose: bool = False) -> SimResult:
+        """Run configured post-processors after a simulation pair and return a SimResult."""
+        run_ok = ref_status in ("COMPLETED", "cached") and curr_status == "COMPLETED"
+        result = SimResult(
+            name=sim["name"],
+            status="SIM_FAILED" if not run_ok else "COMPLETED",
+            ref_dir=ref_run_dir,
+            dev_dir=curr_run_dir,
+        )
+        if not run_ok or "postprocess" not in sim:
+            return result
+
+        tolerances = sim.get("tolerances", {})
+        plots_dir = Path(curr_run_dir) / "plots"
+        plots_dir.mkdir(exist_ok=True)
+
+        for kind, module_path in sim["postprocess"].items():
+            try:
+                mod = importlib.import_module(module_path)
+                sub = mod.run(
+                    ref_dir=ref_run_dir,
+                    dev_dir=curr_run_dir,
+                    tolerances=tolerances.get(kind, {}),
+                    plots_dir=plots_dir,
+                    verbose=verbose,
+                )
+                result.subsections.append(sub)
+            except Exception as exc:
+                result.status = "POSTPROCESS_ERROR"
+                result.notes += f"\n[{kind}] {type(exc).__name__}: {exc}"
+                return result
+
+        all_passed = all(m.passed for s in result.subsections for m in s.metrics
+                         if math.isfinite(m.tolerance))
+        result.status = "PASS" if all_passed else "FAIL"
+        return result
+
+    def _print_summary(self, results: list[SimResult]) -> None:
+        """Render a Rich summary table of all SimResult objects."""
+        KINDS = ["field", "station", "statistics"]
+        LABELS = {"field": "Field", "station": "Station", "statistics": "Statistics"}
+        STATUS_FMT = {
+            "PASS":              "[bold green]✓ PASS[/bold green]",
+            "FAIL":              "[bold red]✗ FAIL[/bold red]",
+            "SIM_FAILED":        "[bold red]✗ SIM_FAILED[/bold red]",
+            "POSTPROCESS_ERROR": "[yellow]⚠ POSTPROCESS_ERROR[/yellow]",
+            "COMPLETED":         "[dim]COMPLETED[/dim]",
+        }
+
+        active_kinds = [k for k in KINDS if any(r.subsection(k) for r in results)]
+
+        table = Table(
+            box=box.SIMPLE_HEAD,
+            header_style="bold cyan",
+            show_edge=False,
+            pad_edge=True,
+        )
+        table.add_column("Simulation", min_width=28)
+        table.add_column("Status",     min_width=12)
+        for k in active_kinds:
+            table.add_column(LABELS[k], justify="center", min_width=10)
+
+        for r in results:
+            row = [r.name, STATUS_FMT.get(r.status, r.status)]
+            for k in active_kinds:
+                sub = r.subsection(k)
+                row.append(sub.summary if sub else "[dim]—[/dim]")
+            table.add_row(*row)
+
+        self.reporter.console.print()
+        self.reporter.console.print(table)
+        self.reporter.console.print()
+
+    def run(self, filter_tags=None, force=False, report: bool = False, pdf: bool = False,
+            verbose: bool = False):
+        self.reporter.step(f"Running Regression Tests (Ref: {self.ref_branch})")
+        if not self._prepare_environment():
+            return
+
+        simulations = self._expand_simulations(self.simulations)
+        if filter_tags:
+            tag_set = set(filter_tags)
+            simulations = [s for s in simulations if tag_set & set(s.get("tags", []))]
+        if not simulations:
+            self.reporter.info("No tests matched the requested tags.")
+            return
+        tag_hint = f"  ({', '.join(sorted(filter_tags))})" if filter_tags else ""
+        self.reporter.info(f"{len(simulations)} test(s){tag_hint}")
+
+        # Build one binary per exe_type actually needed by the selected simulations.
+        ref_hash = curr_hash = ""
+        for exe_type in {s["exe_type"] for s in simulations}:
+            cmake_flags = self.executables[exe_type]
+            ref_build_dir = self._exe_build_dir(self.ref_branch, exe_type)
+            curr_build_dir = self._exe_build_dir("dev", exe_type)
+            ref_bin = os.path.join(ref_build_dir, simulations[0]["binary"])
+            curr_bin = os.path.join(curr_build_dir, simulations[0]["binary"])
+            ref_hash, ref_rebuilt   = self._build(ref_build_dir,  self.worktree_path, cmake_flags=cmake_flags, binary_path=ref_bin,  force=force, label=f"ref/{exe_type}  ({self.ref_branch})")
+            curr_hash, curr_rebuilt = self._build(curr_build_dir, self.repo_root,     cmake_flags=cmake_flags, binary_path=curr_bin, force=force, label=f"dev/{exe_type}  ({self.current_branch})")
+            def _tag(branch, h, rebuilt):
+                label = f"{branch}@{h[:8]}"
+                status = "[green]built[/green]" if rebuilt else "[dim]cached[/dim]"
+                return f"{label}  {status}"
+            self.reporter.info(f"build \\[{exe_type}]  ref: {_tag(self.ref_branch, ref_hash, ref_rebuilt)}  dev: {_tag(self.current_branch, curr_hash, curr_rebuilt)}")
+
+        def _run_with_spinner(job_id, description):
+            t0 = time.time()
+            with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
+                          TimeElapsedColumn(), transient=True) as progress:
+                progress.add_task(description, total=None)
+                while self.provider.get_status(job_id) not in ["COMPLETED", "FAILED"]:
+                    time.sleep(2)
+            return self.provider.get_status(job_id), time.time() - t0
+
+        all_passed = True
+        sim_results: list[SimResult] = []
+        for sim in simulations:
+            exe_type = sim["exe_type"]
+            ref_build_dir  = self._exe_build_dir(self.ref_branch, exe_type)
+            curr_build_dir = self._exe_build_dir("dev", exe_type)
+            curr_input = sim.get("curr_input", sim["input_file"])
+
+            ref_run_dir  = os.path.join(ref_build_dir,  "runs", sim["name"])
+            curr_run_dir = os.path.join(curr_build_dir, "runs", sim["name"])
+            ref_out      = os.path.join(ref_run_dir, sim["output_dir"])
+            sim_stamp    = os.path.join(ref_out, ".sim_complete")
+
+            if force:
+                if os.path.exists(sim_stamp):
+                    os.remove(sim_stamp)
+                for d in (ref_run_dir, curr_run_dir):
+                    if os.path.exists(d):
+                        shutil.rmtree(d)
+
+            # --- ref ---
+            ref_stderr = ""
+            ref_elapsed = 0.0
+            if os.path.exists(sim_stamp):
+                ref_status = "cached"
+            else:
+                self._setup_run_dir(sim, ref_run_dir)
+                ref_id = self.provider.submit(
+                    os.path.join(ref_build_dir, sim["binary"]), sim["input_file"], ref_run_dir,
+                    np=sim.get("np", 1))
+                ref_status, ref_elapsed = _run_with_spinner(ref_id, f"  \\[{sim['name']}]  ref  running  (np={sim.get('np', 1)})")
+                if ref_status == "COMPLETED":
+                    try:
+                        os.makedirs(ref_out, exist_ok=True)
+                        open(os.path.join(ref_out, ".sim_complete"), "w").close()
+                    except Exception:
+                        pass
+                else:
+                    all_passed = False
+                    _, ref_stderr = self.provider.get_output(ref_id)
+
+            # --- dev ---
+            self._setup_run_dir(sim, curr_run_dir)
+            if "preprocess" in sim:
+                self._preprocess(sim, curr_run_dir)
+            curr_id = self.provider.submit(
+                os.path.join(curr_build_dir, sim["binary"]), curr_input, curr_run_dir,
+                np=sim.get("np", 1))
+            curr_status, curr_elapsed = _run_with_spinner(curr_id, f"  \\[{sim['name']}]  dev  running  (np={sim.get('np', 1)})")
+            dev_stderr = ""
+            if curr_status != "COMPLETED":
+                all_passed = False
+                _, dev_stderr = self.provider.get_output(curr_id)
+
+            # --- execution result line ---
+            def _fmt_run(s, elapsed=0.0):
+                if s == "cached":    return "[dim]cached[/dim]"
+                if s == "COMPLETED": return f"[green]ran {elapsed:.0f}s[/green]"
+                return f"[red]{s}[/red]"
+            run_line = f"  \\[{sim['name']}]  ref: {_fmt_run(ref_status, ref_elapsed)}  dev: {_fmt_run(curr_status, curr_elapsed)}"
+            sim_result = self._run_postprocess(sim, ref_run_dir, curr_run_dir, ref_status, curr_status,
+                                               verbose=verbose)
+
+            # --- pass/fail result line ---
+            STATUS_ICON = {
+                "PASS":              "[bold green]✓ PASS[/bold green]",
+                "FAIL":              "[bold red]✗ FAIL[/bold red]",
+                "SIM_FAILED":        "[bold red]✗ SIM FAILED[/bold red]",
+                "POSTPROCESS_ERROR": "[yellow]⚠ ERROR[/yellow]",
+                "COMPLETED":         "[dim]no comparison[/dim]",
+            }
+            sub_summary = "  ".join(
+                f"{s.kind}: {s.summary}" for s in sim_result.subsections
+            )
+            result_icon = STATUS_ICON.get(sim_result.status, sim_result.status)
+            result_line = f"  \\[{sim['name']}]  {result_icon}" + (f"  [dim]{sub_summary}[/dim]" if sub_summary else "")
+
+            self.reporter.info(run_line)
+            if ref_status == "FAILED" or curr_status == "FAILED":
+                for label, err in [("ref", ref_stderr), ("dev", dev_stderr)]:
+                    if err:
+                        self.reporter.info(f"    {label} stderr: {err[:400]}")
+
+            if sim_result.status == "PASS":
+                self.reporter.success(result_line)
+            elif sim_result.status in ("SIM_FAILED", "POSTPROCESS_ERROR"):
+                self.reporter.error(result_line)
+            else:
+                self.reporter.warn(result_line)
+            sim_results.append(sim_result)
+
+        self._print_summary(sim_results)
+
+        any_failed = any(r.status not in ("PASS", "COMPLETED") for r in sim_results)
+        if report or pdf or any_failed:
+            meta = ReportMeta(
+                ref_branch=self.ref_branch,
+                dev_branch=self.current_branch,
+                ref_hash=ref_hash,
+                dev_hash=curr_hash,
+            )
+            base = Path(self.repo_root) / "workspaces" / "regression_report"
+            want_pdf = pdf or any_failed
+            with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
+                          TimeElapsedColumn(), transient=True) as progress:
+                t = progress.add_task("  Generating report...", total=None)
+                html_path = generate_html_report(sim_results, meta, base.with_suffix(".html"))
+                if want_pdf:
+                    pdf_path = generate_pdf_report(sim_results, meta, base.with_suffix(".pdf"))
+            self.reporter.info(f"HTML report: file://{html_path}")
+            if want_pdf:
+                self.reporter.info(f"PDF  report: {pdf_path}")

@@ -205,6 +205,12 @@ CONTAINS
                          MPI_MODE_WRONLY + MPI_MODE_CREATE, &
                          MPI_INFO_NULL, file_handler, ierr)
 
+      ! Truncate any pre-existing file (e.g. stale ASCII output from a prior run).
+      ! MPI_MODE_CREATE does not truncate, so a rerun over ASCII files would leave
+      ! a garbage tail beyond the 10000-byte binary payload.
+      CALL MPI_FILE_SET_SIZE(file_handler, INT(0, KIND=8), ierr)
+      CALL MPI_BARRIER(MPI_COMM_WORLD, ierr)
+
       CALL MPI_FILE_SET_VIEW(file_handler, offset, mpi_sp, file_type_glob, 'native', MPI_INFO_NULL, ierr)
 
       CALL MPI_FILE_WRITE_ALL(file_handler, PHI, 1, mem_type_loc, MPI_STATUS_IGNORE, ierr)

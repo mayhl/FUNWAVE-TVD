@@ -11,10 +11,10 @@ class ConsoleReporter:
         self.console.print(f"[yellow]WARN:[/yellow] {msg}")
 
     def success(self, msg):
-        self.console.print(f"[green]SUCCESS:[/green] {msg}")
+        self.console.print(f"[bold green]PASS:[/bold green] {msg}")
 
     def error(self, message):
-        self.console.print(f"[red]ERROR:[/red] {message}")
+        self.console.print(f"[bold red]FAIL:[/bold red] {message}")
 
     def step(self, message):
         self.console.print(f"[bold yellow]-- {message}[/bold yellow]")

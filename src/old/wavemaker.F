@@ -303,7 +303,9 @@ SUBROUTINE WAVEMAKER_INITIALIZATION
 ! random phase
          DO J = 1, NumFreq
          DO I = 1, NumDir
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+            Phase2D(J, I) = 0.0_SP
+# elif defined (INTEL)
             Phase2D(J, I) = rand()*2.0_SP*pi
 # elif defined (CRAY)
             Phase2D(J, I) = rand()*2.0_SP*pi
@@ -520,7 +522,9 @@ SUBROUTINE WAVEMAKER_INITIALIZATION
          END DO
       ELSE
          DO I = 1, NumFreq
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+            Phase2D(I, 1) = 0.0_SP
+# elif defined (INTEL)
             Phase2D(I, 1) = rand()*2.0_SP*pi
 # elif defined (CRAY)
             Phase2D(I, 1) = rand()*2.0_SP*pi
@@ -1227,7 +1231,9 @@ SUBROUTINE CALCULATE_TMA_Cm_Sm &
              Cm_v(Mloc, Nloc, Numfreq), Sm_v(Mloc, Nloc, Numfreq))
 
    DO kf = 1, NumFreq
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+      Phase_Ser(kf) = 0.0_SP
+# elif defined (INTEL)
       Phase_Ser(kf) = rand()*2.0_SP*3.1415926
 # elif defined (CRAY)
       Phase_Ser(kf) = rand()*2.0_SP*3.1415926
@@ -1572,7 +1578,9 @@ SUBROUTINE CALCULATE_TMA_Cm_Sm_EQUAL_DFREQ &
    Ef = ZERO
 
    DO kf = 1, NumFreq
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+      Phase_Ser(kf) = 0.0_SP
+# elif defined (INTEL)
       Phase_Ser(kf) = rand()*2.0_SP*3.1415926
 # elif defined (CRAY)
       Phase_Ser(kf) = rand()*2.0_SP*3.1415926
@@ -2082,7 +2090,9 @@ SUBROUTINE WK_WAVEMAKER_IRREGULAR_WAVE &
 
    do ktheta = 1, mtheta
    do kf = 1, mfreq
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+      phi1(kf, ktheta) = 0.0_SP
+# elif defined (INTEL)
       phi1(kf, ktheta) = rand()*2.0_SP*pi
 # elif defined (CRAY)
       phi1(kf, ktheta) = rand()*2.0_SP*pi
@@ -2322,7 +2332,9 @@ SUBROUTINE WK_EQUAL_DFREQ_IRREGULAR_WAVE &
 
    do ktheta = 1, mtheta
    do kf = 1, mfreq
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+      phi1(kf, ktheta) = 0.0_SP
+# elif defined (INTEL)
       phi1(kf, ktheta) = rand()*2.0_SP*pi
 # elif defined (CRAY)
       phi1(kf, ktheta) = rand()*2.0_SP*pi
@@ -2961,7 +2973,9 @@ SUBROUTINE WK_NEW_EQUAL_DFREQ_IRREGULAR_WAVE &
 
 1002     CONTINUE
 
-# if defined (INTEL)
+# if defined (ZERO_PHASE)
+         phi1(kf, 1) = 0.0_SP
+# elif defined (INTEL)
          phi1(kf, 1) = rand()*2.0_SP*pi
 # elif defined (CRAY)
          phi1(kf, 1) = rand()*2.0_SP*pi

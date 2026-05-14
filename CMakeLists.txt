@@ -44,6 +44,7 @@ option(USE_FOAM "Enable foam module" OFF)
 option(USE_TRACKING "Enable tracking module" OFF)
 option(USE_SUBGRID "Enable subgrid module" OFF)
 option(USE_PERCIPITATION "Enable precipitation module" OFF)
+option(ZERO_PHASE "Set all random wavemaker phases to zero (for regression testing)" OFF)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -75,6 +76,9 @@ if(USE_SUBGRID)
 endif()
 if(USE_PERCIPITATION)
   list(APPEND MODULE_FLAGS "PERCIPITATION")
+endif()
+if(ZERO_PHASE)
+  list(APPEND MODULE_FLAGS "ZERO_PHASE")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
@@ -116,6 +120,7 @@ if(NOT ENABLE_DEV_MODE)
   target_include_directories(
     ${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules"
                         "${CMAKE_BINARY_DIR}/modules/old")
+  target_compile_definitions(${exe_name} PRIVATE ${MODULE_FLAGS})
   target_link_libraries(${exe_name} PRIVATE ${main_lib} ${main_lib}_old)
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"

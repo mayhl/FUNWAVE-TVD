@@ -15,6 +15,8 @@
 !    output_res:      <int>      field sub-sampling factor,    default 1
 !    EtaBlowVal:      <real>     blow-up threshold (m),        default 10.0
 !    depth_out:       <bool>     output bathymetry (static),   default NO
+!    T_INTV_mean:     <real>     wave-averaging interval (s),  default 999999.0 (disabled)
+!    STEADY_TIME:     <real>     time to start averaging (s),  default 999999.0 (disabled)
 !                                (time-varying once sediment is active)
 !    variables: [U, V, ETA, Hmax, Hmin, Umax, MFmax, VORmax,
 !                MASK, MASK9, Umean, Vmean, ETAmean, WaveHeight,
@@ -155,8 +157,10 @@ contains
          call sub_env%yaml%read('stations_file', val=this%stations_file, default='')
       end if
       call sub_env%yaml%read('output_res', val=this%output_res, default='1')
-      call sub_env%yaml%read('EtaBlowVal',            silent=no_key, val=this%EtaBlowVal, default='10.0')
-      call sub_env%yaml%read('depth_out',             val=this%depth_out,           default='NO')
+      call sub_env%yaml%read('EtaBlowVal',             silent=no_key, val=this%EtaBlowVal,  default='10.0')
+      call sub_env%yaml%read('depth_out',             val=this%depth_out,            default='NO')
+      call sub_env%yaml%read('T_INTV_mean',           silent=no_key, val=this%T_INTV_mean, default='999999.0')
+      call sub_env%yaml%read('STEADY_TIME',           silent=no_key, val=this%STEADY_TIME,  default='999999.0')
 
       call sub_env%yaml%read_string_array('variables', silent=no_vars, val=var_list)
       if (.not. no_vars) then

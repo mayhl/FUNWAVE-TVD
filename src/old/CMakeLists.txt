@@ -38,8 +38,10 @@ target_include_directories(
 # Apply compiler definitions
 target_compile_definitions(${main_lib}_old PRIVATE ${MODULE_FLAGS})
 
-# Explicitly link to model and core libraries to inherit include paths for modules
-target_link_libraries(${main_lib}_old PRIVATE ${main_lib}_model core_all)
+# Inherit module include paths from model and core (linking handled by parent CMakeLists.txt)
+target_include_directories(${main_lib}_old PRIVATE
+    $<TARGET_PROPERTY:${main_lib}_model,Fortran_MODULE_DIRECTORY>
+    $<TARGET_PROPERTY:${main_lib}_core,Fortran_MODULE_DIRECTORY>)
 if(USE_VESSEL)
   target_sources(${main_lib}_old PRIVATE vessel.F)
 endif()

@@ -8,8 +8,8 @@ TITLE = 2D_beach
    !    PX,PY - processor numbers in X and Y 
    !    NOTE: make sure consistency with mpirun -np n (px*py) 
    !     
- PX = 2
- PY = 2
+ PX = 4
+ PY = 1
    ! --------------------DEPTH------------------------------------- 
    ! Depth types, DEPTH_TYPE=DATA: from depth file 
    !              DEPTH_TYPE=FLAT: idealized flat, need depth_flat 
@@ -25,17 +25,18 @@ Xslp = 300.0
    ! -------------------PRINT--------------------------------- 
    ! PRINT*, 
    ! result folder 
-RESULT_FOLDER = output/ 
+RESULT_FOLDER = output/
+FIELD_IO_TYPE = BINARY
    ! ------------------DIMENSION----------------------------- 
    ! global grid dimension 
  Mglob = 250
- Nglob = 500 
+ Nglob = 10 
 
    ! ----------------- TIME---------------------------------- 
    ! time: total computational time/ plot time / screen interval  
    ! all in seconds 
- TOTAL_TIME = 200.0 
- PLOT_INTV = 2.0 
+ TOTAL_TIME = 900.0
+ PLOT_INTV = 5.0
  PLOT_INTV_STATION = 0.5 
  SCREEN_INTV = 2.0 
 
@@ -130,28 +131,28 @@ NumberStations = 0
 STATIONS_FILE = gauges.txt 
   ! output variables, T=.TRUE, F = .FALSE. 
 DEPTH_OUT = T 
-U = F 
-V = F 
+U = T
+V = T
 ETA = T 
 ETAscreen = T
-Hmax = F 
-Hmin = F 
-MFmax = F 
-Umax = F 
-VORmax = F 
+Hmax = T
+Hmin = T
+MFmax = F
+Umax = T
+VORmax = F
 Umean = T 
 Vmean = T 
 ETAmean = T 
 MASK = T 
-MASK9 = F 
+MASK9 = T
 SXL = F 
 SXR = F 
 SYL = F 
 SYR = F 
 SourceX = F 
 SourceY = F 
-P = F 
-Q = F 
+P = T
+Q = T
 Fx = F 
 Fy = F 
 Gx = F 

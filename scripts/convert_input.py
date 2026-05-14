@@ -124,7 +124,7 @@ _WK_PARAMS: dict[str, list[str]] = {
     ],
     'WK_IRR': [
         'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta',
+        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta', 'Nfreq', 'Ntheta',
         'Time_ramp', 'Delta_WK', 'Ywidth_WK',
     ],
     'WK_TIME_SERIES': [
@@ -146,16 +146,16 @@ _WK_PARAMS: dict[str, list[str]] = {
     ],
     'JON_2D': [
         'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta',
+        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta', 'Nfreq', 'Ntheta',
         'Time_ramp', 'Delta_WK', 'Ywidth_WK',
     ],
     'JON_1D': [
         'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'Time_ramp', 'Delta_WK',
+        'Hmo', 'GammaTMA', 'Nfreq', 'Time_ramp', 'Delta_WK',
     ],
     'TMA_1D': [
         'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'Time_ramp', 'Delta_WK',
+        'Hmo', 'GammaTMA', 'Nfreq', 'Time_ramp', 'Delta_WK',
     ],
 }
 
@@ -197,39 +197,54 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
 
     # ---- geometry ----------------------------------------------------------
     geo: dict = {}
-    px = pop_val('PX');  py = pop_val('PY')
-    if px is not None: geo['nx_proc'] = px
-    if py is not None: geo['ny_proc'] = py
+
+    dx = pop_val('DX'); dy = pop_val('DY')
+    if dx is not None and dy is not None:
+        geo['cell_size'] = [dx, dy]
+    elif dx is not None:
+        geo['cell_size'] = [dx, dx]
+    elif dy is not None:
+        geo['cell_size'] = [dy, dy]
 
     depth_type = pop_str('DEPTH_TYPE', 'flat').lower()
     if depth_type == 'data':
         depth_type = 'file'
-    geo['bathy_type'] = depth_type
 
+    mg = pop_val('Mglob'); ng = pop_val('Nglob')
     if depth_type in ('flat', 'slope'):
-        mg = pop_val('Mglob'); ng = pop_val('Nglob')
-        if mg is not None: geo['grid_nx'] = mg
-        if ng is not None: geo['grid_ny'] = ng
+        if mg is not None and ng is not None:
+            geo['grid_size'] = [mg, ng]
+
+    px = pop_val('PX');  py = pop_val('PY')
+    if px is not None or py is not None:
+        decomp: dict = {}
+        if px is not None: decomp['nx_proc'] = px
+        if py is not None: decomp['ny_proc'] = py
+        geo['decomposition'] = decomp
+
+    bathy: dict = {'type': depth_type}
+    if depth_type == 'file':
+        df2 = pop_str('DEPTH_FILE')
+        if df2 is not None: bathy['file'] = df2
+        ftype = pop_str('DEPTH_FTYPE')
+        if ftype is not None: bathy['file_type'] = ftype.lower()
+        bc = pop_bool('BATHY_CORRECTION')
+        if 'BATHY_CORRECTION' in params: bathy['correction'] = bc
+        if mg is not None: bathy['nx'] = mg
+        if ng is not None: bathy['ny'] = ng
     else:
-        mg = pop_val('Mglob'); ng = pop_val('Nglob')
-        if mg is not None: geo['bathy_nx'] = mg
-        if ng is not None: geo['bathy_ny'] = ng
+        pop('DEPTH_FILE'); pop('DEPTH_FTYPE'); pop('BATHY_CORRECTION')
+        df = pop_val('DEPTH_FLAT')
+        if df is not None: bathy['depth'] = df
+        if depth_type == 'slope':
+            slp = pop_val('SLP')
+            if slp is not None: bathy['slope'] = slp
+            xslp = pop_val('Xslp')
+            if xslp is not None: bathy['x0'] = xslp
+        else:
+            pop('SLP'); pop('Xslp')
 
-    df = pop_val('DEPTH_FLAT')
-    if df is not None: geo['bathy_depth'] = df
-    slp = pop_val('SLP')
-    if slp is not None: geo['bathy_slope'] = slp
-    xslp = pop_val('Xslp')
-    if xslp is not None: geo['bathy_slope_x0'] = xslp
-    df2 = pop_str('DEPTH_FILE')
-    if df2 is not None: geo['bathy_file'] = df2
-    bc = pop_bool('BATHY_CORRECTION')
-    if 'BATHY_CORRECTION' in params: geo['bathy_correction'] = bc
-
-    dx = pop_val('DX'); dy = pop_val('DY')
-    if dx is not None: geo['dx'] = dx
-    if dy is not None: geo['dy'] = dy
-
+    geo['bathymetry'] = bathy
     out['geometry'] = geo
 
     # ---- simulation --------------------------------------------------------
@@ -290,6 +305,15 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             v = pop_val(k)
             if v is not None:
                 wm[k] = v
+        # Apply legacy defaults that differ from the model-layer defaults.
+        # Legacy default for all spectral types is Nfreq=45.
+        # Ntheta=1 for 1D types, 24 for 2D types.
+        if wm_type in ('TMA_1D', 'JON_1D'):
+            wm.setdefault('Ntheta', 1)
+            wm.setdefault('Nfreq', 45)
+        elif wm_type in ('WK_IRR', 'JON_2D', 'WK_NEW_IRR'):
+            wm.setdefault('Ntheta', 24)
+            wm.setdefault('Nfreq', 45)
         out['wavemaker'] = wm
 
     # ---- sponge ------------------------------------------------------------

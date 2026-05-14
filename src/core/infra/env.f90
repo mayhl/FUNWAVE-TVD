@@ -39,11 +39,15 @@ module core_env_mod
 
 contains
 
-   function env_initialize(label, yaml_path, log_path) result(this)
+   ! env_initialize is a subroutine (not a function) so that type_env is
+   ! initialized in-place. A function returning type_env by value would copy
+   ! the struct, leaving yaml%root pointing into the destroyed temporary's
+   ! yaml%file — a dangling pointer that causes SIGSEGV.
+   subroutine env_initialize(this, label, yaml_path, log_path)
+      type(type_env), intent(inout) :: this
       character(*), intent(in) :: label
       character(*), intent(in) :: yaml_path
       character(*), intent(in), optional :: log_path
-      type(type_env) :: this
 
       character(:), allocatable :: log_fpath, yaml_fpath
 
@@ -67,7 +71,7 @@ contains
       yaml_fpath = yaml_path
       call this%yaml%init(yaml_fpath, this%comm)
 
-   end function env_initialize
+   end subroutine env_initialize
 
    function get_sub_env(parent_env, dict_name, is_empty) result(sub_env)
       class(type_env), intent(in), target :: parent_env

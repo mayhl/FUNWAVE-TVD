@@ -163,8 +163,6 @@ Program FUNWAVE_TVD
 
    IMPLICIT NONE
 
-    call model % init()
-
    CALL READ_INPUT
 
 # if defined (DEBUG)
