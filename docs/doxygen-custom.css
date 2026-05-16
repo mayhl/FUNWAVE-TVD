@@ -1,0 +1,45 @@
+/* Match doxygen-awesome to the SWAN/CERN MkDocs theme palette.
+   Must use :root to beat doxygen-awesome's own :root definitions. */
+:root {
+  /* Primary: SWAN dark navy */
+  --primary-color:             #03263C;
+  --primary-dark-color:        #011826;
+  --primary-light-color:       #c8d8e8;
+
+  /* Accent: CERN blue */
+  --link-color:                #0053A1;
+  --menu-selected-background:  rgba(0, 83, 161, 0.08);
+  --separator-color:           #c8d8e8;
+
+  /* Code / surface */
+  --code-background:           #FAFAFA;
+
+  /* Font: match SWAN's Roboto stack */
+  --font-family:               "Roboto", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+/* Sidebar minimum width — navtree.js can collapse it to barWidth (~3px) on
+   window resize; enforce a sensible floor here and via doxygen-nav.js. */
+#side-nav {
+  min-width: 220px !important;
+}
+
+/* "← Back to docs" link injected beside the project name */
+#funwave-back-link {
+  font-size: 12px;
+  opacity: 0.75;
+  margin-left: auto;
+  padding: 0 12px;
+  white-space: nowrap;
+  font-family: var(--font-family);
+}
+
+#funwave-back-link a {
+  color: inherit;
+  text-decoration: none;
+}
+
+#funwave-back-link a:hover {
+  opacity: 1;
+  text-decoration: underline;
+}

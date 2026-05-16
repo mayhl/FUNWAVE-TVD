@@ -1,0 +1,59 @@
+site_name: FUNWAVE-TVD
+site_description: Full-dispersion, fully nonlinear Boussinesq wave model
+repo_url: https://github.com/mayhl/mayhlFUNWAVE
+repo_name: mayhl/FUNWAVE-TVD
+
+theme:
+  name: swan
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - toc.follow
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+
+hooks:
+  - docs/hooks.py
+
+plugins:
+  - search
+  - bibtex:
+      bib_file: docs/references.bib
+
+markdown_extensions:
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - footnotes
+  - attr_list
+  - md_in_html
+  - tables
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js
+
+extra_css:
+  - stylesheets/extra.css
+
+nav:
+  - Home: index.md
+  - Model:
+    - Overview: model/overview.md
+    - Governing Equations: model/equations.md
+    - Numerics: model/numerics.md
+  - User Guide:
+    - Installation: guide/installation.md
+    - Configuration: guide/configuration.md
+    - Output: guide/output.md
+  - Examples:
+    - Standing Wave: examples/standing_wave.md
+  - API Reference: api/index.md
