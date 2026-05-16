@@ -19,7 +19,7 @@ module core_env_mod
    use core_log_io_mod, only: type_log_writer, new_log_writer
    use core_yaml_file_mod, only: type_yaml_reader
 
-   implicit none(external)
+   implicit none
 
    private
    public :: new_env, get_sub_env

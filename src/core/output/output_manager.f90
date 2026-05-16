@@ -25,7 +25,7 @@ module core_output_manager_mod
    use core_grid_mod,           only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
    use core_output_channel_mod, only: type_output_channel
-   implicit none(external)
+   implicit none
 
    private
    public :: type_output_manager

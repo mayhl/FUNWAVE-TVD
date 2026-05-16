@@ -5,7 +5,7 @@ module test_gatherer
    use core_constants_mod,        only: SP
    use core_comm_mod,             only: type_comm, new_comm
    use core_output_gatherer_mod,  only: type_output_gatherer
-   implicit none(external)
+   implicit none
 
 contains
 

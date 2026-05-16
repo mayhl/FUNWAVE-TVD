@@ -8,7 +8,7 @@ module test_interpolation
    use core_interpolation_mod, only: type_interpolator
    use core_constants_mod,     only: SP, N_GHOST
 
-   implicit none(external)
+   implicit none
 
    ! M=10 splits evenly across 2 ranks (5 cols each); N=4
    integer,  parameter :: TEST_M  = 10

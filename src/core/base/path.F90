@@ -133,7 +133,7 @@ contains
       class(type_path), intent(in) :: this
       character(len=len(this%root)) :: name
       integer :: i
-      i = scan(this%root, "/\", back=.true.)
+      i = scan(this%root, "/"//achar(92), back=.true.)
       name = this%root(i + 1:)
    end function path_get_filename
 
@@ -141,7 +141,7 @@ contains
       class(type_path), intent(in) :: this
       character(len=len(this%root)) :: parent
       integer :: i
-      i = scan(this%root, "/\", back=.true.)
+      i = scan(this%root, "/"//achar(92), back=.true.)
       if (i > 0) then
          parent = this%root(1:i - 1)
       else

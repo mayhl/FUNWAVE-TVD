@@ -2,7 +2,7 @@ module core_misc_mod
 
    use core_constants_mod, only: SP
 
-   implicit none(external)
+   implicit none
    public random2
 contains
 

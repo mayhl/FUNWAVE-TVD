@@ -10,7 +10,7 @@ module core_yaml_file_mod
    use fortran_yaml_c, only: YamlFile, dp, &
                              type_node, type_dictionary, type_error, &
                              type_list, type_list_item, type_scalar
-   implicit none(external)
+   implicit none
 
    private
    public :: type_yaml_reader

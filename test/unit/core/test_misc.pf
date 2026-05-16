@@ -2,7 +2,7 @@ module test_misc
    use pFUnit
    use core_constants_mod, only: SP
    use core_misc_mod, only: str2int, str2real, count_char
-   implicit none(external)
+   implicit none
 
 contains
 

@@ -6,7 +6,7 @@ module test_comm
    use core_comm_mod, only: type_comm, new_comm
    use core_constants_mod, only: SP, type_string
 
-   implicit none(external)
+   implicit none
 
 contains
 

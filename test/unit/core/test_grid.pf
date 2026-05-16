@@ -7,7 +7,7 @@ module test_grid
    use core_grid_mod,      only: type_grid_2d
    use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH
 
-   implicit none(external)
+   implicit none
 
    ! Test grid dimensions — chosen so M=10 splits evenly across 2 ranks in x
    integer, parameter :: TEST_M = 10

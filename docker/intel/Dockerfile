@@ -35,4 +35,4 @@ COPY . .
 RUN irun python3 scripts/patch_intel_mpi.py
 
 ENV CI=true
-CMD ["irun", "./bin/fun", "unit", "--mode", "ci"]
+CMD ["irun", "./bin/fun-dev", "unit", "--mode", "ci"]

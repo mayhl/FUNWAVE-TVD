@@ -14,9 +14,10 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { compiler: gfortran,  dockerfile: docker/gfortran/Dockerfile }
-          - { compiler: ifx,       dockerfile: docker/intel/Dockerfile }
-          - { compiler: flang-new, dockerfile: docker/flang/Dockerfile }
+          - { compiler: gnu,    dockerfile: docker/gnu/Dockerfile }
+          - { compiler: intel,  dockerfile: docker/intel/Dockerfile }
+          - { compiler: llvm,   dockerfile: docker/llvm/Dockerfile }
+          - { compiler: nvhpc,  dockerfile: docker/nvhpc/Dockerfile }
 
     steps:
       - uses: actions/checkout@v4

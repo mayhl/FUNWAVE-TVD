@@ -16,7 +16,7 @@ module core_comm_mod
    use core_constants_mod, only: LABEL_SIZE, SP, MPI_SP, type_string
    use core_log_io_mod, only: type_log_writer, new_log_writer
 
-   implicit none(external)
+   implicit none
 
    character(LABEL_SIZE), parameter :: log_key = "MPI"
    integer, parameter :: param_buff_max = 30

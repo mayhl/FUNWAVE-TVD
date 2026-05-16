@@ -1,9 +1,9 @@
 #!/bin/bash
 # Usage: ./run_test_refactor.sh [branch_name] [file_to_move]
-# Example: ./run_test_refactor.sh master src/old/io.F
+# Example: ./run_test_refactor.sh master src/model/2d/old/io.F
 
 TARGET_BRANCH=${1:-master}
-FILE_TO_MOVE=${2} # e.g., src/old/io.F
+FILE_TO_MOVE=${2} # e.g., src/model/2d/old/io.F
 
 if [ -z "$FILE_TO_MOVE" ]; then
     echo "Usage: $0 [branch_name] [file_to_move]"
@@ -25,9 +25,9 @@ git pull origin "$TARGET_BRANCH"
 FILE_NAME=$(basename "$FILE_TO_MOVE")
 mv "$FILE_TO_MOVE" "src/$FILE_NAME"
 
-# Note: You may need to update src/CMakeLists.txt and src/old/CMakeLists.txt
+# Note: You may need to update src/CMakeLists.txt and src/model/2d/old/CMakeLists.txt
 # to reflect the move. For a temporary refactor, you can use sed:
-# sed -i "/$FILE_NAME/d" src/old/CMakeLists.txt
+# sed -i "/$FILE_NAME/d" src/model/2d/old/CMakeLists.txt
 # echo "  $FILE_NAME" >> src/CMakeLists.txt
 
 # Build the reference executable

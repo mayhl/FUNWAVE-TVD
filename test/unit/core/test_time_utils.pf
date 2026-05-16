@@ -4,7 +4,7 @@ module test_time_utils
    use pFUnit
    use core_constants_mod, only: SP
    use core_time_utils_mod, only: type_timing_control
-   implicit none(external)
+   implicit none
 
 contains
 

@@ -4,7 +4,7 @@ module test_logging
    use pFUnit
    use core_log_io_mod, only: type_log_writer, new_log_writer, format_log_line
    use core_constants_mod, only: LABEL_SIZE
-   implicit none(external)
+   implicit none
 
 contains
 

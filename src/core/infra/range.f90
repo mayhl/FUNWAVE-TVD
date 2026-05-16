@@ -11,7 +11,7 @@ module core_range_parse_mod
    use core_comm_mod, only: type_comm
    use core_misc_mod, only: str2int, str2real, count_char
 
-   implicit none(external)
+   implicit none
 
    private
 !> @brief Base type for range logic

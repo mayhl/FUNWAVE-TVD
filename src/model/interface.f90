@@ -13,7 +13,7 @@
 module model_interface_mod
 
    use core_env_mod, only: type_env
-   implicit none(external)
+   implicit none
 
    type, abstract, public :: type_model_interface
 
@@ -29,7 +29,7 @@ module model_interface_mod
    abstract interface
       subroutine model_read_input(this, env)
          import :: type_model_interface, type_env
-         implicit none(external)
+         implicit none
          class(type_model_interface), intent(inout) :: this
          type(type_env), intent(inout), target :: env
       end subroutine model_read_input

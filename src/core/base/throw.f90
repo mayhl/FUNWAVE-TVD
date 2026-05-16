@@ -2,7 +2,7 @@
 ! Dummy module for pfUnit testing of errors
 
 module core_throw_mod
-   implicit none(external)
+   implicit none
    private
 
    public :: throw_exception
@@ -11,7 +11,7 @@ module core_throw_mod
 
    abstract interface
       subroutine throw(filename, line_number, message)
-         implicit none(external)
+         implicit none
          character(len=*), intent(in) :: filename
          integer, intent(in) :: line_number
          character(len=*), optional, intent(in) :: message

@@ -3,7 +3,7 @@ module test_path
 
    use pFUnit
    use core_path_mod
-   implicit none(external)
+   implicit none
 
 contains
 

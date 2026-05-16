@@ -1,7 +1,26 @@
+refs:
+  2d:
+    branch: feat/cmake
+  3d:
+    branch: vendor/3d-fd
+    cmake_flags: ["HYPRE_DIR={repo_root}/extern/hypre/installed"]
+
 executables:
-  central: [ZERO_PHASE=ON]
-  vessel: [USE_VESSEL=ON, ZERO_PHASE=ON]
-  vessel-sediment: [USE_VESSEL=ON, USE_SEDIMENT=ON, ZERO_PHASE=ON]
+  # ── 2D  (ref: feat/cmake) ─────────────────────────────────────────────
+  central:
+    cmake_flags: [ZERO_PHASE=ON]
+    ref: 2d
+  vessel:
+    cmake_flags: [USE_VESSEL=ON, ZERO_PHASE=ON]
+    ref: 2d
+  vessel-sediment:
+    cmake_flags: [USE_VESSEL=ON, USE_SEDIMENT=ON, ZERO_PHASE=ON]
+    ref: 2d
+
+  # ── 3D  (ref: vendor/3d-fd) ───────────────────────────────────────────
+  central-3d:
+    cmake_flags: []
+    ref: 3d
 
 simulations:
   # preprocess (optional): command run in dev run dir before simulation.
@@ -61,6 +80,30 @@ simulations:
     tolerances:
       field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4 }
       statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 5.0e-4, Hrms: 5.0e-4, Havg: 5.0e-4, Hsig: 5.0e-4 }
+
+  - name: standing_wave_3d_10m
+    exe_type: central-3d
+    np: 4
+    input: test/regression/inputs/standing_wave_3d
+    input_files: [input_10m.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    preprocess_ref: true
+    binary: funwave
+    output_dir: output
+    tags: [3d]
+    postprocess:
+      field: test.regression.postproc.field_compare
+      standing_wave: test.regression.postproc.standing_wave
+    tolerances:
+      field: { eta: 1.0e-5 }
+      standing_wave: { period_error_pct: 15.0 }
 
   - name: flume_1d_strict
     exe_type: central

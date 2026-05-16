@@ -11,15 +11,17 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# Output file prefix catalogues (sourced from src/old/io.F)
+# Output file prefix catalogues (sourced from src/model/2d/old/io.F)
 # All 2D snapshot files use prefix_%05d naming.
 # Station files use sta_%04d.
 # dep.out is the only static exception (written once at init for DEPTH_OUT).
 # ---------------------------------------------------------------------------
 
 # Prefixes written at each PLOT_INTV (time-evolving field snapshots).
-# Includes sediment transport outputs — same %05d indexing, no reason to separate.
+# 2D prefixes: sourced from src/model/2d/old/io.F  (_%05d naming)
+# 3D prefixes: sourced from src/model/3d/old/io.F  (_%04d naming)
 FIELD_PREFIXES: frozenset[str] = frozenset([
+    # 2D model outputs
     "eta", "etasrn",
     "u", "v",
     "mask", "mask9",
@@ -33,12 +35,13 @@ FIELD_PREFIXES: frozenset[str] = frozenset([
     "Fves", "Pves", "VesUp", "VesVp",
     "tmp",
     "Ax", "Ay", "Bx", "By",
-    # sediment
     "dep",
     "C", "Pick", "Depo", "Pavg", "Davg",
     "DchgS", "DchgB", "BedFx", "BedFy", "BedStr",
     "Aval", "AvalAc", "Cb", "Ca", "Redu", "TauEx", "Hpo",
     "FoamEta",
+    # 3D model outputs (volumetric — see putfile3D in src/model/3d/old/io.F)
+    "w", "tke", "eps", "prod", "mu", "upwp", "sali", "temp", "rho", "b",
 ])
 
 # Binary mask fields — use mismatch fraction instead of normalized L2.
@@ -103,7 +106,7 @@ _TXT_VAR_FLAGS = [
     "AGE", "TMP", "WaveHeight",
 ]
 
-_TSERIES_RE = re.compile(r"^(.+)_(\d{5})$")
+_TSERIES_RE = re.compile(r"^(.+)_(\d{4,5})$")  # 5-digit (2D) or 4-digit (3D)
 _STATION_RE = re.compile(r"^sta_(\d{4})$")
 
 
@@ -139,26 +142,45 @@ class RunMetadata:
     binary: bool = False      # True if FIELD_IO_TYPE = BINARY; default is ASCII
     output_res: int = 1       # OUTPUT_RES stride (ASCII only; binary is always full res)
     variables: list[str] = field(default_factory=list)  # canonical names from input
+    nz: int = 0               # Kglob for 3D runs; 0 for 2D runs
+
+    @property
+    def is_3d(self) -> bool:
+        return self.nz > 1
+
+    def field_path(self, prefix: str, idx: int) -> Path:
+        """Return the path for a time-series output file.
+
+        3D uses 4-digit suffixes (_%04d); 2D uses 5-digit (_%05d).
+        """
+        digits = 4 if self.is_3d else 5
+        return self.output_dir / f"{prefix}_{idx:0{digits}d}"
 
     def output_files(self, variable: str) -> list[Path]:
         """Sorted list of output files for a variable.
 
         For DEPTH_OUT returns [dep.out] if present.
-        For all others globs prefix_%05d files.
+        For all others globs prefix_%05d (2D) or prefix_%04d (3D) files.
         """
         static = STATIC_FILES.get(variable)
         if static:
             p = self.output_dir / static
             return [p] if p.exists() else []
         prefix = VAR_TO_PREFIX.get(variable, variable)
-        return sorted(self.output_dir.glob(f"{prefix}_[0-9][0-9][0-9][0-9][0-9]"))
+        pattern = f"{prefix}_[0-9][0-9][0-9][0-9]" if self.is_3d else f"{prefix}_[0-9][0-9][0-9][0-9][0-9]"
+        return sorted(self.output_dir.glob(pattern))
 
     def read_field(self, path: Path) -> "np.ndarray":
-        """Read a 2D field file and return an (ny, nx) float32 array.
+        """Read a field file and return a float32 numpy array.
 
-        Binary: raw float32, Fortran column-major (MPI_ORDER_FORTRAN), no record
-                markers — must reshape (nx, ny) then transpose to get (ny, nx).
-        ASCII:  one row per J, Mglob values per row — np.loadtxt infers shape.
+        2D runs return (ny, nx).
+        3D runs return (ny, nx) for 2D fields (e.g. eta) and (nz, ny, nx) for
+        volumetric fields (e.g. u, v, w, p) — detected by row count.
+
+        Binary: raw float32, Fortran column-major, no record markers.
+        ASCII:  rows written by the Fortran output routines:
+          putfile2D — Nglob rows, Mglob values each → (ny, nx)
+          putfile3D — Kglob*Nglob rows, Mglob values each → reshaped to (nz, ny, nx)
         """
         import numpy as np
         if self.binary:
@@ -169,7 +191,10 @@ class RunMetadata:
                 .reshape((self.nx, self.ny), order="F")
                 .T
             )
-        return np.loadtxt(path, dtype=np.float32)
+        arr = np.loadtxt(path, dtype=np.float32)
+        if self.nz > 1 and arr.ndim == 2 and arr.shape[0] == self.nz * self.ny:
+            arr = arr.reshape(self.nz, self.ny, self.nx)
+        return arr
 
 
 # ---------------------------------------------------------------------------
@@ -261,7 +286,7 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     geo = cfg.get("geometry", {})
     out = cfg.get("output", {})
 
-    grid_size = geo.get("grid_size", [0, 0])    # [nx, ny]
+    grid_size = geo.get("grid_size", [0, 0])    # [nx, ny] or [nx, ny, nz]
     cell_size = geo.get("cell_size", [1.0, 1.0]) # [dx, dy]
 
     result_folder = out.get("result_folder", "output").rstrip("/")
@@ -279,6 +304,7 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
         output_dir=output_dir,
         nx=int(grid_size[0]),
         ny=int(grid_size[1]),
+        nz=int(grid_size[2]) if len(grid_size) > 2 else 0,
         dx=float(cell_size[0]),
         dy=float(cell_size[1]),
         binary=binary,
@@ -306,6 +332,7 @@ def _from_txt(run_dir: Path, path: Path) -> RunMetadata:
         output_dir=output_dir,
         nx=int(kv.get("Mglob", 0)),
         ny=int(kv.get("Nglob", 0)),
+        nz=int(kv.get("Kglob", 0)),
         dx=float(kv.get("DX", 1.0)),
         dy=float(kv.get("DY", 1.0)),
         binary=binary,
@@ -345,23 +372,29 @@ def compute_metric_series(
     if is_mask:
         vals: list[float] = []
         for idx in indices:
-            ref_arr = ref_meta.read_field(ref_meta.output_dir / f"{prefix}_{idx:05d}").astype(float)
-            dev_arr = dev_meta.read_field(dev_meta.output_dir / f"{prefix}_{idx:05d}").astype(float)
+            ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, idx)).astype(float)
+            dev_arr = dev_meta.read_field(dev_meta.field_path(prefix, idx)).astype(float)
             vals.append(float(np.mean(ref_arr != dev_arr)))
         return np.array(vals)
+
+    # TODO: check error scaling — current metric is ||dev-ref||₂ / max_t(||ref||₂),
+    #       which grows like √N with grid size and makes tolerances grid-dependent.
+    #       Consider switching to RMS form: √mean((dev-ref)²) / √mean(ref²),
+    #       where the N factors cancel and tolerances transfer across resolutions.
+    #       Also revisit DEFAULT_FLOOR if the denominator changes.
 
     # Pass 1: find max reference L2 norm across all timesteps.
     max_norm_ref = 0.0
     for idx in indices:
-        ref_arr = ref_meta.read_field(ref_meta.output_dir / f"{prefix}_{idx:05d}").astype(float)
+        ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, idx)).astype(float)
         max_norm_ref = max(max_norm_ref, float(np.sqrt(np.sum(ref_arr ** 2))))
     denom = max(max_norm_ref, floor)
 
     # Pass 2: compute per-step normalised L2.
     vals = []
     for idx in indices:
-        ref_arr = ref_meta.read_field(ref_meta.output_dir / f"{prefix}_{idx:05d}").astype(float)
-        dev_arr = dev_meta.read_field(dev_meta.output_dir / f"{prefix}_{idx:05d}").astype(float)
+        ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, idx)).astype(float)
+        dev_arr = dev_meta.read_field(dev_meta.field_path(prefix, idx)).astype(float)
         diff = dev_arr - ref_arr
         vals.append(float(np.sqrt(np.sum(diff ** 2))) / denom)
     return np.array(vals)

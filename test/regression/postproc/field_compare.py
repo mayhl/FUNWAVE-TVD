@@ -119,6 +119,9 @@ def run(
         for pfx, l2, i0, il, tol, p in series_data
         if np.isfinite(tol) and not p
     ]
+    # TODO: gate this block on --no-auto-report (passed through as plots=True/False);
+    #       _make_failure_figures writes spatial PNGs for every failing variable and
+    #       is the main source of slowness when tests fail during a dev iteration.
     if failing:
         with Progress(
             SpinnerColumn(),
@@ -249,16 +252,21 @@ def _select_timesteps(l2_per_step: np.ndarray, idx_first: int, tol: float) -> li
 
 
 def _is_1d_mode(ref_meta: RunMetadata) -> bool:
+    if ref_meta.is_3d:
+        return False
     return ref_meta.ny <= max(5, ref_meta.nx // 20)
 
 
 
 def _load_mask(meta: RunMetadata, idx: int) -> np.ndarray | None:
     """Return boolean (ny, nx) wet mask for step idx, or None if unavailable."""
-    p = meta.output_dir / f"mask_{idx:05d}"
+    p = meta.field_path("mask", idx)
     if not p.exists():
         return None
-    return meta.read_field(p) > 0
+    arr = meta.read_field(p)
+    if arr.ndim == 3:
+        arr = arr[arr.shape[0] // 2]  # midplane for 3D masks
+    return arr > 0
 
 
 def _build_time_map(output_dir: Path, run_dir: Path) -> dict[int, float]:
@@ -455,11 +463,19 @@ def _make_failure_figures(
     time_map = _build_time_map(ref_meta.output_dir, ref_meta.run_dir)
     mode_1d  = _is_1d_mode(ref_meta)
 
-    # Read and pre-mask all selected steps
+    # Read and pre-mask all selected steps.
+    # For 3D volumetric fields take the midplane k-slice for visualization.
     pairs: list[tuple[np.ndarray, np.ndarray]] = []
+    is_3d_field = False
+    mid_k: int = 0
     for step in steps:
-        ref_arr = ref_meta.read_field(ref_meta.output_dir / f"{prefix}_{step:05d}").astype(float)
-        dev_arr = dev_meta.read_field(dev_meta.output_dir / f"{prefix}_{step:05d}").astype(float)
+        ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, step)).astype(float)
+        dev_arr = dev_meta.read_field(dev_meta.field_path(prefix, step)).astype(float)
+        if ref_arr.ndim == 3:
+            is_3d_field = True
+            mid_k = ref_arr.shape[0] // 2
+            ref_arr = ref_arr[mid_k]
+            dev_arr = dev_arr[mid_k]
         ref_mask = _load_mask(ref_meta, step)
         dev_mask = _load_mask(dev_meta, step)
         if ref_mask is not None:
@@ -476,10 +492,12 @@ def _make_failure_figures(
         amax_raw = max(float(np.nanmax(np.abs(d - r))) for r, d in pairs)
         amax = amax_raw if amax_raw > 0 else 1.0
 
+    slice_note = f"  [k={mid_k}]" if is_3d_field else ""
     result: list[FigureSpec] = []
     for step, (ref_arr, dev_arr) in zip(steps, pairs):
-        title    = _step_title(step, time_map, cats)
-        png_path = plots_dir / f"diag_{prefix}_{step:05d}.png"
+        title    = _step_title(step, time_map, cats) + slice_note
+        step_fmt = f"{step:04d}" if ref_meta.is_3d else f"{step:05d}"
+        png_path = plots_dir / f"diag_{prefix}_{step_fmt}.png"
 
         if mode_1d:
             fig_dark  = _make_1d_step_fig(ref_meta, ref_arr, dev_arr, prefix, title, dark=True)
@@ -491,7 +509,7 @@ def _make_failure_figures(
             fig_light.write_image(str(png_path), width=900, height=560, scale=2)
 
         result.append(FigureSpec(
-            title=f"{prefix}  —  {title}",
+            title=f"{prefix}{slice_note}  —  {title}",
             png_path=png_path,
             interactive=InteractiveFigure(
                 kind="plotly",
@@ -519,8 +537,9 @@ class _Row:
 
 
 def _print_table(ref_meta: RunMetadata, dev_meta: RunMetadata, rows: list[_Row]) -> None:
+    dims = f"{ref_meta.nx}×{ref_meta.ny}×{ref_meta.nz}" if ref_meta.is_3d else f"{ref_meta.nx}×{ref_meta.ny}"
     fmt  = "binary" if ref_meta.binary else "ASCII"
-    meta = f"[dim]{ref_meta.nx}×{ref_meta.ny}[/dim]  [dim]{fmt}[/dim]"
+    meta = f"[dim]{dims}[/dim]  [dim]{fmt}[/dim]"
     table = Table(
         box=box.SIMPLE_HEAD,
         header_style="bold cyan",

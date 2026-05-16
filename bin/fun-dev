@@ -1,0 +1,51 @@
+#!/usr/bin/env python3
+"""
+Shim that bootstraps uv before delegating to the Typer CLI.
+All other dependency setup (pFUnit etc.) is handled by: fun-dev install
+"""
+import os
+import shutil
+import subprocess
+import sys
+
+BIN_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJ_ROOT = os.path.dirname(BIN_DIR)
+CLI_PATH = os.path.join(PROJ_ROOT, "test", "framework", "cli.py")
+SETUP_CLI_SCRIPT = os.path.join(PROJ_ROOT, "scripts", "setup_cli.sh")
+
+CI_MODE = os.environ.get("CI", "").lower() in ("true", "1", "yes")
+
+
+def ensure_uv():
+    if shutil.which("uv"):
+        return
+
+    if CI_MODE:
+        print("[CI] uv not found — installing...")
+        subprocess.run(["bash", SETUP_CLI_SCRIPT], cwd=PROJ_ROOT, check=True)
+        return
+
+    print("FUNWAVE CLI tools are not initialized.")
+    response = input("Would you like to run 'scripts/setup_cli.sh' to install? [y/N]: ")
+    if response.strip().lower() == "y":
+        subprocess.run(["bash", SETUP_CLI_SCRIPT], cwd=PROJ_ROOT)
+        print("Setup complete. Please restart your terminal and re-run 'fun-dev'.")
+    else:
+        print("Skipped. Run 'scripts/setup_cli.sh' manually when ready.")
+    sys.exit(0)
+
+
+def main():
+    ensure_uv()
+
+    env = os.environ.copy()
+    env["PYTHONPATH"] = PROJ_ROOT
+    result = subprocess.run(
+        ["uv", "run", "python3", CLI_PATH] + sys.argv[1:],
+        env=env,
+    )
+    sys.exit(result.returncode)
+
+
+if __name__ == "__main__":
+    main()

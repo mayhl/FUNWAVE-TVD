@@ -119,12 +119,20 @@ if(NOT ENABLE_DEV_MODE)
   add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
   target_include_directories(
     ${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules"
+                        "${CMAKE_BINARY_DIR}/modules/model"
                         "${CMAKE_BINARY_DIR}/modules/old")
   target_compile_definitions(${exe_name} PRIVATE ${MODULE_FLAGS})
   target_link_libraries(${exe_name} PRIVATE ${main_lib} ${main_lib}_old)
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
+  # Link the 3D shared library when available (built by src/model/3d/CMakeLists.txt
+  # when HYPRE is found).  Transitional scaffolding — remove together with
+  # funwave_3d when MODULE GLOBAL is replaced by the typed framework.
+  if(TARGET funwave_3d)
+    target_link_libraries(${exe_name} PRIVATE funwave_3d)
+    target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules/3d_old")
+  endif()
 endif()
 
 # ==============================================================================

@@ -2,7 +2,7 @@ module test_units
    use pFUnit
    use core_constants_mod, only: SP
    use core_units_mod, only: get_factor, get_units_by_dim, apply_unit_conversion
-   implicit none(external)
+   implicit none
 
 contains
 

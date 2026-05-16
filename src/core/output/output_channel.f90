@@ -34,7 +34,7 @@ module core_output_channel_mod
    use core_time_utils_mod,      only: type_timing_control
    use core_field_registry_mod,  only: type_field_registry
    use core_output_gatherer_mod, only: type_output_gatherer
-   implicit none(external)
+   implicit none
 
    private
    public :: type_output_channel

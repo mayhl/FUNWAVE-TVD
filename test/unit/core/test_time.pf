@@ -4,7 +4,7 @@ module test_time
    use core_comm_mod,           only: type_comm, new_comm
    use core_yaml_file_mod,      only: type_yaml_reader
    use core_simulation_time_mod, only: type_simulation_control
-   implicit none(external)
+   implicit none
 
 contains
 

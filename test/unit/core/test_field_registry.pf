@@ -2,7 +2,7 @@ module test_field_registry
    use pFUnit
    use core_constants_mod, only: SP
    use core_field_registry_mod, only: type_field_registry
-   implicit none(external)
+   implicit none
 
 contains
 

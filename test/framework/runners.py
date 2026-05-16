@@ -42,13 +42,19 @@ class UnitTestRunner(BaseRunner):
         self.reporter.step("")
         if self.mode == "ci":
             self.reporter.info("CI Mode: Performing full build...")
-            subprocess.run([
+            build_type = os.environ.get("BUILD_TYPE", "RelWithDebInfo")
+            import platform
+            cmake_args = [
                 "cmake", "-S", ".", "-B", self.build_dir,
                 "-DENABLE_TESTING=ON", "-DENABLE_DEV_MODE=ON",
-                "-DCMAKE_BUILD_TYPE=Debug",
-            ], check=True)
+                f"-DCMAKE_BUILD_TYPE={build_type}",
+            ]
+            if platform.system() == "Darwin":
+                cmake_args += ["-DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/macos_mpi.cmake"]
+            subprocess.run(cmake_args, check=True)
             nproc = os.cpu_count() or 4
             subprocess.run(["cmake", "--build", self.build_dir, f"-j{nproc}"], check=True)
+            print("=== FUNWAVE TESTS ===", flush=True)
 
         # Load test groups from YAML configuration
         config_path = os.path.join(os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd()), "test/unit/test_config.yaml")
@@ -132,6 +138,7 @@ class UnitTestRunner(BaseRunner):
                 Console().print(Panel(formatted_log, title=f"Error Log: {res['name']}", border_style="red"))
 
         self.reporter.success("Unit tests execution finished.")
+        return all(r["status"] == "Pass" for r in results)
 
     def display_results_table(self, results):
         table = Table(title="Test Execution Summary")

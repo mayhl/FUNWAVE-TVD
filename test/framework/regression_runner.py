@@ -19,37 +19,43 @@ CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "regression", "regre
 
 class RegressionRunner(BaseRunner):
 
-    def __init__(self, reporter, provider, ref_branch="master"):
+    def __init__(self, reporter, provider):
         super().__init__(reporter)
         self.provider = provider
-        self.ref_branch = ref_branch
         self.repo_root = os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd())
-        self.worktree_path = os.path.join(self.repo_root, "test", "regression", "worktrees", ref_branch)
 
         config_path = os.environ.get("FUNWAVE_REGRESSION_CONFIG", CONFIG_PATH)
         with open(config_path) as f:
             config = yaml.safe_load(f)
-        self.executables = config["executables"]
+        self._refs = config.get("refs", {})
+        self.executables = self._normalize_executables(config["executables"])
         self.simulations = config["simulations"]
 
-    def _prepare_environment(self):
-        try:
-            self.current_branch = subprocess.check_output(
-                ["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
-            self.is_ref_same_as_head = (self.current_branch == self.ref_branch)
-        except:
-            self.current_branch = "dev"
-            self.is_ref_same_as_head = False
+    def _normalize_executables(self, raw):
+        result = {}
+        for name, spec in raw.items():
+            if isinstance(spec, list):
+                result[name] = {"cmake_flags": spec, "ref_branch": None}
+            else:
+                ref_key   = spec.get("ref")
+                ref_cfg   = self._refs.get(ref_key, {}) if ref_key else {}
+                exe_flags = spec.get("cmake_flags", [])
+                ref_flags = ref_cfg.get("cmake_flags", [])
+                result[name] = {
+                    "cmake_flags": exe_flags + ref_flags,
+                    "ref_branch":  ref_cfg.get("branch") if ref_key else None,
+                }
+        return result
 
-        if self.is_ref_same_as_head:
-            self.reporter.info("Reference branch is same as current. Using isolated directories.")
-            self.worktree_path = self.repo_root
-        else:
-            if not os.path.exists(self.worktree_path):
-                self.reporter.step(f"Creating worktree for ref branch: {self.ref_branch}")
-                subprocess.run(["git", "worktree", "add", self.worktree_path, self.ref_branch],
-                               check=True, capture_output=True)
-        return True
+    def _worktree_path(self, branch):
+        return os.path.join(self.repo_root, "test", "regression", "worktrees", branch)
+
+    def _ensure_worktree(self, branch):
+        path = self._worktree_path(branch)
+        if not os.path.exists(path):
+            self.reporter.step(f"Creating worktree: {branch}")
+            subprocess.run(["git", "worktree", "add", path, branch], check=True, capture_output=True)
+        return path
 
     def _exe_build_dir(self, workspace, exe_type):
         return os.path.join(get_build_path(workspace), exe_type)
@@ -92,6 +98,10 @@ class RegressionRunner(BaseRunner):
 
         tag = label or os.path.basename(build_dir)
         os.makedirs(build_dir, exist_ok=True)
+        if force:
+            cache = os.path.join(build_dir, "CMakeCache.txt")
+            if os.path.exists(cache):
+                os.remove(cache)
 
         toolchain_path = os.path.join(self.repo_root, "cmake", "toolchains", "macos_mpi.cmake")
         cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir,
@@ -140,6 +150,8 @@ class RegressionRunner(BaseRunner):
 
     def _setup_run_dir(self, sim, run_dir):
         os.makedirs(run_dir, exist_ok=True)
+        if "output_dir" in sim:
+            os.makedirs(os.path.join(run_dir, sim["output_dir"]), exist_ok=True)
         input_dir = os.path.join(self.repo_root, sim["input"])
         for item in os.listdir(input_dir):
             src = os.path.join(input_dir, item)
@@ -162,6 +174,9 @@ class RegressionRunner(BaseRunner):
                     .replace("{run_dir}", run_dir))
         cmd = [subst(a) for a in sim["preprocess"]]
         subprocess.run(cmd, cwd=run_dir, check=True, capture_output=True)
+
+    def _resolve_cmake_flags(self, flags):
+        return [f.replace("{repo_root}", self.repo_root) for f in flags]
 
     def _run_postprocess(self, sim, ref_run_dir, curr_run_dir, ref_status, curr_status,
                          verbose: bool = False) -> SimResult:
@@ -238,10 +253,14 @@ class RegressionRunner(BaseRunner):
         self.reporter.console.print()
 
     def run(self, filter_tags=None, force=False, report: bool = False, pdf: bool = False,
-            verbose: bool = False):
-        self.reporter.step(f"Running Regression Tests (Ref: {self.ref_branch})")
-        if not self._prepare_environment():
-            return
+            verbose: bool = False, stop_on_pass: bool = False):
+        try:
+            current_branch = subprocess.check_output(
+                ["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
+        except Exception:
+            current_branch = "dev"
+
+        self.reporter.step(f"Running Regression Tests (dev: {current_branch})")
 
         simulations = self._expand_simulations(self.simulations)
         if filter_tags:
@@ -253,21 +272,34 @@ class RegressionRunner(BaseRunner):
         tag_hint = f"  ({', '.join(sorted(filter_tags))})" if filter_tags else ""
         self.reporter.info(f"{len(simulations)} test(s){tag_hint}")
 
-        # Build one binary per exe_type actually needed by the selected simulations.
-        ref_hash = curr_hash = ""
+        # Build one binary per exe_type needed. Store dirs so the sim loop doesn't recompute.
+        exe_dirs = {}    # exe_type -> (ref_build_dir, curr_build_dir, ref_branch)
+        ref_hashes = {}
+        curr_hash = ""
         for exe_type in {s["exe_type"] for s in simulations}:
-            cmake_flags = self.executables[exe_type]
-            ref_build_dir = self._exe_build_dir(self.ref_branch, exe_type)
+            spec = self.executables[exe_type]
+            cmake_flags = self._resolve_cmake_flags(spec["cmake_flags"])
+            ref_branch  = spec["ref_branch"]
+
+            ref_source     = self._ensure_worktree(ref_branch) if ref_branch else self.repo_root
+            ref_workspace  = ref_branch if ref_branch else "ref"
+            ref_build_dir  = self._exe_build_dir(ref_workspace, exe_type)
             curr_build_dir = self._exe_build_dir("dev", exe_type)
-            ref_bin = os.path.join(ref_build_dir, simulations[0]["binary"])
-            curr_bin = os.path.join(curr_build_dir, simulations[0]["binary"])
-            ref_hash, ref_rebuilt   = self._build(ref_build_dir,  self.worktree_path, cmake_flags=cmake_flags, binary_path=ref_bin,  force=force, label=f"ref/{exe_type}  ({self.ref_branch})")
-            curr_hash, curr_rebuilt = self._build(curr_build_dir, self.repo_root,     cmake_flags=cmake_flags, binary_path=curr_bin, force=force, label=f"dev/{exe_type}  ({self.current_branch})")
+            exe_dirs[exe_type] = (ref_build_dir, curr_build_dir, ref_branch or ref_workspace)
+
+            first_sim = next(s for s in simulations if s["exe_type"] == exe_type)
+            ref_bin  = os.path.join(ref_build_dir,  first_sim["binary"])
+            curr_bin = os.path.join(curr_build_dir, first_sim["binary"])
+
+            ref_hash,  ref_rebuilt  = self._build(ref_build_dir,  ref_source,     cmake_flags=cmake_flags, binary_path=ref_bin,  force=force, label=f"ref/{exe_type}  ({ref_branch})")
+            curr_hash, curr_rebuilt = self._build(curr_build_dir, self.repo_root, cmake_flags=cmake_flags, binary_path=curr_bin, force=force, label=f"dev/{exe_type}  ({current_branch})")
+            ref_hashes[exe_type] = ref_hash
+
             def _tag(branch, h, rebuilt):
                 label = f"{branch}@{h[:8]}"
                 status = "[green]built[/green]" if rebuilt else "[dim]cached[/dim]"
                 return f"{label}  {status}"
-            self.reporter.info(f"build \\[{exe_type}]  ref: {_tag(self.ref_branch, ref_hash, ref_rebuilt)}  dev: {_tag(self.current_branch, curr_hash, curr_rebuilt)}")
+            self.reporter.info(f"build \\[{exe_type}]  ref: {_tag(ref_branch, ref_hash, ref_rebuilt)}  dev: {_tag(current_branch, curr_hash, curr_rebuilt)}")
 
         def _run_with_spinner(job_id, description):
             t0 = time.time()
@@ -282,8 +314,7 @@ class RegressionRunner(BaseRunner):
         sim_results: list[SimResult] = []
         for sim in simulations:
             exe_type = sim["exe_type"]
-            ref_build_dir  = self._exe_build_dir(self.ref_branch, exe_type)
-            curr_build_dir = self._exe_build_dir("dev", exe_type)
+            ref_build_dir, curr_build_dir, ref_branch = exe_dirs[exe_type]
             curr_input = sim.get("curr_input", sim["input_file"])
 
             ref_run_dir  = os.path.join(ref_build_dir,  "runs", sim["name"])
@@ -305,6 +336,8 @@ class RegressionRunner(BaseRunner):
                 ref_status = "cached"
             else:
                 self._setup_run_dir(sim, ref_run_dir)
+                if "preprocess" in sim and sim.get("preprocess_ref", False):
+                    self._preprocess(sim, ref_run_dir)
                 ref_id = self.provider.submit(
                     os.path.join(ref_build_dir, sim["binary"]), sim["input_file"], ref_run_dir,
                     np=sim.get("np", 1))
@@ -369,21 +402,27 @@ class RegressionRunner(BaseRunner):
                 self.reporter.warn(result_line)
             sim_results.append(sim_result)
 
+            if stop_on_pass and sim_result.status == "PASS":
+                self.reporter.info("  [dim]--stop-on-pass: first passing test found, stopping.[/dim]")
+                break
+
         self._print_summary(sim_results)
 
         any_failed = any(r.status not in ("PASS", "COMPLETED") for r in sim_results)
+        # TODO: honour --no-auto-report: skip this block when any_failed but flag is set
         if report or pdf or any_failed:
+            unique_refs = sorted({exe_dirs[s["exe_type"]][2] for s in simulations})
             meta = ReportMeta(
-                ref_branch=self.ref_branch,
-                dev_branch=self.current_branch,
-                ref_hash=ref_hash,
+                ref_branch=", ".join(unique_refs),
+                dev_branch=current_branch,
+                ref_hash=", ".join(ref_hashes.get(t, "")[:8] for t in sorted(exe_dirs)),
                 dev_hash=curr_hash,
             )
             base = Path(self.repo_root) / "workspaces" / "regression_report"
             want_pdf = pdf or any_failed
             with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"),
                           TimeElapsedColumn(), transient=True) as progress:
-                t = progress.add_task("  Generating report...", total=None)
+                progress.add_task("  Generating report...", total=None)
                 html_path = generate_html_report(sim_results, meta, base.with_suffix(".html"))
                 if want_pdf:
                     pdf_path = generate_pdf_report(sim_results, meta, base.with_suffix(".pdf"))

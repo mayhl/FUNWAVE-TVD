@@ -1,6 +1,6 @@
 module throw_with_pfunit_mod
    use core_throw_mod, only: set_throw_method
-   implicit none(external)
+   implicit none
    private
 
    public :: throw

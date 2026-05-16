@@ -2,7 +2,7 @@ module test_crs
    use pFUnit
    use core_constants_mod, only: SP, PI, R_EARTH
    use core_crs_mod, only: type_crs, CRS_LOCAL, CRS_PROJECTED, CRS_GEOGRAPHIC
-   implicit none(external)
+   implicit none
 
 contains
 

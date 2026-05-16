@@ -368,6 +368,51 @@ def _render_field_section(sub: SubsectionResult) -> str:
     {figures_html}"""
 
 
+def _render_statistics_section(sub: SubsectionResult) -> str:
+    """Generic renderer for statistics/physics metric subsections."""
+    rows_html = ""
+    for m in sub.metrics:
+        tol_finite = math.isfinite(m.tolerance)
+        val_str  = f"{m.value:.4f}" if math.isfinite(m.value) else "—"
+        tol_str  = f"{m.tolerance:.2g}" if tol_finite else "—"
+
+        if not tol_finite:
+            status_cell = '<span class="dim">○</span>'
+            val_cell    = f'<span class="dim">{val_str}</span>'
+        elif m.passed:
+            status_cell = '<span class="pass">✓ PASS</span>'
+            val_cell    = f'<span class="pass">{val_str}</span>'
+        else:
+            status_cell = '<span class="fail">✗ FAIL</span>'
+            val_cell    = f'<span class="fail">{val_str}</span>'
+
+        rows_html += f"""
+        <tr>
+          <td>{m.stat}</td>
+          <td class="right">{val_cell}</td>
+          <td class="right dim">{tol_str}</td>
+          <td class="right">{status_cell}</td>
+        </tr>"""
+
+    figures_html = "\n".join(_render_figure(f) for f in sub.figures)
+
+    return f"""
+    <div class="section-label">{sub.label}</div>
+    <table class="detail-table">
+      <thead>
+        <tr>
+          <th>Metric</th>
+          <th class="right">Value</th>
+          <th class="right">Tolerance</th>
+          <th class="right">Status</th>
+        </tr>
+      </thead>
+      <tbody>{rows_html}
+      </tbody>
+    </table>
+    {figures_html}"""
+
+
 def _render_sim_card(result: SimResult) -> str:
     header = f"""
     <div class="card-header">
@@ -379,6 +424,8 @@ def _render_sim_card(result: SimResult) -> str:
     for sub in result.subsections:
         if sub.kind == "field":
             body_parts.append(_render_field_section(sub))
+        elif sub.kind in ("statistics", "station"):
+            body_parts.append(_render_statistics_section(sub))
         else:
             body_parts.append(f'<div class="section-label">{sub.label}</div><p class="dim">No detail available.</p>')
 

@@ -16,7 +16,7 @@
 
 module core_field_registry_mod
    use core_constants_mod, only: SP
-   implicit none(external)
+   implicit none
 
    private
    public :: type_field_registry

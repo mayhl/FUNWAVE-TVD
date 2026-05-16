@@ -2,6 +2,9 @@
 """
 Convert a legacy FUNWAVE-TVD flat input.txt to the new nested YAML format.
 
+For 3-D inputs (Kglob present) a minimal geometry stub is written instead and
+the source file is copied to input.txt so the legacy READ_INPUT can find it.
+
 Usage:
     python scripts/convert_input.py input.txt [output.yaml]
 
@@ -12,6 +15,7 @@ output file so nothing is silently dropped.
 
 import argparse
 import re
+import shutil
 import sys
 from pathlib import Path
 
@@ -507,6 +511,283 @@ def _dump_yaml(d: dict, indent: int = 0) -> list[str]:
 # CLI
 # ---------------------------------------------------------------------------
 
+def _convert_3d(src: Path, dst_yaml: Path) -> None:
+    """Full 3-D conversion: map legacy input.txt keys to 3D YAML schema.
+
+    Copies src → input.txt so the legacy ref binary (vendor/3d-fd) can still
+    find it when preprocess_ref: true.  The dev binary reads only the YAML.
+    """
+    shutil.copy2(src, 'input.txt')
+    params = parse_input_txt(src)
+
+    def pop(key, default=None):
+        return params.get(key, default)
+
+    def pop_val(key, default=None):
+        v = pop(key)
+        return _auto(v) if v is not None else default
+
+    def pop_bool(key, default=False):
+        v = pop(key)
+        return _bool(v) if v is not None else default
+
+    def pop_str(key, default=None):
+        return params.get(key, default)
+
+    out: dict = {}
+
+    # ---- geometry ------------------------------------------------------------
+    nx = pop_val('Mglob', 0)
+    ny = pop_val('Nglob', 0)
+    nz = pop_val('Kglob', 0)
+    dx = pop_val('DX', 1.0)
+    dy = pop_val('DY', 1.0)
+
+    geo: dict = {
+        'grid_size': [nx, ny, nz],
+        'cell_size': [dx, dy],
+    }
+    ivgrd = pop_val('IVGRD', 1)
+    if ivgrd != 1:
+        geo['ivgrd'] = ivgrd
+    grd_r = pop_val('GRD_R')
+    if grd_r is not None:
+        geo['grd_r'] = grd_r
+
+    px = pop_val('PX'); py = pop_val('PY')
+    if px is not None or py is not None:
+        decomp: dict = {}
+        if px is not None: decomp['nx_proc'] = px
+        if py is not None: decomp['ny_proc'] = py
+        geo['decomposition'] = decomp
+
+    depth_type = pop_str('DEPTH_TYPE', 'CELL_CENTER')
+    ana_bathy  = pop_bool('ANA_BATHY', False)
+    depth_file = pop_str('DEPTH_FILE')
+    bathy: dict = {'type': depth_type, 'analytic': ana_bathy}
+    if depth_file:
+        bathy['file'] = depth_file
+    geo['bathymetry'] = bathy
+
+    ibot = pop_val('Ibot'); cd0 = pop_val('Cd0'); zob = pop_val('Zob')
+    min_dep = pop_val('MinDep')
+    bot: dict = {}
+    if ibot is not None: bot['roughness_type'] = ibot
+    if cd0  is not None: bot['cd']             = cd0
+    if zob  is not None: bot['zob']            = zob
+    if min_dep is not None: bot['min_depth']   = min_dep
+    if bot:
+        geo['bottom'] = bot
+
+    out['geometry'] = geo
+
+    # ---- simulation ----------------------------------------------------------
+    sim: dict = {}
+    total_time  = pop_val('TOTAL_TIME')
+    sim_steps   = pop_val('SIM_STEPS')
+    plot_start  = pop_val('PLOT_START')
+    plot_intv   = pop_val('PLOT_INTV')
+    screen_intv = pop_val('SCREEN_INTV')
+    cfl         = pop_val('CFL')
+    if total_time  is not None: sim['total_time']  = total_time
+    if sim_steps   is not None: sim['sim_steps']   = sim_steps
+    if plot_start  is not None: sim['plot_start']  = plot_start
+    if plot_intv   is not None: sim['plot_intv']   = plot_intv
+    if screen_intv is not None: sim['screen_intv'] = screen_intv
+    if cfl         is not None: sim['cfl']         = cfl
+
+    dt_ini = pop_val('DT_INI'); dt_min = pop_val('DT_MIN'); dt_max = pop_val('DT_MAX')
+    if any(v is not None for v in (dt_ini, dt_min, dt_max)):
+        ts: dict = {}
+        if dt_ini is not None: ts['dt_ini'] = dt_ini
+        if dt_min is not None: ts['dt_min'] = dt_min
+        if dt_max is not None: ts['dt_max'] = dt_max
+        sim['time_stepping'] = ts
+
+    nstat         = pop_val('NSTAT', 0)
+    plot_intv_stat = pop_val('PLOT_INTV_STAT')
+    stations_file = pop_str('STATIONS_FILE')
+    if nstat or plot_intv_stat or stations_file:
+        stat: dict = {'count': nstat or 0}
+        if plot_intv_stat is not None: stat['interval'] = plot_intv_stat
+        if stations_file:              stat['file']     = stations_file
+        sim['stations'] = stat
+
+    if sim:
+        out['simulation'] = sim
+
+    # ---- physics -------------------------------------------------------------
+    phys: dict = {}
+    barotropic = pop_bool('BAROTROPIC', True)
+    non_hydro  = pop_bool('NON_HYDRO',  False)
+    high_order = pop_str('HIGH_ORDER')
+    time_order = pop_str('TIME_ORDER')
+    convection = pop_str('CONVECTION')
+    adv_hllc   = pop_bool('HLLC', False)
+    tramp      = pop_val('TRAMP')
+    periodic_x = pop_bool('PERIODIC_X', False)
+    periodic_y = pop_bool('PERIODIC_Y', False)
+    ext_force  = pop_bool('EXTERNAL_FORCING', False)
+    froude_cap = pop_val('FROUDE_CAP')
+
+    phys['barotropic'] = barotropic
+    phys['non_hydro']  = non_hydro
+    if high_order: phys['high_order'] = high_order
+    if time_order: phys['time_order'] = time_order
+    if convection: phys['convection'] = convection
+    if adv_hllc:   phys['adv_hllc']  = adv_hllc
+    if tramp:      phys['tramp']     = tramp
+    if periodic_x: phys['periodic_x'] = periodic_x
+    if periodic_y: phys['periodic_y'] = periodic_y
+    if ext_force:  phys['external_forcing'] = ext_force
+    if froude_cap is not None: phys['froude_cap'] = froude_cap
+
+    wave_avg_on    = pop_bool('WAVE_AVERAGE_ON', False)
+    wave_avg_start = pop_val('WAVE_AVERAGE_START')
+    wave_avg_end   = pop_val('WAVE_AVERAGE_END')
+    waveheight_id  = pop_val('WaveheightID')
+    if wave_avg_on or wave_avg_start or wave_avg_end or waveheight_id:
+        wa: dict = {'active': wave_avg_on}
+        if wave_avg_start is not None: wa['t_start']   = wave_avg_start
+        if wave_avg_end   is not None: wa['t_end']     = wave_avg_end
+        if waveheight_id  is not None: wa['height_id'] = waveheight_id
+        phys['wave_average'] = wa
+
+    if phys:
+        out['physics'] = phys
+
+    # ---- turbulence ----------------------------------------------------------
+    turb: dict = {}
+    viscous_flow   = pop_bool('VISCOUS_FLOW', False)
+    ivturb         = pop_val('IVTURB')
+    ihturb         = pop_val('IHTURB')
+    viscosity      = pop_val('VISCOSITY')
+    schmidt        = pop_val('Schmidt')
+    cvs            = pop_val('Cvs')
+    chs            = pop_val('Chs')
+    viscous_number = pop_val('VISCOUS_NUMBER')
+    if viscous_flow:   turb['viscous_flow']   = viscous_flow
+    if ivturb is not None: turb['ivturb']    = ivturb
+    if ihturb is not None: turb['ihturb']    = ihturb
+    if viscosity  is not None: turb['visc']          = viscosity
+    if schmidt    is not None: turb['schmidt']        = schmidt
+    if cvs        is not None: turb['cvs']            = cvs
+    if chs        is not None: turb['chs']            = chs
+    if viscous_number is not None: turb['viscous_number'] = viscous_number
+    if turb:
+        out['turbulence'] = turb
+
+    # ---- solver --------------------------------------------------------------
+    isolver = pop_val('ISOLVER'); itmax = pop_val('ITMAX'); tol = pop_val('TOL')
+    slv: dict = {}
+    if isolver is not None: slv['solver_type'] = isolver
+    if itmax   is not None: slv['max_iter']    = itmax
+    if tol     is not None: slv['tolerance']   = tol
+    if slv:
+        out['solver'] = slv
+
+    # ---- wavemaker -----------------------------------------------------------
+    wm_type = pop_str('WAVEMAKER', 'nothing')
+    if wm_type and wm_type.lower() != 'nothing':
+        wm: dict = {'type': wm_type}
+        for k3d, yml in [
+            ('Wave_Comp_File',     'wave_comp_file'),
+            ('Dep_Ser',            'dep_ser'),
+            ('U_FLOW_LEFT',        'u_flow_left'),
+            ('U_FLOW_RIGHT',       'u_flow_right'),
+            ('AMP',   'amp'), ('PER',   'per'),
+            ('DEP',   'dep'), ('THETA', 'theta'),
+            ('Xsource_West', 'xsource_west'), ('Xsource_East', 'xsource_east'),
+            ('Ysource_Suth', 'ysource_suth'), ('Ysource_Nrth', 'ysource_nrth'),
+            ('Hm0', 'hm0'), ('Tp', 'tp'),
+            ('Freq_Min', 'freq_min'), ('Freq_Max', 'freq_max'),
+            ('NumFreq', 'num_freq'),
+        ]:
+            v = pop_val(k3d) if k3d not in ('Wave_Comp_File',) else pop_str(k3d)
+            if v is not None:
+                wm[yml] = v
+        out['wavemaker'] = wm
+
+    # ---- boundary conditions -------------------------------------------------
+    bc: dict = {}
+    bc_x0 = pop_val('BC_X0'); bc_xn = pop_val('BC_Xn')
+    bc_y0 = pop_val('BC_Y0'); bc_yn = pop_val('BC_Yn')
+    bc_z0 = pop_val('BC_Z0'); bc_zn = pop_val('BC_Zn')
+    if bc_x0 is not None: bc['bc_x0'] = bc_x0
+    if bc_xn is not None: bc['bc_xn'] = bc_xn
+    if bc_y0 is not None: bc['bc_y0'] = bc_y0
+    if bc_yn is not None: bc['bc_yn'] = bc_yn
+    if bc_z0 is not None: bc['bc_z0'] = bc_z0
+    if bc_zn is not None: bc['bc_zn'] = bc_zn
+    boundary_type = pop_str('BOUNDARY')
+    boundary_file = pop_str('BOUNDARY_FILE')
+    if boundary_type: bc['boundary_type'] = boundary_type
+    if boundary_file: bc['boundary_file'] = boundary_file
+    if bc:
+        out['boundary_conditions'] = bc
+
+    # ---- sponge --------------------------------------------------------------
+    sponge_on = pop_bool('SPONGE_ON', False)
+    if sponge_on:
+        sp: dict = {}
+        for k3d, yml in [
+            ('Sponge_West_Width',  'west_width'),
+            ('Sponge_East_Width',  'east_width'),
+            ('Sponge_South_Width', 'south_width'),
+            ('Sponge_North_Width', 'north_width'),
+            ('R_Sponge', 'r_sponge'), ('A_Sponge', 'a_sponge'),
+        ]:
+            v = pop_val(k3d)
+            if v is not None: sp[yml] = v
+        out['sponge'] = sp
+
+    # ---- hot start -----------------------------------------------------------
+    hotstart = pop_bool('HOTSTART', False)
+    if hotstart:
+        hs: dict = {}
+        for k3d, yml in [
+            ('Eta_HotStart_File', 'eta_file'),
+            ('U_HotStart_File',   'u_file'),
+            ('V_HotStart_File',   'v_file'),
+            ('W_HotStart_File',   'w_file'),
+            ('P_HotStart_File',   'p_file'),
+            ('Sali_HotStart_File','sali_file'),
+            ('Temp_HotStart_File','temp_file'),
+            ('Rho_HotStart_File', 'rho_file'),
+            ('TKE_HotStart_File', 'tke_file'),
+            ('EPS_HotStart_File', 'eps_file'),
+        ]:
+            v = pop_str(k3d)
+            if v: hs[yml] = v
+        if hs:
+            out['hot_start'] = hs
+
+    # ---- output --------------------------------------------------------------
+    result_folder = pop_str('RESULT_FOLDER', './output/')
+    field_io_type = pop_str('FIELD_IO_TYPE', 'ASCII')
+    _3d_var_map = {
+        'OUT_DEP': 'DEP', 'OUT_ETA': 'ETA', 'OUT_U': 'U',   'OUT_V': 'V',
+        'OUT_W': 'W',     'OUT_P': 'P',     'OUT_K': 'TKE', 'OUT_D': 'EPS',
+        'OUT_S': 'S',     'OUT_C': 'MU',    'OUT_B': 'BUB', 'OUT_A': 'A',
+        'OUT_T': 'T',     'OUT_F': 'F',     'OUT_G': 'G',
+        'OUT_I': 'SALI',  'OUT_Z': 'TEMP',  'OUT_M': 'RHO',
+    }
+    vars_on = [yml for k3d, yml in _3d_var_map.items() if pop_bool(k3d, False)]
+    op: dict = {'result_folder': result_folder}
+    if field_io_type != 'ASCII': op['field_io_type'] = field_io_type
+    if vars_on: op['variables'] = vars_on
+    out['output'] = op
+
+    # ---- write YAML ----------------------------------------------------------
+    header = [
+        '# FUNWAVE-TVD 3D input — converted from legacy input.txt',
+        f'# Source: {src}',
+        '',
+    ]
+    body = '\n'.join(header + _dump_yaml(out)) + '\n'
+    dst_yaml.write_text(body)
+
+
 def main():
     parser = argparse.ArgumentParser(
         description='Convert a legacy FUNWAVE input.txt to the new YAML format.')
@@ -515,6 +796,16 @@ def main():
     args = parser.parse_args()
 
     params = parse_input_txt(args.input)
+
+    # 3-D inputs (Kglob present) get a minimal geometry stub so the unified
+    # funwave launcher can detect dimensionality; full conversion is deferred
+    # until READ_INPUT is replaced by a YAML reader in the 3D path.
+    if 'Kglob' in params:
+        if args.output is None:
+            raise SystemExit('convert_input: output path required for 3-D inputs')
+        _convert_3d(args.input, args.output)
+        return
+
     yaml_dict, unknown = convert(params)
 
     header_lines: list[str] = [

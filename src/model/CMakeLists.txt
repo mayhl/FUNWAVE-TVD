@@ -1,19 +1,11 @@
 target_sources(${main_lib}_model PRIVATE
    base.f90
-   geometry.f90
-   simulation.f90
-   hotstart.f90
-   wavemaker.f90
-   sponge.f90
-   obstacle.f90
-   friction.f90
-   numerics.f90
-   breaking.f90
-   output.f90
-   physics.f90
-   coupling.f90
+   interface.f90
    grid.f90
-   main.f90)
+   launcher.F90)
+
+add_subdirectory(2d)
+add_subdirectory(3d)
 
 set_target_properties(
   ${main_lib}_model PROPERTIES Fortran_MODULE_DIRECTORY

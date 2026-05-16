@@ -26,7 +26,7 @@ module core_output_gatherer_mod
    use core_constants_mod, only: SP, MPI_SP
    use core_comm_mod,      only: type_comm
    use mpi_f08
-   implicit none(external)
+   implicit none
 
    private
    public :: type_output_gatherer
