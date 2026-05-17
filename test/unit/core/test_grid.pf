@@ -241,7 +241,7 @@ contains
          end do
       end do
 
-      call grid%halo_exchange(field, comm)
+      call grid%halo_exchange(field)
 
       ! Rank 0 (iproc=0, ibegin=1): high-x ghost should contain rank 1's first NG interior values
       if (grid%iproc == 0) then
@@ -297,7 +297,7 @@ contains
          end do
       end do
 
-      call grid%halo_exchange(field, comm)
+      call grid%halo_exchange(field)
 
       ! Rank 0 (jproc=0): high-y ghost should contain rank 1's first NG interior values
       if (grid%jproc == 0) then
@@ -397,7 +397,7 @@ contains
          end do
       end do
 
-      call grid%halo_exchange(field, comm)
+      call grid%halo_exchange(field)
 
       ! Rank (iproc=0, jproc=0): high-x / high-y corner ← rank (1,1) data
       if (grid%iproc == 0 .and. grid%jproc == 0) then

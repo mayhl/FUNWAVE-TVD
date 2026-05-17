@@ -1,0 +1,707 @@
+# FUNWAVE Variable and Parameter Registry
+#
+# variables: field arrays output to NetCDF/binary.
+#   Required: name, legacy_name, long_name, standard_name, units, fill_value, latex
+#   standard_name: empty string if no CF match exists.
+#   funwave_name:  required when standard_name is ""; follows CF naming style
+#                  (lowercase, underscores, physical description) so future CF
+#                  migration is obvious. Omit when standard_name is non-empty.
+#
+# parameters: scalar config values stored as name/value pairs in simulation.nc.
+#   Required: name, legacy_name, yaml_path, units (null if dimensionless), default, latex
+#   Sorted by yaml_path within each yaml section group.
+#
+# Neither html descriptions, latex, nor funwave_name are written to NetCDF variable attrs.
+# funwave_name IS written as a global attr on simulation.nc for variable inventory.
+# NetCDF variable attr allowlist: {long_name, standard_name, units, fill_value, grid_mapping}.
+
+variables:
+
+  # ── Primary prognostic fields ──────────────────────────────────────────────
+  - name:           eta
+    legacy_name:    ETA
+    long_name:      "free surface elevation"
+    standard_name:  "sea_surface_height_above_mean_sea_level"
+    units:          "m"
+    fill_value:     -9999.0
+    latex:          "$\\eta$"
+
+  - name:           u
+    legacy_name:    U
+    long_name:      "depth-averaged x-velocity"
+    standard_name:  "eastward_sea_water_velocity"
+    units:          "m s-1"
+    fill_value:     -9999.0
+    latex:          "$u$"
+
+  - name:           v
+    legacy_name:    V
+    long_name:      "depth-averaged y-velocity"
+    standard_name:  "northward_sea_water_velocity"
+    units:          "m s-1"
+    fill_value:     -9999.0
+    latex:          "$v$"
+
+  - name:           p
+    legacy_name:    P
+    long_name:      "x-component of depth-integrated volume flux"
+    standard_name:  ""
+    funwave_name:   "sea_water_x_volume_flux"
+    units:          "m2 s-1"
+    fill_value:     -9999.0
+    latex:          "$P = Hu$"
+
+  - name:           q
+    legacy_name:    Q
+    long_name:      "y-component of depth-integrated volume flux"
+    standard_name:  ""
+    funwave_name:   "sea_water_y_volume_flux"
+    units:          "m2 s-1"
+    fill_value:     -9999.0
+    latex:          "$Q = Hv$"
+
+  # ── Depth / bathymetry ─────────────────────────────────────────────────────
+  - name:           depth
+    legacy_name:    Depth
+    long_name:      "still-water depth"
+    standard_name:  "sea_floor_depth_below_mean_sea_level"
+    units:          "m"
+    fill_value:     -9999.0
+    latex:          "$d$"
+
+  - name:           h
+    legacy_name:    H
+    long_name:      "total water depth"
+    standard_name:  "sea_floor_depth_below_sea_surface"
+    units:          "m"
+    fill_value:     -9999.0
+    latex:          "$H = \\eta + d$"
+
+  # ── Masks ──────────────────────────────────────────────────────────────────
+  - name:           mask
+    legacy_name:    MASK
+    long_name:      "wet/dry mask (1=wet, 0=dry)"
+    standard_name:  ""
+    funwave_name:   "sea_water_wet_binary_mask"
+    units:          "1"
+    fill_value:     -9999.0
+    latex:          "$m$"
+
+  - name:           mask9
+    legacy_name:    MASK9
+    long_name:      "wet/dry mask on 3x3 stencil (1=wet, 0=dry)"
+    standard_name:  ""
+    funwave_name:   "sea_water_3x3_wet_binary_mask"
+    units:          "1"
+    fill_value:     -9999.0
+    latex:          "$m_9$"
+
+  # ── Diagnostics / envelope fields ─────────────────────────────────────────
+  - name:           h_max
+    legacy_name:    HeightMax
+    long_name:      "maximum sea surface elevation above mean sea level"
+    standard_name:  ""
+    funwave_name:   "maximum_sea_surface_height_above_mean_sea_level"
+    units:          "m"
+    fill_value:     -9999.0
+    latex:          "$\\eta_{\\max}$"
+
+  - name:           h_min
+    legacy_name:    HeightMin
+    long_name:      "minimum sea surface elevation above mean sea level"
+    standard_name:  ""
+    funwave_name:   "minimum_sea_surface_height_above_mean_sea_level"
+    units:          "m"
+    fill_value:     -9999.0
+    latex:          "$\\eta_{\\min}$"
+
+  - name:           u_max
+    legacy_name:    VelocityMax
+    long_name:      "maximum depth-averaged sea water speed"
+    standard_name:  ""
+    funwave_name:   "maximum_depth_averaged_sea_water_speed"
+    units:          "m s-1"
+    fill_value:     -9999.0
+    latex:          "$|\\mathbf{u}|_{\\max}$"
+
+  - name:           arr_time
+    legacy_name:    ARRTIME
+    long_name:      "wave front arrival time"
+    standard_name:  ""
+    funwave_name:   "sea_water_wave_front_arrival_time"
+    units:          "s"
+    fill_value:     -9999.0
+    latex:          "$t_{\\mathrm{arr}}$"
+
+
+parameters:
+
+  # ── breaking ───────────────────────────────────────────────────────────────
+  - name:         cbrk1
+    legacy_name:  Cbrk1
+    yaml_path:    "breaking.cbrk1"
+    units:        ~
+    default:      0.65
+    latex:        "$C_{\\mathrm{brk1}}$"
+
+  - name:         cbrk2
+    legacy_name:  Cbrk2
+    yaml_path:    "breaking.cbrk2"
+    units:        ~
+    default:      0.35
+    latex:        "$C_{\\mathrm{brk2}}$"
+
+  - name:         nu_bkg
+    legacy_name:  nu_bkg
+    yaml_path:    "breaking.nu_bkg"
+    units:        "m2 s-1"
+    default:      0.0
+    latex:        "$\\nu_{\\mathrm{bkg}}$"
+
+  - name:         roller
+    legacy_name:  ROLLER
+    yaml_path:    "breaking.roller"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         show_breaking
+    legacy_name:  SHOW_BREAKING
+    yaml_path:    "breaking.show_breaking"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         viscosity_breaking
+    legacy_name:  VISCOSITY_BREAKING
+    yaml_path:    "breaking.viscosity_breaking"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         visbrk
+    legacy_name:  visbrk
+    yaml_path:    "breaking.visbrk"
+    units:        "m2 s-1"
+    default:      0.0
+    latex:        "$\\nu_{\\mathrm{brk}}$"
+
+  - name:         wavemaker_cbrk
+    legacy_name:  WAVEMAKER_Cbrk
+    yaml_path:    "breaking.wavemaker_cbrk"
+    units:        ~
+    default:      0.65
+    latex:        "$C_{\\mathrm{brk,wm}}$"
+
+  - name:         wavemaker_vis
+    legacy_name:  WAVEMAKER_VIS
+    yaml_path:    "breaking.wavemaker_vis"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         wavemaker_visbrk
+    legacy_name:  WAVEMAKER_visbrk
+    yaml_path:    "breaking.wavemaker_visbrk"
+    units:        "m2 s-1"
+    default:      0.0
+    latex:        "$\\nu_{\\mathrm{brk,wm}}$"
+
+  # ── friction ───────────────────────────────────────────────────────────────
+  - name:         cd_file
+    legacy_name:  CD_FILE
+    yaml_path:    "friction.cd_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         cd_fixed
+    legacy_name:  Cd_fixed
+    yaml_path:    "friction.cd_fixed"
+    units:        ~
+    default:      0.0
+    latex:        "$C_d$"
+
+  - name:         friction_matrix
+    legacy_name:  IN_Cd
+    yaml_path:    "friction.friction_matrix"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  # ── geometry ───────────────────────────────────────────────────────────────
+  - name:         bathy_correction
+    legacy_name:  BATHY_CORRECTION
+    yaml_path:    "geometry.bathy_correction"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         bathy_depth
+    legacy_name:  Depth_Flat
+    yaml_path:    "geometry.bathy_depth"
+    units:        "m"
+    default:      ~
+    latex:        "$d_0$"
+
+  - name:         bathy_file
+    legacy_name:  DEPTH_FILE
+    yaml_path:    "geometry.bathy_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         bathy_slope
+    legacy_name:  SLP
+    yaml_path:    "geometry.bathy_slope"
+    units:        ~
+    default:      ~
+    latex:        "$s$"
+
+  - name:         bathy_slope_x0
+    legacy_name:  Xslp
+    yaml_path:    "geometry.bathy_slope_x0"
+    units:        "m"
+    default:      ~
+    latex:        "$x_{s0}$"
+
+  - name:         bathy_type
+    legacy_name:  DEPTH_TYPE
+    yaml_path:    "geometry.bathy_type"
+    units:        ~
+    default:      "flat"
+    latex:        ~
+
+  - name:         dx
+    legacy_name:  DX
+    yaml_path:    "geometry.dx"
+    units:        "m"
+    default:      ~
+    latex:        "$\\Delta x$"
+
+  - name:         dy
+    legacy_name:  DY
+    yaml_path:    "geometry.dy"
+    units:        "m"
+    default:      ~
+    latex:        "$\\Delta y$"
+
+  - name:         grid_nx
+    legacy_name:  Mglob
+    yaml_path:    "geometry.grid_nx"
+    units:        ~
+    default:      ~
+    latex:        "$N_x$"
+
+  - name:         grid_ny
+    legacy_name:  Nglob
+    yaml_path:    "geometry.grid_ny"
+    units:        ~
+    default:      ~
+    latex:        "$N_y$"
+
+  - name:         nx_proc
+    legacy_name:  px
+    yaml_path:    "geometry.nx_proc"
+    units:        ~
+    default:      ~
+    latex:        "$P_x$"
+
+  - name:         ny_proc
+    legacy_name:  py
+    yaml_path:    "geometry.ny_proc"
+    units:        ~
+    default:      ~
+    latex:        "$P_y$"
+
+  # ── hot_start ──────────────────────────────────────────────────────────────
+  - name:         bed_deformation
+    legacy_name:  BED_DEFORMATION
+    yaml_path:    "hot_start.bed_deformation"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         hotstart_eta_file
+    legacy_name:  ETA_FILE
+    yaml_path:    "hot_start.eta_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         hotstart_mask_file
+    legacy_name:  MASK_FILE
+    yaml_path:    "hot_start.mask_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         hotstart_output_start_number
+    legacy_name:  FileNumber_HOTSTART
+    yaml_path:    "hot_start.output_start_number"
+    units:        ~
+    default:      0
+    latex:        ~
+
+  - name:         hotstart_time
+    legacy_name:  HotStartTime
+    yaml_path:    "hot_start.time"
+    units:        "s"
+    default:      0.0
+    latex:        "$t_{\\mathrm{hs}}$"
+
+  - name:         hotstart_u_file
+    legacy_name:  U_FILE
+    yaml_path:    "hot_start.u_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         hotstart_v_file
+    legacy_name:  V_FILE
+    yaml_path:    "hot_start.v_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  # ── numerics ───────────────────────────────────────────────────────────────
+  - name:         arr_time_min_h
+    legacy_name:  ArrTimeMin
+    yaml_path:    "numerics.arr_time_min_h"
+    units:        "m"
+    default:      0.001
+    latex:        "$H_{\\mathrm{arr}}$"
+
+  - name:         cfl
+    legacy_name:  CFL
+    yaml_path:    "numerics.cfl"
+    units:        ~
+    default:      0.15
+    latex:        "$C_{\\mathrm{CFL}}$"
+
+  - name:         construction
+    legacy_name:  CONSTR
+    yaml_path:    "numerics.construction"
+    units:        ~
+    default:      "HLLC"
+    latex:        ~
+
+  - name:         froude_cap
+    legacy_name:  FroudeCap
+    yaml_path:    "numerics.froude_cap"
+    units:        ~
+    default:      10.0
+    latex:        "$Fr_{\\mathrm{cap}}$"
+
+  - name:         high_order
+    legacy_name:  HIGH_ORDER
+    yaml_path:    "numerics.high_order"
+    units:        ~
+    default:      "FOURTH"
+    latex:        ~
+
+  - name:         min_depth
+    legacy_name:  MinDepth
+    yaml_path:    "numerics.min_depth"
+    units:        "m"
+    default:      0.001
+    latex:        "$d_{\\min}$"
+
+  - name:         min_depth_frc
+    legacy_name:  MinDepthFrc
+    yaml_path:    "numerics.min_depth_frc"
+    units:        "m"
+    default:      0.5
+    latex:        "$d_{\\min,f}$"
+
+  - name:         out_time
+    legacy_name:  OUT_Time
+    yaml_path:    "numerics.out_time"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         time_scheme
+    legacy_name:  Time_Scheme
+    yaml_path:    "numerics.time_scheme"
+    units:        ~
+    default:      "Runge_Kutta"
+    latex:        ~
+
+  # ── obstacle ───────────────────────────────────────────────────────────────
+  - name:         breakwater_absorb_coef
+    legacy_name:  BreakWaterAbsorbCoef
+    yaml_path:    "obstacle.breakwater_absorb_coef"
+    units:        ~
+    default:      0.0
+    latex:        "$C_{\\mathrm{bw}}$"
+
+  - name:         breakwater_file
+    legacy_name:  BREAKWATER_FILE
+    yaml_path:    "obstacle.breakwater_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         obstacle_file
+    legacy_name:  OBSTACLE_FILE
+    yaml_path:    "obstacle.obstacle_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  # ── output ─────────────────────────────────────────────────────────────────
+  - name:         depth_out
+    legacy_name:  OUT_DEPTH
+    yaml_path:    "output.depth_out"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         eta_blow_val
+    legacy_name:  EtaBlowVal
+    yaml_path:    "output.eta_blow_val"
+    units:        "m"
+    default:      1.0e8
+    latex:        "$\\eta_{\\mathrm{blow}}$"
+
+  - name:         field_io_type
+    legacy_name:  FIELD_IO_TYPE
+    yaml_path:    "output.field_io_type"
+    units:        ~
+    default:      "binary"
+    latex:        ~
+
+  - name:         number_stations
+    legacy_name:  NumberStations
+    yaml_path:    "output.number_stations"
+    units:        ~
+    default:      0
+    latex:        ~
+
+  - name:         output_res
+    legacy_name:  OUTPUT_RES
+    yaml_path:    "output.output_res"
+    units:        ~
+    default:      1
+    latex:        ~
+
+  - name:         result_folder
+    legacy_name:  RESULT_FOLDER
+    yaml_path:    "output.result_folder"
+    units:        ~
+    default:      "./output/"
+    latex:        ~
+
+  - name:         stations_file
+    legacy_name:  STATIONS_FILE
+    yaml_path:    "output.stations_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         steady_time
+    legacy_name:  STEADY_TIME
+    yaml_path:    "output.steady_time"
+    units:        "s"
+    default:      0.0
+    latex:        "$T_{\\mathrm{steady}}$"
+
+  - name:         t_intv_mean
+    legacy_name:  T_INTV_mean
+    yaml_path:    "output.t_intv_mean"
+    units:        "s"
+    default:      20.0
+    latex:        "$T_{\\mathrm{mean}}$"
+
+  # ── physics ────────────────────────────────────────────────────────────────
+  - name:         beta_ref
+    legacy_name:  Beta_ref
+    yaml_path:    "physics.beta_ref"
+    units:        ~
+    default:      -0.531
+    latex:        "$\\beta_{\\mathrm{ref}}$"
+
+  - name:         c_smg
+    legacy_name:  C_smg
+    yaml_path:    "physics.c_smg"
+    units:        ~
+    default:      0.25
+    latex:        "$C_{\\mathrm{smg}}$"
+
+  - name:         dispersion
+    legacy_name:  DISPERSION
+    yaml_path:    "physics.dispersion"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         gamma1
+    legacy_name:  gamma1
+    yaml_path:    "physics.gamma1"
+    units:        ~
+    default:      ~
+    latex:        "$\\Gamma_1$"
+
+  - name:         gamma2
+    legacy_name:  gamma2
+    yaml_path:    "physics.gamma2"
+    units:        ~
+    default:      ~
+    latex:        "$\\Gamma_2$"
+
+  - name:         gamma3
+    legacy_name:  gamma3
+    yaml_path:    "physics.gamma3"
+    units:        ~
+    default:      ~
+    latex:        "$\\Gamma_3$"
+
+  - name:         periodic
+    legacy_name:  PERIODIC
+    yaml_path:    "physics.periodic"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         swe_eta_dep
+    legacy_name:  SWE_ETA_DEP
+    yaml_path:    "physics.swe_eta_dep"
+    units:        ~
+    default:      0.7
+    latex:        "$\\eta_{\\mathrm{SWE}}$"
+
+  - name:         water_level
+    legacy_name:  WaterLevel
+    yaml_path:    "physics.water_level"
+    units:        "m"
+    default:      0.0
+    latex:        "$\\eta_0$"
+
+  # ── simulation ─────────────────────────────────────────────────────────────
+  - name:         output_interval
+    legacy_name:  PLOT_INTV
+    yaml_path:    "simulation.output_interval"
+    units:        "s"
+    default:      ~
+    latex:        "$\\Delta t_{\\mathrm{out}}$"
+
+  - name:         screen_interval
+    legacy_name:  SCREEN_INTV
+    yaml_path:    "simulation.screen_interval"
+    units:        "s"
+    default:      ~
+    latex:        "$\\Delta t_{\\mathrm{screen}}$"
+
+  - name:         t_start
+    legacy_name:  PLOT_START_TIME
+    yaml_path:    "simulation.t_start"
+    units:        "s"
+    default:      0.0
+    latex:        "$t_0$"
+
+  - name:         title
+    legacy_name:  TITLE
+    yaml_path:    "simulation.title"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         total_time
+    legacy_name:  TOTAL_TIME
+    yaml_path:    "simulation.total_time"
+    units:        "s"
+    default:      ~
+    latex:        "$T$"
+
+  - name:         dt
+    legacy_name:  DT_fixed
+    yaml_path:    "simulation.time_stepping.dt"
+    units:        "s"
+    default:      ~
+    latex:        "$\\Delta t$"
+
+  - name:         fixed_dt
+    legacy_name:  FIXED_DT
+    yaml_path:    "simulation.time_stepping.fixed_dt"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  # ── sponge ─────────────────────────────────────────────────────────────────
+  - name:         a_sponge
+    legacy_name:  A_sponge
+    yaml_path:    "sponge.a_sponge"
+    units:        ~
+    default:      ~
+    latex:        "$A_s$"
+
+  - name:         cd_sponge
+    legacy_name:  CDsponge
+    yaml_path:    "sponge.cd_sponge"
+    units:        ~
+    default:      0.0
+    latex:        "$C_{d,s}$"
+
+  - name:         csp
+    legacy_name:  Csp
+    yaml_path:    "sponge.csp"
+    units:        ~
+    default:      0.15
+    latex:        "$C_{\\mathrm{sp}}$"
+
+  - name:         diffusion_sponge
+    legacy_name:  DIFFUSION_SPONGE
+    yaml_path:    "sponge.diffusion_sponge"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         direct_sponge
+    legacy_name:  DIRECT_SPONGE
+    yaml_path:    "sponge.direct_sponge"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         friction_sponge
+    legacy_name:  FRICTION_SPONGE
+    yaml_path:    "sponge.friction_sponge"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         r_sponge
+    legacy_name:  R_sponge
+    yaml_path:    "sponge.r_sponge"
+    units:        ~
+    default:      ~
+    latex:        "$R_s$"
+
+  - name:         sponge_east_width
+    legacy_name:  Sponge_east_width
+    yaml_path:    "sponge.sponge_east_width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,E}$"
+
+  - name:         sponge_north_width
+    legacy_name:  Sponge_north_width
+    yaml_path:    "sponge.sponge_north_width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,N}$"
+
+  - name:         sponge_south_width
+    legacy_name:  Sponge_south_width
+    yaml_path:    "sponge.sponge_south_width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,S}$"
+
+  - name:         sponge_west_width
+    legacy_name:  Sponge_west_width
+    yaml_path:    "sponge.sponge_west_width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,W}$"

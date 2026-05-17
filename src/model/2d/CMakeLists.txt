@@ -1,5 +1,6 @@
 target_sources(${main_lib}_model PRIVATE
-   grid.f90
+   fields.f90
+   scratch.f90
    geometry.f90
    simulation.f90
    hotstart.f90

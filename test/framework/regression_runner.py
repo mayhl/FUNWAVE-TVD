@@ -1,4 +1,5 @@
 import math
+import re
 import time
 import os
 import shutil
@@ -6,6 +7,8 @@ import subprocess
 import importlib
 from pathlib import Path
 import yaml
+
+_STRICT_STRIP_RE = re.compile(r'^\s*DT_fixed\s*=', re.IGNORECASE)
 from rich import box
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
@@ -104,8 +107,14 @@ class RegressionRunner(BaseRunner):
                 os.remove(cache)
 
         toolchain_path = os.path.join(self.repo_root, "cmake", "toolchains", "macos_mpi.cmake")
+        pfunit_glob = os.path.join(self.repo_root, "extern", "pfunit", "installed", "PFUNIT-*", "cmake")
+        import glob as _glob
+        pfunit_dirs = _glob.glob(pfunit_glob)
+        pfunit_dir = sorted(pfunit_dirs)[-1] if pfunit_dirs else None
         cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir,
                      f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}", "-DENABLE_TESTING=ON"]
+        if pfunit_dir:
+            cmake_cmd.append(f"-DPFUNIT_DIR={pfunit_dir}")
         cmake_cmd += [f"-D{flag}" for flag in (cmake_flags or [])]
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
@@ -148,7 +157,7 @@ class RegressionRunner(BaseRunner):
                 expanded.append(sim)
         return expanded
 
-    def _setup_run_dir(self, sim, run_dir):
+    def _setup_run_dir(self, sim, run_dir, strict=False):
         os.makedirs(run_dir, exist_ok=True)
         if "output_dir" in sim:
             os.makedirs(os.path.join(run_dir, sim["output_dir"]), exist_ok=True)
@@ -156,7 +165,14 @@ class RegressionRunner(BaseRunner):
         for item in os.listdir(input_dir):
             src = os.path.join(input_dir, item)
             if os.path.isfile(src) and item.endswith('.txt'):
-                shutil.copy2(src, os.path.join(run_dir, item))
+                dst = os.path.join(run_dir, item)
+                if strict:
+                    shutil.copy2(src, dst)
+                else:
+                    with open(src) as f:
+                        lines = f.readlines()
+                    with open(dst, 'w') as f:
+                        f.writelines(l for l in lines if not _STRICT_STRIP_RE.match(l))
         data_src = os.path.join(input_dir, 'data')
         if os.path.isdir(data_src):
             data_dst = os.path.join(run_dir, 'data')
@@ -253,7 +269,7 @@ class RegressionRunner(BaseRunner):
         self.reporter.console.print()
 
     def run(self, filter_tags=None, force=False, report: bool = False, pdf: bool = False,
-            verbose: bool = False, stop_on_pass: bool = False):
+            verbose: bool = False, stop_on_pass: bool = False, strict: bool = False):
         try:
             current_branch = subprocess.check_output(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
@@ -322,12 +338,12 @@ class RegressionRunner(BaseRunner):
             ref_out      = os.path.join(ref_run_dir, sim["output_dir"])
             sim_stamp    = os.path.join(ref_out, ".sim_complete")
 
-            if force:
+            if force or strict:
                 if os.path.exists(sim_stamp):
                     os.remove(sim_stamp)
                 for d in (ref_run_dir, curr_run_dir):
                     if os.path.exists(d):
-                        shutil.rmtree(d)
+                        shutil.rmtree(d, ignore_errors=True)
 
             # --- ref ---
             ref_stderr = ""
@@ -335,11 +351,13 @@ class RegressionRunner(BaseRunner):
             if os.path.exists(sim_stamp):
                 ref_status = "cached"
             else:
-                self._setup_run_dir(sim, ref_run_dir)
+                self._setup_run_dir(sim, ref_run_dir, strict=strict)
+                ref_input = sim["input_file"]
                 if "preprocess" in sim and sim.get("preprocess_ref", False):
                     self._preprocess(sim, ref_run_dir)
+                    ref_input = curr_input
                 ref_id = self.provider.submit(
-                    os.path.join(ref_build_dir, sim["binary"]), sim["input_file"], ref_run_dir,
+                    os.path.join(ref_build_dir, sim["binary"]), ref_input, ref_run_dir,
                     np=sim.get("np", 1))
                 ref_status, ref_elapsed = _run_with_spinner(ref_id, f"  \\[{sim['name']}]  ref  running  (np={sim.get('np', 1)})")
                 if ref_status == "COMPLETED":
@@ -353,7 +371,7 @@ class RegressionRunner(BaseRunner):
                     _, ref_stderr = self.provider.get_output(ref_id)
 
             # --- dev ---
-            self._setup_run_dir(sim, curr_run_dir)
+            self._setup_run_dir(sim, curr_run_dir, strict=strict)
             if "preprocess" in sim:
                 self._preprocess(sim, curr_run_dir)
             curr_id = self.provider.submit(

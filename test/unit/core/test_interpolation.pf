@@ -6,7 +6,7 @@ module test_interpolation
    use core_comm_mod,          only: type_comm, new_comm
    use core_grid_mod,          only: type_grid_2d
    use core_interpolation_mod, only: type_interpolator
-   use core_constants_mod,     only: SP, N_GHOST
+   use core_constants_mod,     only: SP, N_GHOST, PI, R_EARTH
 
    implicit none
 
@@ -212,5 +212,101 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_finalize
+
+   ! ----------------------------------------------------------------
+   ! Variable spacing: rank 0 dx=1, rank 1 dx=2, dy=1 everywhere.
+   !   Rank 0: x=[0,1,2,3,4]; rank 1: x=[5,7,9,11,13].
+   !   Query at (5.5, 0.5): owned by rank 1, cell (1,1).
+   !   alpha = (5.5 - 5.0) / 2.0 = 0.25
+   !   beta  = (0.5 - 0.0) / 1.0 = 0.5
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_variable_spacing_alpha(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)      :: grid
+      type(type_comm)         :: comm
+      type(type_interpolator) :: interp
+      type(MPI_Comm) :: mcomm
+      real(SP), allocatable :: dx(:,:), dy(:,:)
+      real(SP) :: xq(1), yq(1)
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+
+      grid%M = 10; grid%N = 4
+      grid%nx_proc = 2; grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+
+      allocate(dx(grid%local_nx, grid%local_ny))
+      allocate(dy(grid%local_nx, grid%local_ny))
+      if (grid%iproc == 0) then
+         dx = 1.0_SP
+      else
+         dx = 2.0_SP
+      end if
+      dy = 1.0_SP
+      call grid%init_spacing(dx, dy)
+
+      xq(1) = 5.5_SP
+      yq(1) = 0.5_SP
+      call interp%init(xq, yq, grid)
+
+      if (grid%iproc == 0) then
+         @assertEqual(0, interp%n_points)
+      else
+         @assertEqual(1,      interp%n_points)
+         @assertEqual(0.25_SP, interp%alpha(1), tolerance=1e-6_SP)
+         @assertEqual(0.5_SP,  interp%beta(1),  tolerance=1e-6_SP)
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_variable_spacing_alpha
+
+   ! ----------------------------------------------------------------
+   ! Spherical grid: alpha uses dx at the query row (lj), not row 1.
+   !   lat0=60°, dlon=1°, dlat=1°; query at row lj=3 (lat 62°).
+   !   dx(i,3) = R_EARTH*cos(62°*PI/180)*PI/180 ≠ dx(i,1).
+   !   alpha_expected = 0.5*cos(60°)/cos(62°) ≠ 0.5.
+   !   Only rank 0 (ibegin=1) owns xq=1.5*dx_ref; rank 1 (ibegin=6) does not.
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_spherical_alpha(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)      :: grid
+      type(type_comm)         :: comm
+      type(type_interpolator) :: interp
+      type(MPI_Comm) :: mcomm
+      real(SP) :: xq(1), yq(1), dx_ref, dy_val, alpha_expected
+      real(SP), parameter :: DLON = 1.0_SP, DLAT = 1.0_SP, LON0 = 0.0_SP, LAT0 = 60.0_SP
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M = 10; grid%N = 6
+      grid%nx_proc = 2; grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing_spherical(DLON, DLAT, LON0, LAT0)
+
+      dx_ref = R_EARTH * cos(LAT0 * PI / 180.0_SP) * DLON * PI / 180.0_SP
+      dy_val = R_EARTH * DLAT * PI / 180.0_SP
+
+      ! Midpoint in x-direction (li=2) and midpoint within row lj=3
+      xq(1) = 1.5_SP * dx_ref
+      yq(1) = 2.5_SP * dy_val
+
+      call interp%init(xq, yq, grid)
+
+      if (grid%iproc == 0) then
+         alpha_expected = 0.5_SP * cos(LAT0 * PI / 180.0_SP) &
+                        / cos((LAT0 + 2.0_SP*DLAT) * PI / 180.0_SP)
+         @assertEqual(1, interp%n_points)
+         @assertEqual(alpha_expected, interp%alpha(1), tolerance=1e-5_SP)
+         @assertEqual(0.5_SP, interp%beta(1), tolerance=1e-5_SP)
+      end if
+      if (grid%iproc == 1) then
+         @assertEqual(0, interp%n_points)
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_spherical_alpha
 
 end module test_interpolation

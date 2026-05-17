@@ -112,11 +112,20 @@ def _run_build(cmd: list[str], verbose: bool, no_cache: bool) -> tuple[int, str]
     return proc.returncode, "".join(lines)
 
 
+def _ccache_mount(name: str) -> list[str]:
+    """Return docker run args to mount a per-compiler ccache volume."""
+    import os
+    cache_dir = Path.home() / ".cache" / "funwave-ccache" / name
+    cache_dir.mkdir(parents=True, exist_ok=True)
+    return ["-v", f"{cache_dir}:/ccache"]
+
+
 def _run_compile_and_test(tag: str, name: str, build_type: str, verbose: bool,
                           prog: Progress | None = None,
                           task_id: int | None = None) -> tuple[int, str, int, str, float, float]:
     """Single docker run — cmake build then ctest, both phases in one container."""
-    cmd = ["docker", "run", "--rm", "-e", f"BUILD_TYPE={build_type}", tag]
+    cmd = ["docker", "run", "--rm", "-e", f"BUILD_TYPE={build_type}",
+           *_ccache_mount(name), tag]
     proc = _popen(cmd)
     assert proc.stdout is not None
 

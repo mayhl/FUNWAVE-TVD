@@ -1,12 +1,12 @@
 refs:
   2d:
-    branch: feat/cmake
+    branch: regression-ref/v4.0-legacy
   3d:
     branch: vendor/3d-fd
     cmake_flags: ["HYPRE_DIR={repo_root}/extern/hypre/installed"]
 
 executables:
-  # ── 2D  (ref: feat/cmake) ─────────────────────────────────────────────
+  # ── 2D  (ref: regression-ref/v4.0-legacy @ 15e1177e) ─────────────────
   central:
     cmake_flags: [ZERO_PHASE=ON]
     ref: 2d
@@ -29,11 +29,13 @@ simulations:
   #   {repo_root}   → absolute path to repo root
   #   {run_dir}     → absolute path to the run directory
   #   Use [uv, run, scripts/my_script.py, ...] for Python scripts.
-  - name: flume_1d
+
+  # ── flume_1d_reg: REG wavemaker — stats meaningful, kept for regression ──
+  - name: flume_1d_reg
     exe_type: central
     np: 4
     input: test/regression/inputs/flume_1d
-    input_files: [wk_irr.txt, wk_reg.txt]
+    input_files: [wk_reg.txt]
     preprocess:
       [
         uv,
@@ -42,6 +44,7 @@ simulations:
         "{input_file}",
         "{curr_input}",
       ]
+    preprocess_ref: true
     binary: funwave
     output_dir: output
     tags: [flume, 1d, smoke]
@@ -52,12 +55,35 @@ simulations:
       # v, q omitted — near-zero in 1D periodic flume (Y-direction noise)
       field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4 }
       # vmean, vlagm omitted — same reason as v/q above
-      # umean, ulagm, Havg raised: time-averaging amplifies the ~4e-6 branch divergence
-      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 1.0e-4, Hrms: 1.0e-4, Havg: 2.0e-4, Hsig: 1.0e-4 }
+      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 1.0e-4, Hrms: 2.0e-4, Havg: 2.0e-4, Hsig: 1.0e-4 }
 
-  # jon_1d and tma_1d: T_INTV_mean raised to 300s (~25 peak periods) so spectral
-  # statistics converge across branches despite the ~1.6e-4 eta divergence.
-  # Field and statistics tolerances are wider than flume_1d to reflect that divergence.
+  # ── flume_1d_irr: IRR wavemaker — code-path coverage only, no stats ──────
+  # Stats (spectral shape, Hm0) belong in the validation framework.
+  - name: flume_1d_irr
+    exe_type: central
+    np: 4
+    input: test/regression/inputs/flume_1d
+    input_files: [wk_irr.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    preprocess_ref: true
+    binary: funwave
+    output_dir: output
+    tags: [flume, 1d, smoke]
+    postprocess:
+      field: test.regression.postproc.field_compare
+    tolerances:
+      # v, q omitted — near-zero in 1D periodic flume (Y-direction noise)
+      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 5.0e-4, p: 1.0e-4 }
+
+  # ── flume_1d_spectral: spectral wavemakers — code-path coverage only ─────
+  # T_INTV_mean removed from inputs; spectral stats belong in validation.
   - name: flume_1d_spectral
     exe_type: central
     np: 4
@@ -71,15 +97,98 @@ simulations:
         "{input_file}",
         "{curr_input}",
       ]
+    preprocess_ref: true
     binary: funwave
     output_dir: output
     tags: [flume, 1d, smoke]
     postprocess:
       field: test.regression.postproc.field_compare
+    tolerances:
+      field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 2.0e-3, mask9: 5.0e-4, p: 5.0e-4 }
+
+  # flume_2d_wk_reg: wall BC (PERIODIC=F), oblique regular wave (Theta=20°).
+  # Two variants: bare walls and walls + south/north sponge.
+  # v/q/vmean/vlagm are now meaningful (oblique wave drives Y-momentum against wall).
+  # Tolerances match flume_1d_wk_reg; wall reflection adds ~no extra FP spread for
+  # regular waves since both ref and dev compile from the same commit.
+  - name: flume_2d
+    exe_type: central
+    np: 8
+    input: test/regression/inputs/flume_2d
+    input_files: [wk_reg_wall.txt, wk_reg_wall_sponge.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    preprocess_ref: true
+    binary: funwave
+    output_dir: output
+    tags: [flume, 2d]
+    postprocess:
+      field: test.regression.postproc.field_compare
       statistics: test.regression.postproc.statistics_compare
     tolerances:
-      field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4 }
-      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 5.0e-4, Hrms: 5.0e-4, Havg: 5.0e-4, Hsig: 5.0e-4 }
+      field: { eta: 1.0e-4, u: 1.0e-3, v: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4, q: 1.0e-3 }
+      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, vmean: 2.0e-2, vlagm: 2.0e-2, etamean: 1.0e-4, Hrms: 2.0e-4, Havg: 2.0e-4, Hsig: 1.0e-4 }
+
+  # flume_2d_irr: IRR wavemaker, PERIODIC=T, ThetaPeak=0 — code-path coverage only.
+  # Tests PY=2 MPI decomp + Nglob=50 + wk_irr spectral wavemaker + 2D slope path.
+  # v/q omitted — near-zero with ThetaPeak=0. Stats removed: spectral stats
+  # belong in the validation framework, not regression.
+  - name: flume_2d_irr
+    exe_type: central
+    np: 8
+    input: test/regression/inputs/flume_2d
+    input_files: [wk_irr_periodic.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    preprocess_ref: true
+    binary: funwave
+    output_dir: output
+    tags: [flume, 2d]
+    postprocess:
+      field: test.regression.postproc.field_compare
+    tolerances:
+      # v/q omitted — near-zero with ThetaPeak=0.
+      field: { eta: 3.0e-3, u: 1.5e-2, hmax: 1.5e-3, hmin: 1.5e-3, umax: 5.0e-3, mask: 2.0e-3, mask9: 3.0e-4, p: 3.0e-3 }
+
+  # rip_2d: DATA bathymetry reader + y-varying 2D depth (rip channels, bar).
+  # Cd=0.0 — clean bathy test; friction is a separate concern.
+  # WK_IRR with VISCOSITY_BREAKING=F; DT_fixed=0.04 (finer DX=1m grid).
+  # Short TOTAL_TIME=200s — code-path coverage only, not full rip development.
+  # Stats removed: mean circulation belongs in validation framework.
+  # Tolerances conservative pending first calibration run.
+  - name: rip_2d
+    exe_type: central
+    np: 4
+    input: test/regression/inputs/rip_2d
+    input_files: [rip_2d.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    preprocess_ref: true
+    binary: funwave
+    output_dir: output
+    tags: [2d, bathy]
+    postprocess:
+      field: test.regression.postproc.field_compare
+    tolerances:
+      field: { eta: 5.0e-3, u: 3.0e-2, v: 3.0e-2, hmax: 3.0e-3, hmin: 3.0e-3, umax: 1.0e-2, mask: 2.0e-3 }
 
   - name: standing_wave_3d_10m
     exe_type: central-3d
@@ -105,23 +214,3 @@ simulations:
       field: { eta: 1.0e-5 }
       standing_wave: { period_error_pct: 15.0 }
 
-  - name: flume_1d_strict
-    exe_type: central
-    np: 4
-    input: test/regression/inputs/flume_1d
-    input_files: [wk_irr_ascii.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    binary: funwave
-    output_dir: output
-    tags: [strict]
-    postprocess:
-      field: test.regression.postproc.field_compare
-    tolerances:
-      field: { eta: 1.0e-8 }

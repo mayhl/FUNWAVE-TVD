@@ -221,7 +221,11 @@ CONTAINS
       ELSE
          DO J = 1, NumFreq
          DO I = 1, NumDir
+# if defined (ZERO_PHASE)
+            Phase_LEFT(J, I) = 0.0_SP
+# else
             Phase_LEFT(J, I) = random2()*2.0_SP*3.1415926
+# endif
          END DO
          END DO
       END IF ! phase true

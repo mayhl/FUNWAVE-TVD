@@ -98,8 +98,11 @@ contains
       call reset_state()
       call dump_state(5.0d0, "main_init_test")
 
-      ! Adopt the caller's env (shallow copy; comm/log pointers are shared)
+      ! Adopt the caller's env (shallow copy; comm/log pointers are shared).
+      ! Transfer yaml ownership: nullify env%yaml%file%root so that only
+      ! this%env's YamlFile_final will free the tree when going out of scope.
       this%env = env
+      call env%yaml%transfer_ownership()
 
       ! Read component inputs using environment resources
       call this%env%comm%barrier()

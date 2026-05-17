@@ -1,8 +1,8 @@
 !INPUT FILE FOR FUNWAVE_TVD
-TITLE = flume_1d_wk_reg
+TITLE = flume_2d_wk_irr_periodic
 
 PX = 4
-PY = 1
+PY = 2
 
 DEPTH_TYPE = SLOPE
 DEPTH_FLAT = 8.0
@@ -13,7 +13,7 @@ RESULT_FOLDER = output/
 FIELD_IO_TYPE = BINARY
 
 Mglob = 250
-Nglob = 10
+Nglob = 50
 
 TOTAL_TIME = 900.0
 PLOT_INTV = 5.0
@@ -23,14 +23,17 @@ SCREEN_INTV = 2.0
 DX = 2.0
 DY = 2.0
 
-WAVEMAKER = WK_REG
+WAVEMAKER = WK_IRR
 DEP_WK = 8.0
 Xc_WK = 150.0
 Yc_WK = 0.0
-Tperiod = 12.0
-AMP_WK = 0.5
-Theta_WK = 0.0
-Time_ramp = 20.0
+FreqPeak = 0.0833
+FreqMin = 0.05
+FreqMax = 0.3
+Hmo = 1.0
+GammaTMA = 5.0
+ThetaPeak = 0.0
+Sigma_Theta = 10.0
 
 PERIODIC = T
 
@@ -39,10 +42,10 @@ FRICTION_SPONGE = T
 DIRECT_SPONGE = T
 Csp = 0.0
 CDsponge = 1.0
-Sponge_west_width =  100.0
-Sponge_east_width =  0.0
-Sponge_south_width = 0.0
-Sponge_north_width = 0.0
+Sponge_west_width  = 100.0
+Sponge_east_width  =   0.0
+Sponge_south_width =   0.0
+Sponge_north_width =   0.0
 
 Cd = 0.0
 
@@ -52,9 +55,7 @@ FroudeCap = 1.0
 
 MinDepth = 0.01
 
-VISCOSITY_BREAKING = T
-Cbrk1 = 0.65
-Cbrk2 = 0.35
+VISCOSITY_BREAKING = F
 
 T_INTV_mean = 100.0
 STEADY_TIME = 100.0
@@ -66,9 +67,9 @@ U = T
 V = T
 ETA = T
 ETAscreen = T
-Umean = T
-Vmean = T
-ETAmean = T
+Umean = F
+Vmean = F
+ETAmean = F
 MASK = T
 MASK9 = T
 Hmax = T
@@ -76,4 +77,4 @@ Hmin = T
 Umax = T
 P = T
 Q = T
-WaveHeight = T
+WaveHeight = F

@@ -1,7 +1,5 @@
 target_sources(${main_lib}_model PRIVATE
    base.f90
-   interface.f90
-   grid.f90
    launcher.F90)
 
 add_subdirectory(2d)

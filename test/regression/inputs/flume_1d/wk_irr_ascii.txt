@@ -105,8 +105,9 @@ Cd = 0.0
   ! froude number cap: FroudeCap 
 ! HIGH_ORDER = THIRD 
   ! CFL 
-CFL = 0.5 
-  ! Froude Number Cap (to avoid jumping drop, set 1.5) 
+CFL = 0.5
+DT_fixed = 0.08
+  ! Froude Number Cap (to avoid jumping drop, set 1.5)
 FroudeCap = 1.0 
 
   ! --------------WET-DRY------------------------------- 

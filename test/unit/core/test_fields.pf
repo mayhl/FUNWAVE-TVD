@@ -1,0 +1,131 @@
+! allow(E001)
+module test_fields
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod,         only: type_comm, new_comm
+   use core_grid_mod,         only: type_grid_2d
+   use model_fields_2d_mod,   only: type_fields_2d
+   use core_constants_mod,    only: SP, N_GHOST
+
+   implicit none
+
+   integer, parameter :: TEST_M = 10
+   integer, parameter :: TEST_N = 8
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine open_grid(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M       = TEST_M
+      grid%N       = TEST_N
+      grid%nx_proc = 2
+      grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+   end subroutine open_grid
+
+   ! ----------------------------------------------------------------
+   ! alloc: arrays have correct ghost-inclusive dimensions
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_alloc_dims(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_fields_2d) :: f
+
+      integer :: ng, expected_m, expected_n
+
+      call open_grid(this, grid, comm)
+      call f%alloc(grid)
+
+      ng         = N_GHOST
+      expected_m = grid%local_nx + 2*ng
+      expected_n = grid%local_ny + 2*ng
+
+      @mpiAssertEqual(expected_m, size(f%eta,   1))
+      @mpiAssertEqual(expected_n, size(f%eta,   2))
+      @mpiAssertEqual(expected_m, size(f%p,     1))
+      @mpiAssertEqual(expected_m, size(f%depth, 1))
+      @mpiAssertEqual(expected_m, size(f%mask,  1))
+      @mpiAssertEqual(expected_m, size(f%eta0,  1))
+      @mpiAssertEqual(expected_m, size(f%h_max, 1))
+
+      call dummy_fix_lint()
+   end subroutine test_alloc_dims
+
+   ! ----------------------------------------------------------------
+   ! alloc: all real arrays initialised to zero, masks to 0
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_alloc_zero(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_fields_2d) :: f
+
+      call open_grid(this, grid, comm)
+      call f%alloc(grid)
+
+      @mpiAssertEqual(0.0_SP, f%eta  (1,1), tolerance=1e-10_SP)
+      @mpiAssertEqual(0.0_SP, f%p    (1,1), tolerance=1e-10_SP)
+      @mpiAssertEqual(0.0_SP, f%depth(1,1), tolerance=1e-10_SP)
+      @mpiAssertEqual(0,      f%mask (1,1))
+
+      call dummy_fix_lint()
+   end subroutine test_alloc_zero
+
+   ! ----------------------------------------------------------------
+   ! free: all arrays deallocated
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_free(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_fields_2d) :: f
+
+      call open_grid(this, grid, comm)
+      call f%alloc(grid)
+      call f%free()
+
+      @assertFalse(allocated(f%eta))
+      @assertFalse(allocated(f%p))
+      @assertFalse(allocated(f%depth))
+      @assertFalse(allocated(f%mask))
+      @assertFalse(allocated(f%h_max))
+
+      call dummy_fix_lint()
+   end subroutine test_free
+
+   ! ----------------------------------------------------------------
+   ! alloc is idempotent: double-alloc reallocates cleanly
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_alloc_idempotent(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_fields_2d) :: f
+
+      call open_grid(this, grid, comm)
+      call f%alloc(grid)
+      call f%alloc(grid)   ! second call should not error
+
+      @assertTrue(allocated(f%eta))
+      @assertTrue(allocated(f%mask))
+
+      call dummy_fix_lint()
+   end subroutine test_alloc_idempotent
+
+end module test_fields

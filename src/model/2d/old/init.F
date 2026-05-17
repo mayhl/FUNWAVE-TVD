@@ -948,29 +948,56 @@ SUBROUTINE INITIALIZATION
 
    CALL WAVEMAKER_INITIALIZATION
 
-   IF (DIRECT_SPONGE) THEN
-      CALL CALCULATE_SPONGE(Mloc, Nloc, Nghost, DX, DY, &
-                            Sponge_west_width, Sponge_east_width, &
-                            Sponge_south_width, Sponge_north_width, &
-                            R_sponge, A_sponge, SPONGE)
-   END IF
+   ! ── Sponge coefficient initialisation via new type_model_sponge ────────────
+   ! Replaces legacy CALCULATE_SPONGE / CALCULATE_DIFFUSION_SPONGE /
+   ! CALCULATE_FRICTION_SPONGE so the regression path exercises the refactored
+   ! init_compute().  Results are copied back into the legacy GLOBAL arrays
+   ! (SPONGE, nu_sponge, CD_4_SPONGE) for use by the existing solver kernels.
+   IF (DIRECT_SPONGE .OR. DIFFUSION_SPONGE .OR. FRICTION_SPONGE) THEN
+      BLOCK
+         USE core_grid_mod,    ONLY: type_grid_2d
+         USE model_sponge_mod, ONLY: type_model_sponge
+         TYPE(type_grid_2d)    :: lgrid
+         TYPE(type_model_sponge) :: lsponge
 
-   IF (DIFFUSION_SPONGE) THEN
-      CALL CALCULATE_DIFFUSION_SPONGE(Mloc, Nloc, Nghost, DX, DY, &
-                                      Sponge_west_width, Sponge_east_width, &
-                                      Sponge_south_width, Sponge_north_width, &
-                                      R_sponge, A_sponge, nu_sponge)
-   END IF
+         ! Populate grid partition fields from GLOBAL scalars.
+         lgrid%M        = Mglob
+         lgrid%N        = Nglob
+         lgrid%nx_proc  = px
+         lgrid%ny_proc  = py
+         lgrid%iproc    = npx
+         lgrid%jproc    = npy
+         lgrid%local_nx = Mloc - 2*Nghost
+         lgrid%local_ny = Nloc - 2*Nghost
+         lgrid%ibegin   = iista
+         lgrid%jbegin   = jjsta
+         lgrid%dx0      = DX
+         lgrid%dy0      = DY
 
-   IF (FRICTION_SPONGE) THEN
+         ! Populate sponge config from GLOBAL scalars.
+         lsponge%is_activated      = .TRUE.
+         lsponge%direct_sponge     = DIRECT_SPONGE
+         lsponge%friction_sponge   = FRICTION_SPONGE
+         lsponge%diffusion_sponge  = DIFFUSION_SPONGE
+         lsponge%Sponge_west_width  = Sponge_west_width
+         lsponge%Sponge_east_width  = Sponge_east_width
+         lsponge%Sponge_south_width = Sponge_south_width
+         lsponge%Sponge_north_width = Sponge_north_width
+         lsponge%R_sponge = R_sponge
+         lsponge%A_sponge = A_sponge
+         lsponge%CDsponge = CDsponge
 
-      IF (.NOT. ALLOCATED(CD_4_SPONGE)) ALLOCATE (CD_4_SPONGE(Mloc, Nloc))
-      CD_4_SPONGE = ZERO
+         CALL lsponge%init_compute(lgrid)
 
-      CALL CALCULATE_FRICTION_SPONGE(Mloc, Nloc, Nghost, DX, DY, &
-                                     Sponge_west_width, Sponge_east_width, &
-                                     Sponge_south_width, Sponge_north_width, &
-                                     R_sponge, A_sponge, CD_4_SPONGE)
+         IF (DIRECT_SPONGE)    SPONGE    (1:Mloc, 1:Nloc) = lsponge%coeff    (1:Mloc, 1:Nloc)
+         IF (DIFFUSION_SPONGE) nu_sponge (1:Mloc, 1:Nloc) = lsponge%nu_sponge(1:Mloc, 1:Nloc)
+         IF (FRICTION_SPONGE) THEN
+            IF (.NOT. ALLOCATED(CD_4_SPONGE)) ALLOCATE (CD_4_SPONGE(Mloc, Nloc))
+            CD_4_SPONGE(1:Mloc, 1:Nloc) = lsponge%cd_sponge(1:Mloc, 1:Nloc)
+         END IF
+
+         CALL lsponge%free()
+      END BLOCK
    END IF
 
    IF (WaveMaker(1:3) == 'ABS') THEN

@@ -81,7 +81,7 @@ fi
 
 # 5. Install Typer autocompletion (User will need to re-source or restart shell)
 echo ""
-echo "Note: Typer autocompletion can be installed by running './bin/fun --install-completion'"
+echo "Note: Typer autocompletion can be installed by running './bin/fun-dev --install-completion'"
 
 echo ""
 echo "CLI setup complete. Please restart your terminal or source your shell config."

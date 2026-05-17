@@ -31,6 +31,7 @@ module core_yaml_file_mod
       procedure, public :: init
       procedure, public :: has_key
       procedure, public :: finalize
+      procedure, public :: transfer_ownership
       procedure, public :: clone
 
       procedure :: parse_error_message
@@ -668,5 +669,15 @@ contains
          nullify (this%root)
       end if
    end subroutine finalize
+
+   ! Transfer ownership of the YAML tree to another yaml_reader that was
+   ! created by value-copying this one (e.g. this%env = env).  Nullifies
+   ! this%file%root so that YamlFile_final won't double-free the root node
+   ! when both copies eventually go out of scope.  Call immediately after
+   ! the value copy, on the SOURCE object.
+   subroutine transfer_ownership(this)
+      class(type_yaml_reader), intent(inout) :: this
+      nullify(this%file%root)
+   end subroutine transfer_ownership
 
 end module core_yaml_file_mod

@@ -106,16 +106,17 @@ Cd = 0.0
   ! froude number cap: FroudeCap 
 ! HIGH_ORDER = THIRD 
   ! CFL 
-CFL = 0.5 
-  ! Froude Number Cap (to avoid jumping drop, set 1.5) 
-FroudeCap = 1.0 
+CFL = 0.5
+DT_fixed = 0.08
+  ! Froude Number Cap (to avoid jumping drop, set 1.5)
+FroudeCap = 1.0
 
   ! --------------WET-DRY------------------------------- 
   ! MinDepth for wetting-drying 
 MinDepth=0.01 
 
   ! -------------- BREAKING ----------------------------
-VISCOSITY_BREAKING = T  
+VISCOSITY_BREAKING = F
 Cbrk1 = 0.65 
 Cbrk2 = 0.35 
   ! ----------------- WAVE AVERAGE ------------------------ 
@@ -140,9 +141,9 @@ Hmin = T
 MFmax = F
 Umax = T
 VORmax = F
-Umean = T 
-Vmean = T 
-ETAmean = T 
+Umean = F
+Vmean = F
+ETAmean = F
 MASK = T 
 MASK9 = T
 SXL = F 
@@ -159,4 +160,4 @@ Gx = F
 Gy = F 
 AGE = F 
 TMP = F 
-WaveHeight = T 
+WaveHeight = F

@@ -155,7 +155,6 @@ SUBROUTINE READ_INPUT
    use core_log_io_mod, only: type_log_writer
    use core_constants_mod, only: LABEL_SIZE
    use core_misc_mod, only: random2
-   use model_grid_mod, only: type_model_grid
    use model_main_mod, only: type_model_main
 !jychoi 14.12.23]
    IMPLICIT NONE
@@ -180,7 +179,6 @@ SUBROUTINE READ_INPUT
    type(type_model_main) :: model
    type(type_yaml_reader), target :: yaml_reader
    type(type_log_writer), target :: log
-   type(type_model_grid), target :: grid
    character(LABEL_SIZE) :: log_label = 'config'
    integer(MPI_ADDRESS_KIND):: address
    ! NOTE: --- MY VARIABLES -------
@@ -456,8 +454,13 @@ SUBROUTINE READ_INPUT
 
                IF (INPUT_PHASE) THEN
                   Phase_LEFT(J, I) = Phase_LEFT(J, I)*3.1415926/180.0_SP
+# if defined (ZERO_PHASE)
+               ELSE
+                  Phase_LEFT(J, I) = 0.0_SP
+# else
                ELSE
                   Phase_LEFT(J, I) = random2()*2.0_SP*3.1415926
+# endif
                END IF
 
             END DO

@@ -215,9 +215,8 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         depth_type = 'file'
 
     mg = pop_val('Mglob'); ng = pop_val('Nglob')
-    if depth_type in ('flat', 'slope'):
-        if mg is not None and ng is not None:
-            geo['grid_size'] = [mg, ng]
+    if mg is not None and ng is not None:
+        geo['grid_size'] = [mg, ng]
 
     px = pop_val('PX');  py = pop_val('PY')
     if px is not None or py is not None:
@@ -268,14 +267,9 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     sob = pop_val('StationOutputBuffer')
     if sob is not None: sim['station_output_buffer'] = sob
 
-    fixed_dt = pop_bool('FIXED_DT')
-    dt = pop_val('DT')
-    if fixed_dt or dt is not None:
-        ts_block: dict = {'fixed_dt': fixed_dt}
-        if dt is not None: ts_block['dt'] = dt
-        sim['time_stepping'] = ts_block
-    else:
-        pop('FIXED_DT'); pop('DT')  # mark consumed even if absent
+    dt_fixed = pop_val('DT_fixed')  # legacy key: non-zero value implies fixed dt
+    if dt_fixed is not None and dt_fixed != 0.0:
+        sim['time_stepping'] = {'fixed_dt': True, 'dt': dt_fixed}
 
     out['simulation'] = sim
 

@@ -1,0 +1,314 @@
+! allow(E001)
+module test_sponge
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod,       only: type_comm, new_comm
+   use core_grid_mod,       only: type_grid_2d
+   use core_constants_mod,  only: SP, N_GHOST
+   use model_sponge_mod,    only: type_model_sponge
+   use model_fields_2d_mod, only: type_fields_2d
+
+   implicit none
+
+   integer,  parameter :: TEST_M  = 20
+   integer,  parameter :: TEST_N  = 16
+   real(SP), parameter :: TEST_DX = 5.0_SP
+
+   ! Module-level constants — gfortran 15 mishandles _SP kind suffixes after
+   ! #line directives inside subroutine bodies.  Define all SP literals here.
+   real(SP), parameter :: R_SP = 0.85_SP
+   real(SP), parameter :: A_SP = 5.0_SP
+   real(SP), parameter :: ZERO_SP  = 0.0_SP
+   real(SP), parameter :: ONE_SP   = 1.0_SP
+   real(SP), parameter :: TWO_SP   = 2.0_SP
+   real(SP), parameter :: THREE_SP = 3.0_SP
+   real(SP), parameter :: FOUR_SP  = 4.0_SP
+   real(SP), parameter :: ONEHALF_SP = 1.5_SP
+   real(SP), parameter :: TOL_SP = 1.0e-6_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine open_grid(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+
+      mcomm      = this%getMpiCommunicator()
+      comm       = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M     = TEST_M
+      grid%N     = TEST_N
+      grid%nx_proc = 2
+      grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=TEST_DX, dy0=TEST_DX)
+   end subroutine open_grid
+
+   ! ----------------------------------------------------------------
+   ! no sponge: init_compute is a no-op
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_inactive_no_alloc(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+
+      call open_grid(this, grid, comm)
+      call sponge%init_compute(grid)
+
+      @assertFalse(allocated(sponge%coeff))
+
+      call dummy_fix_lint()
+   end subroutine test_inactive_no_alloc
+
+   ! ----------------------------------------------------------------
+   ! direct sponge: coeff allocated with correct ghost-inclusive size
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_direct_alloc_shape(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+      integer :: ng, expected_m, expected_n
+
+      call open_grid(this, grid, comm)
+      sponge%is_activated  = .true.
+      sponge%direct_sponge = .true.
+      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+
+      call sponge%init_compute(grid)
+
+      ng         = N_GHOST
+      expected_m = grid%local_nx + 2*ng
+      expected_n = grid%local_ny + 2*ng
+
+      @assertTrue(allocated(sponge%coeff))
+      @mpiAssertEqual(expected_m, size(sponge%coeff, 1))
+      @mpiAssertEqual(expected_n, size(sponge%coeff, 2))
+
+      call sponge%free()
+      call dummy_fix_lint()
+   end subroutine test_direct_alloc_shape
+
+   ! ----------------------------------------------------------------
+   ! direct sponge: all coefficients >= 1.0 (no reduction, only damping)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_direct_coeff_ge_one(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+      integer :: i, j
+      logical :: all_ge_one
+
+      call open_grid(this, grid, comm)
+      sponge%is_activated     = .true.
+      sponge%direct_sponge    = .true.
+      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+      sponge%R_sponge = R_SP
+      sponge%A_sponge = A_SP
+
+      call sponge%init_compute(grid)
+
+      all_ge_one = .true.
+      do j = 1, size(sponge%coeff, 2)
+         do i = 1, size(sponge%coeff, 1)
+            if (sponge%coeff(i, j) < ONE_SP) all_ge_one = .false.
+         end do
+      end do
+
+      @assertTrue(all_ge_one)
+
+      call sponge%free()
+      call dummy_fix_lint()
+   end subroutine test_direct_coeff_ge_one
+
+   ! ----------------------------------------------------------------
+   ! direct sponge on west-boundary rank: first interior cell damped
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_direct_west_sponge_rank0(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+      integer :: ng, rank
+
+      rank = this%getProcessRank()
+      call open_grid(this, grid, comm)
+
+      sponge%is_activated     = .true.
+      sponge%direct_sponge    = .true.
+      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+      sponge%R_sponge = R_SP
+      sponge%A_sponge = A_SP
+
+      call sponge%init_compute(grid)
+
+      ng = N_GHOST
+      if (rank == 0) then
+         @assertTrue(sponge%coeff(ng + 1, ng + 1) > ONE_SP)
+      end if
+
+      call sponge%free()
+      call dummy_fix_lint()
+   end subroutine test_direct_west_sponge_rank0
+
+   ! ----------------------------------------------------------------
+   ! direct sponge: east-half proc is outside narrow west sponge → coeff 1
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_direct_interior_coeff_one(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+      integer :: ng, mloc_g, nloc_g, rank
+
+      rank = this%getProcessRank()
+      call open_grid(this, grid, comm)
+
+      sponge%is_activated     = .true.
+      sponge%direct_sponge    = .true.
+      sponge%Sponge_west_width = TEST_DX * TWO_SP   ! only 2 cells wide
+      sponge%R_sponge = R_SP
+      sponge%A_sponge = A_SP
+
+      call sponge%init_compute(grid)
+
+      ng     = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+
+      if (rank == 1) then
+         @mpiAssertEqual(ONE_SP, sponge%coeff(ng + 1, ng + 1), tolerance=TOL_SP)
+         @mpiAssertEqual(ONE_SP, sponge%coeff(mloc_g,  nloc_g), tolerance=TOL_SP)
+      end if
+
+      call sponge%free()
+      call dummy_fix_lint()
+   end subroutine test_direct_interior_coeff_one
+
+   ! ----------------------------------------------------------------
+   ! apply: divides p/q by coeff; eta only at wet cells
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_apply_direct(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+      type(type_fields_2d)  :: f
+      integer :: ng
+      real(SP) :: eta_before, p_before, q_before
+
+      call open_grid(this, grid, comm)
+      call f%alloc(grid)
+
+      ng = N_GHOST
+
+      sponge%is_activated  = .true.
+      sponge%direct_sponge = .true.
+      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+      sponge%R_sponge = R_SP
+      sponge%A_sponge = A_SP
+
+      call sponge%init_compute(grid)
+
+      f%eta(ng+1, ng+1)  = TWO_SP
+      f%p  (ng+1, ng+1)  = THREE_SP
+      f%q  (ng+1, ng+1)  = FOUR_SP
+      f%mask(ng+1, ng+1) = 1
+
+      eta_before = f%eta(ng+1, ng+1)
+      p_before   = f%p  (ng+1, ng+1)
+      q_before   = f%q  (ng+1, ng+1)
+
+      call sponge%apply(f, grid)
+
+      ! Verify values were damped (divided by coeff >= 1)
+      @assertTrue(f%eta(ng+1, ng+1) <= eta_before)
+      @assertTrue(f%p  (ng+1, ng+1) <= p_before)
+      @assertTrue(f%q  (ng+1, ng+1) <= q_before)
+
+      ! Dry cell: apply should NOT touch eta
+      f%eta(ng+2, ng+1)  = ONEHALF_SP
+      f%mask(ng+2, ng+1) = 0
+      call sponge%apply(f, grid)
+      ! eta unchanged for dry cell (skipped by mask check)
+      @mpiAssertEqual(ONEHALF_SP, f%eta(ng+2, ng+1), tolerance=TOL_SP)
+
+      call sponge%free()
+      call f%free()
+      call dummy_fix_lint()
+   end subroutine test_apply_direct
+
+   ! ----------------------------------------------------------------
+   ! friction sponge: cd_sponge allocated and non-negative
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_friction_coeff_nonneg(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+      integer :: i, j
+      logical :: all_nonneg
+
+      call open_grid(this, grid, comm)
+      sponge%is_activated    = .true.
+      sponge%friction_sponge = .true.
+      sponge%CDsponge        = A_SP
+      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+
+      call sponge%init_compute(grid)
+
+      @assertTrue(allocated(sponge%cd_sponge))
+
+      all_nonneg = .true.
+      do j = 1, size(sponge%cd_sponge, 2)
+         do i = 1, size(sponge%cd_sponge, 1)
+            if (sponge%cd_sponge(i, j) < ZERO_SP) all_nonneg = .false.
+         end do
+      end do
+      @assertTrue(all_nonneg)
+
+      call sponge%free()
+      call dummy_fix_lint()
+   end subroutine test_friction_coeff_nonneg
+
+   ! ----------------------------------------------------------------
+   ! free: deallocates all arrays
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_free(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)    :: grid
+      type(type_comm)       :: comm
+      type(type_model_sponge) :: sponge
+
+      call open_grid(this, grid, comm)
+      sponge%is_activated     = .true.
+      sponge%direct_sponge    = .true.
+      sponge%friction_sponge  = .true.
+      sponge%diffusion_sponge = .true.
+      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+
+      call sponge%init_compute(grid)
+      call sponge%free()
+
+      @assertFalse(allocated(sponge%coeff))
+      @assertFalse(allocated(sponge%cd_sponge))
+      @assertFalse(allocated(sponge%nu_sponge))
+
+      call dummy_fix_lint()
+   end subroutine test_free
+
+end module test_sponge

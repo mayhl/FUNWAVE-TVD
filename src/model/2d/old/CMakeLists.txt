@@ -1,5 +1,6 @@
 add_library(
   ${main_lib}_old STATIC
+  legacy_runner.F
   mod_param.F
   mod_global.F
   mod_input.F

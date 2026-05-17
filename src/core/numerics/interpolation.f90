@@ -233,8 +233,8 @@ contains
       li = max(1, min(grid%local_nx, li))
       lj = max(1, min(grid%local_ny, lj))
 
-      alpha = (xq - grid%x(li, 1)) / grid%dx(li, 1)
-      beta  = (yq - grid%y(1, lj)) / grid%dy(1, lj)
+      alpha = (xq - grid%x(li, lj)) / grid%dx(li, lj)
+      beta  = (yq - grid%y(li, lj)) / grid%dy(li, lj)
       alpha = max(0.0_SP, min(1.0_SP, alpha))
       beta  = max(0.0_SP, min(1.0_SP, beta))
    end subroutine find_bilinear_cell

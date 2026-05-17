@@ -15,6 +15,10 @@ module core_grid_mod
       integer :: local_nx, local_ny
       ! Full domain indices — includes ghost cells
       integer :: ig_begin, ig_stop, jg_begin, jg_stop
+      ! Cartesian topology communicator — derived from the subset comm passed to setup().
+      ! Owned by the grid; does not alias or mutate the caller's comm.
+      ! MPI_COMM_NULL on ranks not participating in this grid (nested grid use).
+      type(MPI_Comm) :: cart_comm
       ! MPI neighbor ranks (MPI_PROC_NULL if at domain boundary)
       integer :: back_rank, shore_rank, left_rank, right_rank
       ! Boundary flags
@@ -45,13 +49,12 @@ contains
 
    subroutine setup(this, comm, create_partition)
       class(type_grid_2d), intent(inout) :: this
-      type(type_comm), intent(inout) :: comm
-      logical, intent(in) :: create_partition
+      type(type_comm),     intent(in)    :: comm
+      logical,             intent(in)    :: create_partition
 
       integer, parameter :: n_dims = 2
       integer, dimension(n_dims) :: dims, coords
       logical, dimension(n_dims) :: periods
-      type(MPI_Comm) :: cart_comm
       integer :: ier
 
       if (create_partition) then
@@ -61,16 +64,17 @@ contains
       dims    = [this%nx_proc, this%ny_proc]
       periods = [.false., .false.]
 
-      call MPI_Cart_Create(comm%id, n_dims, dims, periods, .false., cart_comm, ier)
-      comm%id = cart_comm
+      ! Create Cart topology from the caller's comm without mutating it.
+      ! reorder=.false. guarantees Cart ranks == caller ranks, so comm%rank_id
+      ! is valid for MPI_Cart_coords without re-querying.
+      call MPI_Cart_Create(comm%id, n_dims, dims, periods, .false., this%cart_comm, ier)
 
-      call MPI_Comm_rank(comm%id, comm%rank_id, ier)
-      call MPI_Cart_coords(comm%id, comm%rank_id, n_dims, coords, ier)
+      call MPI_Cart_coords(this%cart_comm, comm%rank_id, n_dims, coords, ier)
       this%iproc = coords(1)
       this%jproc = coords(2)
 
-      call MPI_Cart_shift(comm%id, 0, 1, this%back_rank,  this%shore_rank, ier)
-      call MPI_Cart_shift(comm%id, 1, 1, this%right_rank, this%left_rank,  ier)
+      call MPI_Cart_shift(this%cart_comm, 0, 1, this%back_rank,  this%shore_rank, ier)
+      call MPI_Cart_shift(this%cart_comm, 1, 1, this%right_rank, this%left_rank,  ier)
 
       this%is_back_boundary  = (this%back_rank  == MPI_PROC_NULL)
       this%is_shore_boundary = (this%shore_rank == MPI_PROC_NULL)
@@ -92,10 +96,9 @@ contains
    ! Ghost-cell exchange for a ghost-inclusive field.
    ! field must be allocated as (local_nx + 2*N_GHOST, local_ny + 2*N_GHOST).
    ! Two-phase: x-direction first so corners are correct when y-strips are sent.
-   subroutine halo_exchange(this, field, comm)
+   subroutine halo_exchange(this, field)
       class(type_grid_2d), intent(in)    :: this
       real(SP),            intent(inout) :: field(:,:)
-      type(type_comm),     intent(inout) :: comm
 
       integer :: nx, ny, ng, mloc_g, nloc_g
       integer :: nreq, ierr, i, j
@@ -135,15 +138,15 @@ contains
       nreq = 0
       if (this%back_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
-         call MPI_Irecv(rbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  0, comm%id, req(nreq), ierr)
+         call MPI_Irecv(rbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  0, this%cart_comm, req(nreq), ierr)
          nreq = nreq + 1
-         call MPI_Isend(sbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  1, comm%id, req(nreq), ierr)
+         call MPI_Isend(sbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  1, this%cart_comm, req(nreq), ierr)
       end if
       if (this%shore_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
-         call MPI_Irecv(rbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 1, comm%id, req(nreq), ierr)
+         call MPI_Irecv(rbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 1, this%cart_comm, req(nreq), ierr)
          nreq = nreq + 1
-         call MPI_Isend(sbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 0, comm%id, req(nreq), ierr)
+         call MPI_Isend(sbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 0, this%cart_comm, req(nreq), ierr)
       end if
       if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
 
@@ -180,15 +183,15 @@ contains
       nreq = 0
       if (this%right_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
-         call MPI_Irecv(rbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 2, comm%id, req(nreq), ierr)
+         call MPI_Irecv(rbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 2, this%cart_comm, req(nreq), ierr)
          nreq = nreq + 1
-         call MPI_Isend(sbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 3, comm%id, req(nreq), ierr)
+         call MPI_Isend(sbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 3, this%cart_comm, req(nreq), ierr)
       end if
       if (this%left_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
-         call MPI_Irecv(rbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  3, comm%id, req(nreq), ierr)
+         call MPI_Irecv(rbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  3, this%cart_comm, req(nreq), ierr)
          nreq = nreq + 1
-         call MPI_Isend(sbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  2, comm%id, req(nreq), ierr)
+         call MPI_Isend(sbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  2, this%cart_comm, req(nreq), ierr)
       end if
       if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
 
@@ -324,6 +327,11 @@ contains
       class(type_grid_2d), intent(inout) :: this
       real(SP), intent(in) :: dx(:,:), dy(:,:)
 
+      integer  :: i, j, ierr
+      real(SP) :: x_offset, y_offset
+      type(MPI_Comm) :: row_comm, col_comm
+      logical :: remain(2)
+
       this%dx0 = 0.0_SP
       this%dy0 = 0.0_SP
 
@@ -335,7 +343,38 @@ contains
       allocate(this%inv_dy(size(dy,1), size(dy,2)))
       this%inv_dx = 1.0_SP / dx
       this%inv_dy = 1.0_SP / dy
-      ! TODO: x/y coordinates require global cumulative sum + broadcast
+
+      ! x-offset: prefix sum of each rank's local x-extent across the i-direction.
+      ! remain=[T,F] creates sub-comms that vary in i, fixed j (row communicators).
+      ! MPI_Exscan result is undefined for rank 0 in each sub-comm; x_offset=0 handles it.
+      remain = [.true., .false.]
+      call MPI_Cart_sub(this%cart_comm, remain, row_comm, ierr)
+      x_offset = 0.0_SP
+      call MPI_Exscan(sum(dx(:,1)), x_offset, 1, MPI_SP, MPI_SUM, row_comm, ierr)
+      call MPI_Comm_free(row_comm, ierr)
+
+      ! y-offset: prefix sum across the j-direction (column communicators).
+      remain = [.false., .true.]
+      call MPI_Cart_sub(this%cart_comm, remain, col_comm, ierr)
+      y_offset = 0.0_SP
+      call MPI_Exscan(sum(dy(1,:)), y_offset, 1, MPI_SP, MPI_SUM, col_comm, ierr)
+      call MPI_Comm_free(col_comm, ierr)
+
+      ! Build x/y as global physical coordinates.
+      ! Assumes separable spacing: dx varies only in i, dy varies only in j.
+      ! x(:,j) and y(i,:) are uniform across the other axis — column 1 / row 1 are representative.
+      allocate(this%x(this%local_nx, this%local_ny))
+      allocate(this%y(this%local_nx, this%local_ny))
+
+      this%x(1,:) = x_offset
+      do i = 2, this%local_nx
+         this%x(i,:) = this%x(i-1,:) + dx(i-1, 1)
+      end do
+
+      this%y(:,1) = y_offset
+      do j = 2, this%local_ny
+         this%y(:,j) = this%y(:,j-1) + dy(1, j-1)
+      end do
 
    end subroutine init_spacing_variable
 

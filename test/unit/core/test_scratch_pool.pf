@@ -1,0 +1,203 @@
+! allow(E001)
+module test_scratch_pool
+
+   use pFUnit
+   use model_scratch_mod, only: type_scratch_pool, type_model_scratch
+   use core_constants_mod, only: SP
+
+   implicit none
+
+   integer, parameter :: DIM1 = 8
+   integer, parameter :: DIM2 = 6
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! ----------------------------------------------------------------
+   ! reserve/unreserve: sequential reserves produce peak = max
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_sequential_reserve()
+      type(type_scratch_pool) :: pool
+
+      call pool%reserve(3)
+      call pool%unreserve(3)
+      call pool%reserve(2)
+      call pool%unreserve(2)
+
+      @assertEqual(3, pool%peak)
+      @assertEqual(0, pool%depth)
+
+      call dummy_fix_lint()
+   end subroutine test_sequential_reserve
+
+   ! ----------------------------------------------------------------
+   ! reserve/unreserve: nested reserves accumulate depth
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_nested_reserve()
+      type(type_scratch_pool) :: pool
+
+      call pool%reserve(2)       ! depth=2, peak=2
+         call pool%reserve(3)    ! depth=5, peak=5
+         call pool%unreserve(3)  ! depth=2
+      call pool%unreserve(2)     ! depth=0
+
+      @assertEqual(5, pool%peak)
+      @assertEqual(0, pool%depth)
+
+      call dummy_fix_lint()
+   end subroutine test_nested_reserve
+
+   ! ----------------------------------------------------------------
+   ! finalize: allocates correct number of slots with right shape
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_finalize_shape()
+      type(type_scratch_pool) :: pool
+
+      call pool%reserve(4)
+      call pool%unreserve(4)
+      call pool%finalize(DIM1, DIM2)
+
+      @assertTrue(allocated(pool%slots))
+      @assertTrue(allocated(pool%in_use))
+      @assertEqual(DIM1, size(pool%slots, 1))
+      @assertEqual(DIM2, size(pool%slots, 2))
+      @assertEqual(4,    size(pool%slots, 3))
+      @assertEqual(4,    size(pool%in_use))
+
+      call pool%free()
+      call dummy_fix_lint()
+   end subroutine test_finalize_shape
+
+   ! ----------------------------------------------------------------
+   ! finalize with zero peak: nothing allocated
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_finalize_zero_peak()
+      type(type_scratch_pool) :: pool
+
+      call pool%finalize(DIM1, DIM2)
+
+      @assertFalse(allocated(pool%slots))
+      @assertFalse(allocated(pool%in_use))
+
+      call dummy_fix_lint()
+   end subroutine test_finalize_zero_peak
+
+   ! ----------------------------------------------------------------
+   ! acquire: returns distinct indices, sets in_use
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_acquire_distinct()
+      type(type_scratch_pool) :: pool
+      integer :: k1, k2
+
+      call pool%reserve(2)
+      call pool%unreserve(2)
+      call pool%finalize(DIM1, DIM2)
+
+      k1 = pool%acquire()
+      k2 = pool%acquire()
+
+      @assertTrue(k1 /= k2)
+      @assertTrue(pool%in_use(k1))
+      @assertTrue(pool%in_use(k2))
+
+      call pool%free()
+      call dummy_fix_lint()
+   end subroutine test_acquire_distinct
+
+   ! ----------------------------------------------------------------
+   ! release: slot becomes reusable
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_release_reuse()
+      type(type_scratch_pool) :: pool
+      integer :: k1, k2
+
+      call pool%reserve(1)
+      call pool%unreserve(1)
+      call pool%finalize(DIM1, DIM2)
+
+      k1 = pool%acquire()
+      call pool%release(k1)
+
+      @assertFalse(pool%in_use(k1))
+
+      k2 = pool%acquire()
+
+      @assertEqual(k1, k2)
+      @assertTrue(pool%in_use(k2))
+
+      call pool%free()
+      call dummy_fix_lint()
+   end subroutine test_release_reuse
+
+   ! ----------------------------------------------------------------
+   ! acquired slots hold independent data
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_slot_independence()
+      type(type_scratch_pool) :: pool
+      integer :: k1, k2
+
+      call pool%reserve(2)
+      call pool%unreserve(2)
+      call pool%finalize(DIM1, DIM2)
+
+      k1 = pool%acquire()
+      k2 = pool%acquire()
+
+      pool%slots(1, 1, k1) = 1.0_SP
+      pool%slots(1, 1, k2) = 2.0_SP
+
+      @assertEqual(1.0_SP, pool%slots(1, 1, k1), tolerance=1e-10_SP)
+      @assertEqual(2.0_SP, pool%slots(1, 1, k2), tolerance=1e-10_SP)
+
+      call pool%free()
+      call dummy_fix_lint()
+   end subroutine test_slot_independence
+
+   ! ----------------------------------------------------------------
+   ! type_model_scratch: finalize wires through to field pool
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_model_scratch_finalize()
+      type(type_model_scratch) :: scratch
+
+      call scratch%field%reserve(3)
+      call scratch%field%unreserve(3)
+      call scratch%finalize(DIM1, DIM2)
+
+      @assertTrue(allocated(scratch%field%slots))
+      @assertEqual(3, size(scratch%field%slots, 3))
+
+      call scratch%free()
+      call dummy_fix_lint()
+   end subroutine test_model_scratch_finalize
+
+   ! ----------------------------------------------------------------
+   ! free: deallocates and resets
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_free()
+      type(type_scratch_pool) :: pool
+
+      call pool%reserve(2)
+      call pool%unreserve(2)
+      call pool%finalize(DIM1, DIM2)
+      call pool%free()
+
+      @assertFalse(allocated(pool%slots))
+      @assertFalse(allocated(pool%in_use))
+      @assertEqual(0, pool%peak)
+      @assertEqual(0, pool%depth)
+
+      call dummy_fix_lint()
+   end subroutine test_free
+
+end module test_scratch_pool

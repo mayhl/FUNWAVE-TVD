@@ -80,9 +80,14 @@ contains
       type(type_model_main), intent(inout) :: model
       type(type_env),        intent(inout) :: env
 
+      external :: run_legacy_2d  ! src/model/2d/old/legacy_runner.F
+
       call model%init_from_env(env)
-      ! TODO: call model%run() once the 2D time-loop is refactored out of
-      !       src/model/2d/old/main.F into type_model_main.
+      ! Bridge: run_legacy_2d calls READ_INPUT (which re-reads via model%init()
+      ! internally) to populate MODULE GLOBALs, then runs the full simulation loop.
+      ! TODO: replace with call model%run() once the time-loop is refactored out
+      !       of src/model/2d/old/ into type_model_main.
+      call run_legacy_2d()
       call model%finalize()
    end subroutine run_2d
 

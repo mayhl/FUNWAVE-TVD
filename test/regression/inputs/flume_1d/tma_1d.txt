@@ -48,11 +48,12 @@ Sponge_north_width = 0.0
 Cd = 0.0
 
 CFL = 0.5
+DT_fixed = 0.08
 FroudeCap = 1.0
 
 MinDepth = 0.01
 
-VISCOSITY_BREAKING = T
+VISCOSITY_BREAKING = F
 Cbrk1 = 0.65
 Cbrk2 = 0.35
 
@@ -66,9 +67,9 @@ U = T
 V = T
 ETA = T
 ETAscreen = T
-Umean = T
-Vmean = T
-ETAmean = T
+Umean = F
+Vmean = F
+ETAmean = F
 MASK = T
 MASK9 = T
 Hmax = T
@@ -76,4 +77,4 @@ Hmin = T
 Umax = T
 P = T
 Q = T
-WaveHeight = T
+WaveHeight = F

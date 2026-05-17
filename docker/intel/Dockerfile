@@ -3,7 +3,7 @@ FROM intel/oneapi-hpckit:latest
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git python3 python3-pip curl ca-certificates make m4 \
+        git python3 python3-pip curl ca-certificates make m4 ccache \
     && pip3 install cmake --break-system-packages \
     && rm -rf /var/lib/apt/lists/*
 
@@ -15,6 +15,10 @@ RUN printf '#!/bin/bash\n. /opt/intel/oneapi/setvars.sh --force >/dev/null 2>&1\
         > /usr/local/bin/irun && chmod +x /usr/local/bin/irun
 
 ENV FC=mpiifx CC=mpiicx CXX=mpiicpx
+ENV CMAKE_Fortran_COMPILER_LAUNCHER=ccache \
+    CMAKE_C_COMPILER_LAUNCHER=ccache \
+    CMAKE_CXX_COMPILER_LAUNCHER=ccache \
+    CCACHE_DIR=/ccache
 
 WORKDIR /workspace
 

@@ -322,8 +322,8 @@ def _render_field_section(sub: SubsectionResult) -> str:
 
     rows_html = ""
     for var, stats in by_var.items():
-        mean_m = stats.get("L2_mean")
-        max_m  = stats.get("L2_max")
+        mean_m = next((v for k, v in stats.items() if k.endswith("_mean")), None)
+        max_m  = next((v for k, v in stats.items() if k.endswith("_max")),  None)
         if mean_m is None:
             continue
 

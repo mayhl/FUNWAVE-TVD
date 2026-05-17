@@ -54,3 +54,12 @@ extern/
 fun.env
 *.log
 .gemini_shared_memory.json
+site/
+docs/_build/
+
+# FUNWAVE runtime output (accidentally runs from repo root)
+dump.bin
+output/
+Grid_Range.out
+time_dt.out
+LOG.txt
