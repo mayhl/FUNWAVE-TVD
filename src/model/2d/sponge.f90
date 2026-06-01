@@ -29,7 +29,7 @@
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam  (read_input)
-!    05/28/2026  Michael-Angelo Y.H. Lam  (init_compute, apply)
+!    05/28/2026  Michael-Angelo Y.H. Lam  (init_compute, merge_friction, apply)
 !
 !-------------------------------------------------
 
@@ -73,10 +73,11 @@ module model_sponge_mod
       real(SP), allocatable :: nu_sponge(:,:)
 
    contains
-      procedure :: read_input   => sponge_read_input
-      procedure :: init_compute => sponge_init_compute
-      procedure :: apply        => sponge_apply
-      procedure :: free         => sponge_free
+      procedure :: read_input      => sponge_read_input
+      procedure :: init_compute    => sponge_init_compute
+      procedure :: merge_friction  => sponge_merge_friction
+      procedure :: apply           => sponge_apply
+      procedure :: free            => sponge_free
    end type type_model_sponge
 
 contains
@@ -116,20 +117,16 @@ contains
    !> Allocate and compute sponge coefficient arrays.
    !>
    !> Direct sponge (coeff):    Larsen-Dancy exponential damping ratio.
-   !> Friction sponge (cd):     tanh-profile drag coefficient, max-folded into cd_inout
-   !>                           when provided (eliminates separate cd_sponge allocation).
+   !> Friction sponge (cd):     tanh-profile drag coefficient; allocates cd_sponge.
    !> Diffusion sponge (nu):    tanh-profile lateral viscosity.
-   !>
-   !> cd_inout: optional ghost-inclusive Cd array from type_model_friction.  When
-   !>   present, friction sponge values are max-merged in-place and cd_sponge is NOT
-   !>   allocated.  When absent (legacy bridge path), cd_sponge is allocated as before.
    !>
    !> All arrays ghost-inclusive.  Called once at init_compute time, before
    !> the first timestep and after grid%setup() + grid%init_spacing() have run.
-   subroutine sponge_init_compute(this, grid, cd_inout)
-      class(type_model_sponge), intent(inout)        :: this
-      type(type_grid_2d),       intent(in)           :: grid
-      real(SP), optional,       intent(inout)        :: cd_inout(:,:)
+   !> To max-merge friction sponge into an external Cd array instead, call
+   !> merge_friction() after init_compute().
+   subroutine sponge_init_compute(this, grid)
+      class(type_model_sponge), intent(inout) :: this
+      type(type_grid_2d),       intent(in)    :: grid
 
       integer  :: ng, nx, ny, mloc_g, nloc_g
       real(SP) :: ref_dx, ref_dy
@@ -158,24 +155,13 @@ contains
       end if
 
       if (this%friction_sponge) then
-         if (present(cd_inout)) then
-            ! Max-merge sponge profile into the caller's Cd array; no separate allocation.
-            call compute_friction_coeff(cd_inout, size(cd_inout,1), size(cd_inout,2), &
-                                        ng, ref_dx, ref_dy,                           &
-                                        this%Sponge_west_width, this%Sponge_east_width, &
-                                        this%Sponge_south_width, this%Sponge_north_width, &
-                                        this%CDsponge,                                 &
-                                        grid%ibegin, grid%iproc, grid%nx_proc, nx,    &
-                                        grid%jbegin, grid%jproc, grid%ny_proc, ny)
-         else
-            allocate(this%cd_sponge(mloc_g, nloc_g), source=0.0_SP)
-            call compute_friction_coeff(this%cd_sponge, mloc_g, nloc_g, ng, ref_dx, ref_dy, &
-                                        this%Sponge_west_width, this%Sponge_east_width,      &
-                                        this%Sponge_south_width, this%Sponge_north_width,    &
-                                        this%CDsponge,                                       &
-                                        grid%ibegin, grid%iproc, grid%nx_proc, nx,           &
-                                        grid%jbegin, grid%jproc, grid%ny_proc, ny)
-         end if
+         allocate(this%cd_sponge(mloc_g, nloc_g), source=0.0_SP)
+         call compute_friction_coeff(this%cd_sponge, mloc_g, nloc_g, ng, ref_dx, ref_dy, &
+                                     this%Sponge_west_width, this%Sponge_east_width,      &
+                                     this%Sponge_south_width, this%Sponge_north_width,    &
+                                     this%CDsponge,                                       &
+                                     grid%ibegin, grid%iproc, grid%nx_proc, nx,           &
+                                     grid%jbegin, grid%jproc, grid%ny_proc, ny)
       end if
 
       if (this%diffusion_sponge) then
@@ -189,6 +175,34 @@ contains
       end if
 
    end subroutine sponge_init_compute
+
+   !> Max-merge friction sponge profile into an external Cd array.
+   !>
+   !> Must be called after init_compute().  When friction_sponge is active,
+   !> max-merges cd_sponge into cd_inout and then deallocates cd_sponge.
+   !> No-op when friction_sponge is inactive or not allocated.
+   !>
+   !> Use this instead of holding both cd_sponge and friction%Cd simultaneously:
+   !>   call sponge%init_compute(grid)
+   !>   call sponge%merge_friction(friction%Cd)
+   subroutine sponge_merge_friction(this, cd_inout)
+      class(type_model_sponge), intent(inout) :: this
+      real(SP),                 intent(inout) :: cd_inout(:,:)
+
+      integer :: i, j
+
+      if (.not. this%friction_sponge) return
+      if (.not. allocated(this%cd_sponge)) return
+
+      do j = 1, size(cd_inout, 2)
+         do i = 1, size(cd_inout, 1)
+            cd_inout(i, j) = max(cd_inout(i, j), this%cd_sponge(i, j))
+         end do
+      end do
+
+      deallocate(this%cd_sponge)
+
+   end subroutine sponge_merge_friction
 
    ! ── Apply (direct sponge only) ────────────────────────────────────────────
 
