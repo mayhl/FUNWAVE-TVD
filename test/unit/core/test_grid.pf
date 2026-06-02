@@ -443,4 +443,36 @@ contains
       call dummy_fix_lint()
    end subroutine test_corner_filling
 
+   ! ----------------------------------------------------------------
+   ! type_loop_bounds: verify lp populated correctly by setup()
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_loop_bounds(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      integer :: ng
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+      ng = N_GHOST
+
+      ! Interior bounds in ghost-inclusive indexing
+      @mpiAssertEqual(ng + 1,               grid%lp%ib)
+      @mpiAssertEqual(ng + grid%local_nx,   grid%lp%ie)
+      @mpiAssertEqual(ng + 1,               grid%lp%jb)
+      @mpiAssertEqual(ng + grid%local_ny,   grid%lp%je)
+      ! Ghost-inclusive array dims
+      @mpiAssertEqual(grid%local_nx + 2*ng, grid%lp%mloc)
+      @mpiAssertEqual(grid%local_ny + 2*ng, grid%lp%nloc)
+      ! 2D sentinel
+      @mpiAssertEqual(0,  grid%lp%kb)
+      @mpiAssertEqual(-1, grid%lp%ke)
+      @mpiAssertEqual(0,  grid%lp%kloc)
+      ! Default tile sizes
+      @mpiAssertEqual(32, grid%lp%ti)
+      @mpiAssertEqual(32, grid%lp%tj)
+
+      call dummy_fix_lint()
+   end subroutine test_loop_bounds
+
 end module test_grid

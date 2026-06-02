@@ -5,6 +5,17 @@ module core_grid_mod
    use mpi_f08
    implicit none
 
+   type, public :: type_loop_bounds
+      integer :: ib, ie        ! interior x bounds in ghost-inclusive indexing (ib = N_GHOST+1)
+      integer :: jb, je        ! interior y bounds
+      integer :: mloc, nloc    ! ghost-inclusive local array dims
+      integer :: kb  = 0       ! σ-layer start (ke < kb = 2D sentinel)
+      integer :: ke  = -1      ! σ-layer end
+      integer :: kloc = 0      ! ghost-inclusive σ-layer dim (0 = 2D)
+      integer :: ti  = 32      ! tile size x (CPU OMP cache blocking)
+      integer :: tj  = 32      ! tile size y
+   end type type_loop_bounds
+
    type, public :: type_grid_2d
       integer :: M, N
       ! Domain decomposition
@@ -26,6 +37,8 @@ module core_grid_mod
       logical :: is_shore_boundary = .false.
       logical :: is_left_boundary  = .false.
       logical :: is_right_boundary = .false.
+      ! Loop bounds — derived from grid at setup(); safe for OMP target mapping (no allocatables)
+      type(type_loop_bounds) :: lp
       ! Coordinate system
       logical         :: is_spherical = .false.
       type(type_crs)  :: crs
@@ -90,6 +103,13 @@ contains
       this%ig_stop  = this%istop  + N_GHOST
       this%jg_begin = this%jbegin - N_GHOST
       this%jg_stop  = this%jstop  + N_GHOST
+
+      this%lp%ib   = N_GHOST + 1
+      this%lp%ie   = N_GHOST + this%local_nx
+      this%lp%jb   = N_GHOST + 1
+      this%lp%je   = N_GHOST + this%local_ny
+      this%lp%mloc = this%local_nx + 2*N_GHOST
+      this%lp%nloc = this%local_ny + 2*N_GHOST
 
    end subroutine setup
 
