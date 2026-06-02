@@ -1,0 +1,272 @@
+! allow(E001)
+module test_kernel_dispersion
+
+   use pFUnit
+   use core_constants_mod,         only: SP
+   use core_grid_mod,               only: type_loop_bounds
+   use model_kernel_dispersion_mod, only: type_disp_workspace, cal_dispersion
+
+   implicit none
+
+   integer, parameter :: NG   = 3
+   integer, parameter :: LNX  = 6
+   integer, parameter :: LNY  = 6
+   integer, parameter :: MLOC = LNX + 2*NG   ! 12
+   integer, parameter :: NLOC = LNY + 2*NG   ! 12
+
+   real(SP), parameter :: TOL = 1.0e-4_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_lp(lp)
+      type(type_loop_bounds), intent(out) :: lp
+      lp%ib = NG + 1;  lp%ie = NG + LNX
+      lp%jb = NG + 1;  lp%je = NG + LNY
+      lp%mloc = MLOC;  lp%nloc = NLOC
+   end subroutine make_lp
+
+   ! ----------------------------------------------------------------
+   ! type_disp_workspace: alloc / free round-trip
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_disp_workspace_alloc_free()
+      type(type_disp_workspace) :: ws
+
+      call ws%alloc(MLOC, NLOC)
+
+      @assertTrue(allocated(ws%du))
+      @assertTrue(allocated(ws%uxx))
+      @assertTrue(allocated(ws%utxx))
+      @assertEqual(MLOC, ws%m)
+      @assertEqual(NLOC, ws%n)
+
+      call ws%free()
+
+      @assertFalse(allocated(ws%du))
+      @assertFalse(allocated(ws%uxx))
+      @assertEqual(0, ws%m)
+
+      call dummy_fix_lint()
+   end subroutine test_disp_workspace_alloc_free
+
+   ! ----------------------------------------------------------------
+   ! ETAT = -(dP/dx + dQ/dy).  With P(i,j)=(i-1)*dx, Q=0:
+   !   ETAT = -(dx/dx + 0) = -1 everywhere in the interior.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_cal_dispersion_etat()
+      type(type_loop_bounds)   :: lp
+      type(type_disp_workspace) :: ws
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
+      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
+      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      integer  :: i, j
+      real(SP), parameter :: DX_VAL = 2.0_SP
+
+      call make_lp(lp)
+      call ws%alloc(MLOC, NLOC)
+
+      eta = 0.0_SP;  depth = 1.0_SP
+      u = 0.0_SP;    v = 0.0_SP;  u0 = 0.0_SP;  v0 = 0.0_SP
+      mask9 = 1;  inv_dx = 1.0_SP/DX_VAL;  inv_dy = 1.0_SP/DX_VAL
+      ! P(i,j) = (i-1)*DX_VAL  => P(i+1,j)-P(i,j) = DX_VAL  => dP/dx*inv_dx = 1
+      do j = 1, NLOC
+         do i = 1, MLOC+1
+            p(i,j) = real(i-1, SP) * DX_VAL
+         end do
+      end do
+      q = 0.0_SP
+      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
+      u1pp = 0.0_SP;  v1pp = 0.0_SP
+      u2 = 0.0_SP;    v2 = 0.0_SP;   u3 = 0.0_SP;  v3 = 0.0_SP
+
+      call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
+                          inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
+                          0.2_SP, 0.0_SP, 0.0_SP, .false., &
+                          .true., .true., .true., .true., &
+                          etat, ut, vt, etax, etay, &
+                          u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
+
+      do j = 1, NLOC - 1
+         do i = 1, MLOC - 1
+            @assertEqual(-1.0_SP, etat(i,j), tolerance=TOL)
+         end do
+      end do
+
+      call ws%free()
+      call dummy_fix_lint()
+   end subroutine test_cal_dispersion_etat
+
+   ! ----------------------------------------------------------------
+   ! Uniform u/v/depth: all second derivatives are zero, so
+   ! u4 = v4 = u1p = v1p = 0.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_cal_dispersion_uniform_zero()
+      type(type_loop_bounds)    :: lp
+      type(type_disp_workspace) :: ws
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
+      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
+      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      integer  :: i, j
+
+      call make_lp(lp)
+      call ws%alloc(MLOC, NLOC)
+
+      eta = 0.0_SP;  depth = 1.0_SP
+      u = 1.0_SP;  v = 0.5_SP;  u0 = 1.0_SP;  v0 = 0.5_SP
+      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1
+      inv_dx = 1.0_SP;  inv_dy = 1.0_SP
+      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
+      u1pp = 0.0_SP;  v1pp = 0.0_SP
+      u2 = 0.0_SP;  v2 = 0.0_SP;  u3 = 0.0_SP;  v3 = 0.0_SP
+
+      call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
+                          inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
+                          0.2_SP, 0.0_SP, 0.0_SP, .false., &
+                          .true., .true., .true., .true., &
+                          etat, ut, vt, etax, etay, &
+                          u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(0.0_SP, u4(i,j),  tolerance=TOL)
+            @assertEqual(0.0_SP, v4(i,j),  tolerance=TOL)
+            @assertEqual(0.0_SP, u1p(i,j), tolerance=TOL)
+            @assertEqual(0.0_SP, v1p(i,j), tolerance=TOL)
+         end do
+      end do
+
+      call ws%free()
+      call dummy_fix_lint()
+   end subroutine test_cal_dispersion_uniform_zero
+
+   ! ----------------------------------------------------------------
+   ! gamma2 = 0: u1pp/v1pp/u2/v2/u3/v3 must remain at their
+   ! pre-call sentinel values (intent(inout), not written).
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_cal_dispersion_gamma2_skip()
+      type(type_loop_bounds)    :: lp
+      type(type_disp_workspace) :: ws
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
+      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
+      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP), parameter :: SENTINEL = 99.0_SP
+
+      call make_lp(lp)
+      call ws%alloc(MLOC, NLOC)
+
+      eta = 0.0_SP;  depth = 1.0_SP
+      u = 0.0_SP;  v = 0.0_SP;  u0 = 0.0_SP;  v0 = 0.0_SP
+      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1
+      inv_dx = 1.0_SP;  inv_dy = 1.0_SP
+      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
+      ! pre-set gamma2 arrays to sentinel
+      u1pp = SENTINEL;  v1pp = SENTINEL
+      u2   = SENTINEL;  v2   = SENTINEL
+      u3   = SENTINEL;  v3   = SENTINEL
+
+      call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
+                          inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
+                          0.2_SP, 0.0_SP, 0.0_SP, .false., &  ! gamma2 = 0
+                          .true., .true., .true., .true., &
+                          etat, ut, vt, etax, etay, &
+                          u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
+
+      @assertEqual(SENTINEL, u1pp(lp%ib, lp%jb), tolerance=TOL)
+      @assertEqual(SENTINEL, v1pp(lp%ie, lp%je), tolerance=TOL)
+      @assertEqual(SENTINEL, u2(lp%ib, lp%jb),   tolerance=TOL)
+      @assertEqual(SENTINEL, v3(lp%ie, lp%je),   tolerance=TOL)
+
+      call ws%free()
+      call dummy_fix_lint()
+   end subroutine test_cal_dispersion_gamma2_skip
+
+   ! ----------------------------------------------------------------
+   ! Parabolic u = i^2, v = 0, depth = 1, beta1 = 0:
+   !   uxx = 2*inv_dx^2, others zero.
+   !   u4 = coeff_a*h^2*uxx + coeff_b*h*(h*uxx)
+   !      = h^2*uxx*(coeff_a + coeff_b)
+   !      = uxx*(-1/6)   [with beta1=0: coeff_a=1/3, coeff_b=-1/2]
+   !      = 2*(-1/6) = -1/3  (with inv_dx=1, h=1)
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_cal_dispersion_u4_parabolic()
+      type(type_loop_bounds)    :: lp
+      type(type_disp_workspace) :: ws
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
+      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
+      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      integer  :: i, j
+      real(SP), parameter :: BETA1 = 0.0_SP   ! simplifies coeff_a=1/3, coeff_b=-1/2
+      real(SP), parameter :: EXPECTED_U4 = -1.0_SP/3.0_SP
+
+      call make_lp(lp)
+      call ws%alloc(MLOC, NLOC)
+
+      depth = 1.0_SP;  eta = 0.0_SP
+      ! u(i,j) = i^2 so uxx = 2 everywhere (with inv_dx=1)
+      do j = 1, NLOC
+         do i = 1, MLOC
+            u(i,j) = real(i, SP) * real(i, SP)
+         end do
+      end do
+      v = 0.0_SP;  u0 = u;  v0 = 0.0_SP
+      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1
+      inv_dx = 1.0_SP;  inv_dy = 1.0_SP
+      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
+      u1pp = 0.0_SP;  v1pp = 0.0_SP
+      u2 = 0.0_SP;  v2 = 0.0_SP;  u3 = 0.0_SP;  v3 = 0.0_SP
+
+      call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
+                          inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
+                          BETA1, 0.0_SP, 0.0_SP, .false., &
+                          .false., .false., .false., .false., &
+                          etat, ut, vt, etax, etay, &
+                          u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
+
+      ! inner cells away from boundaries where uxx is exactly 2
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(EXPECTED_U4, u4(i,j),  tolerance=TOL)
+            @assertEqual(0.0_SP,      v4(i,j),  tolerance=TOL)
+         end do
+      end do
+
+      call ws%free()
+      call dummy_fix_lint()
+   end subroutine test_cal_dispersion_u4_parabolic
+
+end module test_kernel_dispersion
