@@ -37,3 +37,6 @@ target_link_libraries(test_kernel_derivatives libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_fluxes)
 target_link_libraries(test_kernel_fluxes libfunwave_model)
+
+qadd_pfunit_ctest(test_kernel_masks)
+target_link_libraries(test_kernel_masks libfunwave_model)

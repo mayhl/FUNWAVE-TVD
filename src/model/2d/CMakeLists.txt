@@ -3,6 +3,7 @@ target_sources(${main_lib}_model PRIVATE
    scratch.f90
    kernel_derivatives.f90
    kernel_fluxes.f90
+   kernel_masks.f90
    geometry.f90
    simulation.f90
    hotstart.f90

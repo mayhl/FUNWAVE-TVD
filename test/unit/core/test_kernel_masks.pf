@@ -1,0 +1,240 @@
+! allow(E001)
+module test_kernel_masks
+
+   use pFUnit
+   use core_constants_mod,     only: SP
+   use core_grid_mod,          only: type_loop_bounds
+   use model_kernel_masks_mod, only: update_mask, update_mask9
+
+   implicit none
+
+   integer, parameter :: NG   = 3
+   integer, parameter :: LNX  = 6
+   integer, parameter :: LNY  = 6
+   integer, parameter :: MLOC = LNX + 2*NG   ! 12
+   integer, parameter :: NLOC = LNY + 2*NG   ! 12
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_lp(lp)
+      type(type_loop_bounds), intent(out) :: lp
+      lp%ib = NG + 1;  lp%ie = NG + LNX
+      lp%jb = NG + 1;  lp%je = NG + LNY
+      lp%mloc = MLOC;  lp%nloc = NLOC
+   end subroutine make_lp
+
+   ! ----------------------------------------------------------------
+   ! A wet cell with eta < -depth must dry out.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask_drying()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: depthx(MLOC,NLOC), depthy(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask_struc(MLOC,NLOC)
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      eta = 0.0_SP;  depth = 1.0_SP
+      depthx = 1.0_SP;  depthy = 1.0_SP
+      mask = 1;  mask_struc = 1
+
+      ! put one cell below the wetting threshold
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      eta(ic,jc) = -2.0_SP          ! eta < -depth = -1 -> dry
+
+      call update_mask(lp, eta, depth, mask_struc, mask, depthx, depthy, .false.)
+
+      @assertEqual(0, mask(ic,jc))
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask_drying
+
+   ! ----------------------------------------------------------------
+   ! A dry cell with a wet higher-eta neighbour must flood.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask_flooding()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: depthx(MLOC,NLOC), depthy(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask_struc(MLOC,NLOC)
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      depth = 1.0_SP;  depthx = 1.0_SP;  depthy = 1.0_SP
+      mask_struc = 1
+
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      ! cell (ic,jc) is dry, eta < 0 but -depth check fails
+      eta = -0.5_SP      ! all cells mildly below surface
+      mask = 0           ! all dry
+      eta(ic+1,jc) = 1.0_SP   ! wet neighbour to the right has higher eta
+      mask(ic+1,jc) = 1
+
+      call update_mask(lp, eta, depth, mask_struc, mask, depthx, depthy, .false.)
+
+      @assertEqual(1, mask(ic,jc))
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask_flooding
+
+   ! ----------------------------------------------------------------
+   ! A cell with mask_struc=0 must never change (permanent obstacle).
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask_struc_immutable()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: depthx(MLOC,NLOC), depthy(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask_struc(MLOC,NLOC)
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      eta = 1.0_SP;  depth = 0.5_SP
+      depthx = 0.5_SP;  depthy = 0.5_SP
+      mask = 0;  mask_struc = 1
+
+      ic = lp%ib;  jc = lp%jb
+      mask_struc(ic,jc) = 0    ! permanent obstacle
+
+      call update_mask(lp, eta, depth, mask_struc, mask, depthx, depthy, .false.)
+
+      @assertEqual(0, mask(ic,jc))
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask_struc_immutable
+
+   ! ----------------------------------------------------------------
+   ! With truncate_depth=.true., depthx/depthy near a dry cell are reset.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_truncate_depth()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      real(SP) :: depthx(MLOC,NLOC), depthy(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask_struc(MLOC,NLOC)
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      depth = 2.0_SP;  depthx = 99.0_SP;  depthy = 99.0_SP
+      mask = 1;  mask_struc = 1
+
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      ! mark cell as dry via mask directly, eta well below threshold
+      mask(ic,jc) = 0
+      eta = 0.0_SP;  eta(ic,jc) = -5.0_SP
+
+      call update_mask(lp, eta, depth, mask_struc, mask, depthx, depthy, .true.)
+
+      ! depthx(ic,jc) reset to depth(ic-1,jc), depthy(ic,jc) to depth(ic,jc-1)
+      @assertEqual(depth(ic-1,jc), depthx(ic,jc),  tolerance=1.0e-5_SP)
+      @assertEqual(depth(ic,jc-1), depthy(ic,jc),  tolerance=1.0e-5_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_truncate_depth
+
+   ! ----------------------------------------------------------------
+   ! All-wet 3x3 neighbourhood -> mask9 = 1.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask9_all_wet()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+
+      call make_lp(lp)
+      mask = 1;  eta = 0.0_SP;  depth = 1.0_SP
+      mask9 = -1
+
+      call update_mask9(lp, eta, depth, mask, mask9, 0.01_SP, 10.0_SP, .false.)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(1, mask9(i,j))
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask9_all_wet
+
+   ! ----------------------------------------------------------------
+   ! One dry neighbour -> mask9 = 0 at that cell.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask9_dry_neighbour()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      mask = 1;  eta = 0.0_SP;  depth = 1.0_SP
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      mask(ic+1,jc) = 0          ! one neighbour dry
+
+      call update_mask9(lp, eta, depth, mask, mask9, 0.01_SP, 10.0_SP, .false.)
+
+      @assertEqual(0, mask9(ic,jc))
+      ! adjacent wet cell unaffected
+      @assertEqual(1, mask9(ic-1,jc))
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask9_dry_neighbour
+
+   ! ----------------------------------------------------------------
+   ! Large eta/depth ratio -> mask9 = 0 (switch to SWE).
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask9_swe_ratio()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      mask = 1;  depth = 1.0_SP;  eta = 0.0_SP
+      mask9 = -1
+      ic = lp%ib + 2;  jc = lp%jb + 2
+      eta(ic,jc) = 100.0_SP     ! abs(eta)/depth = 100 >> swe_eta_dep=0.8
+
+      call update_mask9(lp, eta, depth, mask, mask9, 0.01_SP, 0.8_SP, .false.)
+
+      @assertEqual(0, mask9(ic,jc))
+      ! away from that cell it's still 1
+      @assertEqual(1, mask9(lp%ib, lp%jb))
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask9_swe_ratio
+
+   ! ----------------------------------------------------------------
+   ! viscosity_breaking=.true. -> mask9 = 1 everywhere.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_update_mask9_viscosity_breaking()
+      type(type_loop_bounds) :: lp
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+
+      call make_lp(lp)
+      ! set some dry cells and high eta/depth ratios that would normally zero mask9
+      mask = 0;  depth = 0.1_SP;  eta = 100.0_SP
+      mask9 = -1
+
+      call update_mask9(lp, eta, depth, mask, mask9, 0.01_SP, 0.8_SP, .true.)
+
+      do j = lp%jb - 1, lp%je + 1
+         do i = lp%ib - 1, lp%ie + 1
+            @assertEqual(1, mask9(i,j))
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_update_mask9_viscosity_breaking
+
+end module test_kernel_masks
