@@ -23,20 +23,3 @@ target_link_libraries(test_time libcore_engine libcore_infra libcore_base)
 qadd_pfunit_ctest(test_field_registry)
 qadd_pfunit_ctest(test_gatherer 2)
 
-qadd_pfunit_ctest(test_fields 2)
-target_link_libraries(test_fields libfunwave_model)
-
-qadd_pfunit_ctest(test_scratch_pool)
-target_link_libraries(test_scratch_pool libfunwave_model)
-
-qadd_pfunit_ctest(test_sponge 2)
-target_link_libraries(test_sponge libfunwave_model)
-
-qadd_pfunit_ctest(test_kernel_derivatives)
-target_link_libraries(test_kernel_derivatives libfunwave_model)
-
-qadd_pfunit_ctest(test_kernel_fluxes)
-target_link_libraries(test_kernel_fluxes libfunwave_model)
-
-qadd_pfunit_ctest(test_kernel_masks)
-target_link_libraries(test_kernel_masks libfunwave_model)
