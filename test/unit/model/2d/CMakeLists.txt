@@ -18,3 +18,6 @@ target_link_libraries(test_kernel_masks libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_dispersion)
 target_link_libraries(test_kernel_dispersion libfunwave_model)
+
+qadd_pfunit_ctest(test_kernel_breaker)
+target_link_libraries(test_kernel_breaker libfunwave_model)

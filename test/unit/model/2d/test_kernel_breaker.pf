@@ -1,0 +1,267 @@
+! allow(E001)
+module test_kernel_breaker
+
+   use pFUnit
+   use core_constants_mod,      only: SP
+   use core_grid_mod,            only: type_loop_bounds
+   use model_kernel_breaker_mod, only: wave_breaking, &
+                                       VIS_SCHEME_DEFAULT, VIS_SCHEME_KENNEDY, &
+                                       VIS_SCHEME_KENNEDY_ORIG, VIS_SCHEME_STATIC_TRANS, &
+                                       VIS_SCHEME_DEPTH_RATIO
+
+   implicit none
+
+   integer, parameter :: NG   = 3
+   integer, parameter :: LNX  = 6
+   integer, parameter :: LNY  = 6
+   integer, parameter :: MLOC = LNX + 2*NG
+   integer, parameter :: NLOC = LNY + 2*NG
+
+   real(SP), parameter :: TOL  = 1.0e-4_SP
+   real(SP), parameter :: GRAV = 9.81_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_lp(lp)
+      type(type_loop_bounds), intent(out) :: lp
+      lp%ib = NG + 1;  lp%ie = NG + LNX
+      lp%jb = NG + 1;  lp%je = NG + LNY
+      lp%mloc = MLOC;  lp%nloc = NLOC
+   end subroutine make_lp
+
+   subroutine make_default_fields(lp, etax, etay, etat, eta, depth, h, &
+                                   u, v, etamean, dx, dy, &
+                                   nu_break, age, roller_flux, undertow_u, undertow_v, &
+                                   in_wm_zone)
+      type(type_loop_bounds), intent(in) :: lp
+      real(SP), intent(out) :: etax(MLOC,NLOC), etay(MLOC,NLOC), etat(MLOC,NLOC)
+      real(SP), intent(out) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP), intent(out) :: u(MLOC,NLOC), v(MLOC,NLOC), etamean(MLOC,NLOC)
+      real(SP), intent(out) :: dx(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP), intent(out) :: nu_break(MLOC,NLOC), age(MLOC,NLOC)
+      real(SP), intent(out) :: roller_flux(MLOC,NLOC), undertow_u(MLOC,NLOC), undertow_v(MLOC,NLOC)
+      logical,  intent(out) :: in_wm_zone(MLOC,NLOC)
+      etax = 0.0_SP;  etay = 0.0_SP;  etat = 0.0_SP
+      eta = 0.0_SP;  depth = 1.0_SP;  h = 1.0_SP
+      u = 0.0_SP;    v = 0.0_SP;      etamean = 0.0_SP
+      dx = 1.0_SP;   dy = 1.0_SP
+      nu_break = 0.0_SP;  age = 0.0_SP
+      roller_flux = 0.0_SP;  undertow_u = 0.0_SP;  undertow_v = 0.0_SP
+      in_wm_zone = .false.
+   end subroutine make_default_fields
+
+   ! ----------------------------------------------------------------
+   ! ETAt below threshold: nu_break stays at nu_bkg, age stays 0.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_no_breaking()
+      type(type_loop_bounds) :: lp
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC), etat(MLOC,NLOC)
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), etamean(MLOC,NLOC)
+      real(SP) :: dx(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP) :: nu_break(MLOC,NLOC), age(MLOC,NLOC)
+      real(SP) :: roller_flux(MLOC,NLOC), undertow_u(MLOC,NLOC), undertow_v(MLOC,NLOC)
+      logical  :: in_wm_zone(MLOC,NLOC)
+      real(SP), parameter :: NU_BKG = 1.0e-4_SP
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      call make_default_fields(lp, etax, etay, etat, eta, depth, h, u, v, &
+                                etamean, dx, dy, nu_break, age, roller_flux, &
+                                undertow_u, undertow_v, in_wm_zone)
+      nu_break = NU_BKG
+
+      ! etat well below cbrk1*c = 0.35*sqrt(9.81*1) ~ 1.096
+      etat = 0.1_SP
+
+      call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
+                         dx, dy, 0.1_SP, 10.0_SP, 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, 0.5_SP, NU_BKG, &
+                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         nu_break, age, roller_flux, undertow_u, undertow_v)
+
+      ic = lp%ib;  jc = lp%jb
+      @assertEqual(NU_BKG, nu_break(ic,jc), tolerance=TOL)
+      @assertEqual(0.0_SP, age(ic,jc),      tolerance=TOL)
+
+      call dummy_fix_lint()
+   end subroutine test_no_breaking
+
+   ! ----------------------------------------------------------------
+   ! ETAt >= cbrk1*c, age=0 -> age set to dt (breaking onset).
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_breaking_onset()
+      type(type_loop_bounds) :: lp
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC), etat(MLOC,NLOC)
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), etamean(MLOC,NLOC)
+      real(SP) :: dx(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP) :: nu_break(MLOC,NLOC), age(MLOC,NLOC)
+      real(SP) :: roller_flux(MLOC,NLOC), undertow_u(MLOC,NLOC), undertow_v(MLOC,NLOC)
+      logical  :: in_wm_zone(MLOC,NLOC)
+      real(SP), parameter :: DT = 0.05_SP
+      real(SP) :: thr1
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      call make_default_fields(lp, etax, etay, etat, eta, depth, h, u, v, &
+                                etamean, dx, dy, nu_break, age, roller_flux, &
+                                undertow_u, undertow_v, in_wm_zone)
+      ! cbrk1*sqrt(g*h) = 0.35*sqrt(9.81) ~ 1.096
+      thr1 = 0.35_SP * sqrt(GRAV * 1.0_SP)
+      etat = thr1 + 0.1_SP   ! just above threshold
+      age = 0.0_SP
+
+      call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
+                         dx, dy, DT, 10.0_SP, 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, &
+                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         nu_break, age, roller_flux, undertow_u, undertow_v)
+
+      ic = lp%ib;  jc = lp%jb
+      @assertEqual(DT, age(ic,jc), tolerance=TOL)
+
+      call dummy_fix_lint()
+   end subroutine test_breaking_onset
+
+   ! ----------------------------------------------------------------
+   ! Active breaking (age > 0, age < T_brk, ETAt > thr2):
+   ! Default scheme -> nu = cap1*thr2 + nu_bkg.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_active_breaking_default()
+      type(type_loop_bounds) :: lp
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC), etat(MLOC,NLOC)
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), etamean(MLOC,NLOC)
+      real(SP) :: dx(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP) :: nu_break(MLOC,NLOC), age(MLOC,NLOC)
+      real(SP) :: roller_flux(MLOC,NLOC), undertow_u(MLOC,NLOC), undertow_v(MLOC,NLOC)
+      logical  :: in_wm_zone(MLOC,NLOC)
+      real(SP) :: thr2, cap1, expected_nu
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      call make_default_fields(lp, etax, etay, etat, eta, depth, h, u, v, &
+                                etamean, dx, dy, nu_break, age, roller_flux, &
+                                undertow_u, undertow_v, in_wm_zone)
+      ! set up active breaking at centre cell
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      ! keep h = depth so kernel thr2 matches the expected value
+      thr2 = 0.65_SP * sqrt(GRAV * 1.0_SP)
+      etat(ic,jc)  = thr2 + 0.5_SP   ! above thr2
+      age(ic,jc)   = 1.0_SP           ! 0 < age < T_brk=10
+      eta(ic,jc)   = 0.1_SP
+      depth(ic,jc) = 1.0_SP
+      h(ic,jc)     = 1.0_SP
+
+      cap1 = max(depth(ic,jc), 1.0e-4_SP) + eta(ic,jc)
+      expected_nu = cap1 * thr2   ! nu_bkg=0
+
+      call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
+                         dx, dy, 0.05_SP, 10.0_SP, 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, &
+                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         nu_break, age, roller_flux, undertow_u, undertow_v)
+
+      @assertEqual(expected_nu, nu_break(ic,jc), tolerance=TOL)
+
+      call dummy_fix_lint()
+   end subroutine test_active_breaking_default
+
+   ! ----------------------------------------------------------------
+   ! Kennedy scheme: B transition applied.
+   ! With ETAt = 1.5*thr1: B = ETAt/thr1 - 1 = 0.5
+   ! nu = cap1*thr2*(1+B) + nu_bkg = cap1*thr2*1.5
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_active_breaking_kennedy()
+      type(type_loop_bounds) :: lp
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC), etat(MLOC,NLOC)
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), etamean(MLOC,NLOC)
+      real(SP) :: dx(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP) :: nu_break(MLOC,NLOC), age(MLOC,NLOC)
+      real(SP) :: roller_flux(MLOC,NLOC), undertow_u(MLOC,NLOC), undertow_v(MLOC,NLOC)
+      logical  :: in_wm_zone(MLOC,NLOC)
+      real(SP) :: thr1, thr2, cap1, b, expected_nu
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      call make_default_fields(lp, etax, etay, etat, eta, depth, h, u, v, &
+                                etamean, dx, dy, nu_break, age, roller_flux, &
+                                undertow_u, undertow_v, in_wm_zone)
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      ! Use cbrk1=0.5 so that 1.5*thr1 = 0.75*c > thr2 = 0.65*c,
+      ! placing etat in the partial-B range (thr1 < etat <= 2*thr1).
+      thr1 = 0.50_SP * sqrt(GRAV * 1.0_SP)
+      thr2 = 0.65_SP * sqrt(GRAV * 1.0_SP)
+
+      etat(ic,jc) = 1.5_SP * thr1   ! thr1 < etat <= 2*thr1  -> B = 0.5
+      age(ic,jc)  = 1.0_SP
+      eta(ic,jc)  = 0.0_SP
+      h(ic,jc)    = 1.0_SP
+
+      b = etat(ic,jc)/thr1 - 1.0_SP   ! = 0.5
+      cap1 = max(depth(ic,jc), 1.0e-4_SP) + eta(ic,jc)
+      expected_nu = cap1 * thr2 * (1.0_SP + b)
+
+      call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
+                         dx, dy, 0.05_SP, 10.0_SP, 1.0e-4_SP, &
+                         0.50_SP, 0.65_SP, 0.5_SP, 0.0_SP, &
+                         VIS_SCHEME_KENNEDY, 0.8_SP, in_wm_zone, &
+                         nu_break, age, roller_flux, undertow_u, undertow_v)
+
+      @assertEqual(expected_nu, nu_break(ic,jc), tolerance=TOL)
+
+      call dummy_fix_lint()
+   end subroutine test_active_breaking_kennedy
+
+   ! ----------------------------------------------------------------
+   ! in_wm_zone = .true.: wavemaker viscosity formula used instead.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_wavemaker_zone()
+      type(type_loop_bounds) :: lp
+      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC), etat(MLOC,NLOC)
+      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), etamean(MLOC,NLOC)
+      real(SP) :: dx(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP) :: nu_break(MLOC,NLOC), age(MLOC,NLOC)
+      real(SP) :: roller_flux(MLOC,NLOC), undertow_u(MLOC,NLOC), undertow_v(MLOC,NLOC)
+      logical  :: in_wm_zone(MLOC,NLOC)
+      real(SP), parameter :: WM_CBRK = 0.5_SP
+      real(SP) :: c_shallow, cap1, expected_nu
+      integer  :: ic, jc
+
+      call make_lp(lp)
+      call make_default_fields(lp, etax, etay, etat, eta, depth, h, u, v, &
+                                etamean, dx, dy, nu_break, age, roller_flux, &
+                                undertow_u, undertow_v, in_wm_zone)
+      ic = lp%ib + 1;  jc = lp%jb + 1
+      in_wm_zone(ic,jc) = .true.
+      c_shallow = sqrt(GRAV * 1.0_SP)
+      ! etat > min(thr2, wm_cbrk*c)
+      etat(ic,jc) = WM_CBRK * c_shallow + 0.5_SP
+      eta(ic,jc)  = 0.2_SP
+
+      cap1 = max(depth(ic,jc), 1.0e-4_SP) + eta(ic,jc)
+      expected_nu = cap1 * WM_CBRK * c_shallow
+
+      call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
+                         dx, dy, 0.05_SP, 10.0_SP, 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, WM_CBRK, 0.0_SP, &
+                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         nu_break, age, roller_flux, undertow_u, undertow_v)
+
+      @assertEqual(expected_nu, nu_break(ic,jc), tolerance=TOL)
+
+      call dummy_fix_lint()
+   end subroutine test_wavemaker_zone
+
+end module test_kernel_breaker
