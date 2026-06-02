@@ -63,7 +63,7 @@ macro("qadd_pfunit_ctest" name)
   set(_extra_args ${ARGN})
   list(LENGTH _extra_args _extra_count)
 
-  set(_other_sources ../../throw_with_pfunit.F90)
+  set(_other_sources ${CMAKE_SOURCE_DIR}/test/throw_with_pfunit.F90)
   set(_extra_use throw_with_pfunit_mod)
   set(_extra_init initialize_throw)
 
