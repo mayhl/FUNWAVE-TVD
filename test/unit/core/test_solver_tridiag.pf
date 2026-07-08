@@ -2,7 +2,8 @@
 module test_solver_tridiag
 
    use pFUnit
-   use core_constants_mod,      only: SP
+   use core_constants_mod,      only: SP, N_GHOST
+   use core_comm_mod,           only: type_comm, new_comm
    use core_grid_mod,           only: type_loop_bounds, type_grid_2d
    use core_solver_tridiag_mod, only: trid_thomas_1d, trid_x, trid_y, &
                                       trid_x_periodic, trid_y_periodic, &
@@ -283,5 +284,195 @@ contains
       call tws%free()
       call MPI_Comm_free(grid%cart_comm)
    end subroutine test_trid_y_periodic_serial
+
+   ! ================================================================
+   ! Distributed tests — real 2x2 Cartesian decomposition on 4 ranks.
+   ! These exercise the pipelined Irecv/Isend sweeps and the periodic
+   ! cross-rank exchanges that the serial-stub tests above cannot
+   ! (all their neighbors are MPI_PROC_NULL).
+   ! Global domain 16x16, local 8x8 per rank (same MLOC/NLOC).
+   ! ================================================================
+
+   subroutine make_dist_grid(this, grid, lp)
+      class(MpiTestMethod),   intent(inout) :: this
+      type(type_grid_2d),     intent(inout) :: grid
+      type(type_loop_bounds), intent(out)   :: lp
+      type(type_comm) :: comm
+      type(MPI_Comm)  :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+
+      grid%M       = 2*LNX
+      grid%N       = 2*LNY
+      grid%nx_proc = 2
+      grid%ny_proc = 2
+      call grid%setup(comm, create_partition=.false.)
+
+      lp%ib = N_GHOST + 1;  lp%ie = N_GHOST + grid%local_nx
+      lp%jb = N_GHOST + 1;  lp%je = N_GHOST + grid%local_ny
+      lp%mloc = grid%local_nx + 2*N_GHOST
+      lp%nloc = grid%local_ny + 2*N_GHOST
+   end subroutine make_dist_grid
+
+   ! ----------------------------------------------------------------
+   ! trid_x on 2x2 ranks: global 16-cell x-lines, solution x(ig) = ig.
+   ! Pipelined forward sweep and back substitution cross the rank seam.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_trid_x_distributed(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_loop_bounds) :: lp
+      type(type_grid_2d)     :: grid
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      real(SP) :: x_exact(2*LNX)
+      integer  :: i, j, ig, ng
+
+      call make_dist_grid(this, grid, lp)
+      ng = 2*LNX
+      do ig = 1, ng
+         x_exact(ig) = real(ig, SP)
+      end do
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            ig = grid%ibegin + (i - lp%ib)
+            a(i,j) = merge(0.0_SP, -0.5_SP, ig == 1)
+            c(i,j) = merge(0.0_SP, -0.5_SP, ig == ng)
+            if (ig == 1) then
+               d(i,j) = x_exact(1) - 0.5_SP*x_exact(2)
+            else if (ig == ng) then
+               d(i,j) = -0.5_SP*x_exact(ng-1) + x_exact(ng)
+            else
+               d(i,j) = -0.5_SP*x_exact(ig-1) + x_exact(ig) - 0.5_SP*x_exact(ig+1)
+            end if
+         end do
+      end do
+
+      call trid_x(lp, grid, a, c, d, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            ig = grid%ibegin + (i - lp%ib)
+            @mpiAssertEqual(x_exact(ig), f(i,j), TOL)
+         end do
+      end do
+   end subroutine test_trid_x_distributed
+
+   ! ----------------------------------------------------------------
+   ! trid_y on 2x2 ranks: global 16-cell y-lines, solution x(jg) = jg.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_trid_y_distributed(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_loop_bounds) :: lp
+      type(type_grid_2d)     :: grid
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      real(SP) :: x_exact(2*LNY)
+      integer  :: i, j, jg, ng
+
+      call make_dist_grid(this, grid, lp)
+      ng = 2*LNY
+      do jg = 1, ng
+         x_exact(jg) = real(jg, SP)
+      end do
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      do j = lp%jb, lp%je
+         jg = grid%jbegin + (j - lp%jb)
+         do i = lp%ib, lp%ie
+            a(i,j) = merge(0.0_SP, -0.5_SP, jg == 1)
+            c(i,j) = merge(0.0_SP, -0.5_SP, jg == ng)
+            if (jg == 1) then
+               d(i,j) = x_exact(1) - 0.5_SP*x_exact(2)
+            else if (jg == ng) then
+               d(i,j) = -0.5_SP*x_exact(ng-1) + x_exact(ng)
+            else
+               d(i,j) = -0.5_SP*x_exact(jg-1) + x_exact(jg) - 0.5_SP*x_exact(jg+1)
+            end if
+         end do
+      end do
+
+      call trid_y(lp, grid, a, c, d, f)
+
+      do j = lp%jb, lp%je
+         jg = grid%jbegin + (j - lp%jb)
+         do i = lp%ib, lp%ie
+            @mpiAssertEqual(x_exact(jg), f(i,j), TOL)
+         end do
+      end do
+   end subroutine test_trid_y_distributed
+
+   ! ----------------------------------------------------------------
+   ! trid_x_periodic on 2x2 ranks: global circulant, solution = 1.
+   ! Exercises the Sherman-Morrison corner exchange and beta broadcast.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_trid_x_periodic_distributed(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_loop_bounds)    :: lp
+      type(type_grid_2d)        :: grid
+      type(type_trid_workspace) :: tws
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      integer  :: i, j
+
+      call make_dist_grid(this, grid, lp)
+      call tws%alloc(lp%mloc, lp%nloc)
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            a(i,j) = -0.25_SP
+            c(i,j) = -0.25_SP
+            d(i,j) =  0.5_SP
+         end do
+      end do
+
+      call trid_x_periodic(lp, grid, a, c, d, tws, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @mpiAssertEqual(1.0_SP, f(i,j), TOL)
+         end do
+      end do
+
+      call tws%free()
+   end subroutine test_trid_x_periodic_distributed
+
+   ! ----------------------------------------------------------------
+   ! trid_y_periodic on 2x2 ranks: global circulant, solution = 1.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_trid_y_periodic_distributed(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_loop_bounds)    :: lp
+      type(type_grid_2d)        :: grid
+      type(type_trid_workspace) :: tws
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      integer  :: i, j
+
+      call make_dist_grid(this, grid, lp)
+      call tws%alloc(lp%mloc, lp%nloc)
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            a(i,j) = -0.25_SP
+            c(i,j) = -0.25_SP
+            d(i,j) =  0.5_SP
+         end do
+      end do
+
+      call trid_y_periodic(lp, grid, a, c, d, tws, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @mpiAssertEqual(1.0_SP, f(i,j), TOL)
+         end do
+      end do
+
+      call tws%free()
+   end subroutine test_trid_y_periodic_distributed
 
 end module test_solver_tridiag
