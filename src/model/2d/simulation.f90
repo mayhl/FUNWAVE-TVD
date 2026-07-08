@@ -28,6 +28,11 @@ module model_simulation_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
+   use model_config_defaults_mod, only: DEF_SIMULATION_PLOT_INTV_STATION, &
+                                          DEF_SIMULATION_SCREEN_INTERVAL, &
+                                          DEF_SIMULATION_STATION_OUTPUT_BUFFER, &
+                                          DEF_SIMULATION_T_START
+
    implicit none
 
    private
@@ -64,14 +69,14 @@ contains
 
       call sub_env%yaml%read('title', silent=no_title, val=this%title)
       call sub_env%yaml%read_positive('total_time', val=this%total_time)
-      call sub_env%yaml%read('t_start', silent=no_tstart, val=this%t_start, default='0.0')
+      call sub_env%yaml%read('t_start', silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)
       call sub_env%yaml%read_positive('output_interval', val=this%plot_intv)
       call sub_env%yaml%read('screen_interval', silent=no_screen, &
-                              val=this%screen_interval, default='1.0')
+                              val=this%screen_interval, default=DEF_SIMULATION_SCREEN_INTERVAL)
       call sub_env%yaml%read('plot_intv_station',     silent=no_ts, &
-                              val=this%plot_intv_station,    default='1.0')
+                              val=this%plot_intv_station,    default=DEF_SIMULATION_PLOT_INTV_STATION)
       call sub_env%yaml%read('station_output_buffer', silent=no_ts, &
-                              val=this%station_output_buffer, default='1000')
+                              val=this%station_output_buffer, default=DEF_SIMULATION_STATION_OUTPUT_BUFFER)
 
       ! Time stepping sub-block (optional)
       ts_yaml = sub_env%yaml%cast_dictionary('time_stepping', no_ts)

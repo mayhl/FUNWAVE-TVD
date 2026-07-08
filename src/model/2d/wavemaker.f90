@@ -61,6 +61,32 @@ module model_wavemaker_mod
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
 
+   use model_config_defaults_mod, only: DEF_WAVEMAKER_A0_NWAVE, DEF_WAVEMAKER_ALPHA_C, &
+                                          DEF_WAVEMAKER_AMP, DEF_WAVEMAKER_AMP_WK, &
+                                          DEF_WAVEMAKER_A_SPONGE_WAVEMAKER, &
+                                          DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP, &
+                                          DEF_WAVEMAKER_DEPTHWAVEMAKER, &
+                                          DEF_WAVEMAKER_DEP_NWAVE, DEF_WAVEMAKER_DEP_WK, &
+                                          DEF_WAVEMAKER_EQUALENERGY, &
+                                          DEF_WAVEMAKER_ETA_LIMITER, DEF_WAVEMAKER_FREQMAX, &
+                                          DEF_WAVEMAKER_FREQMIN, DEF_WAVEMAKER_FREQPEAK, &
+                                          DEF_WAVEMAKER_GAMMATMA, DEF_WAVEMAKER_GAMMA_NWAVE, &
+                                          DEF_WAVEMAKER_HMO, DEF_WAVEMAKER_LAGTIME, &
+                                          DEF_WAVEMAKER_NFREQ, DEF_WAVEMAKER_NTHETA, &
+                                          DEF_WAVEMAKER_NUMWAVECOMP, DEF_WAVEMAKER_PEAKPERIOD, &
+                                          DEF_WAVEMAKER_R_SPONGE_WAVEMAKER, &
+                                          DEF_WAVEMAKER_SIGMA_THETA, &
+                                          DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION, &
+                                          DEF_WAVEMAKER_THETAPEAK, DEF_WAVEMAKER_THETA_WK, &
+                                          DEF_WAVEMAKER_TIME_RAMP, DEF_WAVEMAKER_TPERIOD, &
+                                          DEF_WAVEMAKER_TYPE, DEF_WAVEMAKER_WAVEMAKERCD, &
+                                          DEF_WAVEMAKER_WAVE_DATA_TYPE, DEF_WAVEMAKER_WID, &
+                                          DEF_WAVEMAKER_WIDTHWAVEMAKER, &
+                                          DEF_WAVEMAKER_X1_NWAVE, DEF_WAVEMAKER_X2_NWAVE, &
+                                          DEF_WAVEMAKER_XC, DEF_WAVEMAKER_XC_WK, &
+                                          DEF_WAVEMAKER_XWAVEMAKER, DEF_WAVEMAKER_YC, &
+                                          DEF_WAVEMAKER_YC_WK, DEF_WAVEMAKER_YWIDTH_WK
+
    implicit none
 
    private
@@ -154,77 +180,77 @@ contains
       this%is_activated = .not. no_wm
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('type', val=this%wavemaker_type, default='nothing')
+      call sub_env%yaml%read('type', val=this%wavemaker_type, default=DEF_WAVEMAKER_TYPE)
 
       ! Shared position / depth / ramp
-      call sub_env%yaml%read('Xc_WK',     silent=no_key, val=this%Xc_WK,     default='0.0')
-      call sub_env%yaml%read('Yc_WK',     silent=no_key, val=this%Yc_WK,     default='0.0')
-      call sub_env%yaml%read('DEP_WK',    silent=no_key, val=this%DEP_WK,    default='0.0')
-      call sub_env%yaml%read('Time_ramp', silent=no_key, val=this%Time_ramp,  default='0.0')
-      call sub_env%yaml%read('Delta_WK',  silent=no_key, val=this%Delta_WK,   default='0.5')
-      call sub_env%yaml%read('Ywidth_WK', silent=no_key, val=this%Ywidth_WK,  default='999999.0')
+      call sub_env%yaml%read('Xc_WK',     silent=no_key, val=this%Xc_WK,     default=DEF_WAVEMAKER_XC_WK)
+      call sub_env%yaml%read('Yc_WK',     silent=no_key, val=this%Yc_WK,     default=DEF_WAVEMAKER_YC_WK)
+      call sub_env%yaml%read('DEP_WK',    silent=no_key, val=this%DEP_WK,    default=DEF_WAVEMAKER_DEP_WK)
+      call sub_env%yaml%read('Time_ramp', silent=no_key, val=this%Time_ramp,  default=DEF_WAVEMAKER_TIME_RAMP)
+      call sub_env%yaml%read('Delta_WK',  silent=no_key, val=this%Delta_WK,   default=DEF_WAVEMAKER_DELTA_WK)
+      call sub_env%yaml%read('Ywidth_WK', silent=no_key, val=this%Ywidth_WK,  default=DEF_WAVEMAKER_YWIDTH_WK)
 
       ! Solitary
-      call sub_env%yaml%read('AMP',                       silent=no_key, val=this%AMP_SOLI,  default='0.0')
-      call sub_env%yaml%read('DEP',                       silent=no_key, val=this%DEP_SOLI,  default='0.0')
-      call sub_env%yaml%read('LAGTIME',                   silent=no_key, val=this%LAG_SOLI,  default='0.0')
-      call sub_env%yaml%read('XWAVEMAKER',                silent=no_key, val=this%XWAVEMAKER, default='0.0')
+      call sub_env%yaml%read('AMP',                       silent=no_key, val=this%AMP_SOLI,  default=DEF_WAVEMAKER_AMP)
+      call sub_env%yaml%read('DEP',                       silent=no_key, val=this%DEP_SOLI,  default=DEF_WAVEMAKER_DEP)
+      call sub_env%yaml%read('LAGTIME',                   silent=no_key, val=this%LAG_SOLI,  default=DEF_WAVEMAKER_LAGTIME)
+      call sub_env%yaml%read('XWAVEMAKER',                silent=no_key, val=this%XWAVEMAKER, default=DEF_WAVEMAKER_XWAVEMAKER)
       call sub_env%yaml%read('SolitaryPositiveDirection', silent=no_key, &
-                              val=this%SolitaryPositiveDirection, default='YES')
+                              val=this%SolitaryPositiveDirection, default=DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION)
 
       ! Initial condition
-      call sub_env%yaml%read('Xc',  silent=no_key, val=this%Xc,  default='0.0')
-      call sub_env%yaml%read('Yc',  silent=no_key, val=this%Yc,  default='0.0')
-      call sub_env%yaml%read('WID', silent=no_key, val=this%WID, default='0.0')
+      call sub_env%yaml%read('Xc',  silent=no_key, val=this%Xc,  default=DEF_WAVEMAKER_XC)
+      call sub_env%yaml%read('Yc',  silent=no_key, val=this%Yc,  default=DEF_WAVEMAKER_YC)
+      call sub_env%yaml%read('WID', silent=no_key, val=this%WID, default=DEF_WAVEMAKER_WID)
 
       ! N-wave
-      call sub_env%yaml%read('x1_Nwave',    silent=no_key, val=this%x1_Nwave,    default='0.0')
-      call sub_env%yaml%read('x2_Nwave',    silent=no_key, val=this%x2_Nwave,    default='0.0')
-      call sub_env%yaml%read('a0_Nwave',    silent=no_key, val=this%a0_Nwave,    default='0.0')
-      call sub_env%yaml%read('gamma_Nwave', silent=no_key, val=this%gamma_Nwave, default='0.0')
-      call sub_env%yaml%read('dep_Nwave',   silent=no_key, val=this%dep_Nwave,   default='0.0')
+      call sub_env%yaml%read('x1_Nwave',    silent=no_key, val=this%x1_Nwave,    default=DEF_WAVEMAKER_X1_NWAVE)
+      call sub_env%yaml%read('x2_Nwave',    silent=no_key, val=this%x2_Nwave,    default=DEF_WAVEMAKER_X2_NWAVE)
+      call sub_env%yaml%read('a0_Nwave',    silent=no_key, val=this%a0_Nwave,    default=DEF_WAVEMAKER_A0_NWAVE)
+      call sub_env%yaml%read('gamma_Nwave', silent=no_key, val=this%gamma_Nwave, default=DEF_WAVEMAKER_GAMMA_NWAVE)
+      call sub_env%yaml%read('dep_Nwave',   silent=no_key, val=this%dep_Nwave,   default=DEF_WAVEMAKER_DEP_NWAVE)
 
       ! Regular wave
-      call sub_env%yaml%read('Tperiod',  silent=no_key, val=this%Tperiod,  default='0.0')
-      call sub_env%yaml%read('AMP_WK',   silent=no_key, val=this%AMP_WK,   default='0.0')
-      call sub_env%yaml%read('Theta_WK', silent=no_key, val=this%Theta_WK, default='0.0')
+      call sub_env%yaml%read('Tperiod',  silent=no_key, val=this%Tperiod,  default=DEF_WAVEMAKER_TPERIOD)
+      call sub_env%yaml%read('AMP_WK',   silent=no_key, val=this%AMP_WK,   default=DEF_WAVEMAKER_AMP_WK)
+      call sub_env%yaml%read('Theta_WK', silent=no_key, val=this%Theta_WK, default=DEF_WAVEMAKER_THETA_WK)
 
       ! Multi-component time series
-      call sub_env%yaml%read('NumWaveComp',  silent=no_key, val=this%NumWaveComp, default='1')
-      call sub_env%yaml%read('PeakPeriod',   silent=no_key, val=this%PeakPeriod,  default='0.0')
+      call sub_env%yaml%read('NumWaveComp',  silent=no_key, val=this%NumWaveComp, default=DEF_WAVEMAKER_NUMWAVECOMP)
+      call sub_env%yaml%read('PeakPeriod',   silent=no_key, val=this%PeakPeriod,  default=DEF_WAVEMAKER_PEAKPERIOD)
       call sub_env%yaml%read('WaveCompFile', silent=no_key, val=this%WaveCompFile)
 
       ! Spectral
-      call sub_env%yaml%read('FreqPeak',    silent=no_key, val=this%FreqPeak,    default='0.0')
-      call sub_env%yaml%read('FreqMin',     silent=no_key, val=this%FreqMin,     default='0.0')
-      call sub_env%yaml%read('FreqMax',     silent=no_key, val=this%FreqMax,     default='0.0')
-      call sub_env%yaml%read('Hmo',         silent=no_key, val=this%Hmo,         default='0.0')
-      call sub_env%yaml%read('GammaTMA',    silent=no_key, val=this%GammaTMA,    default='3.3')
-      call sub_env%yaml%read('Nfreq',       silent=no_key, val=this%Nfreq,       default='45')
-      call sub_env%yaml%read('ThetaPeak',   silent=no_key, val=this%ThetaPeak,   default='0.0')
-      call sub_env%yaml%read('Ntheta',      silent=no_key, val=this%Ntheta,      default='1')
-      call sub_env%yaml%read('Sigma_Theta', silent=no_key, val=this%Sigma_Theta, default='0.0')
-      call sub_env%yaml%read('alpha_c',     silent=no_key, val=this%alpha_c,     default='0.0')
+      call sub_env%yaml%read('FreqPeak',    silent=no_key, val=this%FreqPeak,    default=DEF_WAVEMAKER_FREQPEAK)
+      call sub_env%yaml%read('FreqMin',     silent=no_key, val=this%FreqMin,     default=DEF_WAVEMAKER_FREQMIN)
+      call sub_env%yaml%read('FreqMax',     silent=no_key, val=this%FreqMax,     default=DEF_WAVEMAKER_FREQMAX)
+      call sub_env%yaml%read('Hmo',         silent=no_key, val=this%Hmo,         default=DEF_WAVEMAKER_HMO)
+      call sub_env%yaml%read('GammaTMA',    silent=no_key, val=this%GammaTMA,    default=DEF_WAVEMAKER_GAMMATMA)
+      call sub_env%yaml%read('Nfreq',       silent=no_key, val=this%Nfreq,       default=DEF_WAVEMAKER_NFREQ)
+      call sub_env%yaml%read('ThetaPeak',   silent=no_key, val=this%ThetaPeak,   default=DEF_WAVEMAKER_THETAPEAK)
+      call sub_env%yaml%read('Ntheta',      silent=no_key, val=this%Ntheta,      default=DEF_WAVEMAKER_NTHETA)
+      call sub_env%yaml%read('Sigma_Theta', silent=no_key, val=this%Sigma_Theta, default=DEF_WAVEMAKER_SIGMA_THETA)
+      call sub_env%yaml%read('alpha_c',     silent=no_key, val=this%alpha_c,     default=DEF_WAVEMAKER_ALPHA_C)
 
       ! Eta limiter
-      call sub_env%yaml%read('ETA_LIMITER', val=this%ETA_LIMITER, default='NO')
+      call sub_env%yaml%read('ETA_LIMITER', val=this%ETA_LIMITER, default=DEF_WAVEMAKER_ETA_LIMITER)
       if (this%ETA_LIMITER) then
          call sub_env%yaml%read('CrestLimit',  val=this%CrestLimit)
          call sub_env%yaml%read('TroughLimit', val=this%TroughLimit)
       end if
 
       ! Absorbing-generating
-      call sub_env%yaml%read('WAVE_DATA_TYPE', val=this%WAVE_DATA_TYPE, default='DATA_1D')
-      call sub_env%yaml%read('DepthWaveMaker', silent=no_key, val=this%DepthWaveMaker, default='0.0')
+      call sub_env%yaml%read('WAVE_DATA_TYPE', val=this%WAVE_DATA_TYPE, default=DEF_WAVEMAKER_WAVE_DATA_TYPE)
+      call sub_env%yaml%read('DepthWaveMaker', silent=no_key, val=this%DepthWaveMaker, default=DEF_WAVEMAKER_DEPTHWAVEMAKER)
       if (no_key) &
-         call sub_env%yaml%read('DEP_WK', silent=no_key, val=this%DepthWaveMaker, default='0.0')
-      call sub_env%yaml%read('WidthWaveMaker',     silent=no_key, val=this%WidthWaveMaker,     default='0.0')
-      call sub_env%yaml%read('R_sponge_wavemaker', silent=no_key, val=this%R_sponge_wavemaker, default='0.0')
-      call sub_env%yaml%read('A_sponge_wavemaker', silent=no_key, val=this%A_sponge_wavemaker, default='0.0')
-      call sub_env%yaml%read('EqualEnergy',        val=this%EqualEnergy, default='NO')
+         call sub_env%yaml%read('DEP_WK', silent=no_key, val=this%DepthWaveMaker, default=DEF_WAVEMAKER_DEP_WK)
+      call sub_env%yaml%read('WidthWaveMaker',     silent=no_key, val=this%WidthWaveMaker,     default=DEF_WAVEMAKER_WIDTHWAVEMAKER)
+      call sub_env%yaml%read('R_sponge_wavemaker', silent=no_key, val=this%R_sponge_wavemaker, default=DEF_WAVEMAKER_R_SPONGE_WAVEMAKER)
+      call sub_env%yaml%read('A_sponge_wavemaker', silent=no_key, val=this%A_sponge_wavemaker, default=DEF_WAVEMAKER_A_SPONGE_WAVEMAKER)
+      call sub_env%yaml%read('EqualEnergy',        val=this%EqualEnergy, default=DEF_WAVEMAKER_EQUALENERGY)
 
       ! WaveMakerCd presence enables WaveMakerCurrentBalance
-      call sub_env%yaml%read('WaveMakerCd', silent=no_key, val=this%WaveMakerCd, default='0.0')
+      call sub_env%yaml%read('WaveMakerCd', silent=no_key, val=this%WaveMakerCd, default=DEF_WAVEMAKER_WAVEMAKERCD)
       this%WaveMakerCurrentBalance = .not. no_key
 
    end subroutine wavemaker_read_input

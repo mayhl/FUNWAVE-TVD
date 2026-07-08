@@ -30,6 +30,9 @@ module model_friction_mod
    use core_path_mod,       only: type_path
    use model_base_mod,      only: type_model_base
 
+   use model_config_defaults_mod, only: DEF_FRICTION_CD, DEF_FRICTION_FRICTION_MATRIX, &
+                                          DEF_FRICTION_MANNING
+
    implicit none
 
    private
@@ -70,10 +73,10 @@ contains
       this%is_activated = .not. no_fr
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('friction_matrix', val=this%friction_matrix, default='NO')
+      call sub_env%yaml%read('friction_matrix', val=this%friction_matrix, default=DEF_FRICTION_FRICTION_MATRIX)
       call sub_env%yaml%read_input_path('friction_file', silent=this%no_cd_file, val=this%cd_file)
-      call sub_env%yaml%read('manning', silent=no_key, val=this%manning, default='NO')
-      call sub_env%yaml%read('Cd', silent=no_key, val=this%Cd_fixed, default='0.0')
+      call sub_env%yaml%read('manning', silent=no_key, val=this%manning, default=DEF_FRICTION_MANNING)
+      call sub_env%yaml%read('Cd', silent=no_key, val=this%Cd_fixed, default=DEF_FRICTION_CD)
 
    end subroutine friction_read_input
 

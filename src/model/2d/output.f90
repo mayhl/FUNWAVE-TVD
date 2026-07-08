@@ -38,6 +38,12 @@ module model_output_mod
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
 
+   use model_config_defaults_mod, only: DEF_OUTPUT_DEPTH_OUT, DEF_OUTPUT_ETABLOWVAL, &
+                                          DEF_OUTPUT_FIELD_IO_TYPE, &
+                                          DEF_OUTPUT_NUMBER_STATIONS, DEF_OUTPUT_OUTPUT_RES, &
+                                          DEF_OUTPUT_RESULT_FOLDER, DEF_OUTPUT_STEADY_TIME, &
+                                          DEF_OUTPUT_T_INTV_MEAN
+
    implicit none
 
    private
@@ -150,17 +156,17 @@ contains
       if (allocated(this%channels)) deallocate(this%channels)
       if (is_empty) return
 
-      call sub_env%yaml%read('result_folder',         val=this%result_folder,       default='./output/')
-      call sub_env%yaml%read('field_io_type',         val=this%field_io_type,       default='ASCII')
-      call sub_env%yaml%read('number_stations',       val=this%number_stations,     default='0')
+      call sub_env%yaml%read('result_folder',         val=this%result_folder,       default=DEF_OUTPUT_RESULT_FOLDER)
+      call sub_env%yaml%read('field_io_type',         val=this%field_io_type,       default=DEF_OUTPUT_FIELD_IO_TYPE)
+      call sub_env%yaml%read('number_stations',       val=this%number_stations,     default=DEF_OUTPUT_NUMBER_STATIONS)
       if (this%number_stations > 0) then
          call sub_env%yaml%read('stations_file', val=this%stations_file, default='')
       end if
-      call sub_env%yaml%read('output_res', val=this%output_res, default='1')
-      call sub_env%yaml%read('EtaBlowVal',             silent=no_key, val=this%EtaBlowVal,  default='10.0')
-      call sub_env%yaml%read('depth_out',             val=this%depth_out,            default='NO')
-      call sub_env%yaml%read('T_INTV_mean',           silent=no_key, val=this%T_INTV_mean, default='999999.0')
-      call sub_env%yaml%read('STEADY_TIME',           silent=no_key, val=this%STEADY_TIME,  default='999999.0')
+      call sub_env%yaml%read('output_res', val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
+      call sub_env%yaml%read('EtaBlowVal',             silent=no_key, val=this%EtaBlowVal,  default=DEF_OUTPUT_ETABLOWVAL)
+      call sub_env%yaml%read('depth_out',             val=this%depth_out,            default=DEF_OUTPUT_DEPTH_OUT)
+      call sub_env%yaml%read('T_INTV_mean',           silent=no_key, val=this%T_INTV_mean, default=DEF_OUTPUT_T_INTV_MEAN)
+      call sub_env%yaml%read('STEADY_TIME',           silent=no_key, val=this%STEADY_TIME,  default=DEF_OUTPUT_STEADY_TIME)
 
       call sub_env%yaml%read_string_array('variables', silent=no_vars, val=var_list)
       if (.not. no_vars) then

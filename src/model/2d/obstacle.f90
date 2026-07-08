@@ -21,6 +21,8 @@ module model_obstacle_mod
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
 
+   use model_config_defaults_mod, only: DEF_OBSTACLE_BREAKWATERABSORBCOEF
+
    implicit none
 
    private
@@ -60,7 +62,7 @@ contains
       this%breakwater = .not. no_bw
 
       call sub_env%yaml%read('BreakWaterAbsorbCoef', silent=no_key, &
-                              val=this%BreakWaterAbsorbCoef, default='10.0')
+                              val=this%BreakWaterAbsorbCoef, default=DEF_OBSTACLE_BREAKWATERABSORBCOEF)
 
    end subroutine obstacle_read_input
 

@@ -28,6 +28,12 @@ module model_numerics_mod
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
 
+   use model_config_defaults_mod, only: DEF_NUMERICS_ARRTIMEMINH, DEF_NUMERICS_CFL, &
+                                          DEF_NUMERICS_CONSTRUCTION, DEF_NUMERICS_FROUDECAP, &
+                                          DEF_NUMERICS_HIGH_ORDER, DEF_NUMERICS_MINDEPTH, &
+                                          DEF_NUMERICS_MINDEPTHFRC, DEF_NUMERICS_OUT_TIME, &
+                                          DEF_NUMERICS_TIME_SCHEME
+
    implicit none
 
    private
@@ -69,17 +75,17 @@ contains
       this%is_activated = .not. no_num
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('Time_Scheme',  val=this%Time_Scheme,  default='Runge_Kutta')
-      call sub_env%yaml%read('CONSTRUCTION', val=this%construction, default='HLLC')
-      call sub_env%yaml%read('HIGH_ORDER',   val=this%high_order,   default='FOURTH')
+      call sub_env%yaml%read('Time_Scheme',  val=this%Time_Scheme,  default=DEF_NUMERICS_TIME_SCHEME)
+      call sub_env%yaml%read('CONSTRUCTION', val=this%construction, default=DEF_NUMERICS_CONSTRUCTION)
+      call sub_env%yaml%read('HIGH_ORDER',   val=this%high_order,   default=DEF_NUMERICS_HIGH_ORDER)
 
-      call sub_env%yaml%read('CFL',         silent=no_key, val=this%CFL,         default='0.5')
-      call sub_env%yaml%read('FroudeCap',   silent=no_key, val=this%FroudeCap,   default='3.0')
-      call sub_env%yaml%read('MinDepth',    silent=no_key, val=this%MinDepth,    default='0.1')
-      call sub_env%yaml%read('MinDepthFrc', silent=no_key, val=this%MinDepthFrc, default='0.1')
+      call sub_env%yaml%read('CFL',         silent=no_key, val=this%CFL,         default=DEF_NUMERICS_CFL)
+      call sub_env%yaml%read('FroudeCap',   silent=no_key, val=this%FroudeCap,   default=DEF_NUMERICS_FROUDECAP)
+      call sub_env%yaml%read('MinDepth',    silent=no_key, val=this%MinDepth,    default=DEF_NUMERICS_MINDEPTH)
+      call sub_env%yaml%read('MinDepthFrc', silent=no_key, val=this%MinDepthFrc, default=DEF_NUMERICS_MINDEPTHFRC)
 
-      call sub_env%yaml%read('OUT_Time',   val=this%OUT_Time,   default='NO')
-      call sub_env%yaml%read('ArrTimeMinH', silent=no_key, val=this%ArrTimeMin, default='0.001')
+      call sub_env%yaml%read('OUT_Time',   val=this%OUT_Time,   default=DEF_NUMERICS_OUT_TIME)
+      call sub_env%yaml%read('ArrTimeMinH', silent=no_key, val=this%ArrTimeMin, default=DEF_NUMERICS_ARRTIMEMINH)
 
    end subroutine numerics_read_input
 
