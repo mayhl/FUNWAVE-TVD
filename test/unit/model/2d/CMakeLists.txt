@@ -24,3 +24,6 @@ target_link_libraries(test_kernel_breaker libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_etauv 1)
 target_link_libraries(test_kernel_etauv libfunwave_model)
+
+qadd_pfunit_ctest(test_kernel_sources)
+target_link_libraries(test_kernel_sources libfunwave_model)

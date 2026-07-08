@@ -12,4 +12,4 @@ groups:
   - name: Model2D
     tests: [test_fields, test_scratch_pool, test_sponge, test_kernel_derivatives,
             test_kernel_fluxes, test_kernel_masks, test_kernel_dispersion,
-            test_kernel_breaker, test_kernel_etauv]
+            test_kernel_breaker, test_kernel_etauv, test_kernel_sources]

@@ -1,0 +1,237 @@
+! allow(E001)
+module test_kernel_sources
+
+   use pFUnit
+   use core_constants_mod,       only: SP, GRAV
+   use core_grid_mod,            only: type_loop_bounds
+   use model_kernel_sources_mod, only: cal_sources
+
+   implicit none
+
+   integer, parameter :: NG   = 3
+   integer, parameter :: LNX  = 6
+   integer, parameter :: LNY  = 6
+   integer, parameter :: MLOC = LNX + 2*NG   ! 12
+   integer, parameter :: NLOC = LNY + 2*NG   ! 12
+
+   real(SP), parameter :: TOL = 1.0e-10_SP
+   real(SP), parameter :: MIN_DEPTH_FRC = 0.5_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_lp(lp)
+      type(type_loop_bounds), intent(out) :: lp
+      lp%ib = NG + 1;  lp%ie = NG + LNX
+      lp%jb = NG + 1;  lp%je = NG + LNY
+      lp%mloc = MLOC;  lp%nloc = NLOC
+   end subroutine make_lp
+
+   ! Zero-fill every optional forcing input; tests switch on one term each.
+   subroutine zero_inputs(inv_dx, inv_dy, depth_x, depth_y, eta, h, u, v, p, q, &
+                          u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                          wavemaker_mass, cd, nu_vis, mask, mask9)
+      real(SP), intent(out) :: inv_dx(:,:), inv_dy(:,:)
+      real(SP), intent(out) :: depth_x(:,:), depth_y(:,:), eta(:,:), h(:,:)
+      real(SP), intent(out) :: u(:,:), v(:,:), p(:,:), q(:,:)
+      real(SP), intent(out) :: u4(:,:), v4(:,:), u1p(:,:), v1p(:,:)
+      real(SP), intent(out) :: u1pp(:,:), v1pp(:,:), u2(:,:), v2(:,:), u3(:,:), v3(:,:)
+      real(SP), intent(out) :: wavemaker_mass(:,:), cd(:,:), nu_vis(:,:)
+      integer,  intent(out) :: mask(:,:), mask9(:,:)
+      inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
+      depth_x = 10.0_SP;  depth_y = 10.0_SP
+      eta = 0.0_SP;  h = 10.0_SP
+      u = 0.0_SP;  v = 0.0_SP;  p = 0.0_SP;  q = 0.0_SP
+      u4 = 0.0_SP;  v4 = 0.0_SP;  u1p = 0.0_SP;  v1p = 0.0_SP
+      u1pp = 0.0_SP;  v1pp = 0.0_SP;  u2 = 0.0_SP;  v2 = 0.0_SP
+      u3 = 0.0_SP;  v3 = 0.0_SP
+      wavemaker_mass = 0.0_SP;  cd = 0.0_SP;  nu_vis = 0.0_SP
+      mask = 1;  mask9 = 1
+   end subroutine zero_inputs
+
+   ! ----------------------------------------------------------------
+   ! Bathy slope: depth_x(i,j) = i*ds → src_x = g*eta*ds*inv_dx.
+   ! All other terms off.  src_y = 0 (flat depth_y).
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_bathy_slope()
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
+      real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
+      real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
+      real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+      real(SP), parameter :: DS = 0.1_SP, ETA0 = 0.5_SP
+
+      call make_lp(lp)
+      call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, mask, mask9)
+      p = 0.0_SP;  q = 0.0_SP;  depth_y = 10.0_SP
+      do j = 1, NLOC
+         do i = 1, MLOC + 1
+            depth_x(i,j) = real(i, SP)*DS
+         end do
+      end do
+      eta = ETA0
+
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(GRAV*ETA0*DS*inv_dx(i,j), src_x(i,j), TOL)
+            @assertEqual(0.0_SP, src_y(i,j), TOL)
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_bathy_slope
+
+   ! ----------------------------------------------------------------
+   ! Friction: flat bathy, cd const, u=2, v=0 → src_x = -cd*u*|u|.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_friction_drag()
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
+      real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
+      real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
+      real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+      real(SP), parameter :: CD0 = 0.01_SP, U0 = 2.0_SP
+
+      call make_lp(lp)
+      call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, mask, mask9)
+      p = 0.0_SP;  q = 0.0_SP;  depth_x = 10.0_SP;  depth_y = 10.0_SP
+      cd = CD0
+      u  = U0
+
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(-CD0*U0*U0, src_x(i,j), TOL)
+            @assertEqual(0.0_SP, src_y(i,j), TOL)
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_friction_drag
+
+   ! ----------------------------------------------------------------
+   ! Wavemaker mass injection: src += mass*u / mass*v.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_wavemaker_mass()
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
+      real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
+      real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
+      real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+      real(SP), parameter :: WM0 = 0.3_SP, U0 = 1.5_SP, V0 = -0.5_SP
+
+      call make_lp(lp)
+      call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, mask, mask9)
+      p = 0.0_SP;  q = 0.0_SP;  depth_x = 10.0_SP;  depth_y = 10.0_SP
+      wavemaker_mass = WM0
+      u = U0;  v = V0
+
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+
+      ! friction off (cd=0), bathy flat: src = wavemaker mass term - drag on |UV|
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(WM0*U0, src_x(i,j), TOL)
+            @assertEqual(WM0*V0, src_y(i,j), TOL)
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_wavemaker_mass
+
+   ! ----------------------------------------------------------------
+   ! Eddy viscosity term: linear p (d²P/dx² = 0) with nu_vis const
+   ! contributes exactly zero — the term is a Laplacian-type operator.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_eddy_viscosity_linear_p()
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
+      real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
+      real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
+      real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+
+      call make_lp(lp)
+      call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, mask, mask9)
+      depth_x = 10.0_SP;  depth_y = 10.0_SP
+      nu_vis = 0.2_SP
+      do j = 1, NLOC
+         do i = 1, MLOC + 1
+            p(i,j) = 3.0_SP*real(i, SP)
+         end do
+      end do
+      q = 0.0_SP
+
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(0.0_SP, src_x(i,j), TOL)
+            @assertEqual(0.0_SP, src_y(i,j), TOL)
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_eddy_viscosity_linear_p
+
+end module test_kernel_sources
