@@ -6,6 +6,8 @@ target_sources(${main_lib}_model PRIVATE
    kernel_masks.f90
    kernel_dispersion.f90
    kernel_breaker.f90
+   kernel_etauv.f90
+   kernel_sources.f90
    geometry.f90
    simulation.f90
    hotstart.f90

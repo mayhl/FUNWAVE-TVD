@@ -6,6 +6,10 @@ groups:
   - name: Engine
     tests: [test_time, test_time_utils]
   - name: Numerics
-    tests: [test_grid, test_interpolation, test_crs, test_accumulators]
+    tests: [test_grid, test_interpolation, test_crs, test_accumulators, test_solver_tridiag]
   - name: Output
     tests: [test_field_registry, test_gatherer]
+  - name: Model2D
+    tests: [test_fields, test_scratch_pool, test_sponge, test_kernel_derivatives,
+            test_kernel_fluxes, test_kernel_masks, test_kernel_dispersion,
+            test_kernel_breaker, test_kernel_etauv]
