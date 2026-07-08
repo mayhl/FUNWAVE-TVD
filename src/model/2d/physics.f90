@@ -14,7 +14,7 @@
 !    Beta_ref:   <real>      reference level (CART/ZALPHA),    default -0.531
 !    Gamma3:     <real>      linearity switch coefficient,     default 1.0
 !    viscosity_breaking: <bool>   default YES
-!    SWE_ETA_DEP: <real>    SWE depth fraction,               default 0.8
+!    SWE_ETA_DEP: <real>    SWE depth fraction,               default 0.7
 !    breaking: <bool>
 !    wavemaker: <bool>
 !    sediment: <bool>
@@ -45,7 +45,7 @@ module model_physics_mod
       real(SP) :: Beta_ref   = -0.531_SP
       real(SP) :: Gamma3     = 1.0_SP
       logical  :: viscosity_breaking = .true.
-      real(SP) :: SWE_ETA_DEP = 0.80_SP
+      real(SP) :: SWE_ETA_DEP = 0.70_SP
       real(SP) :: C_smg       = 0.0_SP   ! Smagorinsky sub-grid viscosity coefficient
       logical  :: breaking   = .false.
       logical  :: wavemaker  = .false.
@@ -84,7 +84,9 @@ contains
       call sub_env%yaml%read('Beta_ref',  silent=no_key, val=this%Beta_ref,  default='-0.531')
       call sub_env%yaml%read('Gamma3',    silent=no_key, val=this%Gamma3,    default='1.0')
       call sub_env%yaml%read('viscosity_breaking', val=this%viscosity_breaking, default='YES')
-      call sub_env%yaml%read('SWE_ETA_DEP', silent=no_key, val=this%SWE_ETA_DEP, default='0.8')
+      ! 0.7 matches the legacy default (old/mod_global.F); the earlier 0.8 here
+      ! was unintentional drift.
+      call sub_env%yaml%read('SWE_ETA_DEP', silent=no_key, val=this%SWE_ETA_DEP, default='0.7')
       call sub_env%yaml%read('C_smg',      silent=no_key, val=this%C_smg,       default='0.0')
       call sub_env%yaml%read('breaking',   val=this%breaking,  default='NO')
       call sub_env%yaml%read('wavemaker', val=this%wavemaker, default='NO')
