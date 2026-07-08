@@ -133,8 +133,6 @@ contains
    end subroutine deriv_xx_high
 
    ! Second derivative d²/dy² — higher-order 5-point stencil.
-   ! Note: the original spherical branch of DERIVATIVE_YY_HIGH contained a typo
-   ! (Uin(I+2,J+2) instead of Uin(I,J+2)); corrected here.
    pure subroutine deriv_yy_high(lp, inv_dy, mask, uin, uout)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: inv_dy(:,:), uin(:,:)
