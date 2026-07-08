@@ -13,6 +13,7 @@ qadd_pfunit_ctest(test_interpolation 2)
 
 qadd_pfunit_ctest(test_accumulators)
 qadd_pfunit_ctest(test_crs)
+qadd_pfunit_ctest(test_solver_tridiag 4)
 
 qadd_pfunit_ctest(test_misc)
 qadd_pfunit_ctest(test_units)

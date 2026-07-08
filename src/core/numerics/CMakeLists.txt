@@ -1,7 +1,7 @@
 # libcore_numerics: Numerics — grid decomposition, accumulators, interpolation, CRS
 add_library(
   libcore_numerics STATIC
-  accumulators.f90 crs.f90 grid.f90 interpolation.f90)
+  accumulators.f90 crs.f90 grid.f90 interpolation.f90 solver_tridiag.f90)
 
 set_target_properties(
   libcore_numerics PROPERTIES Fortran_MODULE_DIRECTORY

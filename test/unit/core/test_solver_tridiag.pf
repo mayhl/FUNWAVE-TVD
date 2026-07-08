@@ -1,0 +1,287 @@
+! allow(E001)
+module test_solver_tridiag
+
+   use pFUnit
+   use core_constants_mod,      only: SP
+   use core_grid_mod,           only: type_loop_bounds, type_grid_2d
+   use core_solver_tridiag_mod, only: trid_thomas_1d, trid_x, trid_y, &
+                                      trid_x_periodic, trid_y_periodic, &
+                                      type_trid_workspace
+   use mpi_f08
+
+   implicit none
+
+   integer, parameter :: NG   = 3
+   integer, parameter :: LNX  = 8
+   integer, parameter :: LNY  = 8
+   integer, parameter :: MLOC = LNX + 2*NG
+   integer, parameter :: NLOC = LNY + 2*NG
+   real(SP), parameter :: TOL  = 1.0e-4_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_lp(lp)
+      type(type_loop_bounds), intent(out) :: lp
+      lp%ib = NG + 1;  lp%ie = NG + LNX
+      lp%jb = NG + 1;  lp%je = NG + LNY
+      lp%mloc = MLOC;  lp%nloc = NLOC
+   end subroutine make_lp
+
+   ! Make a single-rank (serial) grid stub — all neighbor ranks are MPI_PROC_NULL.
+   subroutine make_serial_grid(grid)
+      type(type_grid_2d), intent(out) :: grid
+      integer :: dims(2), ierr
+      logical :: periods(2)
+      grid%nx_proc = 1;  grid%ny_proc = 1
+      grid%iproc   = 0;  grid%jproc   = 0
+      grid%back_rank  = MPI_PROC_NULL
+      grid%shore_rank = MPI_PROC_NULL
+      grid%right_rank = MPI_PROC_NULL
+      grid%left_rank  = MPI_PROC_NULL
+      grid%is_back_boundary  = .true.
+      grid%is_shore_boundary = .true.
+      grid%is_right_boundary = .true.
+      grid%is_left_boundary  = .true.
+      dims    = [1, 1]
+      periods = [.false., .false.]
+      call MPI_Cart_create(MPI_COMM_SELF, 2, dims, periods, .false., grid%cart_comm, ierr)
+   end subroutine make_serial_grid
+
+   ! ----------------------------------------------------------------
+   ! trid_thomas_1d: solve simple tri-diagonal with known solution.
+   ! System: diag=1, lower=upper=-0.5, RHS chosen so x(i) = i.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_thomas_1d_poisson()
+      integer, parameter :: N = 8
+      real(SP) :: a(N), c(N), d(N), z(N)
+      integer  :: i
+      real(SP) :: x_exact(N)
+
+      ! Build: a(i)=-0.5, c(i)=-0.5, d chosen so solution is x(i) = real(i)
+      ! Equation: -0.5*x(i-1) + x(i) - 0.5*x(i+1) = d(i)
+      !   d(1) = x(1) - 0.5*x(2)          (no left coupling for first row)
+      !   d(i) = -0.5*x(i-1) + x(i) - 0.5*x(i+1)
+      !   d(N) = -0.5*x(N-1) + x(N)       (no right coupling for last row)
+      do i = 1, N
+         x_exact(i) = real(i, SP)
+         a(i) = -0.5_SP
+         c(i) = -0.5_SP
+      end do
+      a(1) = 0.0_SP   ! no lower coupling at first row
+      c(N) = 0.0_SP   ! no upper coupling at last row
+      d(1) = x_exact(1) - 0.5_SP*x_exact(2)
+      do i = 2, N-1
+         d(i) = -0.5_SP*x_exact(i-1) + x_exact(i) - 0.5_SP*x_exact(i+1)
+      end do
+      d(N) = -0.5_SP*x_exact(N-1) + x_exact(N)
+
+      call trid_thomas_1d(N, a, c, d, z)
+
+      do i = 1, N
+         @assertEqual(x_exact(i), z(i), TOL)
+      end do
+   end subroutine test_thomas_1d_poisson
+
+   ! ----------------------------------------------------------------
+   ! trid_thomas_1d: purely diagonal system (a=0, c=0) — solution equals RHS.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_thomas_1d_diagonal()
+      integer, parameter :: N = 4
+      real(SP) :: a(N), c(N), d(N), z(N)
+      integer  :: i
+
+      a = 0.0_SP
+      c = 0.0_SP
+      do i = 1, N
+         d(i) = real(i, SP)
+      end do
+
+      call trid_thomas_1d(N, a, c, d, z)
+
+      do i = 1, N
+         @assertEqual(real(i, SP), z(i), TOL)
+      end do
+   end subroutine test_thomas_1d_diagonal
+
+   ! ----------------------------------------------------------------
+   ! trid_x serial (PX=1): x-sweep on a 2D ghost-padded array.
+   ! Known solution: f(i,j) = real(i - lp%ib + 1) for all j.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_trid_x_serial()
+      type(type_loop_bounds) :: lp
+      type(type_grid_2d)     :: grid
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      integer  :: i, j, n
+      real(SP) :: x_exact(LNX)
+
+      call make_lp(lp)
+      call make_serial_grid(grid)
+
+      n = LNX
+      do i = 1, n
+         x_exact(i) = real(i, SP)
+      end do
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+
+      do j = lp%jb, lp%je
+         ! First row: no lower coupling
+         a(lp%ib, j)   = 0.0_SP
+         c(lp%ib, j)   = -0.5_SP
+         d(lp%ib, j)   = x_exact(1) - 0.5_SP*x_exact(2)
+         ! Interior rows
+         do i = lp%ib + 1, lp%ie - 1
+            a(i, j) = -0.5_SP
+            c(i, j) = -0.5_SP
+            d(i, j) = -0.5_SP*x_exact(i - lp%ib) + x_exact(i - lp%ib + 1) &
+                     - 0.5_SP*x_exact(i - lp%ib + 2)
+         end do
+         ! Last row: no upper coupling
+         a(lp%ie, j) = -0.5_SP
+         c(lp%ie, j) =  0.0_SP
+         d(lp%ie, j) = -0.5_SP*x_exact(n-1) + x_exact(n)
+      end do
+
+      call trid_x(lp, grid, a, c, d, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(x_exact(i - lp%ib + 1), f(i, j), TOL)
+         end do
+      end do
+
+      call MPI_Comm_free(grid%cart_comm)
+   end subroutine test_trid_x_serial
+
+   ! ----------------------------------------------------------------
+   ! trid_y serial (PY=1): y-sweep on a 2D ghost-padded array.
+   ! Known solution: f(i,j) = real(j - lp%jb + 1) for all i.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_trid_y_serial()
+      type(type_loop_bounds) :: lp
+      type(type_grid_2d)     :: grid
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      integer  :: i, j, n
+      real(SP) :: x_exact(LNY)
+
+      call make_lp(lp)
+      call make_serial_grid(grid)
+
+      n = LNY
+      do j = 1, n
+         x_exact(j) = real(j, SP)
+      end do
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+
+      do i = lp%ib, lp%ie
+         a(i, lp%jb) = 0.0_SP
+         c(i, lp%jb) = -0.5_SP
+         d(i, lp%jb) = x_exact(1) - 0.5_SP*x_exact(2)
+         do j = lp%jb + 1, lp%je - 1
+            a(i, j) = -0.5_SP
+            c(i, j) = -0.5_SP
+            d(i, j) = -0.5_SP*x_exact(j - lp%jb) + x_exact(j - lp%jb + 1) &
+                     - 0.5_SP*x_exact(j - lp%jb + 2)
+         end do
+         a(i, lp%je) = -0.5_SP
+         c(i, lp%je) =  0.0_SP
+         d(i, lp%je) = -0.5_SP*x_exact(n-1) + x_exact(n)
+      end do
+
+      call trid_y(lp, grid, a, c, d, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(x_exact(j - lp%jb + 1), f(i, j), TOL)
+         end do
+      end do
+
+      call MPI_Comm_free(grid%cart_comm)
+   end subroutine test_trid_y_serial
+
+   ! ----------------------------------------------------------------
+   ! trid_x_periodic (PX=1): periodic x-sweep.
+   ! Use circulant system with known solution f(i,j) = 1 for all i,j.
+   ! RHS d(i) = 1 - 0.25 - 0.25 = 0.5 for interior; same at boundaries
+   ! since the periodic wrap also has coupling -0.25 on each side.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_trid_x_periodic_serial()
+      type(type_loop_bounds)     :: lp
+      type(type_grid_2d)         :: grid
+      type(type_trid_workspace)  :: tws
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      integer  :: i, j
+
+      call make_lp(lp)
+      call make_serial_grid(grid)
+      call tws%alloc(MLOC, NLOC)
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            a(i, j) = -0.25_SP   ! lower (includes periodic corner at ib)
+            c(i, j) = -0.25_SP   ! upper (includes periodic corner at ie)
+            d(i, j) =  0.5_SP    ! RHS for constant solution 1.0
+         end do
+      end do
+
+      call trid_x_periodic(lp, grid, a, c, d, tws, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(1.0_SP, f(i, j), TOL)
+         end do
+      end do
+
+      call tws%free()
+      call MPI_Comm_free(grid%cart_comm)
+   end subroutine test_trid_x_periodic_serial
+
+   ! ----------------------------------------------------------------
+   ! trid_y_periodic (PY=1): periodic y-sweep, same circulant system.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_trid_y_periodic_serial()
+      type(type_loop_bounds)     :: lp
+      type(type_grid_2d)         :: grid
+      type(type_trid_workspace)  :: tws
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC), f(MLOC, NLOC)
+      integer  :: i, j
+
+      call make_lp(lp)
+      call make_serial_grid(grid)
+      call tws%alloc(MLOC, NLOC)
+
+      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            a(i, j) = -0.25_SP
+            c(i, j) = -0.25_SP
+            d(i, j) =  0.5_SP
+         end do
+      end do
+
+      call trid_y_periodic(lp, grid, a, c, d, tws, f)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(1.0_SP, f(i, j), TOL)
+         end do
+      end do
+
+      call tws%free()
+      call MPI_Comm_free(grid%cart_comm)
+   end subroutine test_trid_y_periodic_serial
+
+end module test_solver_tridiag
