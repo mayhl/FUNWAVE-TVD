@@ -1,6 +1,6 @@
 ! allow(E001)
 module model_kernel_breaker_mod
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, GRAV, DEG2RAD, RAD2DEG
    use core_grid_mod,      only: type_loop_bounds
    implicit none
    private
@@ -16,8 +16,10 @@ module model_kernel_breaker_mod
    integer, parameter :: VIS_SCHEME_DEPTH_RATIO   = 4
 
    real(SP), parameter :: SMALL = 1.0e-6_SP
-   real(SP), parameter :: GRAV  = 9.81_SP
-   real(SP), parameter :: PI    = 3.14159265358979_SP
+
+   ! Empirical roller coefficients (values carried over from legacy breaker.F).
+   real(SP), parameter :: ROLLER_COEF  = 0.45_SP    !< r = |ROLLER_COEF*etat/c|
+   real(SP), parameter :: ROLLER_R_MAX = 0.1638_SP  !< cap on roller ratio r
 
 contains
 
@@ -75,7 +77,7 @@ contains
             dxg  = dx(i,j)
             dyg  = dy(i,j)
 
-            angle = atan2(-etay(i,j), -etax(i,j)) * 180.0_SP / PI
+            angle = atan2(-etay(i,j), -etax(i,j)) * RAD2DEG
 
             ! ---- VIS_DEPTH_RATIO: ratio-based detection, no age -----
             if (vis_scheme == VIS_SCHEME_DEPTH_RATIO) then
@@ -180,13 +182,13 @@ contains
 
                   ! ---- roller flux and undertow --------------------
                   c1 = max(abs(etat(i,j))/slope_mag, sqrt(GRAV*abs(h(i,j))))
-                  r  = abs(0.45_SP * etat(i,j) / max(c1, SMALL))
-                  r  = min(r, 0.1638_SP)
+                  r  = abs(ROLLER_COEF * etat(i,j) / max(c1, SMALL))
+                  r  = min(r, ROLLER_R_MAX)
 
                   roller_flux(i,j) = abs(c1 - sqrt(u(i,j)*u(i,j) + v(i,j)*v(i,j))) &
                                      * r * (eta(i,j) - etamean(i,j))
-                  undertow_u(i,j)  = -roller_flux(i,j) * cos(angle * PI / 180.0_SP)
-                  undertow_v(i,j)  = -roller_flux(i,j) * sin(angle * PI / 180.0_SP)
+                  undertow_u(i,j)  = -roller_flux(i,j) * cos(angle * DEG2RAD)
+                  undertow_v(i,j)  = -roller_flux(i,j) * sin(angle * DEG2RAD)
                else
                   nu_break(i,j) = nu_bkg
                end if
