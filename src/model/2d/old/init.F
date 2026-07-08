@@ -650,6 +650,10 @@ SUBROUTINE INITIALIZATION
       Gamma2 = ZERO
 # endif
    END IF
+   ! TODO: DISP_TIME_LEFT = (Gamma2 > ZERO) once semi-implicit Gamma2 path
+   !       is validated post-refactoring. Currently kept .FALSE. so the
+   !       Gamma2 correction remains fully explicit (sources.F only), matching
+   !       all prior FUNWAVE results.
 
 # if defined (CARTESIAN)
 ! physics - below are fully nonlinear Boussinesq for reference

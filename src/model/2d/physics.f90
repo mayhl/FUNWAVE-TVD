@@ -41,6 +41,7 @@ module model_physics_mod
       logical  :: dispersion = .true.
       real(SP) :: Gamma1     = 1.0_SP
       real(SP) :: Gamma2     = 1.0_SP
+      logical  :: disp_time_left = .false.   ! semi-implicit Gamma2 LHS correction; deferred post-refactor
       real(SP) :: Beta_ref   = -0.531_SP
       real(SP) :: Gamma3     = 1.0_SP
       logical  :: viscosity_breaking = .true.
@@ -70,8 +71,16 @@ contains
       call sub_env%yaml%read('water_level', val=this%water_level, default='0.0')
       call sub_env%yaml%read('periodic',    val=this%periodic,    default='NO')
       call sub_env%yaml%read('dispersion',  val=this%dispersion,  default='YES')
+      ! TODO: add mode enum (e.g. mode: boussinesq_full / boussinesq_linear / nswe /
+      !       weakly_nonlinear) that sets Gamma1/Gamma2/Gamma3 automatically, so
+      !       users never need to specify raw Gamma values directly in YAML.
+      !   boussinesq_full    -> Gamma1=1, Gamma2=1, Gamma3=1  (default)
+      !   boussinesq_linear  -> Gamma1=1, Gamma2=0, Gamma3=1
+      !   weakly_nonlinear   -> Gamma1=1, Gamma2=1, Gamma3=0
+      !   nswe               -> Gamma1=0, Gamma2=0, Gamma3=1
       call sub_env%yaml%read('Gamma1',    silent=no_key, val=this%Gamma1,    default='1.0')
-      call sub_env%yaml%read('Gamma2',    silent=no_key, val=this%Gamma2,    default='1.0')
+      call sub_env%yaml%read('Gamma2',          silent=no_key, val=this%Gamma2,          default='1.0')
+      call sub_env%yaml%read('disp_time_left', silent=no_key, val=this%disp_time_left, default='NO')
       call sub_env%yaml%read('Beta_ref',  silent=no_key, val=this%Beta_ref,  default='-0.531')
       call sub_env%yaml%read('Gamma3',    silent=no_key, val=this%Gamma3,    default='1.0')
       call sub_env%yaml%read('viscosity_breaking', val=this%viscosity_breaking, default='YES')
