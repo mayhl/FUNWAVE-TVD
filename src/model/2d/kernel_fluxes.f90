@@ -1,6 +1,6 @@
 ! allow(E001)
 module model_kernel_fluxes_mod
-   use core_constants_mod, only: SP, N_GHOST
+   use core_constants_mod, only: SP, N_GHOST, GRAV
    use core_grid_mod,      only: type_loop_bounds
    implicit none
    private
@@ -39,6 +39,8 @@ module model_kernel_fluxes_mod
       ! output fluxes: (m+1)xn and mx(n+1)
       real(SP), allocatable :: p(:,:),  fx(:,:),  gx(:,:)
       real(SP), allocatable :: q(:,:),  fy(:,:),  gy(:,:)
+      ! slope scratch for construction: m x n
+      real(SP), allocatable :: sl(:,:)
    contains
       procedure :: alloc => fws_alloc
       procedure :: free  => fws_free
@@ -94,6 +96,7 @@ contains
       allocate(ws%syl(m,n1),    ws%syr(m,n1))
       allocate(ws%p(m1,n),  ws%fx(m1,n),  ws%gx(m1,n))
       allocate(ws%q(m,n1),  ws%fy(m,n1),  ws%gy(m,n1))
+      allocate(ws%sl(m,n))
    end subroutine fws_alloc
 
    subroutine fws_free(ws)
@@ -113,55 +116,59 @@ contains
       deallocate(ws%gyl,    ws%gyr,    ws%syl,    ws%syr)
       deallocate(ws%p,  ws%fx,  ws%gx)
       deallocate(ws%q,  ws%fy,  ws%gy)
+      deallocate(ws%sl)
       ws%m = 0;  ws%n = 0
    end subroutine fws_free
 
    ! ----------------------------------------------------------------
-   ! Van Leer limited slope in x (uses actual dx, not inv_dx).
-   ! Full-array operation; boundary cells use one-sided differences.
+   ! Van Leer limited slope in x.  Takes inv_dx (no division by grid
+   ! spacing); the limiter's own ratio division is data-dependent and
+   ! intrinsic to the scheme.  Deliberately full-array (size-based, not
+   ! lp): interface arrays are staggered and ghost slopes feed the
+   ! boundary reconstruction, matching legacy DelxFun.
    ! ----------------------------------------------------------------
-   pure subroutine delx_fun(dx, din, dout)
-      real(SP), intent(in)  :: dx(:,:), din(:,:)
+   pure subroutine delx_fun(inv_dx, din, dout)
+      real(SP), intent(in)  :: inv_dx(:,:), din(:,:)
       real(SP), intent(out) :: dout(:,:)
       integer  :: i, j, m, n
       real(SP) :: tmp1, tmp2
       m = size(din, 1);  n = size(din, 2)
       do j = 1, n
          do i = 2, m - 1
-            tmp1 = (din(i+1,j) - din(i,j))   / dx(i,j)
-            tmp2 = (din(i,j)   - din(i-1,j)) / dx(i-1,j)
+            tmp1 = (din(i+1,j) - din(i,j))   * inv_dx(i,j)
+            tmp2 = (din(i,j)   - din(i-1,j)) * inv_dx(i-1,j)
             if (abs(tmp1) + abs(tmp2) < SMALL) then
                dout(i,j) = 0.0_SP
             else
                dout(i,j) = (tmp1*abs(tmp2) + abs(tmp1)*tmp2) / (abs(tmp1) + abs(tmp2))
             end if
          end do
-         dout(1,j) = (din(2,j)   - din(1,j))   / dx(1,j)
-         dout(m,j) = (din(m,j)   - din(m-1,j)) / dx(m,j)
+         dout(1,j) = (din(2,j)   - din(1,j))   * inv_dx(1,j)
+         dout(m,j) = (din(m,j)   - din(m-1,j)) * inv_dx(m,j)
       end do
    end subroutine delx_fun
 
    ! ----------------------------------------------------------------
-   ! Van Leer limited slope in y.
+   ! Van Leer limited slope in y (takes inv_dy; see delx_fun notes).
    ! ----------------------------------------------------------------
-   pure subroutine dely_fun(dy, din, dout)
-      real(SP), intent(in)  :: dy(:,:), din(:,:)
+   pure subroutine dely_fun(inv_dy, din, dout)
+      real(SP), intent(in)  :: inv_dy(:,:), din(:,:)
       real(SP), intent(out) :: dout(:,:)
       integer  :: i, j, m, n
       real(SP) :: tmp1, tmp2
       m = size(din, 1);  n = size(din, 2)
       do i = 1, m
          do j = 2, n - 1
-            tmp1 = (din(i,j+1) - din(i,j))   / dy(i,j)
-            tmp2 = (din(i,j)   - din(i,j-1)) / dy(i,j-1)
+            tmp1 = (din(i,j+1) - din(i,j))   * inv_dy(i,j)
+            tmp2 = (din(i,j)   - din(i,j-1)) * inv_dy(i,j-1)
             if (abs(tmp1) + abs(tmp2) < SMALL) then
                dout(i,j) = 0.0_SP
             else
                dout(i,j) = (tmp1*abs(tmp2) + abs(tmp1)*tmp2) / (abs(tmp1) + abs(tmp2))
             end if
          end do
-         dout(i,1) = (din(i,2) - din(i,1))   / dy(i,1)
-         dout(i,n) = (din(i,n) - din(i,n-1)) / dy(i,n)
+         dout(i,1) = (din(i,2) - din(i,1))   * inv_dy(i,1)
+         dout(i,n) = (din(i,n) - din(i,n-1)) * inv_dy(i,n)
       end do
    end subroutine dely_fun
 
@@ -643,11 +650,10 @@ contains
    ! Roe wave speeds (Zhou et al. 2001).
    ! ----------------------------------------------------------------
    pure subroutine wave_speed(lp, uxl, uxr, vyl, vyr, hxl, hxr, hyl, hyr, &
-                               grav, sxl, sxr, syl, syr)
+                               sxl, sxr, syl, syr)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: uxl(:,:), uxr(:,:), hxl(:,:), hxr(:,:)
       real(SP), intent(in)  :: vyl(:,:), vyr(:,:), hyl(:,:), hyr(:,:)
-      real(SP), intent(in)  :: grav
       real(SP), intent(out) :: sxl(:,:), sxr(:,:)
       real(SP), intent(out) :: syl(:,:), syr(:,:)
       integer  :: i, j, m, n, m1, n1
@@ -655,7 +661,7 @@ contains
       m = lp%mloc;  n = lp%nloc;  m1 = m + 1;  n1 = n + 1
       do j = 1+N_GHOST, n-N_GHOST
          do i = 1+N_GHOST, m1-N_GHOST
-            spl = sqrt(grav*abs(hxl(i,j)));  spr = sqrt(grav*abs(hxr(i,j)))
+            spl = sqrt(GRAV*abs(hxl(i,j)));  spr = sqrt(GRAV*abs(hxr(i,j)))
             sps = 0.5_SP*(spl+spr) + 0.25_SP*(uxl(i,j)-uxr(i,j))
             us  = 0.5_SP*(uxl(i,j)+uxr(i,j)) + spl - spr
             sxl(i,j) = min(uxl(i,j)-spl, us-sps)
@@ -680,7 +686,7 @@ contains
       end do
       do j = 1+N_GHOST, n1-N_GHOST
          do i = 1+N_GHOST, m-N_GHOST
-            spl = sqrt(grav*abs(hyl(i,j)));  spr = sqrt(grav*abs(hyr(i,j)))
+            spl = sqrt(GRAV*abs(hyl(i,j)));  spr = sqrt(GRAV*abs(hyr(i,j)))
             sps = 0.5_SP*(spl+spr) + 0.25_SP*(vyl(i,j)-vyr(i,j))
             us  = 0.5_SP*(vyl(i,j)+vyr(i,j)) + spl - spr
             syl(i,j) = min(vyl(i,j)-spl, us-sps)
@@ -759,10 +765,10 @@ contains
    ! ----------------------------------------------------------------
    ! Private helper: assemble P/Fx/Gx from x-interface arrays.
    ! ----------------------------------------------------------------
-   subroutine assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, grav, dispersion)
+   subroutine assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_flux_workspace), intent(inout) :: ws
-      real(SP), intent(in) :: depthx(:,:), gamma1, gamma3, grav
+      real(SP), intent(in) :: depthx(:,:), gamma1, gamma3
       integer,  intent(in) :: mask9(:,:)
       logical,  intent(in) :: dispersion
       integer  :: i, j, ii
@@ -780,9 +786,9 @@ contains
                ws%pl(i,j) = ws%huxl(i,j) + ws%hxl(i,j)*u4l
                ws%pr(i,j) = ws%huxr(i,j) + ws%hxr(i,j)*u4r
                ws%fxl(i,j) = gamma3*ws%pl(i,j)*(ws%uxl(i,j)+u4l) &
-                    + 0.5_SP*grav*(gamma3*ws%etarxl(i,j)**2 + 2.0_SP*ws%etarxl(i,j)*depthx(i,j))
+                    + 0.5_SP*GRAV*(gamma3*ws%etarxl(i,j)**2 + 2.0_SP*ws%etarxl(i,j)*depthx(i,j))
                ws%fxr(i,j) = gamma3*ws%pr(i,j)*(ws%uxr(i,j)+u4r) &
-                    + 0.5_SP*grav*(gamma3*ws%etarxr(i,j)**2 + 2.0_SP*ws%etarxr(i,j)*depthx(i,j))
+                    + 0.5_SP*GRAV*(gamma3*ws%etarxr(i,j)**2 + 2.0_SP*ws%etarxr(i,j)*depthx(i,j))
                ws%gxl(i,j) = gamma3*ws%hxl(i,j)*(ws%uxl(i,j)+u4l)*(ws%vxl(i,j)+v4l)
                ws%gxr(i,j) = gamma3*ws%hxr(i,j)*(ws%uxr(i,j)+u4r)*(ws%vxr(i,j)+v4r)
             end do
@@ -791,9 +797,9 @@ contains
          ws%pl  = ws%huxl
          ws%pr  = ws%huxr
          ws%fxl = gamma3*ws%pl*ws%uxl &
-                  + 0.5_SP*grav*(gamma3*ws%etarxl**2 + 2.0_SP*ws%etarxl*depthx)
+                  + 0.5_SP*GRAV*(gamma3*ws%etarxl**2 + 2.0_SP*ws%etarxl*depthx)
          ws%fxr = gamma3*ws%pr*ws%uxr &
-                  + 0.5_SP*grav*(gamma3*ws%etarxr**2 + 2.0_SP*ws%etarxr*depthx)
+                  + 0.5_SP*GRAV*(gamma3*ws%etarxr**2 + 2.0_SP*ws%etarxr*depthx)
          ws%gxl = gamma3*ws%hxl*ws%uxl*ws%vxl
          ws%gxr = gamma3*ws%hxr*ws%uxr*ws%vxr
       end if
@@ -802,10 +808,10 @@ contains
    ! ----------------------------------------------------------------
    ! Private helper: assemble Q/Fy/Gy from y-interface arrays.
    ! ----------------------------------------------------------------
-   subroutine assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, grav, dispersion)
+   subroutine assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_flux_workspace), intent(inout) :: ws
-      real(SP), intent(in) :: depthy(:,:), gamma1, gamma3, grav
+      real(SP), intent(in) :: depthy(:,:), gamma1, gamma3
       integer,  intent(in) :: mask9(:,:)
       logical,  intent(in) :: dispersion
       integer  :: i, j, jj
@@ -823,9 +829,9 @@ contains
                ws%ql(i,j) = ws%hvyl(i,j) + ws%hyl(i,j)*v4l
                ws%qr(i,j) = ws%hvyr(i,j) + ws%hyr(i,j)*v4r
                ws%gyl(i,j) = gamma3*ws%ql(i,j)*(ws%vyl(i,j)+v4l) &
-                    + 0.5_SP*grav*(gamma3*ws%etaryl(i,j)**2 + 2.0_SP*ws%etaryl(i,j)*depthy(i,j))
+                    + 0.5_SP*GRAV*(gamma3*ws%etaryl(i,j)**2 + 2.0_SP*ws%etaryl(i,j)*depthy(i,j))
                ws%gyr(i,j) = gamma3*ws%qr(i,j)*(ws%vyr(i,j)+v4r) &
-                    + 0.5_SP*grav*(gamma3*ws%etaryr(i,j)**2 + 2.0_SP*ws%etaryr(i,j)*depthy(i,j))
+                    + 0.5_SP*GRAV*(gamma3*ws%etaryr(i,j)**2 + 2.0_SP*ws%etaryr(i,j)*depthy(i,j))
                ws%fyl(i,j) = gamma3*ws%hyl(i,j)*(ws%uyl(i,j)+u4l)*(ws%vyl(i,j)+v4l)
                ws%fyr(i,j) = gamma3*ws%hyr(i,j)*(ws%uyr(i,j)+u4r)*(ws%vyr(i,j)+v4r)
             end do
@@ -834,9 +840,9 @@ contains
          ws%ql  = ws%hvyl
          ws%qr  = ws%hvyr
          ws%gyl = gamma3*ws%ql*ws%vyl &
-                  + 0.5_SP*grav*(gamma3*ws%etaryl**2 + 2.0_SP*ws%etaryl*depthy)
+                  + 0.5_SP*GRAV*(gamma3*ws%etaryl**2 + 2.0_SP*ws%etaryl*depthy)
          ws%gyr = gamma3*ws%qr*ws%vyr &
-                  + 0.5_SP*grav*(gamma3*ws%etaryr**2 + 2.0_SP*ws%etaryr*depthy)
+                  + 0.5_SP*GRAV*(gamma3*ws%etaryr**2 + 2.0_SP*ws%etaryr*depthy)
          ws%fyl = gamma3*ws%hyl*ws%uyl*ws%vyl
          ws%fyr = gamma3*ws%hyr*ws%uyr*ws%vyr
       end if
@@ -846,54 +852,50 @@ contains
    ! Basic (1st-order) CONSTRUCTION: van Leer slopes + construct_x/y.
    ! ----------------------------------------------------------------
    subroutine construction(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                            dx, dy, mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                            dx, dy, inv_dx, inv_dy, mask, mask9, &
+                            gamma1, gamma3, dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
       real(SP), intent(in)  :: eta(:,:), u(:,:), v(:,:), hu(:,:), hv(:,:)
       real(SP), intent(in)  :: u4(:,:), v4(:,:)
       real(SP), intent(in)  :: depthx(:,:), depthy(:,:)
-      real(SP), intent(in)  :: dx(:,:), dy(:,:)
+      real(SP), intent(in)  :: dx(:,:), dy(:,:), inv_dx(:,:), inv_dy(:,:)
       integer,  intent(in)  :: mask(:,:), mask9(:,:)
-      real(SP), intent(in)  :: gamma1, gamma3, grav
+      real(SP), intent(in)  :: gamma1, gamma3
       logical,  intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
-      integer  :: m, n
-      real(SP), allocatable :: sl(:,:)
-      m = lp%mloc;  n = lp%nloc
-      allocate(sl(m,n))
-      call delx_fun(dx, eta, sl);  call construct_x(dx, eta, sl, ws%etarxl, ws%etarxr)
-      call delx_fun(dx, u,   sl);  call construct_x(dx, u,   sl, ws%uxl,    ws%uxr)
-      call delx_fun(dx, v,   sl);  call construct_x(dx, v,   sl, ws%vxl,    ws%vxr)
-      call delx_fun(dx, hu,  sl);  call construct_x(dx, hu,  sl, ws%huxl,   ws%huxr)
-      call delx_fun(dx, hv,  sl);  call construct_x(dx, hv,  sl, ws%hvxl,   ws%hvxr)
+      call delx_fun(inv_dx, eta, ws%sl);  call construct_x(dx, eta, ws%sl, ws%etarxl, ws%etarxr)
+      call delx_fun(inv_dx, u,   ws%sl);  call construct_x(dx, u,   ws%sl, ws%uxl,    ws%uxr)
+      call delx_fun(inv_dx, v,   ws%sl);  call construct_x(dx, v,   ws%sl, ws%vxl,    ws%vxr)
+      call delx_fun(inv_dx, hu,  ws%sl);  call construct_x(dx, hu,  ws%sl, ws%huxl,   ws%huxr)
+      call delx_fun(inv_dx, hv,  ws%sl);  call construct_x(dx, hv,  ws%sl, ws%hvxl,   ws%hvxr)
       if (dispersion) then
-         call delx_fun(dx, u4, sl); call construct_x(dx, u4, sl, ws%u4xl, ws%u4xr)
-         call delx_fun(dx, v4, sl); call construct_x(dx, v4, sl, ws%v4xl, ws%v4xr)
+         call delx_fun(inv_dx, u4, ws%sl); call construct_x(dx, u4, ws%sl, ws%u4xl, ws%u4xr)
+         call delx_fun(inv_dx, v4, ws%sl); call construct_x(dx, v4, ws%sl, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, grav, dispersion)
-      call dely_fun(dy, eta, sl);  call construct_y(dy, eta, sl, ws%etaryl, ws%etaryr)
-      call dely_fun(dy, u,   sl);  call construct_y(dy, u,   sl, ws%uyl,    ws%uyr)
-      call dely_fun(dy, v,   sl);  call construct_y(dy, v,   sl, ws%vyl,    ws%vyr)
-      call dely_fun(dy, hv,  sl);  call construct_y(dy, hv,  sl, ws%hvyl,   ws%hvyr)
-      call dely_fun(dy, hu,  sl);  call construct_y(dy, hu,  sl, ws%huyl,   ws%huyr)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
+      call dely_fun(inv_dy, eta, ws%sl);  call construct_y(dy, eta, ws%sl, ws%etaryl, ws%etaryr)
+      call dely_fun(inv_dy, u,   ws%sl);  call construct_y(dy, u,   ws%sl, ws%uyl,    ws%uyr)
+      call dely_fun(inv_dy, v,   ws%sl);  call construct_y(dy, v,   ws%sl, ws%vyl,    ws%vyr)
+      call dely_fun(inv_dy, hv,  ws%sl);  call construct_y(dy, hv,  ws%sl, ws%hvyl,   ws%hvyr)
+      call dely_fun(inv_dy, hu,  ws%sl);  call construct_y(dy, hu,  ws%sl, ws%huyl,   ws%huyr)
       if (dispersion) then
-         call dely_fun(dy, v4, sl); call construct_y(dy, v4, sl, ws%v4yl, ws%v4yr)
-         call dely_fun(dy, u4, sl); call construct_y(dy, u4, sl, ws%u4yl, ws%u4yr)
+         call dely_fun(inv_dy, v4, ws%sl); call construct_y(dy, v4, ws%sl, ws%v4yl, ws%v4yr)
+         call dely_fun(inv_dy, u4, ws%sl); call construct_y(dy, u4, ws%sl, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, grav, dispersion)
-      deallocate(sl)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
    end subroutine construction
 
    ! ----------------------------------------------------------------
    ! High-order CONSTRUCTION ('FOU'): 4th-order van Leer+minmod.
    ! ----------------------------------------------------------------
    subroutine construction_ho(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                               mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                               mask, mask9, gamma1, gamma3, dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
       real(SP), intent(in)  :: eta(:,:), u(:,:), v(:,:), hu(:,:), hv(:,:)
       real(SP), intent(in)  :: u4(:,:), v4(:,:)
       real(SP), intent(in)  :: depthx(:,:), depthy(:,:)
       integer,  intent(in)  :: mask(:,:), mask9(:,:)
-      real(SP), intent(in)  :: gamma1, gamma3, grav
+      real(SP), intent(in)  :: gamma1, gamma3
       logical,  intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
       call construct_ho_x(lp, mask, eta, ws%etarxl, ws%etarxr)
@@ -905,7 +907,7 @@ contains
          call construct_ho_x(lp, mask, u4, ws%u4xl, ws%u4xr)
          call construct_ho_x(lp, mask, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
       call construct_ho_y(lp, mask, eta, ws%etaryl, ws%etaryr)
       call construct_ho_y(lp, mask, u,   ws%uyl,    ws%uyr)
       call construct_ho_y(lp, mask, v,   ws%vyl,    ws%vyr)
@@ -915,20 +917,20 @@ contains
          call construct_ho_y(lp, mask, v4, ws%v4yl, ws%v4yr)
          call construct_ho_y(lp, mask, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
    end subroutine construction_ho
 
    ! ----------------------------------------------------------------
    ! 'FMI': 4th-order minmod-only.
    ! ----------------------------------------------------------------
    subroutine construction_ho_minmod(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                                      mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                                      mask, mask9, gamma1, gamma3, dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
       real(SP), intent(in)  :: eta(:,:), u(:,:), v(:,:), hu(:,:), hv(:,:)
       real(SP), intent(in)  :: u4(:,:), v4(:,:)
       real(SP), intent(in)  :: depthx(:,:), depthy(:,:)
       integer,  intent(in)  :: mask(:,:), mask9(:,:)
-      real(SP), intent(in)  :: gamma1, gamma3, grav
+      real(SP), intent(in)  :: gamma1, gamma3
       logical,  intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
       call construct_ho_x_minmod(lp, mask, eta, ws%etarxl, ws%etarxr)
@@ -940,7 +942,7 @@ contains
          call construct_ho_x_minmod(lp, mask, u4, ws%u4xl, ws%u4xr)
          call construct_ho_x_minmod(lp, mask, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
       call construct_ho_y_minmod(lp, mask, eta, ws%etaryl, ws%etaryr)
       call construct_ho_y_minmod(lp, mask, u,   ws%uyl,    ws%uyr)
       call construct_ho_y_minmod(lp, mask, v,   ws%vyl,    ws%vyr)
@@ -950,20 +952,20 @@ contains
          call construct_ho_y_minmod(lp, mask, v4, ws%v4yl, ws%v4yr)
          call construct_ho_y_minmod(lp, mask, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
    end subroutine construction_ho_minmod
 
    ! ----------------------------------------------------------------
    ! 'MLP': MLP reconstruction.
    ! ----------------------------------------------------------------
    subroutine construction_ho_mlp(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                                   mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                                   mask, mask9, gamma1, gamma3, dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
       real(SP), intent(in)  :: eta(:,:), u(:,:), v(:,:), hu(:,:), hv(:,:)
       real(SP), intent(in)  :: u4(:,:), v4(:,:)
       real(SP), intent(in)  :: depthx(:,:), depthy(:,:)
       integer,  intent(in)  :: mask(:,:), mask9(:,:)
-      real(SP), intent(in)  :: gamma1, gamma3, grav
+      real(SP), intent(in)  :: gamma1, gamma3
       logical,  intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
       call construct_ho_x_mlp(lp, mask, eta, ws%etarxl, ws%etarxr)
@@ -975,7 +977,7 @@ contains
          call construct_ho_x_mlp(lp, mask, u4, ws%u4xl, ws%u4xr)
          call construct_ho_x_mlp(lp, mask, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
       call construct_ho_y_mlp(lp, mask, eta, ws%etaryl, ws%etaryr)
       call construct_ho_y_mlp(lp, mask, u,   ws%uyl,    ws%uyr)
       call construct_ho_y_mlp(lp, mask, v,   ws%vyl,    ws%vyr)
@@ -985,20 +987,20 @@ contains
          call construct_ho_y_mlp(lp, mask, v4, ws%v4yl, ws%v4yr)
          call construct_ho_y_mlp(lp, mask, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
    end subroutine construction_ho_mlp
 
    ! ----------------------------------------------------------------
    ! 'WEN': WENO5 reconstruction (Cartesian, constant dx).
    ! ----------------------------------------------------------------
    subroutine construction_weno(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                                 mask9, gamma1, gamma3, grav, dispersion, ws)
+                                 mask9, gamma1, gamma3, dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
       real(SP), intent(in)  :: eta(:,:), u(:,:), v(:,:), hu(:,:), hv(:,:)
       real(SP), intent(in)  :: u4(:,:), v4(:,:)
       real(SP), intent(in)  :: depthx(:,:), depthy(:,:)
       integer,  intent(in)  :: mask9(:,:)
-      real(SP), intent(in)  :: gamma1, gamma3, grav
+      real(SP), intent(in)  :: gamma1, gamma3
       logical,  intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
       call weno_construct_x(lp, eta, ws%etarxl, ws%etarxr)
@@ -1010,7 +1012,7 @@ contains
          call weno_construct_x(lp, u4, ws%u4xl, ws%u4xr)
          call weno_construct_x(lp, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
       call weno_construct_y(lp, eta, ws%etaryl, ws%etaryr)
       call weno_construct_y(lp, u,   ws%uyl,    ws%uyr)
       call weno_construct_y(lp, v,   ws%vyl,    ws%vyr)
@@ -1020,7 +1022,7 @@ contains
          call weno_construct_y(lp, v4, ws%v4yl, ws%v4yr)
          call weno_construct_y(lp, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, grav, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
    end subroutine construction_weno
 
    ! ----------------------------------------------------------------
@@ -1029,38 +1031,38 @@ contains
    ! ----------------------------------------------------------------
    subroutine fluxes(lp, high_order, constr, &
                      eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                     dx, dy, mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                     dx, dy, inv_dx, inv_dy, mask, mask9, gamma1, gamma3, dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
       character(len=*),       intent(in)    :: high_order, constr
       real(SP), intent(in)  :: eta(:,:), u(:,:), v(:,:), hu(:,:), hv(:,:)
       real(SP), intent(in)  :: u4(:,:), v4(:,:)
       real(SP), intent(in)  :: depthx(:,:), depthy(:,:)
-      real(SP), intent(in)  :: dx(:,:), dy(:,:)
+      real(SP), intent(in)  :: dx(:,:), dy(:,:), inv_dx(:,:), inv_dy(:,:)
       integer,  intent(in)  :: mask(:,:), mask9(:,:)
-      real(SP), intent(in)  :: gamma1, gamma3, grav
+      real(SP), intent(in)  :: gamma1, gamma3
       logical,  intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
 
       select case (high_order(1:3))
       case ('FOU')
          call construction_ho(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                               mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                               mask, mask9, gamma1, gamma3, dispersion, ws)
       case ('FMI')
          call construction_ho_minmod(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                                     mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                                     mask, mask9, gamma1, gamma3, dispersion, ws)
       case ('WEN')
          call construction_weno(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                                 mask9, gamma1, gamma3, grav, dispersion, ws)
+                                 mask9, gamma1, gamma3, dispersion, ws)
       case ('MLP')
          call construction_ho_mlp(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                                   mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                                   mask, mask9, gamma1, gamma3, dispersion, ws)
       case default
          call construction(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                           dx, dy, mask, mask9, gamma1, gamma3, grav, dispersion, ws)
+                           dx, dy, inv_dx, inv_dy, mask, mask9, gamma1, gamma3, dispersion, ws)
       end select
 
       call wave_speed(lp, ws%uxl, ws%uxr, ws%vyl, ws%vyr, &
-                      ws%hxl, ws%hxr, ws%hyl, ws%hyr, grav, &
+                      ws%hxl, ws%hxr, ws%hyl, ws%hyr, &
                       ws%sxl, ws%sxr, ws%syl, ws%syr)
 
       if (constr(1:3) == 'HLL') then

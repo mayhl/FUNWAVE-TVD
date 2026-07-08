@@ -34,14 +34,14 @@ contains
    end subroutine make_lp
 
    ! ----------------------------------------------------------------
-   ! delx_fun: u(i,j)=i, dx=1 → slope = 1 everywhere
+   ! delx_fun: u(i,j)=i, inv_dx=1 → slope = 1 everywhere
    ! ----------------------------------------------------------------
    @test
    subroutine test_delx_fun_linear()
-      real(SP) :: uin(MLOC,NLOC), dout(MLOC,NLOC), dx(MLOC,NLOC)
+      real(SP) :: uin(MLOC,NLOC), dout(MLOC,NLOC), inv_dx(MLOC,NLOC)
       integer  :: i, j
 
-      dx = 1.0_SP
+      inv_dx = 1.0_SP
       do j = 1, NLOC
          do i = 1, MLOC
             uin(i,j) = real(i, SP)
@@ -49,7 +49,7 @@ contains
       end do
       dout = 0.0_SP
 
-      call delx_fun(dx, uin, dout)
+      call delx_fun(inv_dx, uin, dout)
 
       do j = 1, NLOC
          do i = 1, MLOC
@@ -61,14 +61,14 @@ contains
    end subroutine test_delx_fun_linear
 
    ! ----------------------------------------------------------------
-   ! dely_fun: u(i,j)=j, dy=1 → slope = 1 everywhere
+   ! dely_fun: u(i,j)=j, inv_dy=1 → slope = 1 everywhere
    ! ----------------------------------------------------------------
    @test
    subroutine test_dely_fun_linear()
-      real(SP) :: uin(MLOC,NLOC), dout(MLOC,NLOC), dy(MLOC,NLOC)
+      real(SP) :: uin(MLOC,NLOC), dout(MLOC,NLOC), inv_dy(MLOC,NLOC)
       integer  :: i, j
 
-      dy = 1.0_SP
+      inv_dy = 1.0_SP
       do j = 1, NLOC
          do i = 1, MLOC
             uin(i,j) = real(j, SP)
@@ -76,7 +76,7 @@ contains
       end do
       dout = 0.0_SP
 
-      call dely_fun(dy, uin, dout)
+      call dely_fun(inv_dy, uin, dout)
 
       do j = 1, NLOC
          do i = 1, MLOC
