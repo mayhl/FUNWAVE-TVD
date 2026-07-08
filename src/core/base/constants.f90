@@ -68,8 +68,8 @@ module core_constants_mod
    ! Mathematical Constants
    ! ----------------------
 
-   !> \f$\pi = 3.141592653\ldots\f$
-   real(SP), parameter :: PI = 3.141592653_SP
+   !> \f$\pi\f$ to full real64 precision.
+   real(SP), parameter :: PI = 3.14159265358979323846_SP
 
    !> Number of ghost layers shared across MPI subdomain boundaries.
    !!
@@ -99,7 +99,10 @@ module core_constants_mod
    real(SP), parameter :: RHO_WATER = 1000.0_SP
 
    !> Degrees-to-radians conversion factor \f$\pi/180\f$.
-   real(SP), parameter :: DEG2RAD = 0.0175_SP
+   real(SP), parameter :: DEG2RAD = PI/180.0_SP
+
+   !> Radians-to-degrees conversion factor \f$180/\pi\f$.
+   real(SP), parameter :: RAD2DEG = 180.0_SP/PI
 
    ! -----------
    ! Error Codes
