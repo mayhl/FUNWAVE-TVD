@@ -6,6 +6,7 @@ module test_fields
    use core_comm_mod,         only: type_comm, new_comm
    use core_grid_mod,         only: type_grid_2d
    use model_fields_2d_mod,   only: type_fields_2d
+   use core_field_registry_mod, only: type_field_registry
    use core_constants_mod,    only: SP, N_GHOST
 
    implicit none
@@ -127,5 +128,44 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_alloc_idempotent
+
+   ! ----------------------------------------------------------------
+   ! register: registry pointers alias the field arrays (write through
+   ! the field, read through the registry), breaking fields only after
+   ! alloc_breaking, masks not registered (real-only registry).
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_register(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)           :: grid
+      type(type_comm)              :: comm
+      type(type_fields_2d), target :: f
+      type(type_field_registry)    :: reg
+      real(SP), pointer :: ptr(:,:)
+
+      call open_grid(this, grid, comm)
+      call f%alloc(grid)
+      call f%register(reg)
+
+      @assertTrue(reg%has('eta'))
+      @assertTrue(reg%has('depth'))
+      @assertTrue(reg%has('arr_time'))
+      ! integer fields not registered; breaking not allocated yet
+      @assertFalse(reg%has('mask'))
+      @assertFalse(reg%has('nu_break'))
+
+      f%eta = 3.5_SP
+      ptr => reg%get('eta')
+      @mpiAssertEqual(3.5_SP, ptr(N_GHOST+1, N_GHOST+1), 1.0e-12_SP)
+      @mpiAssertEqual(size(f%eta,1), size(ptr,1))
+
+      call f%alloc_breaking(grid)
+      call f%register(reg)
+      @assertTrue(reg%has('nu_break'))
+
+      call reg%finalize()
+      call f%free()
+      call dummy_fix_lint()
+   end subroutine test_register
 
 end module test_fields

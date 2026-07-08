@@ -1,6 +1,7 @@
 module model_fields_2d_mod
-   use core_constants_mod, only: SP, N_GHOST
-   use core_grid_mod,      only: type_grid_2d
+   use core_constants_mod,     only: SP, N_GHOST
+   use core_grid_mod,          only: type_grid_2d
+   use core_field_registry_mod, only: type_field_registry
    implicit none
 
    !> Primary field arrays for the 2D Boussinesq model.
@@ -67,6 +68,7 @@ module model_fields_2d_mod
    contains
       procedure :: alloc         => fields_alloc
       procedure :: alloc_breaking => fields_alloc_breaking
+      procedure :: register      => fields_register
       procedure :: free          => fields_free
    end type type_fields_2d
 
@@ -133,6 +135,42 @@ contains
       allocate(this%vy      (mloc, nloc), source=0.0_SP)
       allocate(this%d_break (mloc, nloc), source=0.0_SP)
    end subroutine fields_alloc_breaking
+
+   !> Register all output-relevant fields with the field registry by their
+   !> registry.yaml names.  Call once after alloc() (and alloc_breaking(),
+   !> when active) in the init path; output channels then look fields up via
+   !> registry%get(name).
+   !>
+   !> `this` must be a target: the registry stores pointers into these arrays.
+   !> Integer masks (mask/mask_struc/mask9) are NOT registered — the registry
+   !> is real(SP)-only; an integer channel or real view is deferred to Step 6.
+   subroutine fields_register(this, registry)
+      class(type_fields_2d), target, intent(in)    :: this
+      type(type_field_registry),     intent(inout) :: registry
+
+      call registry%register('eta',        this%eta)
+      call registry%register('p',          this%p)
+      call registry%register('q',          this%q)
+      call registry%register('u',          this%u)
+      call registry%register('v',          this%v)
+      call registry%register('h',          this%h)
+
+      call registry%register('depth',      this%depth)
+      call registry%register('depth_node', this%depth_node)
+      call registry%register('depth_x',    this%depth_x)
+      call registry%register('depth_y',    this%depth_y)
+
+      call registry%register('h_max',      this%h_max)
+      call registry%register('h_min',      this%h_min)
+      call registry%register('u_max',      this%u_max)
+      call registry%register('mf_max',     this%mf_max)
+      call registry%register('vort_max',   this%vort_max)
+      call registry%register('arr_time',   this%arr_time)
+
+      ! Optional breaking-physics fields: present only after alloc_breaking().
+      if (allocated(this%nu_break)) call registry%register('nu_break', this%nu_break)
+      if (allocated(this%d_break))  call registry%register('d_break',  this%d_break)
+   end subroutine fields_register
 
    !> Deallocate all field arrays.
    subroutine fields_free(this)
