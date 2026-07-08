@@ -162,6 +162,31 @@ simulations:
       # v/q omitted — near-zero with ThetaPeak=0.
       field: { eta: 3.0e-3, u: 1.5e-2, hmax: 1.5e-3, hmin: 1.5e-3, umax: 5.0e-3, mask: 2.0e-3, mask9: 3.0e-4, p: 3.0e-3 }
 
+  # solitary_flat_1d: INI_SOLITARY on flat bottom — wavemaker-free physics path.
+  # Exercises core flux divergence (ESTIMATE_HUV else branch) + dispersion tridiagonal.
+  # No sponge, no friction, PERIODIC=T so wave wraps; short run to verify mass conservation.
+  - name: solitary_flat_1d
+    exe_type: central
+    np: 4
+    input: test/regression/inputs/solitary_flat_1d
+    input_files: [solitary_flat_1d.txt]
+    preprocess:
+      [
+        uv,
+        run,
+        "{repo_root}/scripts/convert_input.py",
+        "{input_file}",
+        "{curr_input}",
+      ]
+    preprocess_ref: true
+    binary: funwave
+    output_dir: output
+    tags: [solitary, 1d, smoke]
+    postprocess:
+      field: test.regression.postproc.field_compare
+    tolerances:
+      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 2.0e-4, umax: 1.0e-3, mask: 1.0e-4, p: 1.0e-4 }
+
   # rip_2d: DATA bathymetry reader + y-varying 2D depth (rip channels, bar).
   # Cd=0.0 — clean bathy test; friction is a separate concern.
   # WK_IRR with VISCOSITY_BREAKING=F; DT_fixed=0.04 (finer DX=1m grid).

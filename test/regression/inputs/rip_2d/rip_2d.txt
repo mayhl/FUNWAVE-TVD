@@ -1,0 +1,76 @@
+!INPUT FILE FOR FUNWAVE_TVD
+TITLE = rip_2d
+
+PX = 2
+PY = 2
+
+DEPTH_TYPE = DATA
+DEPTH_FILE = depth_a15.txt
+
+RESULT_FOLDER = output/
+FIELD_IO_TYPE = BINARY
+
+Mglob = 512
+Nglob = 250
+
+TOTAL_TIME = 200.0
+PLOT_INTV = 20.0
+SCREEN_INTV = 20.0
+
+DX = 1.0
+DY = 2.0
+
+WAVEMAKER = WK_IRR
+DEP_WK = 13.0
+Xc_WK = 425.0
+Yc_WK = 0.0
+FreqPeak = 0.1
+FreqMin = 0.03
+FreqMax = 0.5
+Hmo = 1.0
+GammaTMA = 5.0
+ThetaPeak = 0.0
+Sigma_Theta = 10.0
+
+PERIODIC = T
+
+DIFFUSION_SPONGE = F
+FRICTION_SPONGE = T
+DIRECT_SPONGE = T
+Csp = 0.0
+CDsponge = 1.0
+Sponge_west_width  =  0.0
+Sponge_east_width  = 60.0
+Sponge_south_width =  0.0
+Sponge_north_width =  0.0
+
+Cd = 0.0
+
+CFL = 0.5
+DT_fixed = 0.04
+FroudeCap = 1.0
+
+MinDepth = 0.01
+
+VISCOSITY_BREAKING = F
+Cbrk1 = 0.65
+Cbrk2 = 0.35
+
+NumberStations = 0
+STATIONS_FILE = gauges.txt
+DEPTH_OUT = T
+U = T
+V = T
+ETA = T
+ETAscreen = T
+Hmax = T
+Hmin = T
+Umax = T
+Umean = F
+Vmean = F
+ETAmean = F
+MASK = T
+MASK9 = F
+P = F
+Q = F
+WaveHeight = F
