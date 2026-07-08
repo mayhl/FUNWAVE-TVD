@@ -1,4 +1,5 @@
 target_sources(${main_lib}_model PRIVATE
+   config_defaults.f90
    fields.f90
    scratch.f90
    kernel_derivatives.f90
