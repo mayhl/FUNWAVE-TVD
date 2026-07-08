@@ -16,6 +16,7 @@ dependencies = [
     "mkdocs-bibtex>=4.4.0",
     "pymdown-extensions>=10.21.3",
     "mkdocs-swan>=0.4.0",
+    "matplotlib>=3.10.9",
 ]
 
 [tool.ruff]
