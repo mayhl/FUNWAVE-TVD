@@ -103,5 +103,12 @@ def setup(workspace: str = typer.Argument("dev", help="Workspace name to initial
     path = setup_workspace(workspace)
     typer.echo(f"Workspace '{workspace}' initialized at: {path}")
 
+@app.command()
+def registry(check: bool = typer.Option(True, "--check/--regen",
+                                        help="verify (default) or regenerate config_defaults.f90")):
+    """Registry sync: config_defaults.f90 vs registry.yaml (scripts/gen_registry.py)."""
+    cmd = ["uv", "run", "scripts/gen_registry.py"] + (["--check"] if check else [])
+    raise typer.Exit(subprocess.run(cmd, cwd=PROJ_ROOT).returncode)
+
 if __name__ == "__main__":
     app()
