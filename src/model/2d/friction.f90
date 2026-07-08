@@ -8,16 +8,23 @@
 !  YAML block: friction:       (top-level; omit for no friction)
 !    friction_matrix: <bool>   use spatially varying Cd file, default NO
 !    friction_file:   <path>   required when friction_matrix: YES
-!    Cd:              <real>   constant drag coefficient, default 0.0
+!    manning:         <bool>   Manning roughness formula, default NO
+!    Cd:              <real>   constant drag coefficient (or Manning n), default 0.0
+!
+!  When manning: YES, Cd holds Manning n.  Call update_cd(h, min_depth_frc)
+!  each timestep to overwrite Cd with g*n²/H^(1/3) before cal_sources.
+!  cal_sources always uses Cd as a plain linear drag; Manning formula is
+!  invisible to the kernel.
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam  (read_input)
 !    06/01/2026  Michael-Angelo Y.H. Lam  (init_compute, free)
+!    06/02/2026  Michael-Angelo Y.H. Lam  (manning flag, update_cd)
 !
 !-------------------------------------------------
 
 module model_friction_mod
-   use core_constants_mod,  only: SP, N_GHOST
+   use core_constants_mod,  only: SP, N_GHOST, GRAV
    use core_env_mod,        only: type_env, get_sub_env
    use core_grid_mod,       only: type_grid_2d
    use core_path_mod,       only: type_path
@@ -32,17 +39,21 @@ module model_friction_mod
 
       logical  :: friction_matrix = .false.
       logical  :: no_cd_file      = .true.
+      logical  :: manning         = .false.
       type(type_path) :: cd_file
 
+      ! Cd_fixed: constant Manning n (manning=YES) or drag coefficient (manning=NO).
       real(SP) :: Cd_fixed = 0.0_SP
 
       ! Ghost-inclusive drag coefficient: (local_nx+2*N_GHOST, local_ny+2*N_GHOST).
       ! Allocated by init_compute; nil when friction is not active.
+      ! When manning=YES, update_cd overwrites this with g*n²/H^(1/3) each timestep.
       real(SP), allocatable :: Cd(:,:)
 
    contains
       procedure :: read_input   => friction_read_input
       procedure :: init_compute => friction_init_compute
+      procedure :: update_cd    => friction_update_cd
       procedure :: free         => friction_free
    end type type_model_friction
 
@@ -61,6 +72,7 @@ contains
 
       call sub_env%yaml%read('friction_matrix', val=this%friction_matrix, default='NO')
       call sub_env%yaml%read_input_path('friction_file', silent=this%no_cd_file, val=this%cd_file)
+      call sub_env%yaml%read('manning', silent=no_key, val=this%manning, default='NO')
       call sub_env%yaml%read('Cd', silent=no_key, val=this%Cd_fixed, default='0.0')
 
    end subroutine friction_read_input
@@ -85,6 +97,29 @@ contains
       ! when this%friction_matrix is true.
 
    end subroutine friction_init_compute
+
+   ! Recompute effective drag from Manning n and current total depth H.
+   ! No-op when manning=.false. or friction not active.
+   ! Call once per timestep after update_h, before cal_sources.
+   subroutine friction_update_cd(this, h, min_depth_frc)
+      class(type_model_friction), intent(inout) :: this
+      real(SP), intent(in) :: h(:,:)
+      real(SP), intent(in) :: min_depth_frc
+
+      integer :: i, j
+
+      if (.not. this%is_activated .or. .not. this%manning) return
+
+      ! TODO: spatially varying Manning n (friction_matrix=YES) needs a
+      ! separate n_raw(:,:) array populated from cd_file in init_compute.
+      do j = 1, size(this%Cd, 2)
+         do i = 1, size(this%Cd, 1)
+            this%Cd(i,j) = GRAV * this%Cd_fixed**2 &
+                           / max(h(i,j), min_depth_frc)**(0.333333_SP)
+         end do
+      end do
+
+   end subroutine friction_update_cd
 
    subroutine friction_free(this)
       class(type_model_friction), intent(inout) :: this
