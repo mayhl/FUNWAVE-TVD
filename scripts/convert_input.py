@@ -118,8 +118,9 @@ _VAR_FLAGS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 _WK_PARAMS: dict[str, list[str]] = {
-    'LEF_SOL': ['AMP_SOLI', 'DEP_SOLI', 'LAG_SOLI'],
-    'INI_SOL': ['AMP_SOLI', 'DEP_SOLI', 'Xwavemaker'],
+    'LEF_SOL':      ['AMP', 'DEP', 'LAGTIME'],
+    'INI_SOL':      ['AMP', 'DEP', 'XWAVEMAKER'],
+    'INI_SOLITARY': ['AMP', 'DEP', 'XWAVEMAKER'],
     'INI_REC': ['Xc', 'Yc', 'WID', 'AMP'],
     'INI_Gau': ['AMP', 'Xc', 'Yc', 'WID', 'GauRadius'],
     'WK_REG': [
