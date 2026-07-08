@@ -179,15 +179,21 @@ contains
    !> Max-merge friction sponge profile into an external Cd array.
    !>
    !> Must be called after init_compute().  When friction_sponge is active,
-   !> max-merges cd_sponge into cd_inout and then deallocates cd_sponge.
+   !> max-merges cd_sponge*depth into cd_inout and then deallocates cd_sponge.
    !> No-op when friction_sponge is inactive or not allocated.
+   !>
+   !> The *depth factor converts the flux-based sponge drag to the same units
+   !> as the velocity-based friction term in cal_sources:
+   !>   legacy: -CD_4_SPONGE * U * |UV| * Depth  (Wei et al. flux form)
+   !>   merged: -(CD_4_SPONGE * Depth) * U * |UV|  (same as Cd * U * |UV|)
    !>
    !> Use this instead of holding both cd_sponge and friction%Cd simultaneously:
    !>   call sponge%init_compute(grid)
-   !>   call sponge%merge_friction(friction%Cd)
-   subroutine sponge_merge_friction(this, cd_inout)
+   !>   call sponge%merge_friction(friction%Cd, fields%depth)
+   subroutine sponge_merge_friction(this, cd_inout, depth)
       class(type_model_sponge), intent(inout) :: this
       real(SP),                 intent(inout) :: cd_inout(:,:)
+      real(SP),                 intent(in)    :: depth(:,:)
 
       integer :: i, j
 
@@ -196,7 +202,7 @@ contains
 
       do j = 1, size(cd_inout, 2)
          do i = 1, size(cd_inout, 1)
-            cd_inout(i, j) = max(cd_inout(i, j), this%cd_sponge(i, j))
+            cd_inout(i, j) = max(cd_inout(i, j), this%cd_sponge(i, j) * depth(i, j))
          end do
       end do
 
