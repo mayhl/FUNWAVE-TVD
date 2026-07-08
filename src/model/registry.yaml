@@ -174,9 +174,9 @@ parameters:
 
   - name:         viscosity_breaking
     legacy_name:  VISCOSITY_BREAKING
-    yaml_path:    "breaking.viscosity_breaking"
+    yaml_path:    "physics.viscosity_breaking"
     units:        ~
-    default:      false
+    default:      true
     latex:        ~
 
   - name:         visbrk
@@ -190,7 +190,7 @@ parameters:
     legacy_name:  WAVEMAKER_Cbrk
     yaml_path:    "breaking.wavemaker_cbrk"
     units:        ~
-    default:      0.65
+    default:      1.0
     latex:        "$C_{\\mathrm{brk,wm}}$"
 
   - name:         wavemaker_vis
@@ -210,14 +210,14 @@ parameters:
   # ── friction ───────────────────────────────────────────────────────────────
   - name:         cd_file
     legacy_name:  CD_FILE
-    yaml_path:    "friction.cd_file"
+    yaml_path:    "friction.friction_file"
     units:        ~
     default:      ~
     latex:        ~
 
   - name:         cd_fixed
     legacy_name:  Cd_fixed
-    yaml_path:    "friction.cd_fixed"
+    yaml_path:    "friction.Cd"
     units:        ~
     default:      0.0
     latex:        "$C_d$"
@@ -376,7 +376,7 @@ parameters:
     legacy_name:  CFL
     yaml_path:    "numerics.cfl"
     units:        ~
-    default:      0.15
+    default:      0.5
     latex:        "$C_{\\mathrm{CFL}}$"
 
   - name:         construction
@@ -469,7 +469,7 @@ parameters:
     legacy_name:  FIELD_IO_TYPE
     yaml_path:    "output.field_io_type"
     units:        ~
-    default:      "binary"
+    default:      ASCII
     latex:        ~
 
   - name:         number_stations
@@ -504,14 +504,14 @@ parameters:
     legacy_name:  STEADY_TIME
     yaml_path:    "output.steady_time"
     units:        "s"
-    default:      0.0
+    default:      999999.0    # legacy LARGE
     latex:        "$T_{\\mathrm{steady}}$"
 
   - name:         t_intv_mean
     legacy_name:  T_INTV_mean
     yaml_path:    "output.t_intv_mean"
     units:        "s"
-    default:      20.0
+    default:      999999.0    # legacy LARGE
     latex:        "$T_{\\mathrm{mean}}$"
 
   # ── physics ────────────────────────────────────────────────────────────────
@@ -526,35 +526,35 @@ parameters:
     legacy_name:  C_smg
     yaml_path:    "physics.c_smg"
     units:        ~
-    default:      0.25
+    default:      0.0
     latex:        "$C_{\\mathrm{smg}}$"
 
   - name:         dispersion
     legacy_name:  DISPERSION
     yaml_path:    "physics.dispersion"
     units:        ~
-    default:      false
+    default:      true
     latex:        ~
 
   - name:         gamma1
     legacy_name:  gamma1
     yaml_path:    "physics.gamma1"
     units:        ~
-    default:      ~
+    default:      1.0
     latex:        "$\\Gamma_1$"
 
   - name:         gamma2
     legacy_name:  gamma2
     yaml_path:    "physics.gamma2"
     units:        ~
-    default:      ~
+    default:      1.0
     latex:        "$\\Gamma_2$"
 
   - name:         gamma3
     legacy_name:  gamma3
     yaml_path:    "physics.gamma3"
     units:        ~
-    default:      ~
+    default:      1.0
     latex:        "$\\Gamma_3$"
 
   - name:         periodic
@@ -590,7 +590,7 @@ parameters:
     legacy_name:  SCREEN_INTV
     yaml_path:    "simulation.screen_interval"
     units:        "s"
-    default:      ~
+    default:      1.0
     latex:        "$\\Delta t_{\\mathrm{screen}}$"
 
   - name:         t_start
@@ -633,7 +633,7 @@ parameters:
     legacy_name:  A_sponge
     yaml_path:    "sponge.a_sponge"
     units:        ~
-    default:      ~
+    default:      5.0
     latex:        "$A_s$"
 
   - name:         cd_sponge
@@ -647,7 +647,7 @@ parameters:
     legacy_name:  Csp
     yaml_path:    "sponge.csp"
     units:        ~
-    default:      0.15
+    default:      0.1
     latex:        "$C_{\\mathrm{sp}}$"
 
   - name:         diffusion_sponge
@@ -675,7 +675,7 @@ parameters:
     legacy_name:  R_sponge
     yaml_path:    "sponge.r_sponge"
     units:        ~
-    default:      ~
+    default:      0.85
     latex:        "$R_s$"
 
   - name:         sponge_east_width
@@ -705,3 +705,439 @@ parameters:
     units:        "m"
     default:      0.0
     latex:        "$W_{s,W}$"
+
+  # ── entries added 2026-07-08 from reader inventory (defaults = reader/io.F) ──
+  - name:         roller_effect
+    legacy_name:  ROLLER_EFFECT
+    yaml_path:    "breaking.roller_effect"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         coupling_file
+    legacy_name:  COUPLING_FILE
+    yaml_path:    "coupling.coupling_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         manning
+    legacy_name:  ~
+    yaml_path:    "friction.manning"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         arrtime_min_h
+    legacy_name:  ArrTimeMinH
+    yaml_path:    "numerics.ArrTimeMinH"
+    units:        ~
+    default:      0.001
+    latex:        ~
+
+  - name:         froude_cap
+    legacy_name:  FroudeCap
+    yaml_path:    "numerics.FroudeCap"
+    units:        ~
+    default:      3.0
+    latex:        ~
+
+  - name:         min_depth
+    legacy_name:  MinDepth
+    yaml_path:    "numerics.MinDepth"
+    units:        ~
+    default:      0.1
+    latex:        ~
+
+  - name:         min_depth_frc
+    legacy_name:  MinDepthFrc
+    yaml_path:    "numerics.MinDepthFrc"
+    units:        ~
+    default:      0.1
+    latex:        ~
+
+  - name:         breakwater_absorb_coef
+    legacy_name:  BreakWaterAbsorbCoef
+    yaml_path:    "obstacle.BreakWaterAbsorbCoef"
+    units:        ~
+    default:      10.0
+    latex:        ~
+
+  - name:         eta_blow_val
+    legacy_name:  EtaBlowVal
+    yaml_path:    "output.EtaBlowVal"
+    units:        ~
+    default:      10.0
+    latex:        ~
+
+  - name:         breaking_flag
+    legacy_name:  ~
+    yaml_path:    "physics.breaking"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         disp_time_left
+    legacy_name:  DISP_TIME_LEFT
+    yaml_path:    "physics.disp_time_left"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         sediment_flag
+    legacy_name:  ~
+    yaml_path:    "physics.sediment"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         wavemaker_flag
+    legacy_name:  ~
+    yaml_path:    "physics.wavemaker"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         plot_intv_station
+    legacy_name:  PLOT_INTV_STATION
+    yaml_path:    "simulation.plot_intv_station"
+    units:        ~
+    default:      1.0
+    latex:        ~
+
+  - name:         station_output_buffer
+    legacy_name:  StationOutputBuffer
+    yaml_path:    "simulation.station_output_buffer"
+    units:        ~
+    default:      1000
+    latex:        ~
+
+  - name:         cdsponge
+    legacy_name:  CDsponge
+    yaml_path:    "sponge.CDsponge"
+    units:        ~
+    default:      5.0
+    latex:        ~
+
+  - name:         amp
+    legacy_name:  AMP
+    yaml_path:    "wavemaker.AMP"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         amp_wk
+    legacy_name:  AMP_WK
+    yaml_path:    "wavemaker.AMP_WK"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         a_sponge_wavemaker
+    legacy_name:  A_sponge_wavemaker
+    yaml_path:    "wavemaker.A_sponge_wavemaker"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         crestlimit
+    legacy_name:  CrestLimit
+    yaml_path:    "wavemaker.CrestLimit"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         dep
+    legacy_name:  DEP
+    yaml_path:    "wavemaker.DEP"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         dep_wk
+    legacy_name:  DEP_WK
+    yaml_path:    "wavemaker.DEP_WK"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         delta_wk
+    legacy_name:  Delta_WK
+    yaml_path:    "wavemaker.Delta_WK"
+    units:        ~
+    default:      0.5
+    latex:        ~
+
+  - name:         depthwavemaker
+    legacy_name:  DepthWaveMaker
+    yaml_path:    "wavemaker.DepthWaveMaker"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         eta_limiter
+    legacy_name:  ETA_LIMITER
+    yaml_path:    "wavemaker.ETA_LIMITER"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         equalenergy
+    legacy_name:  EqualEnergy
+    yaml_path:    "wavemaker.EqualEnergy"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         freqmax
+    legacy_name:  FreqMax
+    yaml_path:    "wavemaker.FreqMax"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         freqmin
+    legacy_name:  FreqMin
+    yaml_path:    "wavemaker.FreqMin"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         freqpeak
+    legacy_name:  FreqPeak
+    yaml_path:    "wavemaker.FreqPeak"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         gammatma
+    legacy_name:  GammaTMA
+    yaml_path:    "wavemaker.GammaTMA"
+    units:        ~
+    default:      3.3
+    latex:        ~
+
+  - name:         hmo
+    legacy_name:  Hmo
+    yaml_path:    "wavemaker.Hmo"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         lagtime
+    legacy_name:  LAGTIME
+    yaml_path:    "wavemaker.LAGTIME"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         nfreq
+    legacy_name:  Nfreq
+    yaml_path:    "wavemaker.Nfreq"
+    units:        ~
+    default:      45
+    latex:        ~
+
+  - name:         ntheta
+    legacy_name:  Ntheta
+    yaml_path:    "wavemaker.Ntheta"
+    units:        ~
+    default:      1           # PENDING adjudication: legacy uses 24 in directional TMA/JON branch
+    latex:        ~
+
+  - name:         numwavecomp
+    legacy_name:  NumWaveComp
+    yaml_path:    "wavemaker.NumWaveComp"
+    units:        ~
+    default:      1
+    latex:        ~
+
+  - name:         peakperiod
+    legacy_name:  PeakPeriod
+    yaml_path:    "wavemaker.PeakPeriod"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         r_sponge_wavemaker
+    legacy_name:  R_sponge_wavemaker
+    yaml_path:    "wavemaker.R_sponge_wavemaker"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         sigma_theta
+    legacy_name:  Sigma_Theta
+    yaml_path:    "wavemaker.Sigma_Theta"
+    units:        ~
+    default:      0.0         # PENDING adjudication: legacy uses 10.0 in directional TMA/JON branch
+    latex:        ~
+
+  - name:         solitarypositivedirection
+    legacy_name:  SolitaryPositiveDirection
+    yaml_path:    "wavemaker.SolitaryPositiveDirection"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         thetapeak
+    legacy_name:  ThetaPeak
+    yaml_path:    "wavemaker.ThetaPeak"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         theta_wk
+    legacy_name:  Theta_WK
+    yaml_path:    "wavemaker.Theta_WK"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         time_ramp
+    legacy_name:  Time_ramp
+    yaml_path:    "wavemaker.Time_ramp"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         tperiod
+    legacy_name:  Tperiod
+    yaml_path:    "wavemaker.Tperiod"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         troughlimit
+    legacy_name:  TroughLimit
+    yaml_path:    "wavemaker.TroughLimit"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         wave_data_type
+    legacy_name:  WAVE_DATA_TYPE
+    yaml_path:    "wavemaker.WAVE_DATA_TYPE"
+    units:        ~
+    default:      DATA_1D
+    latex:        ~
+
+  - name:         wid
+    legacy_name:  WID
+    yaml_path:    "wavemaker.WID"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         wavecompfile
+    legacy_name:  WaveCompFile
+    yaml_path:    "wavemaker.WaveCompFile"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         wavemakercd
+    legacy_name:  WaveMakerCd
+    yaml_path:    "wavemaker.WaveMakerCd"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         widthwavemaker
+    legacy_name:  WidthWaveMaker
+    yaml_path:    "wavemaker.WidthWaveMaker"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         xwavemaker
+    legacy_name:  XWAVEMAKER
+    yaml_path:    "wavemaker.XWAVEMAKER"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         xc
+    legacy_name:  Xc
+    yaml_path:    "wavemaker.Xc"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         xc_wk
+    legacy_name:  Xc_WK
+    yaml_path:    "wavemaker.Xc_WK"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         yc
+    legacy_name:  Yc
+    yaml_path:    "wavemaker.Yc"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         yc_wk
+    legacy_name:  Yc_WK
+    yaml_path:    "wavemaker.Yc_WK"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         ywidth_wk
+    legacy_name:  Ywidth_WK
+    yaml_path:    "wavemaker.Ywidth_WK"
+    units:        ~
+    default:      999999.0
+    latex:        ~
+
+  - name:         a0_nwave
+    legacy_name:  a0_Nwave
+    yaml_path:    "wavemaker.a0_Nwave"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         alpha_c
+    legacy_name:  alpha_c
+    yaml_path:    "wavemaker.alpha_c"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         dep_nwave
+    legacy_name:  dep_Nwave
+    yaml_path:    "wavemaker.dep_Nwave"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         gamma_nwave
+    legacy_name:  gamma_Nwave
+    yaml_path:    "wavemaker.gamma_Nwave"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         type
+    legacy_name:  type
+    yaml_path:    "wavemaker.type"
+    units:        ~
+    default:      nothing
+    latex:        ~
+
+  - name:         x1_nwave
+    legacy_name:  x1_Nwave
+    yaml_path:    "wavemaker.x1_Nwave"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
+  - name:         x2_nwave
+    legacy_name:  x2_Nwave
+    yaml_path:    "wavemaker.x2_Nwave"
+    units:        ~
+    default:      0.0
+    latex:        ~
+
