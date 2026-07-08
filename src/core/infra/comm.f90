@@ -152,7 +152,7 @@ contains
       class(type_comm), intent(inout) :: this
       real(SP), intent(inout) :: val
 
-      call MPI_Bcast(val, 1, MPI_DOUBLE_PRECISION, this%io_node_id, this%id)
+      call MPI_Bcast(val, 1, MPI_SP, this%io_node_id, this%id)
       call this%barrier()
 
    end subroutine bcast_real
@@ -225,7 +225,7 @@ contains
          if (allocated(val)) deallocate (val)
          allocate (val(n))
       end if
-      call MPI_Bcast(val, n, MPI_DOUBLE_PRECISION, this%io_node_id, this%id, ierr)
+      call MPI_Bcast(val, n, MPI_SP, this%io_node_id, this%id, ierr)
       call this%barrier()
    end subroutine bcast_real_array
 
