@@ -104,9 +104,10 @@ contains
 
       integer  :: i, j
       real(SP) :: rh, rhx, rhy, reta
-      real(SP) :: uxxvxy, uxyvyy, huxxhvxy, huxyHvyy
+      real(SP) :: uxxvxy, uxyvyy, huxxhvxy, huxyhvyy
+      real(SP) :: inv_dt
       real(SP) :: uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y
-      real(SP) :: huxxhvxy_x, huxxhvxy_y, huxyHvyy_x, huxyHvyy_y
+      real(SP) :: huxxhvxy_x, huxxhvxy_y, huxyhvyy_x, huxyhvyy_y
       real(SP) :: ken1, ken2, ken3, ken4, ken5
       real(SP) :: omega_0, omega_1
       real(SP) :: coeff_a, coeff_b, coeff_1p
@@ -159,10 +160,11 @@ contains
 
       ! ---- Ut, Vt and their depth-scaled forms (gamma2 only) ----------
       if (gamma2 > 0.0_SP) then
+         inv_dt = 1.0_SP/dt
          do j = 1, lp%nloc
             do i = 1, lp%mloc
-               ut(i,j)      = (u(i,j) - u0(i,j)) / dt
-               vt(i,j)      = (v(i,j) - v0(i,j)) / dt
+               ut(i,j)      = (u(i,j) - u0(i,j)) * inv_dt
+               vt(i,j)      = (v(i,j) - v0(i,j)) * inv_dt
                ws%dut(i,j)  = max(depth(i,j), min_depth_frc) * ut(i,j)
                ws%dvt(i,j)  = max(depth(i,j), min_depth_frc) * vt(i,j)
             end do
@@ -229,13 +231,13 @@ contains
             uxxvxy   = ws%uxx(i,j)  + ws%vxy(i,j)
             uxyvyy   = ws%uxy(i,j)  + ws%vyy(i,j)
             huxxhvxy = ws%duxx(i,j) + ws%dvxy(i,j)
-            huxyHvyy = ws%duxy(i,j) + ws%dvyy(i,j)
+            huxyhvyy = ws%duxy(i,j) + ws%dvyy(i,j)
             rh = depth(i,j)
 
             u4(i,j)  = coeff_a*rh*rh*uxxvxy  + coeff_b*rh*huxxhvxy
-            v4(i,j)  = coeff_a*rh*rh*uxyvyy  + coeff_b*rh*huxyHvyy
+            v4(i,j)  = coeff_a*rh*rh*uxyvyy  + coeff_b*rh*huxyhvyy
             u1p(i,j) = coeff_1p*rh*rh*uxxvxy + (beta1 - 1.0_SP)*rh*huxxhvxy
-            v1p(i,j) = coeff_1p*rh*rh*uxyvyy + (beta1 - 1.0_SP)*rh*huxyHvyy
+            v1p(i,j) = coeff_1p*rh*rh*uxyvyy + (beta1 - 1.0_SP)*rh*huxyhvyy
 
             ! gamma2 nonlinear addition to u4/v4
             if (gamma2 > 0.0_SP) then
@@ -244,7 +246,7 @@ contains
                       + (0.5_SP*beta1*beta1 - 1.0_SP/6.0_SP)*reta*reta*beta2*beta2
                ken2 = (beta1 - 0.5_SP)*reta*beta2
                u4(i,j) = u4(i,j) + gamma2*mask9(i,j)*(ken1*uxxvxy  + ken2*huxxhvxy)
-               v4(i,j) = v4(i,j) + gamma2*mask9(i,j)*(ken1*uxyvyy  + ken2*huxyHvyy)
+               v4(i,j) = v4(i,j) + gamma2*mask9(i,j)*(ken1*uxyvyy  + ken2*huxyhvyy)
             end if
          end do
       end do
@@ -257,7 +259,7 @@ contains
             uxxvxy   = ws%uxx(i,j)  + ws%vxy(i,j)
             uxyvyy   = ws%uxy(i,j)  + ws%vyy(i,j)
             huxxhvxy = ws%duxx(i,j) + ws%dvxy(i,j)
-            huxyHvyy = ws%duxy(i,j) + ws%dvyy(i,j)
+            huxyhvyy = ws%duxy(i,j) + ws%dvyy(i,j)
 
             uxxvxy_x  = (ws%uxx(i+1,j)  + ws%vxy(i+1,j)  - ws%uxx(i-1,j)  - ws%vxy(i-1,j)) &
                         * 0.5_SP * inv_dx(i,j)
@@ -271,9 +273,9 @@ contains
                          * 0.5_SP * inv_dx(i,j)
             huxxhvxy_y = (ws%duxx(i,j+1) + ws%dvxy(i,j+1) - ws%duxx(i,j-1) - ws%dvxy(i,j-1)) &
                          * 0.5_SP * inv_dy(i,j)
-            huxyHvyy_x = (ws%duxy(i+1,j) + ws%dvyy(i+1,j) - ws%duxy(i-1,j) - ws%dvyy(i-1,j)) &
+            huxyhvyy_x = (ws%duxy(i+1,j) + ws%dvyy(i+1,j) - ws%duxy(i-1,j) - ws%dvyy(i-1,j)) &
                          * 0.5_SP * inv_dx(i,j)
-            huxyHvyy_y = (ws%duxy(i,j+1) + ws%dvyy(i,j+1) - ws%duxy(i,j-1) - ws%dvyy(i,j-1)) &
+            huxyhvyy_y = (ws%duxy(i,j+1) + ws%dvyy(i,j+1) - ws%duxy(i,j-1) - ws%dvyy(i,j-1)) &
                          * 0.5_SP * inv_dy(i,j)
 
             rh   = depth(i,j)
@@ -304,7 +306,7 @@ contains
                         + ken3*huxxhvxy + ken4*(ws%dutxx(i,j) + ws%dvtxy(i,j))
             v1pp(i,j) = v1pp(i,j) - ken1*uxyvyy                              &
                         - ken2*(ws%utxy(i,j) + ws%vtyy(i,j))                  &
-                        + ken3*huxyHvyy + ken4*(ws%dutxy(i,j) + ws%dvtyy(i,j))
+                        + ken3*huxyhvyy + ken4*(ws%dutxy(i,j) + ws%dvtyy(i,j))
 
             ! ---- U2 / V2  (nonlinear advection-type dispersion) ------
             ken1 = (beta1 - 1.0_SP)*(rhx + etax(i,j))*beta2
@@ -319,9 +321,9 @@ contains
                    - beta1*(1.0_SP - beta1)*(rhy*reta + rh*etay(i,j))*beta2         &
                    + (beta1*beta1 - 1.0_SP)*reta*etay(i,j)*beta2*beta2
 
-            u2(i,j) = ken1*(u(i,j)*huxxhvxy + v(i,j)*huxyHvyy)                     &
+            u2(i,j) = ken1*(u(i,j)*huxxhvxy + v(i,j)*huxyhvyy)                     &
                       + ken2*(ws%ux(i,j)*huxxhvxy + u(i,j)*huxxhvxy_x               &
-                              + ws%vx(i,j)*huxyHvyy + v(i,j)*huxyHvyy_x)            &
+                              + ws%vx(i,j)*huxyhvyy + v(i,j)*huxyhvyy_x)            &
                       + ken3*(u(i,j)*uxxvxy + v(i,j)*uxyvyy)                        &
                       + ken4*(ws%ux(i,j)*uxxvxy  + u(i,j)*uxxvxy_x                  &
                               + ws%vx(i,j)*uxyvyy + v(i,j)*uxyvyy_x)                &
@@ -332,21 +334,21 @@ contains
 
             ken1 = (beta1 - 1.0_SP)*(rhy + etay(i,j))*beta2
 
-            v2(i,j) = ken1*(u(i,j)*huxxhvxy + v(i,j)*huxyHvyy)                     &
+            v2(i,j) = ken1*(u(i,j)*huxxhvxy + v(i,j)*huxyhvyy)                     &
                       + ken2*(ws%uy(i,j)*huxxhvxy + u(i,j)*huxxhvxy_y               &
-                              + ws%vy(i,j)*huxyHvyy + v(i,j)*huxyHvyy_y)            &
+                              + ws%vy(i,j)*huxyhvyy + v(i,j)*huxyhvyy_y)            &
                       + ken5*(u(i,j)*uxxvxy + v(i,j)*uxyvyy)                        &
                       + ken4*(ws%uy(i,j)*uxxvxy  + u(i,j)*uxxvxy_y                  &
                               + ws%vy(i,j)*uxyvyy + v(i,j)*uxyvyy_y)                &
                       + beta2*beta2*(ws%dux(i,j) + ws%dvy(i,j)                      &
                                      + reta*beta2*(ws%ux(i,j) + ws%vy(i,j)))        &
-                      * (huxyHvyy + etay(i,j)*beta2*(ws%ux(i,j) + ws%vy(i,j))       &
+                      * (huxyhvyy + etay(i,j)*beta2*(ws%ux(i,j) + ws%vy(i,j))       &
                          + reta*beta2*uxyvyy)
 
             ! ---- U3 / V3  (vorticity-type dispersion) ----------------
             omega_0 = ws%vx(i,j) - ws%uy(i,j)
             omega_1 = ((beta1-1.0_SP)*rhx + beta1*etax(i,j))*beta2                  &
-                      * (huxyHvyy + ((beta1-1.0_SP)*rh + beta1*reta)*beta2*uxyvyy)  &
+                      * (huxyhvyy + ((beta1-1.0_SP)*rh + beta1*reta)*beta2*uxyvyy)  &
                       - ((beta1-1.0_SP)*rhy + beta1*etay(i,j))*beta2                &
                       * (huxxhvxy + ((beta1-1.0_SP)*rh + beta1*reta)*beta2*uxxvxy)
 
@@ -355,7 +357,7 @@ contains
                    + (1.0_SP/6.0_SP - beta1 + beta1*beta1)*rh*reta*beta2            &
                    + (0.5_SP*beta1*beta1 - 1.0_SP/6.0_SP)*reta*reta*beta2*beta2
 
-            u3(i,j) = -v(i,j)*omega_1 - omega_0*(ken1*huxyHvyy + ken2*uxyvyy)
+            u3(i,j) = -v(i,j)*omega_1 - omega_0*(ken1*huxyhvyy + ken2*uxyvyy)
             v3(i,j) =  u(i,j)*omega_1 + omega_0*(ken1*huxxhvxy + ken2*uxxvxy)
          end do
       end do
