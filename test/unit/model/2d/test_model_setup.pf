@@ -1,0 +1,78 @@
+! allow(E001)
+module test_model_setup
+
+   use mpi_f08
+   use pFUnit
+   use core_constants_mod, only: SP, N_GHOST
+   use core_env_mod,       only: type_env, new_env
+   use model_main_mod,     only: type_model_main
+
+   implicit none
+
+   ! Matches test_setup.yaml: 40x4 flat flume, 4x1 decomp, INI_SOLITARY
+   integer, parameter :: TEST_M = 40
+   integer, parameter :: TEST_N = 4
+
+   ! Module-level SP literals (gfortran 15 kind-suffix quirk, see test_sponge)
+   real(SP), parameter :: DEPTH_SP = 10.0_SP
+   real(SP), parameter :: AMP_SP   = 0.5_SP
+   real(SP), parameter :: TOL_SP   = 1.0e-6_SP
+   real(SP), parameter :: TOL2PCT  = 0.02_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! ----------------------------------------------------------------
+   ! Full config -> setup path: grid built, fields allocated, depth
+   ! filled, solitary IC applied, masks wet, H = eta + d, p = H u,
+   ! fields registered.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_setup_solitary_flat(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_main) :: model
+      type(type_env)        :: env
+      real(SP) :: eta_max
+
+      call new_env(env, label='test_setup', yaml_path='test_setup.yaml', &
+                   log_path='test_setup.log')
+      call model%init_from_env(env)
+      call model%setup()
+
+      associate (f => model%fields, lp => model%grid%lp)
+
+      ! grid
+      @assertEqual(TEST_M, model%grid%M)
+      @assertEqual(4, model%grid%nx_proc)
+      @assertEqual(TEST_M/4, model%grid%local_nx)
+
+      ! depth
+      @assertEqual(DEPTH_SP, minval(f%depth), TOL_SP)
+      @assertEqual(DEPTH_SP, maxval(f%depth), TOL_SP)
+
+      ! solitary IC: local eta bounded by crest amplitude, v still zero
+      eta_max = maxval(f%eta(lp%ib:lp%ie, lp%jb:lp%je))
+      @assertTrue(eta_max <= AMP_SP * (1.0_SP + TOL2PCT))
+      @assertEqual(0.0_SP, maxval(abs(f%v)), TOL_SP)
+
+      ! all wet, mask9 all one (all-wet solitary on deep water)
+      @assertEqual(1, minval(f%mask))
+      @assertEqual(1, minval(f%mask9(lp%ib:lp%ie, lp%jb:lp%je)))
+
+      ! H = Gamma3*eta + depth (no clipping when wet), p = H*u
+      @assertEqual(f%eta(lp%ib, lp%jb) + f%depth(lp%ib, lp%jb), &
+                   f%h(lp%ib, lp%jb), TOL_SP)
+      @assertEqual(f%h(lp%ib+1, lp%jb) * f%u(lp%ib+1, lp%jb), &
+                   f%p(lp%ib+1, lp%jb), TOL_SP)
+
+      ! registry serves the live eta array
+      @assertTrue(model%registry%has('eta'))
+
+      end associate
+
+      call dummy_fix_lint()
+   end subroutine test_setup_solitary_flat
+
+end module test_model_setup

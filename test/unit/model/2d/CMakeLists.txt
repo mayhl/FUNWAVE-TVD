@@ -7,6 +7,11 @@ target_link_libraries(test_scratch_pool libfunwave_model)
 qadd_pfunit_ctest(test_sponge 2)
 target_link_libraries(test_sponge libfunwave_model)
 
+file(COPY test_setup.yaml DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+qadd_pfunit_ctest(test_model_setup 4)
+target_link_libraries(test_model_setup libfunwave_model)
+
 qadd_pfunit_ctest(test_wavemaker 4)
 target_link_libraries(test_wavemaker libfunwave_model)
 

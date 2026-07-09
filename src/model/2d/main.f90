@@ -13,7 +13,10 @@
 
 module model_main_mod
 
+   use core_constants_mod, only: SP
    use core_env_mod, only: type_env, new_env
+   use core_grid_mod, only: type_grid_2d
+   use core_field_registry_mod, only: type_field_registry
    use probe_mod, only: dump_state, reset_state
 
    use model_geometry_mod,   only: type_model_geometry
@@ -28,6 +31,9 @@ module model_main_mod
    use model_output_mod,     only: type_model_output
    use model_physics_mod,    only: type_model_physics
    use model_coupling_mod,   only: type_model_coupling
+
+   use model_fields_2d_mod,    only: type_fields_2d
+   use model_kernel_masks_mod, only: update_mask9
 
    implicit none
 
@@ -46,9 +52,15 @@ module model_main_mod
       type(type_model_output)     :: output
       type(type_model_physics)    :: physics
       type(type_model_coupling)   :: coupling
+
+      ! Distributed state — built by setup() after all read_input calls
+      type(type_grid_2d)        :: grid
+      type(type_fields_2d)      :: fields
+      type(type_field_registry) :: registry
    contains
       procedure :: init
       procedure :: init_from_env => model_init_from_env
+      procedure :: setup => model_setup
       procedure :: finalize => model_finalize
    end type type_model_main
 
@@ -122,6 +134,66 @@ contains
       call this%env%yaml%finalize()
 
    end subroutine model_init_from_env
+
+   ! ----------------------------------------------------------------
+   ! Build the distributed state from parsed config — Phase 6a.
+   ! Ports the state-init portion of legacy INITIALIZATION (old/init.F):
+   ! grid, bathymetry, initial condition, wet/dry masks, and conserved
+   ! variables.  Call once, after init()/init_from_env().
+   !
+   ! Wet/dry from the IC (legacy "get Eta and H"):
+   !   $$ \eta < -d \;\Rightarrow\; \text{dry:}\ m = 0,\
+   !      \eta := -d_{min} - d $$
+   ! Total depth and conserved variables:
+   !   $$ H = \max(\gamma_3\,\eta + d,\ d_{frc}), \qquad
+   !      p = H u, \quad q = H v $$
+   ! The dispersion-corrected initial state
+   ! $\bar U = Hu + \gamma_1 U_{1p} H$ needs cal_dispersion outputs and
+   ! lands with the stepper's state-derivation step (Phase 6c); p = Hu
+   ! is exact when $\gamma_1 = 0$ or $U_{1p}(t{=}0) = 0$.
+   ! ----------------------------------------------------------------
+   subroutine model_setup(this)
+      class(type_model_main), intent(inout) :: this
+
+      integer :: i, j
+
+      call this%geometry%build_grid(this%env%comm, this%grid, &
+                                    periodic_y=this%physics%periodic)
+      call this%fields%alloc(this%grid)
+      if (this%physics%viscosity_breaking) call this%fields%alloc_breaking(this%grid)
+
+      call this%geometry%init_depth(this%grid, this%fields%depth, &
+                                    this%fields%depth_x, this%fields%depth_y)
+      call this%wavemaker%apply_ic(this%grid, this%fields%eta, &
+                                   this%fields%u, this%fields%v)
+
+      ! wet/dry mask from the initial condition (structure masks: Step 6+)
+      this%fields%mask_struc = 1
+      associate (f => this%fields, lp => this%grid%lp)
+      do j = 1, lp%nloc
+         do i = 1, lp%mloc
+            if (f%eta(i, j) < -f%depth(i, j)) then
+               f%mask(i, j) = 0
+               f%eta(i, j)  = -this%numerics%MinDepth - f%depth(i, j)
+            else
+               f%mask(i, j) = 1
+            end if
+         end do
+      end do
+      f%mask = f%mask * f%mask_struc
+
+      call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
+                        this%numerics%MinDepthFrc, this%physics%SWE_ETA_DEP, &
+                        this%physics%viscosity_breaking)
+
+      f%h = max(this%physics%Gamma3 * f%eta + f%depth, this%numerics%MinDepthFrc)
+      f%p = f%h * f%u
+      f%q = f%h * f%v
+      end associate
+
+      call this%fields%register(this%registry)
+
+   end subroutine model_setup
 
    subroutine model_finalize(this)
       use mpi_f08, only: MPI_Finalize

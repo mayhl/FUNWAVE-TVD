@@ -1,0 +1,27 @@
+# Fixture for test_model_setup — solitary IC on a flat 4-rank flume
+geometry:
+  cell_size: [1.0, 1.0]
+  grid_size: [40, 4]
+  decomposition:
+    nx_proc: 4
+    ny_proc: 1
+  bathymetry:
+    type: flat
+    depth: 10.0
+simulation:
+  title: test_model_setup
+  total_time: 1.0
+  output_interval: 1.0
+wavemaker:
+  type: INI_SOLITARY
+  AMP: 0.5
+  DEP: 10.0
+  XWAVEMAKER: 20.0
+physics:
+  periodic: true
+  viscosity_breaking: false
+numerics:
+  CFL: 0.5
+  MinDepth: 0.01
+output:
+  variables: [ETA]
