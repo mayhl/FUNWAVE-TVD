@@ -19,7 +19,7 @@
 !! @see core_constants_mod::N_GHOST
 module core_interpolation_mod
    use core_constants_mod, only: SP, N_GHOST
-   use core_grid_mod,      only: type_grid_2d
+   use core_grid_mod, only: type_grid_2d
    implicit none
 
    !> Stores pre-computed bilinear stencils for a set of query points
@@ -33,18 +33,18 @@ module core_interpolation_mod
       integer :: n_points = 0
       !> Ghost-inclusive local i-index of the lower-left bilinear cell,
       !! i.e. interior index + N_GHOST.
-      integer,  allocatable :: src_i(:)
+      integer, allocatable :: src_i(:)
       !> Ghost-inclusive local j-index of the lower-left bilinear cell.
-      integer,  allocatable :: src_j(:)
+      integer, allocatable :: src_j(:)
       !> Normalised x-weight \f$\alpha \in [0,1]\f$.
       real(SP), allocatable :: alpha(:)
       !> Normalised y-weight \f$\beta \in [0,1]\f$.
       real(SP), allocatable :: beta(:)
       !> Global (1-based) index of each point, for output assembly across ranks.
-      integer,  allocatable :: point_id(:)
+      integer, allocatable :: point_id(:)
    contains
-      procedure :: init     => interp_init
-      procedure :: gather   => interp_gather
+      procedure :: init => interp_init
+      procedure :: gather => interp_gather
       procedure :: finalize => interp_finalize
    end type type_interpolator
 
@@ -67,38 +67,38 @@ contains
    !! @param[in]  grid  Local subdomain grid descriptor.
    subroutine interp_init(this, xq, yq, grid)
       class(type_interpolator), intent(inout) :: this
-      real(SP),           intent(in) :: xq(:), yq(:)
+      real(SP), intent(in) :: xq(:), yq(:)
       type(type_grid_2d), intent(in) :: grid
 
       integer :: n_global, k, cnt
-      integer,  allocatable :: tmp_si(:), tmp_sj(:), tmp_pid(:)
+      integer, allocatable :: tmp_si(:), tmp_sj(:), tmp_pid(:)
       real(SP), allocatable :: tmp_a(:), tmp_b(:)
       integer  :: li, lj
       real(SP) :: a, b
 
       n_global = size(xq)
-      allocate(tmp_si(n_global), tmp_sj(n_global), tmp_pid(n_global))
-      allocate(tmp_a(n_global),  tmp_b(n_global))
+      allocate (tmp_si(n_global), tmp_sj(n_global), tmp_pid(n_global))
+      allocate (tmp_a(n_global), tmp_b(n_global))
 
       cnt = 0
       do k = 1, n_global
          if (.not. point_is_local(xq(k), yq(k), grid)) cycle
          call find_bilinear_cell(xq(k), yq(k), grid, li, lj, a, b)
          cnt = cnt + 1
-         tmp_si(cnt)  = li + N_GHOST   ! shift to ghost-inclusive index
-         tmp_sj(cnt)  = lj + N_GHOST
-         tmp_a(cnt)   = a
-         tmp_b(cnt)   = b
+         tmp_si(cnt) = li + N_GHOST   ! shift to ghost-inclusive index
+         tmp_sj(cnt) = lj + N_GHOST
+         tmp_a(cnt) = a
+         tmp_b(cnt) = b
          tmp_pid(cnt) = k
       end do
 
       call this%finalize()
       this%n_points = cnt
       if (cnt > 0) then
-         this%src_i    = tmp_si(1:cnt)
-         this%src_j    = tmp_sj(1:cnt)
-         this%alpha    = tmp_a(1:cnt)
-         this%beta     = tmp_b(1:cnt)
+         this%src_i = tmp_si(1:cnt)
+         this%src_j = tmp_sj(1:cnt)
+         this%alpha = tmp_a(1:cnt)
+         this%beta = tmp_b(1:cnt)
          this%point_id = tmp_pid(1:cnt)
       end if
    end subroutine interp_init
@@ -135,20 +135,20 @@ contains
    !!                    owned query points.
    subroutine interp_gather(this, field, out)
       class(type_interpolator), intent(in)  :: this
-      real(SP), intent(in)  :: field(:,:)
+      real(SP), intent(in)  :: field(:, :)
       real(SP), intent(out) :: out(:)
       integer  :: k, i, j
       real(SP) :: a, b, oma, omb
 
       !$omp parallel do private(i, j, a, b, oma, omb)
       do k = 1, this%n_points
-         i = this%src_i(k);  j = this%src_j(k)
-         a = this%alpha(k);  b = this%beta(k)
-         oma = 1.0_SP - a;   omb = 1.0_SP - b
-         out(k) = oma*omb * field(i,   j  ) &
-                +   a*omb * field(i+1, j  ) &
-                + oma*  b * field(i,   j+1) &
-                +   a*  b * field(i+1, j+1)
+         i = this%src_i(k); j = this%src_j(k)
+         a = this%alpha(k); b = this%beta(k)
+         oma = 1.0_SP - a; omb = 1.0_SP - b
+         out(k) = oma*omb*field(i, j) &
+                  + a*omb*field(i + 1, j) &
+                  + oma*b*field(i, j + 1) &
+                  + a*b*field(i + 1, j + 1)
       end do
       !$omp end parallel do
    end subroutine interp_gather
@@ -157,11 +157,11 @@ contains
    subroutine interp_finalize(this)
       class(type_interpolator), intent(inout) :: this
       this%n_points = 0
-      if (allocated(this%src_i))    deallocate(this%src_i)
-      if (allocated(this%src_j))    deallocate(this%src_j)
-      if (allocated(this%alpha))    deallocate(this%alpha)
-      if (allocated(this%beta))     deallocate(this%beta)
-      if (allocated(this%point_id)) deallocate(this%point_id)
+      if (allocated(this%src_i)) deallocate (this%src_i)
+      if (allocated(this%src_j)) deallocate (this%src_j)
+      if (allocated(this%alpha)) deallocate (this%alpha)
+      if (allocated(this%beta)) deallocate (this%beta)
+      if (allocated(this%point_id)) deallocate (this%point_id)
    end subroutine interp_finalize
 
    !> Test whether a query point falls within the local subdomain.
@@ -176,13 +176,13 @@ contains
    !! @param[in]  grid  Local subdomain grid descriptor.
    !! @return           `.true.` if the point is owned by this rank.
    logical function point_is_local(xq, yq, grid)
-      real(SP),           intent(in) :: xq, yq
+      real(SP), intent(in) :: xq, yq
       type(type_grid_2d), intent(in) :: grid
       integer :: li, lj
       logical :: in_x, in_y
 
-      li = bisect(grid%x(:,1), xq)
-      lj = bisect(grid%y(1,:), yq)
+      li = bisect(grid%x(:, 1), xq)
+      lj = bisect(grid%y(1, :), yq)
 
       in_x = (li >= 1) .and. (li <= grid%local_nx)
       in_y = (lj >= 1) .and. (lj <= grid%local_ny)
@@ -222,10 +222,10 @@ contains
    !! @param[out] alpha  Normalised x-weight \f$\in [0,1]\f$.
    !! @param[out] beta   Normalised y-weight \f$\in [0,1]\f$.
    subroutine find_bilinear_cell(xq, yq, grid, li, lj, alpha, beta)
-      real(SP),           intent(in)  :: xq, yq
+      real(SP), intent(in)  :: xq, yq
       type(type_grid_2d), intent(in)  :: grid
-      integer,            intent(out) :: li, lj
-      real(SP),           intent(out) :: alpha, beta
+      integer, intent(out) :: li, lj
+      real(SP), intent(out) :: alpha, beta
 
       li = bisect(grid%x(:, 1), xq)
       lj = bisect(grid%y(1, :), yq)
@@ -233,10 +233,10 @@ contains
       li = max(1, min(grid%local_nx, li))
       lj = max(1, min(grid%local_ny, lj))
 
-      alpha = (xq - grid%x(li, lj)) / grid%dx(li, lj)
-      beta  = (yq - grid%y(li, lj)) / grid%dy(li, lj)
+      alpha = (xq - grid%x(li, lj))/grid%dx(li, lj)
+      beta = (yq - grid%y(li, lj))/grid%dy(li, lj)
       alpha = max(0.0_SP, min(1.0_SP, alpha))
-      beta  = max(0.0_SP, min(1.0_SP, beta))
+      beta = max(0.0_SP, min(1.0_SP, beta))
    end subroutine find_bilinear_cell
 
    !> Left-biased binary search on a strictly increasing 1-D array.
@@ -266,7 +266,7 @@ contains
       lo = 1
       hi = size(arr)
       do while (lo < hi)
-         mid = (lo + hi + 1) / 2
+         mid = (lo + hi + 1)/2
          if (arr(mid) <= val) then
             lo = mid
          else

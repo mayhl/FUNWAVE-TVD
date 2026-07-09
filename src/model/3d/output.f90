@@ -32,24 +32,24 @@ module model_3d_output_mod
       character(:), allocatable :: result_folder
       character(:), allocatable :: field_io_type
 
-      logical :: out_dep  = .false.
-      logical :: out_eta  = .false.
-      logical :: out_u    = .false.
-      logical :: out_v    = .false.
-      logical :: out_w    = .false.
-      logical :: out_p    = .false.
-      logical :: out_tke  = .false.
-      logical :: out_eps  = .false.
-      logical :: out_s    = .false.
-      logical :: out_mu   = .false.
-      logical :: out_bub  = .false.
-      logical :: out_a    = .false.
-      logical :: out_f    = .false.
-      logical :: out_t    = .false.
-      logical :: out_g    = .false.
+      logical :: out_dep = .false.
+      logical :: out_eta = .false.
+      logical :: out_u = .false.
+      logical :: out_v = .false.
+      logical :: out_w = .false.
+      logical :: out_p = .false.
+      logical :: out_tke = .false.
+      logical :: out_eps = .false.
+      logical :: out_s = .false.
+      logical :: out_mu = .false.
+      logical :: out_bub = .false.
+      logical :: out_a = .false.
+      logical :: out_f = .false.
+      logical :: out_t = .false.
+      logical :: out_g = .false.
       logical :: out_sali = .false.
       logical :: out_temp = .false.
-      logical :: out_rho  = .false.
+      logical :: out_rho = .false.
 
    contains
       procedure :: read_input => output_3d_read_input
@@ -80,24 +80,24 @@ contains
       if (.not. no_vars) then
          do iv = 1, size(var_list)
             select case (trim(var_list(iv)%s))
-            case ("DEP");  this%out_dep  = .true.
-            case ("ETA");  this%out_eta  = .true.
-            case ("U");    this%out_u    = .true.
-            case ("V");    this%out_v    = .true.
-            case ("W");    this%out_w    = .true.
-            case ("P");    this%out_p    = .true.
-            case ("TKE");  this%out_tke  = .true.
-            case ("EPS");  this%out_eps  = .true.
-            case ("S");    this%out_s    = .true.
-            case ("MU");   this%out_mu   = .true.
-            case ("BUB");  this%out_bub  = .true.
-            case ("A");    this%out_a    = .true.
-            case ("F");    this%out_f    = .true.
-            case ("T");    this%out_t    = .true.
-            case ("G");    this%out_g    = .true.
+            case ("DEP"); this%out_dep = .true.
+            case ("ETA"); this%out_eta = .true.
+            case ("U"); this%out_u = .true.
+            case ("V"); this%out_v = .true.
+            case ("W"); this%out_w = .true.
+            case ("P"); this%out_p = .true.
+            case ("TKE"); this%out_tke = .true.
+            case ("EPS"); this%out_eps = .true.
+            case ("S"); this%out_s = .true.
+            case ("MU"); this%out_mu = .true.
+            case ("BUB"); this%out_bub = .true.
+            case ("A"); this%out_a = .true.
+            case ("F"); this%out_f = .true.
+            case ("T"); this%out_t = .true.
+            case ("G"); this%out_g = .true.
             case ("SALI"); this%out_sali = .true.
             case ("TEMP"); this%out_temp = .true.
-            case ("RHO");  this%out_rho  = .true.
+            case ("RHO"); this%out_rho = .true.
             end select
          end do
       end if

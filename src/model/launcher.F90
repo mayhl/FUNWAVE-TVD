@@ -22,10 +22,10 @@
 !-------------------------------------------------
 
 module model_launcher_mod
-   use core_env_mod,   only: type_env, new_env, get_sub_env
+   use core_env_mod, only: type_env, new_env, get_sub_env
    use model_main_mod, only: type_model_main
 # if defined (ENABLE_3D)
-   use model_3d_mod,   only: type_model_3d
+   use model_3d_mod, only: type_model_3d
 # endif
 
    implicit none
@@ -47,7 +47,7 @@ contains
 
       call get_command_argument(1, yaml_path)
       if (len_trim(yaml_path) == 0) then
-         write(*, "(a)") "Usage: funwave <input.yaml>"
+         write (*, "(a)") "Usage: funwave <input.yaml>"
          stop 1
       end if
 
@@ -67,7 +67,7 @@ contains
 # if defined (ENABLE_3D)
          call run_3d(model_3d, env)
 # else
-         write(*, "(a)") "ERROR: 3D grid detected but HYPRE not linked — rebuild with -DHYPRE_DIR=<path>."
+         write (*, "(a)") "ERROR: 3D grid detected but HYPRE not linked — rebuild with -DHYPRE_DIR=<path>."
          stop 1
 # endif
       end if
@@ -78,7 +78,7 @@ contains
    ! constructing a second MPI/YAML environment inside type_model_main%init.
    subroutine run_2d(model, env)
       type(type_model_main), intent(inout) :: model
-      type(type_env),        intent(inout) :: env
+      type(type_env), intent(inout) :: env
 
       external :: run_legacy_2d  ! src/model/2d/old/legacy_runner.F
 
@@ -98,7 +98,7 @@ contains
    subroutine run_3d(model, env)
       use mpi, only: MPI_FINALIZE
       type(type_model_3d), intent(inout)         :: model
-      type(type_env),      intent(inout), target :: env
+      type(type_env), intent(inout), target :: env
       integer                                    :: ier
 
       call model%read_input(env)

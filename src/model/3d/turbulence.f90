@@ -32,13 +32,13 @@ module model_3d_turbulence_mod
 
    type, extends(type_model_base) :: type_model_3d_turbulence
 
-      logical  :: viscous_flow   = .false.
-      integer  :: ivturb         = 0
-      integer  :: ihturb         = 0
-      real(SP) :: visc           = 1.0e-6_SP
-      real(SP) :: schmidt        = 1.0_SP
-      real(SP) :: cvs            = 0.0_SP
-      real(SP) :: chs            = 0.0_SP
+      logical  :: viscous_flow = .false.
+      integer  :: ivturb = 0
+      integer  :: ihturb = 0
+      real(SP) :: visc = 1.0e-6_SP
+      real(SP) :: schmidt = 1.0_SP
+      real(SP) :: cvs = 0.0_SP
+      real(SP) :: chs = 0.0_SP
       real(SP) :: viscous_number = 0.0_SP
 
    contains
@@ -57,13 +57,13 @@ contains
       sub_env = get_sub_env(env, "turbulence")
       this%is_activated = .true.
 
-      call sub_env%yaml%read("viscous_flow",   val=this%viscous_flow,   default="NO")
-      call sub_env%yaml%read("ivturb",         val=this%ivturb,         default="0")
-      call sub_env%yaml%read("ihturb",         val=this%ihturb,         default="0")
-      call sub_env%yaml%read("visc",           silent=no_key, val=this%visc,           default="1.0e-6")
-      call sub_env%yaml%read("schmidt",        silent=no_key, val=this%schmidt,        default="1.0")
-      call sub_env%yaml%read("cvs",            silent=no_key, val=this%cvs,            default="0.0")
-      call sub_env%yaml%read("chs",            silent=no_key, val=this%chs,            default="0.0")
+      call sub_env%yaml%read("viscous_flow", val=this%viscous_flow, default="NO")
+      call sub_env%yaml%read("ivturb", val=this%ivturb, default="0")
+      call sub_env%yaml%read("ihturb", val=this%ihturb, default="0")
+      call sub_env%yaml%read("visc", silent=no_key, val=this%visc, default="1.0e-6")
+      call sub_env%yaml%read("schmidt", silent=no_key, val=this%schmidt, default="1.0")
+      call sub_env%yaml%read("cvs", silent=no_key, val=this%cvs, default="0.0")
+      call sub_env%yaml%read("chs", silent=no_key, val=this%chs, default="0.0")
       call sub_env%yaml%read("viscous_number", silent=no_key, val=this%viscous_number, default="0.0")
 
    end subroutine turbulence_3d_read_input

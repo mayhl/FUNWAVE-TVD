@@ -35,19 +35,19 @@
 
 module model_sponge_mod
    use core_constants_mod, only: SP, N_GHOST
-   use core_env_mod,       only: type_env, get_sub_env
-   use core_grid_mod,      only: type_grid_2d
-   use model_base_mod,     only: type_model_base
+   use core_env_mod, only: type_env, get_sub_env
+   use core_grid_mod, only: type_grid_2d
+   use model_base_mod, only: type_model_base
    use model_fields_2d_mod, only: type_fields_2d
 
    use model_config_defaults_mod, only: DEF_SPONGE_A_SPONGE, DEF_SPONGE_CDSPONGE, &
-                                          DEF_SPONGE_CSP, DEF_SPONGE_DIFFUSION_SPONGE, &
-                                          DEF_SPONGE_DIRECT_SPONGE, &
-                                          DEF_SPONGE_FRICTION_SPONGE, DEF_SPONGE_R_SPONGE, &
-                                          DEF_SPONGE_SPONGE_EAST_WIDTH, &
-                                          DEF_SPONGE_SPONGE_NORTH_WIDTH, &
-                                          DEF_SPONGE_SPONGE_SOUTH_WIDTH, &
-                                          DEF_SPONGE_SPONGE_WEST_WIDTH
+                                        DEF_SPONGE_CSP, DEF_SPONGE_DIFFUSION_SPONGE, &
+                                        DEF_SPONGE_DIRECT_SPONGE, &
+                                        DEF_SPONGE_FRICTION_SPONGE, DEF_SPONGE_R_SPONGE, &
+                                        DEF_SPONGE_SPONGE_EAST_WIDTH, &
+                                        DEF_SPONGE_SPONGE_NORTH_WIDTH, &
+                                        DEF_SPONGE_SPONGE_SOUTH_WIDTH, &
+                                        DEF_SPONGE_SPONGE_WEST_WIDTH
 
    implicit none
 
@@ -58,14 +58,14 @@ module model_sponge_mod
 
       ! ── YAML parameters ───────────────────────────────────────────
       logical  :: diffusion_sponge = .false.
-      logical  :: direct_sponge    = .false.
-      logical  :: friction_sponge  = .false.
+      logical  :: direct_sponge = .false.
+      logical  :: friction_sponge = .false.
 
-      real(SP) :: Csp      = 0.1_SP
+      real(SP) :: Csp = 0.1_SP
       real(SP) :: CDsponge = 5.0_SP
 
-      real(SP) :: Sponge_west_width  = 0.0_SP
-      real(SP) :: Sponge_east_width  = 0.0_SP
+      real(SP) :: Sponge_west_width = 0.0_SP
+      real(SP) :: Sponge_east_width = 0.0_SP
       real(SP) :: Sponge_south_width = 0.0_SP
       real(SP) :: Sponge_north_width = 0.0_SP
 
@@ -77,16 +77,16 @@ module model_sponge_mod
       ! coeff:     direct sponge damping ratio (>= 1; 1.0 = no damping).
       ! cd_sponge: friction sponge drag coefficient (>= 0).
       ! nu_sponge: diffusion sponge kinematic viscosity (>= 0).
-      real(SP), allocatable :: coeff    (:,:)
-      real(SP), allocatable :: cd_sponge(:,:)
-      real(SP), allocatable :: nu_sponge(:,:)
+      real(SP), allocatable :: coeff(:, :)
+      real(SP), allocatable :: cd_sponge(:, :)
+      real(SP), allocatable :: nu_sponge(:, :)
 
    contains
-      procedure :: read_input      => sponge_read_input
-      procedure :: init_compute    => sponge_init_compute
-      procedure :: merge_friction  => sponge_merge_friction
-      procedure :: apply           => sponge_apply
-      procedure :: free            => sponge_free
+      procedure :: read_input => sponge_read_input
+      procedure :: init_compute => sponge_init_compute
+      procedure :: merge_friction => sponge_merge_friction
+      procedure :: apply => sponge_apply
+      procedure :: free => sponge_free
    end type type_model_sponge
 
 contains
@@ -105,16 +105,16 @@ contains
       if (.not. this%is_activated) return
 
       call sub_env%yaml%read("diffusion_sponge", val=this%diffusion_sponge, default=DEF_SPONGE_DIFFUSION_SPONGE)
-      call sub_env%yaml%read("direct_sponge",    val=this%direct_sponge,    default=DEF_SPONGE_DIRECT_SPONGE)
-      call sub_env%yaml%read("friction_sponge",  val=this%friction_sponge,  default=DEF_SPONGE_FRICTION_SPONGE)
+      call sub_env%yaml%read("direct_sponge", val=this%direct_sponge, default=DEF_SPONGE_DIRECT_SPONGE)
+      call sub_env%yaml%read("friction_sponge", val=this%friction_sponge, default=DEF_SPONGE_FRICTION_SPONGE)
 
-      call sub_env%yaml%read("Csp",      silent=no_key, val=this%Csp,      default=DEF_SPONGE_CSP)
+      call sub_env%yaml%read("Csp", silent=no_key, val=this%Csp, default=DEF_SPONGE_CSP)
       call sub_env%yaml%read("CDsponge", silent=no_key, val=this%CDsponge, default=DEF_SPONGE_CDSPONGE)
 
-      call sub_env%yaml%read("Sponge_west_width",  silent=no_key, val=this%Sponge_west_width,  default=DEF_SPONGE_SPONGE_WEST_WIDTH)
-      call sub_env%yaml%read("Sponge_east_width",  silent=no_key, val=this%Sponge_east_width,  default=DEF_SPONGE_SPONGE_EAST_WIDTH)
-      call sub_env%yaml%read("Sponge_south_width", silent=no_key, val=this%Sponge_south_width, default=DEF_SPONGE_SPONGE_SOUTH_WIDTH)
-      call sub_env%yaml%read("Sponge_north_width", silent=no_key, val=this%Sponge_north_width, default=DEF_SPONGE_SPONGE_NORTH_WIDTH)
+      call sub_env%yaml%read("Sponge_west_width", silent=no_key, val=this%Sponge_west_width, default=DEF_SPONGE_SPONGE_WEST_WIDTH)
+      call sub_env%yaml%read("Sponge_east_width", silent=no_key, val=this%Sponge_east_width, default=DEF_SPONGE_SPONGE_EAST_WIDTH)
+     call sub_env%yaml%read("Sponge_south_width", silent=no_key, val=this%Sponge_south_width, default=DEF_SPONGE_SPONGE_SOUTH_WIDTH)
+     call sub_env%yaml%read("Sponge_north_width", silent=no_key, val=this%Sponge_north_width, default=DEF_SPONGE_SPONGE_NORTH_WIDTH)
 
       call sub_env%yaml%read("R_sponge", silent=no_key, val=this%R_sponge, default=DEF_SPONGE_R_SPONGE)
       call sub_env%yaml%read("A_sponge", silent=no_key, val=this%A_sponge, default=DEF_SPONGE_A_SPONGE)
@@ -135,16 +135,16 @@ contains
    !> merge_friction() after init_compute().
    subroutine sponge_init_compute(this, grid)
       class(type_model_sponge), intent(inout) :: this
-      type(type_grid_2d),       intent(in)    :: grid
+      type(type_grid_2d), intent(in)    :: grid
 
       integer  :: ng, nx, ny, mloc_g, nloc_g
       real(SP) :: ref_dx, ref_dy
 
       if (.not. this%is_activated) return
 
-      ng     = N_GHOST
-      nx     = grid%local_nx
-      ny     = grid%local_ny
+      ng = N_GHOST
+      nx = grid%local_nx
+      ny = grid%local_ny
       mloc_g = nx + 2*ng
       nloc_g = ny + 2*ng
 
@@ -154,32 +154,32 @@ contains
       call this%free()
 
       if (this%direct_sponge) then
-         allocate(this%coeff(mloc_g, nloc_g), source=1.0_SP)
+         allocate (this%coeff(mloc_g, nloc_g), source=1.0_SP)
          call compute_direct_coeff(this%coeff, mloc_g, nloc_g, ng, ref_dx, ref_dy, &
-                                   this%Sponge_west_width, this%Sponge_east_width,  &
+                                   this%Sponge_west_width, this%Sponge_east_width, &
                                    this%Sponge_south_width, this%Sponge_north_width, &
-                                   this%R_sponge, this%A_sponge,                    &
-                                   grid%ibegin, grid%iproc, grid%nx_proc, nx,       &
+                                   this%R_sponge, this%A_sponge, &
+                                   grid%ibegin, grid%iproc, grid%nx_proc, nx, &
                                    grid%jbegin, grid%jproc, grid%ny_proc, ny)
       end if
 
       if (this%friction_sponge) then
-         allocate(this%cd_sponge(mloc_g, nloc_g), source=0.0_SP)
+         allocate (this%cd_sponge(mloc_g, nloc_g), source=0.0_SP)
          call compute_friction_coeff(this%cd_sponge, mloc_g, nloc_g, ng, ref_dx, ref_dy, &
-                                     this%Sponge_west_width, this%Sponge_east_width,      &
-                                     this%Sponge_south_width, this%Sponge_north_width,    &
-                                     this%CDsponge,                                       &
-                                     grid%ibegin, grid%iproc, grid%nx_proc, nx,           &
+                                     this%Sponge_west_width, this%Sponge_east_width, &
+                                     this%Sponge_south_width, this%Sponge_north_width, &
+                                     this%CDsponge, &
+                                     grid%ibegin, grid%iproc, grid%nx_proc, nx, &
                                      grid%jbegin, grid%jproc, grid%ny_proc, ny)
       end if
 
       if (this%diffusion_sponge) then
-         allocate(this%nu_sponge(mloc_g, nloc_g), source=0.0_SP)
+         allocate (this%nu_sponge(mloc_g, nloc_g), source=0.0_SP)
          call compute_diffusion_coeff(this%nu_sponge, mloc_g, nloc_g, ng, ref_dx, ref_dy, &
-                                      this%Sponge_west_width, this%Sponge_east_width,      &
-                                      this%Sponge_south_width, this%Sponge_north_width,    &
-                                      this%Csp,                                            &
-                                      grid%ibegin, grid%iproc, grid%nx_proc, nx,           &
+                                      this%Sponge_west_width, this%Sponge_east_width, &
+                                      this%Sponge_south_width, this%Sponge_north_width, &
+                                      this%Csp, &
+                                      grid%ibegin, grid%iproc, grid%nx_proc, nx, &
                                       grid%jbegin, grid%jproc, grid%ny_proc, ny)
       end if
 
@@ -201,8 +201,8 @@ contains
    !>   call sponge%merge_friction(friction%Cd, fields%depth)
    subroutine sponge_merge_friction(this, cd_inout, depth)
       class(type_model_sponge), intent(inout) :: this
-      real(SP),                 intent(inout) :: cd_inout(:,:)
-      real(SP),                 intent(in)    :: depth(:,:)
+      real(SP), intent(inout) :: cd_inout(:, :)
+      real(SP), intent(in)    :: depth(:, :)
 
       integer :: i, j
 
@@ -211,11 +211,11 @@ contains
 
       do j = 1, size(cd_inout, 2)
          do i = 1, size(cd_inout, 1)
-            cd_inout(i, j) = max(cd_inout(i, j), this%cd_sponge(i, j) * depth(i, j))
+            cd_inout(i, j) = max(cd_inout(i, j), this%cd_sponge(i, j)*depth(i, j))
          end do
       end do
 
-      deallocate(this%cd_sponge)
+      deallocate (this%cd_sponge)
 
    end subroutine sponge_merge_friction
 
@@ -231,24 +231,24 @@ contains
    !> their apply is in sources.f90 (refactor TODO).
    subroutine sponge_apply(this, fields, grid)
       class(type_model_sponge), intent(in)    :: this
-      type(type_fields_2d),     intent(inout) :: fields
-      type(type_grid_2d),       intent(in)    :: grid
+      type(type_fields_2d), intent(inout) :: fields
+      type(type_grid_2d), intent(in)    :: grid
 
       integer :: i, j, mloc_g, nloc_g, ng
 
       if (.not. this%is_activated) return
       if (.not. this%direct_sponge) return
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
 
       do j = 1, nloc_g
          do i = 1, mloc_g
             if (fields%mask(i, j) > 0) &
-               fields%eta(i, j) = fields%eta(i, j) / this%coeff(i, j)
-            fields%p(i, j) = fields%p(i, j) / this%coeff(i, j)
-            fields%q(i, j) = fields%q(i, j) / this%coeff(i, j)
+               fields%eta(i, j) = fields%eta(i, j)/this%coeff(i, j)
+            fields%p(i, j) = fields%p(i, j)/this%coeff(i, j)
+            fields%q(i, j) = fields%q(i, j)/this%coeff(i, j)
          end do
       end do
 
@@ -258,9 +258,9 @@ contains
 
    subroutine sponge_free(this)
       class(type_model_sponge), intent(inout) :: this
-      if (allocated(this%coeff))     deallocate(this%coeff)
-      if (allocated(this%cd_sponge)) deallocate(this%cd_sponge)
-      if (allocated(this%nu_sponge)) deallocate(this%nu_sponge)
+      if (allocated(this%coeff)) deallocate (this%coeff)
+      if (allocated(this%cd_sponge)) deallocate (this%cd_sponge)
+      if (allocated(this%nu_sponge)) deallocate (this%nu_sponge)
    end subroutine sponge_free
 
    ! ── Private coefficient computation ───────────────────────────────────────
@@ -273,23 +273,23 @@ contains
    !> Bug-fix vs. legacy: each axis is combined independently so that a west-only
    !> sponge is not silently zeroed by the empty south/north combine pass.
    subroutine compute_direct_coeff(coeff, dim1, dim2, ng, ref_dx, ref_dy, &
-                                    w_width, e_width, s_width, n_width,    &
-                                    R_sp, A_sp,                            &
-                                    ibegin, iproc, nx_proc, local_nx,      &
-                                    jbegin, jproc, ny_proc, local_ny)
+                                   w_width, e_width, s_width, n_width, &
+                                   R_sp, A_sp, &
+                                   ibegin, iproc, nx_proc, local_nx, &
+                                   jbegin, jproc, ny_proc, local_ny)
       real(SP), intent(inout) :: coeff(dim1, dim2)
-      integer,  intent(in)    :: dim1, dim2, ng
+      integer, intent(in)    :: dim1, dim2, ng
       real(SP), intent(in)    :: ref_dx, ref_dy
       real(SP), intent(in)    :: w_width, e_width, s_width, n_width
       real(SP), intent(in)    :: R_sp, A_sp
-      integer,  intent(in)    :: ibegin, iproc, nx_proc, local_nx
-      integer,  intent(in)    :: jbegin, jproc, ny_proc, local_ny
+      integer, intent(in)    :: ibegin, iproc, nx_proc, local_nx
+      integer, intent(in)    :: jbegin, jproc, ny_proc, local_ny
 
-      real(SP), allocatable :: tmp1(:,:), tmp2(:,:)
+      real(SP), allocatable :: tmp1(:, :), tmp2(:, :)
       real(SP) :: ri, lim, floor_val
       integer  :: i, j, iwidth
 
-      allocate(tmp1(dim1, dim2), tmp2(dim1, dim2))
+      allocate (tmp1(dim1, dim2), tmp2(dim1, dim2))
       floor_val = A_sp**(R_sp**50)
 
       ! ── west / east — combine only when at least one side is active ──
@@ -298,23 +298,23 @@ contains
          tmp2 = 0.0_SP
 
          if (w_width > 0.0_SP) then
-            iwidth = int(w_width / ref_dx) + ng
+            iwidth = int(w_width/ref_dx) + ng
             do j = 1, dim2
                do i = 1, dim1
                   lim = max(coeff(i, j), 1.0_SP)
-                  ri  = R_sp**(50.0_SP * real(i + ibegin - 2, SP) / real(iwidth - 1, SP))
+                  ri = R_sp**(50.0_SP*real(i + ibegin - 2, SP)/real(iwidth - 1, SP))
                   tmp1(i, j) = max(A_sp**ri, lim)
                end do
             end do
          end if
 
          if (e_width > 0.0_SP) then
-            iwidth = int(e_width / ref_dx) + ng
+            iwidth = int(e_width/ref_dx) + ng
             do j = 1, dim2
                do i = 1, dim1
                   lim = max(coeff(i, j), 1.0_SP)
-                  ri  = R_sp**(50.0_SP * real(dim1 - i + (nx_proc - iproc - 1)*local_nx, SP) &
-                                       / real(iwidth - 1, SP))
+                  ri = R_sp**(50.0_SP*real(dim1 - i + (nx_proc - iproc - 1)*local_nx, SP) &
+                              /real(iwidth - 1, SP))
                   tmp2(i, j) = max(A_sp**ri, lim)
                end do
             end do
@@ -334,23 +334,23 @@ contains
          tmp2 = 0.0_SP
 
          if (s_width > 0.0_SP) then
-            iwidth = int(s_width / ref_dy) + ng
+            iwidth = int(s_width/ref_dy) + ng
             do i = 1, dim1
                do j = 1, dim2
                   lim = max(coeff(i, j), 1.0_SP)
-                  ri  = R_sp**(50.0_SP * real(j + jbegin - 2, SP) / real(iwidth - 1, SP))
+                  ri = R_sp**(50.0_SP*real(j + jbegin - 2, SP)/real(iwidth - 1, SP))
                   tmp1(i, j) = max(A_sp**ri, lim)
                end do
             end do
          end if
 
          if (n_width > 0.0_SP) then
-            iwidth = int(n_width / ref_dy) + ng
+            iwidth = int(n_width/ref_dy) + ng
             do i = 1, dim1
                do j = 1, dim2
                   lim = max(coeff(i, j), 1.0_SP)
-                  ri  = R_sp**(50.0_SP * real(dim2 - j + (ny_proc - jproc - 1)*local_ny, SP) &
-                                       / real(iwidth - 1, SP))
+                  ri = R_sp**(50.0_SP*real(dim2 - j + (ny_proc - jproc - 1)*local_ny, SP) &
+                              /real(iwidth - 1, SP))
                   tmp2(i, j) = max(A_sp**ri, lim)
                end do
             end do
@@ -364,52 +364,52 @@ contains
          end do
       end if
 
-      deallocate(tmp1, tmp2)
+      deallocate (tmp1, tmp2)
    end subroutine compute_direct_coeff
 
    !> Friction sponge drag coefficient (cd_sponge >= 0).
    !> Linear ramp via tanh profile.  No floor reset — zero outside sponge is correct.
    subroutine compute_friction_coeff(cd, dim1, dim2, ng, ref_dx, ref_dy, &
-                                      w_width, e_width, s_width, n_width, &
-                                      CDsp,                               &
-                                      ibegin, iproc, nx_proc, local_nx,   &
-                                      jbegin, jproc, ny_proc, local_ny)
+                                     w_width, e_width, s_width, n_width, &
+                                     CDsp, &
+                                     ibegin, iproc, nx_proc, local_nx, &
+                                     jbegin, jproc, ny_proc, local_ny)
       real(SP), intent(inout) :: cd(dim1, dim2)
-      integer,  intent(in)    :: dim1, dim2, ng
+      integer, intent(in)    :: dim1, dim2, ng
       real(SP), intent(in)    :: ref_dx, ref_dy
       real(SP), intent(in)    :: w_width, e_width, s_width, n_width
       real(SP), intent(in)    :: CDsp
-      integer,  intent(in)    :: ibegin, iproc, nx_proc, local_nx
-      integer,  intent(in)    :: jbegin, jproc, ny_proc, local_ny
+      integer, intent(in)    :: ibegin, iproc, nx_proc, local_nx
+      integer, intent(in)    :: jbegin, jproc, ny_proc, local_ny
 
-      real(SP), allocatable :: tmp1(:,:), tmp2(:,:)
+      real(SP), allocatable :: tmp1(:, :), tmp2(:, :)
       real(SP) :: ri, lim
       integer  :: i, j, iwidth
 
-      allocate(tmp1(dim1, dim2), tmp2(dim1, dim2))
+      allocate (tmp1(dim1, dim2), tmp2(dim1, dim2))
 
       if (w_width > 0.0_SP .or. e_width > 0.0_SP) then
          tmp1 = 0.0_SP
          tmp2 = 0.0_SP
 
          if (w_width > 0.0_SP) then
-            iwidth = int(w_width / ref_dx) + ng
+            iwidth = int(w_width/ref_dx) + ng
             do j = 1, dim2
                do i = 1, dim1
                   lim = max(cd(i, j), 0.0_SP)
-                  ri  = max(0.0_SP, real(iwidth - i - (ibegin - 1), SP))
-                  tmp1(i, j) = max(CDsp * tanh(ri / 10.0_SP), lim)
+                  ri = max(0.0_SP, real(iwidth - i - (ibegin - 1), SP))
+                  tmp1(i, j) = max(CDsp*tanh(ri/10.0_SP), lim)
                end do
             end do
          end if
 
          if (e_width > 0.0_SP) then
-            iwidth = int(e_width / ref_dx) + ng
+            iwidth = int(e_width/ref_dx) + ng
             do j = 1, dim2
                do i = 1, dim1
                   lim = max(cd(i, j), 0.0_SP)
-                  ri  = max(0.0_SP, real(iwidth - dim1 + i - (nx_proc - iproc - 1)*local_nx, SP))
-                  tmp2(i, j) = max(CDsp * tanh(ri / 10.0_SP), lim)
+                  ri = max(0.0_SP, real(iwidth - dim1 + i - (nx_proc - iproc - 1)*local_nx, SP))
+                  tmp2(i, j) = max(CDsp*tanh(ri/10.0_SP), lim)
                end do
             end do
          end if
@@ -426,23 +426,23 @@ contains
          tmp2 = 0.0_SP
 
          if (s_width > 0.0_SP) then
-            iwidth = int(s_width / ref_dy) + ng
+            iwidth = int(s_width/ref_dy) + ng
             do i = 1, dim1
                do j = 1, dim2
                   lim = max(cd(i, j), 0.0_SP)
-                  ri  = max(0.0_SP, real(iwidth - j - (jbegin - 1), SP))
-                  tmp1(i, j) = max(CDsp * tanh(ri / 10.0_SP), lim)
+                  ri = max(0.0_SP, real(iwidth - j - (jbegin - 1), SP))
+                  tmp1(i, j) = max(CDsp*tanh(ri/10.0_SP), lim)
                end do
             end do
          end if
 
          if (n_width > 0.0_SP) then
-            iwidth = int(n_width / ref_dy) + ng
+            iwidth = int(n_width/ref_dy) + ng
             do i = 1, dim1
                do j = 1, dim2
                   lim = max(cd(i, j), 0.0_SP)
-                  ri  = max(0.0_SP, real(iwidth - dim2 + j - (ny_proc - jproc - 1)*local_ny, SP))
-                  tmp2(i, j) = max(CDsp * tanh(ri / 10.0_SP), lim)
+                  ri = max(0.0_SP, real(iwidth - dim2 + j - (ny_proc - jproc - 1)*local_ny, SP))
+                  tmp2(i, j) = max(CDsp*tanh(ri/10.0_SP), lim)
                end do
             end do
          end if
@@ -454,29 +454,29 @@ contains
          end do
       end if
 
-      deallocate(tmp1, tmp2)
+      deallocate (tmp1, tmp2)
    end subroutine compute_friction_coeff
 
    !> Diffusion sponge lateral viscosity (nu_sponge >= 0).
    !> Same tanh profile as friction sponge, amplitude = Csp.
    subroutine compute_diffusion_coeff(nu, dim1, dim2, ng, ref_dx, ref_dy, &
-                                       w_width, e_width, s_width, n_width, &
-                                       Csp_val,                            &
-                                       ibegin, iproc, nx_proc, local_nx,   &
-                                       jbegin, jproc, ny_proc, local_ny)
+                                      w_width, e_width, s_width, n_width, &
+                                      Csp_val, &
+                                      ibegin, iproc, nx_proc, local_nx, &
+                                      jbegin, jproc, ny_proc, local_ny)
       real(SP), intent(inout) :: nu(dim1, dim2)
-      integer,  intent(in)    :: dim1, dim2, ng
+      integer, intent(in)    :: dim1, dim2, ng
       real(SP), intent(in)    :: ref_dx, ref_dy
       real(SP), intent(in)    :: w_width, e_width, s_width, n_width
       real(SP), intent(in)    :: Csp_val
-      integer,  intent(in)    :: ibegin, iproc, nx_proc, local_nx
-      integer,  intent(in)    :: jbegin, jproc, ny_proc, local_ny
+      integer, intent(in)    :: ibegin, iproc, nx_proc, local_nx
+      integer, intent(in)    :: jbegin, jproc, ny_proc, local_ny
 
       call compute_friction_coeff(nu, dim1, dim2, ng, ref_dx, ref_dy, &
-                                   w_width, e_width, s_width, n_width, &
-                                   Csp_val,                            &
-                                   ibegin, iproc, nx_proc, local_nx,   &
-                                   jbegin, jproc, ny_proc, local_ny)
+                                  w_width, e_width, s_width, n_width, &
+                                  Csp_val, &
+                                  ibegin, iproc, nx_proc, local_nx, &
+                                  jbegin, jproc, ny_proc, local_ny)
    end subroutine compute_diffusion_coeff
 
 end module model_sponge_mod

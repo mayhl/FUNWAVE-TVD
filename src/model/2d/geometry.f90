@@ -45,9 +45,9 @@ module model_geometry_mod
    public :: type_model_geometry
 
    character(len=8), parameter :: BATHY_TYPES(3) = &
-      [character(len=8) :: "file", "flat", "slope"]
+                                  [character(len=8) :: "file", "flat", "slope"]
    character(len=8), parameter :: FILE_TYPES(1) = &
-      [character(len=8) :: "ascii"]
+                                  [character(len=8) :: "ascii"]
 
    type, extends(type_model_base) :: type_model_geometry
 
@@ -90,7 +90,7 @@ contains
       type(type_env) :: sub_env
       type(type_yaml_reader) :: bathy_yaml, decomp_yaml
       real(SP), allocatable :: cell_size(:), origin(:)
-      integer,  allocatable :: grid_size(:)
+      integer, allocatable :: grid_size(:)
       logical :: no_cell_size, no_origin, no_decomp
       logical :: no_nx_proc, no_ny_proc, no_dx_file, no_dy_file
       logical :: no_bathy_nx, no_bathy_ny
@@ -172,9 +172,9 @@ contains
    ! ----------------------------------------------------------------
    subroutine geometry_build_grid(this, comm, grid, periodic_y)
       class(type_model_geometry), intent(in)    :: this
-      type(type_comm),            intent(in)    :: comm
-      type(type_grid_2d),         intent(inout) :: grid
-      logical,                    intent(in)    :: periodic_y
+      type(type_comm), intent(in)    :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      logical, intent(in)    :: periodic_y
 
       logical :: create_partition
 
@@ -190,7 +190,7 @@ contains
 
       create_partition = (this%nx_proc <= 0)
       if (.not. create_partition) then
-         if (this%nx_proc * this%ny_proc /= comm%size) then
+         if (this%nx_proc*this%ny_proc /= comm%size) then
             error stop "geometry/decomposition: nx_proc*ny_proc must equal MPI size"
          end if
          grid%nx_proc = this%nx_proc
@@ -222,50 +222,50 @@ contains
    ! ----------------------------------------------------------------
    subroutine geometry_init_depth(this, grid, depth, depth_x, depth_y)
       class(type_model_geometry), intent(in)    :: this
-      type(type_grid_2d),         intent(in)    :: grid
-      real(SP),                   intent(inout) :: depth(:,:), depth_x(:,:), depth_y(:,:)
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(inout) :: depth(:, :), depth_x(:, :), depth_y(:, :)
 
       integer :: i, j, gi, i_slp
 
       associate (lp => grid%lp)
 
-      select case (trim(this%bathy_type))
-      case ("flat")
-         depth = this%bathy_depth
-      case ("slope")
-         i_slp = int(this%bathy_slope_x0 / this%dx) + 1
-         do j = lp%jb, lp%je
-            do i = lp%ib, lp%ie
-               gi = grid%ibegin + (i - lp%ib)
-               if (gi >= i_slp) then
-                  depth(i, j) = this%bathy_depth - this%bathy_slope * real(gi - i_slp, SP) * this%dx
-               else
-                  depth(i, j) = this%bathy_depth
-               end if
+         select case (trim(this%bathy_type))
+         case ("flat")
+            depth = this%bathy_depth
+         case ("slope")
+            i_slp = int(this%bathy_slope_x0/this%dx) + 1
+            do j = lp%jb, lp%je
+               do i = lp%ib, lp%ie
+                  gi = grid%ibegin + (i - lp%ib)
+                  if (gi >= i_slp) then
+                     depth(i, j) = this%bathy_depth - this%bathy_slope*real(gi - i_slp, SP)*this%dx
+                  else
+                     depth(i, j) = this%bathy_depth
+                  end if
+               end do
+            end do
+         case default
+            error stop "geometry: init_depth supports flat and slope only"
+         end select
+
+         call grid%halo_exchange(depth)
+         call fill_ghost_wall(lp, grid%is_back_boundary, grid%is_shore_boundary, &
+                              grid%is_right_boundary, grid%is_left_boundary, &
+                              SIGN_MIRROR, SIGN_MIRROR, depth)
+
+         do j = 1, lp%nloc
+            do i = 2, lp%mloc
+               depth_x(i, j) = 0.5_SP*(depth(i - 1, j) + depth(i, j))
+            end do
+            depth_x(1, j) = 0.5_SP*(3.0_SP*depth(1, j) - depth(2, j))
+         end do
+
+         do j = 2, lp%nloc
+            do i = 1, lp%mloc
+               depth_y(i, j) = 0.5_SP*(depth(i, j - 1) + depth(i, j))
             end do
          end do
-      case default
-         error stop "geometry: init_depth supports flat and slope only"
-      end select
-
-      call grid%halo_exchange(depth)
-      call fill_ghost_wall(lp, grid%is_back_boundary, grid%is_shore_boundary, &
-                           grid%is_right_boundary, grid%is_left_boundary, &
-                           SIGN_MIRROR, SIGN_MIRROR, depth)
-
-      do j = 1, lp%nloc
-         do i = 2, lp%mloc
-            depth_x(i, j) = 0.5_SP * (depth(i - 1, j) + depth(i, j))
-         end do
-         depth_x(1, j) = 0.5_SP * (3.0_SP * depth(1, j) - depth(2, j))
-      end do
-
-      do j = 2, lp%nloc
-         do i = 1, lp%mloc
-            depth_y(i, j) = 0.5_SP * (depth(i, j - 1) + depth(i, j))
-         end do
-      end do
-      depth_y(:, 1) = 0.5_SP * (3.0_SP * depth(:, 1) - depth(:, 2))
+         depth_y(:, 1) = 0.5_SP*(3.0_SP*depth(:, 1) - depth(:, 2))
 
       end associate
 

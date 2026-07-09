@@ -28,8 +28,8 @@ module model_3d_solver_mod
    type, extends(type_model_base) :: type_model_3d_solver
 
       integer  :: solver_type = 1
-      integer  :: max_iter    = 500
-      real(SP) :: tolerance   = 1.0e-6_SP
+      integer  :: max_iter = 500
+      real(SP) :: tolerance = 1.0e-6_SP
 
    contains
       procedure :: read_input => solver_3d_read_input
@@ -48,8 +48,8 @@ contains
       this%is_activated = .true.
 
       call sub_env%yaml%read("solver_type", silent=no_key, val=this%solver_type, default="1")
-      call sub_env%yaml%read("max_iter",    silent=no_key, val=this%max_iter,    default="500")
-      call sub_env%yaml%read("tolerance",   silent=no_key, val=this%tolerance,   default="1.0e-6")
+      call sub_env%yaml%read("max_iter", silent=no_key, val=this%max_iter, default="500")
+      call sub_env%yaml%read("tolerance", silent=no_key, val=this%tolerance, default="1.0e-6")
 
    end subroutine solver_3d_read_input
 

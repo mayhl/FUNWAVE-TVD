@@ -109,39 +109,39 @@ contains
             kglob_local = 0
          end if
 
-         open(2, file=trim(this%boundary_file))
-            read(2, *) what
-            read(2, *) this%num_time_data
-            allocate(this%time_data(this%num_time_data))
-            allocate(this%data_u_l(this%num_time_data))
-            allocate(this%data_u_r(this%num_time_data))
-            allocate(this%data_eta_l(this%num_time_data))
-            allocate(this%data_eta_r(this%num_time_data))
-            allocate(this%data_sal_l(this%num_time_data))
-            allocate(this%data_sal_r(this%num_time_data))
-            allocate(this%data_tem_l(this%num_time_data))
-            allocate(this%data_tem_r(this%num_time_data))
-            if (kglob_local > 0) then
-               allocate(this%z_pct_west(kglob_local))
-               allocate(this%z_pct_east(kglob_local))
-               read(2, *) what
-               read(2, *) what
-               read(2, *) (this%z_pct_west(i), i = 1, kglob_local)
-               read(2, *) what
-               read(2, *) (this%z_pct_east(i), i = 1, kglob_local)
-            end if
-            read(2, *) what
-            do i = 1, this%num_time_data
-               read(2, *, end=111) this%time_data(i)
-               read(2, *) what
-               read(2, *, end=111) this%data_eta_l(i), this%data_u_l(i), &
-                                   this%data_sal_l(i), this%data_tem_l(i)
-               read(2, *) what
-               read(2, *, end=111) this%data_eta_r(i), this%data_u_r(i), &
-                                   this%data_sal_r(i), this%data_tem_r(i)
-            end do
-111         continue
-         close(2)
+         open (2, file=trim(this%boundary_file))
+         read (2, *) what
+         read (2, *) this%num_time_data
+         allocate (this%time_data(this%num_time_data))
+         allocate (this%data_u_l(this%num_time_data))
+         allocate (this%data_u_r(this%num_time_data))
+         allocate (this%data_eta_l(this%num_time_data))
+         allocate (this%data_eta_r(this%num_time_data))
+         allocate (this%data_sal_l(this%num_time_data))
+         allocate (this%data_sal_r(this%num_time_data))
+         allocate (this%data_tem_l(this%num_time_data))
+         allocate (this%data_tem_r(this%num_time_data))
+         if (kglob_local > 0) then
+            allocate (this%z_pct_west(kglob_local))
+            allocate (this%z_pct_east(kglob_local))
+            read (2, *) what
+            read (2, *) what
+            read (2, *) (this%z_pct_west(i), i=1, kglob_local)
+            read (2, *) what
+            read (2, *) (this%z_pct_east(i), i=1, kglob_local)
+         end if
+         read (2, *) what
+         do i = 1, this%num_time_data
+            read (2, *, end=111) this%time_data(i)
+            read (2, *) what
+            read (2, *, end=111) this%data_eta_l(i), this%data_u_l(i), &
+               this%data_sal_l(i), this%data_tem_l(i)
+            read (2, *) what
+            read (2, *, end=111) this%data_eta_r(i), this%data_u_r(i), &
+               this%data_sal_r(i), this%data_tem_r(i)
+         end do
+111      continue
+         close (2)
       end if
 
    end subroutine bc_3d_read_input

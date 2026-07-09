@@ -24,14 +24,14 @@
 !-------------------------------------------------
 
 module model_friction_mod
-   use core_constants_mod,  only: SP, N_GHOST, GRAV
-   use core_env_mod,        only: type_env, get_sub_env
-   use core_grid_mod,       only: type_grid_2d
-   use core_path_mod,       only: type_path
-   use model_base_mod,      only: type_model_base
+   use core_constants_mod, only: SP, N_GHOST, GRAV
+   use core_env_mod, only: type_env, get_sub_env
+   use core_grid_mod, only: type_grid_2d
+   use core_path_mod, only: type_path
+   use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_FRICTION_CD, DEF_FRICTION_FRICTION_MATRIX, &
-                                          DEF_FRICTION_MANNING
+                                        DEF_FRICTION_MANNING
 
    implicit none
 
@@ -41,8 +41,8 @@ module model_friction_mod
    type, extends(type_model_base) :: type_model_friction
 
       logical  :: friction_matrix = .false.
-      logical  :: no_cd_file      = .true.
-      logical  :: manning         = .false.
+      logical  :: no_cd_file = .true.
+      logical  :: manning = .false.
       type(type_path) :: cd_file
 
       ! Cd_fixed: constant Manning n (manning=YES) or drag coefficient (manning=NO).
@@ -51,13 +51,13 @@ module model_friction_mod
       ! Ghost-inclusive drag coefficient: (local_nx+2*N_GHOST, local_ny+2*N_GHOST).
       ! Allocated by init_compute; nil when friction is not active.
       ! When manning=YES, update_cd overwrites this with g*n²/H^(1/3) each timestep.
-      real(SP), allocatable :: Cd(:,:)
+      real(SP), allocatable :: Cd(:, :)
 
    contains
-      procedure :: read_input   => friction_read_input
+      procedure :: read_input => friction_read_input
       procedure :: init_compute => friction_init_compute
-      procedure :: update_cd    => friction_update_cd
-      procedure :: free         => friction_free
+      procedure :: update_cd => friction_update_cd
+      procedure :: free => friction_free
    end type type_model_friction
 
 contains
@@ -82,7 +82,7 @@ contains
 
    subroutine friction_init_compute(this, grid)
       class(type_model_friction), intent(inout) :: this
-      type(type_grid_2d),         intent(in)    :: grid
+      type(type_grid_2d), intent(in)    :: grid
 
       integer :: ng, mloc_g, nloc_g
 
@@ -90,11 +90,11 @@ contains
 
       call this%free()
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
 
-      allocate(this%Cd(mloc_g, nloc_g), source=this%Cd_fixed)
+      allocate (this%Cd(mloc_g, nloc_g), source=this%Cd_fixed)
 
       ! TODO: overwrite with spatially varying values read from this%cd_file
       ! when this%friction_matrix is true.
@@ -106,7 +106,7 @@ contains
    ! Call once per timestep after update_h, before cal_sources.
    subroutine friction_update_cd(this, h, min_depth_frc)
       class(type_model_friction), intent(inout) :: this
-      real(SP), intent(in) :: h(:,:)
+      real(SP), intent(in) :: h(:, :)
       real(SP), intent(in) :: min_depth_frc
 
       integer :: i, j
@@ -117,8 +117,8 @@ contains
       ! separate n_raw(:,:) array populated from cd_file in init_compute.
       do j = 1, size(this%Cd, 2)
          do i = 1, size(this%Cd, 1)
-            this%Cd(i,j) = GRAV * this%Cd_fixed**2 &
-                           / max(h(i,j), min_depth_frc)**(0.333333_SP)
+            this%Cd(i, j) = GRAV*this%Cd_fixed**2 &
+                            /max(h(i, j), min_depth_frc)**(0.333333_SP)
          end do
       end do
 
@@ -126,7 +126,7 @@ contains
 
    subroutine friction_free(this)
       class(type_model_friction), intent(inout) :: this
-      if (allocated(this%Cd)) deallocate(this%Cd)
+      if (allocated(this%Cd)) deallocate (this%Cd)
    end subroutine friction_free
 
 end module model_friction_mod

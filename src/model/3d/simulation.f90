@@ -39,20 +39,20 @@ module model_3d_simulation_mod
 
    type, extends(type_model_base) :: type_model_3d_simulation
 
-      real(SP) :: total_time   = 0.0_SP
-      integer  :: sim_steps    = 0
-      real(SP) :: plot_start   = 0.0_SP
-      real(SP) :: plot_intv    = 0.0_SP
-      real(SP) :: screen_intv  = 1.0_SP
-      real(SP) :: cfl          = 0.5_SP
+      real(SP) :: total_time = 0.0_SP
+      integer  :: sim_steps = 0
+      real(SP) :: plot_start = 0.0_SP
+      real(SP) :: plot_intv = 0.0_SP
+      real(SP) :: screen_intv = 1.0_SP
+      real(SP) :: cfl = 0.5_SP
 
       real(SP) :: dt_ini = 0.1_SP
       real(SP) :: dt_min = 1.0e-6_SP
       real(SP) :: dt_max = 1.0_SP
 
-      integer  :: nstat            = 0
+      integer  :: nstat = 0
       character(:), allocatable :: stations_file
-      real(SP) :: plot_intv_stat   = 1.0_SP
+      real(SP) :: plot_intv_stat = 1.0_SP
 
    contains
       procedure :: read_input => simulation_3d_read_input
@@ -72,11 +72,11 @@ contains
       this%is_activated = .true.
 
       call sub_env%yaml%read_positive("total_time", val=this%total_time)
-      call sub_env%yaml%read("sim_steps",   silent=no_key, val=this%sim_steps,   default="0")
-      call sub_env%yaml%read("plot_start",  silent=no_key, val=this%plot_start,  default="0.0")
+      call sub_env%yaml%read("sim_steps", silent=no_key, val=this%sim_steps, default="0")
+      call sub_env%yaml%read("plot_start", silent=no_key, val=this%plot_start, default="0.0")
       call sub_env%yaml%read_positive("plot_intv", val=this%plot_intv)
       call sub_env%yaml%read("screen_intv", silent=no_key, val=this%screen_intv, default="1.0")
-      call sub_env%yaml%read("cfl",         silent=no_key, val=this%cfl,         default="0.5")
+      call sub_env%yaml%read("cfl", silent=no_key, val=this%cfl, default="0.5")
 
       ts_yaml = sub_env%yaml%cast_dictionary("time_stepping", no_ts)
       if (.not. no_ts) then
@@ -87,7 +87,7 @@ contains
 
       stat_yaml = sub_env%yaml%cast_dictionary("stations", no_stat)
       if (.not. no_stat) then
-         call stat_yaml%read("count",    silent=no_key, val=this%nstat,          default="0")
+         call stat_yaml%read("count", silent=no_key, val=this%nstat, default="0")
          call stat_yaml%read("interval", silent=no_key, val=this%plot_intv_stat, default="1.0")
          if (this%nstat > 0) then
             call stat_yaml%read("file", val=this%stations_file)

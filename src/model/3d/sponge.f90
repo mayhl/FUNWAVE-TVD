@@ -30,12 +30,12 @@ module model_3d_sponge_mod
 
    type, extends(type_model_base) :: type_model_3d_sponge
 
-      real(SP) :: west_width  = 0.0_SP
-      real(SP) :: east_width  = 0.0_SP
+      real(SP) :: west_width = 0.0_SP
+      real(SP) :: east_width = 0.0_SP
       real(SP) :: south_width = 0.0_SP
       real(SP) :: north_width = 0.0_SP
-      real(SP) :: r_sponge    = 0.85_SP
-      real(SP) :: a_sponge    = 5.0_SP
+      real(SP) :: r_sponge = 0.85_SP
+      real(SP) :: a_sponge = 5.0_SP
 
    contains
       procedure :: read_input => sponge_3d_read_input
@@ -54,12 +54,12 @@ contains
       this%is_activated = .not. is_empty
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read("west_width",  silent=no_key, val=this%west_width,  default="0.0")
-      call sub_env%yaml%read("east_width",  silent=no_key, val=this%east_width,  default="0.0")
+      call sub_env%yaml%read("west_width", silent=no_key, val=this%west_width, default="0.0")
+      call sub_env%yaml%read("east_width", silent=no_key, val=this%east_width, default="0.0")
       call sub_env%yaml%read("south_width", silent=no_key, val=this%south_width, default="0.0")
       call sub_env%yaml%read("north_width", silent=no_key, val=this%north_width, default="0.0")
-      call sub_env%yaml%read("r_sponge",    silent=no_key, val=this%r_sponge,    default="0.85")
-      call sub_env%yaml%read("a_sponge",    silent=no_key, val=this%a_sponge,    default="5.0")
+      call sub_env%yaml%read("r_sponge", silent=no_key, val=this%r_sponge, default="0.85")
+      call sub_env%yaml%read("a_sponge", silent=no_key, val=this%a_sponge, default="5.0")
 
    end subroutine sponge_3d_read_input
 

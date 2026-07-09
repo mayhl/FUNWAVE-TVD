@@ -1,7 +1,7 @@
 module core_grid_mod
    use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH, MPI_SP
-   use core_comm_mod,      only: type_comm
-   use core_crs_mod,       only: type_crs, CRS_GEOGRAPHIC
+   use core_comm_mod, only: type_comm
+   use core_crs_mod, only: type_crs, CRS_GEOGRAPHIC
    use mpi_f08
    implicit none
 
@@ -9,11 +9,11 @@ module core_grid_mod
       integer :: ib, ie        ! interior x bounds in ghost-inclusive indexing (ib = N_GHOST+1)
       integer :: jb, je        ! interior y bounds
       integer :: mloc, nloc    ! ghost-inclusive local array dims
-      integer :: kb  = 0       ! σ-layer start (ke < kb = 2D sentinel)
-      integer :: ke  = -1      ! σ-layer end
+      integer :: kb = 0       ! σ-layer start (ke < kb = 2D sentinel)
+      integer :: ke = -1      ! σ-layer end
       integer :: kloc = 0      ! ghost-inclusive σ-layer dim (0 = 2D)
-      integer :: ti  = 32      ! tile size x (CPU OMP cache blocking)
-      integer :: tj  = 32      ! tile size y
+      integer :: ti = 32      ! tile size x (CPU OMP cache blocking)
+      integer :: tj = 32      ! tile size y
    end type type_loop_bounds
 
    type, public :: type_grid_2d
@@ -33,9 +33,9 @@ module core_grid_mod
       ! MPI neighbor ranks (MPI_PROC_NULL if at domain boundary)
       integer :: back_rank, shore_rank, left_rank, right_rank
       ! Boundary flags
-      logical :: is_back_boundary  = .false.
+      logical :: is_back_boundary = .false.
       logical :: is_shore_boundary = .false.
-      logical :: is_left_boundary  = .false.
+      logical :: is_left_boundary = .false.
       logical :: is_right_boundary = .false.
       ! Loop bounds — derived from grid at setup(); safe for OMP target mapping (no allocatables)
       type(type_loop_bounds) :: lp
@@ -44,9 +44,9 @@ module core_grid_mod
       type(type_crs)  :: crs
       ! Grid spacing — always 2D arrays (local_nx x local_ny, no ghost cells)
       real(SP) :: dx0 = 0.0_SP, dy0 = 0.0_SP     ! scalar when uniform (for reporting)
-      real(SP), allocatable :: dx(:,:), dy(:,:)
-      real(SP), allocatable :: inv_dx(:,:), inv_dy(:,:)  ! precomputed 1/dx, 1/dy
-      real(SP), allocatable :: x(:,:), y(:,:)       ! physical coordinates (local metres)
+      real(SP), allocatable :: dx(:, :), dy(:, :)
+      real(SP), allocatable :: inv_dx(:, :), inv_dy(:, :)  ! precomputed 1/dx, 1/dy
+      real(SP), allocatable :: x(:, :), y(:, :)       ! physical coordinates (local metres)
    contains
       procedure, public :: decompose
       procedure, public :: setup
@@ -54,7 +54,7 @@ module core_grid_mod
       procedure, public :: init_spacing_uniform
       procedure, public :: init_spacing_variable
       procedure, public :: init_spacing_spherical
-      generic,   public :: init_spacing => init_spacing_uniform, init_spacing_variable
+      generic, public :: init_spacing => init_spacing_uniform, init_spacing_variable
       procedure, public :: finalize => grid_finalize
    end type type_grid_2d
 
@@ -65,9 +65,9 @@ contains
    ! a left/right boundary, so physical-BC ghost fills skip those faces.
    subroutine setup(this, comm, create_partition, periodic_y)
       class(type_grid_2d), intent(inout) :: this
-      type(type_comm),     intent(in)    :: comm
-      logical,             intent(in)    :: create_partition
-      logical, optional,   intent(in)    :: periodic_y
+      type(type_comm), intent(in)    :: comm
+      logical, intent(in)    :: create_partition
+      logical, optional, intent(in)    :: periodic_y
 
       integer, parameter :: n_dims = 2
       integer, dimension(n_dims) :: dims, coords
@@ -82,7 +82,7 @@ contains
          call compute_optimal_grid_size(comm%size, this%M, this%N, this%nx_proc, this%ny_proc)
       end if
 
-      dims    = [this%nx_proc, this%ny_proc]
+      dims = [this%nx_proc, this%ny_proc]
       periods = [.false., wrap_y]
 
       ! Create Cart topology from the caller's comm without mutating it.
@@ -94,12 +94,12 @@ contains
       this%iproc = coords(1)
       this%jproc = coords(2)
 
-      call MPI_Cart_shift(this%cart_comm, 0, 1, this%back_rank,  this%shore_rank, ier)
-      call MPI_Cart_shift(this%cart_comm, 1, 1, this%right_rank, this%left_rank,  ier)
+      call MPI_Cart_shift(this%cart_comm, 0, 1, this%back_rank, this%shore_rank, ier)
+      call MPI_Cart_shift(this%cart_comm, 1, 1, this%right_rank, this%left_rank, ier)
 
-      this%is_back_boundary  = (this%back_rank  == MPI_PROC_NULL)
+      this%is_back_boundary = (this%back_rank == MPI_PROC_NULL)
       this%is_shore_boundary = (this%shore_rank == MPI_PROC_NULL)
-      this%is_left_boundary  = (this%left_rank  == MPI_PROC_NULL)
+      this%is_left_boundary = (this%left_rank == MPI_PROC_NULL)
       this%is_right_boundary = (this%right_rank == MPI_PROC_NULL)
 
       call grid_range_per_procs(1, this%M, this%nx_proc, this%iproc, &
@@ -108,14 +108,14 @@ contains
                                 this%jbegin, this%jstop, this%local_ny)
 
       this%ig_begin = this%ibegin - N_GHOST
-      this%ig_stop  = this%istop  + N_GHOST
+      this%ig_stop = this%istop + N_GHOST
       this%jg_begin = this%jbegin - N_GHOST
-      this%jg_stop  = this%jstop  + N_GHOST
+      this%jg_stop = this%jstop + N_GHOST
 
-      this%lp%ib   = N_GHOST + 1
-      this%lp%ie   = N_GHOST + this%local_nx
-      this%lp%jb   = N_GHOST + 1
-      this%lp%je   = N_GHOST + this%local_ny
+      this%lp%ib = N_GHOST + 1
+      this%lp%ie = N_GHOST + this%local_nx
+      this%lp%jb = N_GHOST + 1
+      this%lp%je = N_GHOST + this%local_ny
       this%lp%mloc = this%local_nx + 2*N_GHOST
       this%lp%nloc = this%local_ny + 2*N_GHOST
 
@@ -126,7 +126,7 @@ contains
    ! Two-phase: x-direction first so corners are correct when y-strips are sent.
    subroutine halo_exchange(this, field)
       class(type_grid_2d), intent(in)    :: this
-      real(SP),            intent(inout) :: field(:,:)
+      real(SP), intent(inout) :: field(:, :)
 
       integer :: nx, ny, ng, mloc_g, nloc_g
       integer :: nreq, ierr, i, j
@@ -134,21 +134,21 @@ contains
       type(MPI_Status)  :: stat(4)
 
       ! x-direction send/recv buffers: (nloc_g, ng) — contiguous in memory
-      real(SP), allocatable :: sbuf_back(:,:), rbuf_back(:,:)
-      real(SP), allocatable :: sbuf_shore(:,:), rbuf_shore(:,:)
+      real(SP), allocatable :: sbuf_back(:, :), rbuf_back(:, :)
+      real(SP), allocatable :: sbuf_shore(:, :), rbuf_shore(:, :)
       ! y-direction send/recv buffers: (mloc_g, ng)
-      real(SP), allocatable :: sbuf_right(:,:), rbuf_right(:,:)
-      real(SP), allocatable :: sbuf_left(:,:), rbuf_left(:,:)
+      real(SP), allocatable :: sbuf_right(:, :), rbuf_right(:, :)
+      real(SP), allocatable :: sbuf_left(:, :), rbuf_left(:, :)
 
-      nx     = this%local_nx
-      ny     = this%local_ny
-      ng     = N_GHOST
+      nx = this%local_nx
+      ny = this%local_ny
+      ng = N_GHOST
       mloc_g = nx + 2*ng
       nloc_g = ny + 2*ng
 
       ! ---- Phase 1: x-direction (back / shore) ----
-      allocate(sbuf_back (nloc_g, ng), rbuf_back (nloc_g, ng))
-      allocate(sbuf_shore(nloc_g, ng), rbuf_shore(nloc_g, ng))
+      allocate (sbuf_back(nloc_g, ng), rbuf_back(nloc_g, ng))
+      allocate (sbuf_shore(nloc_g, ng), rbuf_shore(nloc_g, ng))
 
       ! Pack: low-x interior strip → send to back_rank
       do i = 1, ng
@@ -166,9 +166,9 @@ contains
       nreq = 0
       if (this%back_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
-         call MPI_Irecv(rbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  0, this%cart_comm, req(nreq), ierr)
+         call MPI_Irecv(rbuf_back, nloc_g*ng, MPI_SP, this%back_rank, 0, this%cart_comm, req(nreq), ierr)
          nreq = nreq + 1
-         call MPI_Isend(sbuf_back,  nloc_g*ng, MPI_SP, this%back_rank,  1, this%cart_comm, req(nreq), ierr)
+         call MPI_Isend(sbuf_back, nloc_g*ng, MPI_SP, this%back_rank, 1, this%cart_comm, req(nreq), ierr)
       end if
       if (this%shore_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
@@ -194,17 +194,17 @@ contains
          end do
       end if
 
-      deallocate(sbuf_back, rbuf_back, sbuf_shore, rbuf_shore)
+      deallocate (sbuf_back, rbuf_back, sbuf_shore, rbuf_shore)
 
       ! ---- Phase 2: y-direction (right / left) ----
       ! After phase 1, x ghost cells are filled — y-sends include correct corner data.
-      allocate(sbuf_right(mloc_g, ng), rbuf_right(mloc_g, ng))
-      allocate(sbuf_left (mloc_g, ng), rbuf_left (mloc_g, ng))
+      allocate (sbuf_right(mloc_g, ng), rbuf_right(mloc_g, ng))
+      allocate (sbuf_left(mloc_g, ng), rbuf_left(mloc_g, ng))
 
       do j = 1, ng
          do i = 1, mloc_g
             sbuf_right(i, j) = field(i, ng + j)
-            sbuf_left (i, j) = field(i, ny + j)
+            sbuf_left(i, j) = field(i, ny + j)
          end do
       end do
 
@@ -217,9 +217,9 @@ contains
       end if
       if (this%left_rank /= MPI_PROC_NULL) then
          nreq = nreq + 1
-         call MPI_Irecv(rbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  3, this%cart_comm, req(nreq), ierr)
+         call MPI_Irecv(rbuf_left, mloc_g*ng, MPI_SP, this%left_rank, 3, this%cart_comm, req(nreq), ierr)
          nreq = nreq + 1
-         call MPI_Isend(sbuf_left,  mloc_g*ng, MPI_SP, this%left_rank,  2, this%cart_comm, req(nreq), ierr)
+         call MPI_Isend(sbuf_left, mloc_g*ng, MPI_SP, this%left_rank, 2, this%cart_comm, req(nreq), ierr)
       end if
       if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
 
@@ -238,7 +238,7 @@ contains
          end do
       end if
 
-      deallocate(sbuf_right, rbuf_right, sbuf_left, rbuf_left)
+      deallocate (sbuf_right, rbuf_right, sbuf_left, rbuf_left)
    end subroutine halo_exchange
 
    subroutine decompose(this, nprocs)
@@ -252,9 +252,9 @@ contains
       integer, intent(out) :: i1, i2, local_n
       integer :: n_min, n_left
 
-      n_min  = int((i2_global - i1_global + 1) / n_procs)
+      n_min = int((i2_global - i1_global + 1)/n_procs)
       n_left = mod(i2_global - i1_global + 1, n_procs)
-      i1 = rank_id * n_min + i1_global + min(rank_id, n_left)
+      i1 = rank_id*n_min + i1_global + min(rank_id, n_left)
       i2 = i1 + n_min - 1
       if (n_left > rank_id) i2 = i2 + 1
       local_n = i2 - i1 + 1
@@ -271,12 +271,12 @@ contains
       call get_factors(nproc, factors, nfactors)
       min_ratio = 9e10_SP
       do i = 1, nfactors
-         nx_loc = (1.0_SP*nx) / (1.0_SP*factors(i))
-         ny_loc = (1.0_SP*ny) / ((1.0_SP*nproc) / (1.0_SP*factors(i)))
+         nx_loc = (1.0_SP*nx)/(1.0_SP*factors(i))
+         ny_loc = (1.0_SP*ny)/((1.0_SP*nproc)/(1.0_SP*factors(i)))
          if (nx_loc > ny_loc) then
-            ratio = nx_loc / ny_loc
+            ratio = nx_loc/ny_loc
          else
-            ratio = ny_loc / nx_loc
+            ratio = ny_loc/nx_loc
          end if
          if (ratio < min_ratio) then
             min_i = i
@@ -284,7 +284,7 @@ contains
          end if
       end do
       px = factors(min_i)
-      py = nproc / factors(min_i)
+      py = nproc/factors(min_i)
 
    end subroutine compute_optimal_grid_size
 
@@ -297,12 +297,12 @@ contains
 
       if (n <= 0) then
          nfactors = 0
-         allocate(factors(0))
+         allocate (factors(0))
          return
       end if
 
       limit = int(sqrt(real(n)))
-      allocate(temp(2*limit))
+      allocate (temp(2*limit))
       count = 0
       do i = 1, limit
          if (mod(n, i) == 0) then
@@ -315,9 +315,9 @@ contains
          end if
       end do
       nfactors = count
-      allocate(factors(nfactors))
+      allocate (factors(nfactors))
       factors = temp(1:nfactors)
-      deallocate(temp)
+      deallocate (temp)
 
    end subroutine get_factors
 
@@ -335,17 +335,17 @@ contains
 
       call grid_finalize(this)
 
-      allocate(this%dx    (this%local_nx, this%local_ny), source=dx0)
-      allocate(this%dy    (this%local_nx, this%local_ny), source=dy0)
-      allocate(this%inv_dx(this%local_nx, this%local_ny), source=1.0_SP/dx0)
-      allocate(this%inv_dy(this%local_nx, this%local_ny), source=1.0_SP/dy0)
-      allocate(this%x(this%local_nx, this%local_ny))
-      allocate(this%y(this%local_nx, this%local_ny))
+      allocate (this%dx(this%local_nx, this%local_ny), source=dx0)
+      allocate (this%dy(this%local_nx, this%local_ny), source=dy0)
+      allocate (this%inv_dx(this%local_nx, this%local_ny), source=1.0_SP/dx0)
+      allocate (this%inv_dy(this%local_nx, this%local_ny), source=1.0_SP/dy0)
+      allocate (this%x(this%local_nx, this%local_ny))
+      allocate (this%y(this%local_nx, this%local_ny))
 
       do j = 1, this%local_ny
          do i = 1, this%local_nx
-            this%x(i,j) = ox + real(this%ibegin + i - 2, SP) * dx0
-            this%y(i,j) = oy + real(this%jbegin + j - 2, SP) * dy0
+            this%x(i, j) = ox + real(this%ibegin + i - 2, SP)*dx0
+            this%y(i, j) = oy + real(this%jbegin + j - 2, SP)*dy0
          end do
       end do
 
@@ -353,7 +353,7 @@ contains
 
    subroutine init_spacing_variable(this, dx, dy)
       class(type_grid_2d), intent(inout) :: this
-      real(SP), intent(in) :: dx(:,:), dy(:,:)
+      real(SP), intent(in) :: dx(:, :), dy(:, :)
 
       integer  :: i, j, ierr
       real(SP) :: x_offset, y_offset
@@ -365,12 +365,12 @@ contains
 
       call grid_finalize(this)
 
-      allocate(this%dx,     source=dx)
-      allocate(this%dy,     source=dy)
-      allocate(this%inv_dx(size(dx,1), size(dx,2)))
-      allocate(this%inv_dy(size(dy,1), size(dy,2)))
-      this%inv_dx = 1.0_SP / dx
-      this%inv_dy = 1.0_SP / dy
+      allocate (this%dx, source=dx)
+      allocate (this%dy, source=dy)
+      allocate (this%inv_dx(size(dx, 1), size(dx, 2)))
+      allocate (this%inv_dy(size(dy, 1), size(dy, 2)))
+      this%inv_dx = 1.0_SP/dx
+      this%inv_dy = 1.0_SP/dy
 
       ! x-offset: prefix sum of each rank's local x-extent across the i-direction.
       ! remain=[T,F] creates sub-comms that vary in i, fixed j (row communicators).
@@ -378,30 +378,30 @@ contains
       remain = [.true., .false.]
       call MPI_Cart_sub(this%cart_comm, remain, row_comm, ierr)
       x_offset = 0.0_SP
-      call MPI_Exscan(sum(dx(:,1)), x_offset, 1, MPI_SP, MPI_SUM, row_comm, ierr)
+      call MPI_Exscan(sum(dx(:, 1)), x_offset, 1, MPI_SP, MPI_SUM, row_comm, ierr)
       call MPI_Comm_free(row_comm, ierr)
 
       ! y-offset: prefix sum across the j-direction (column communicators).
       remain = [.false., .true.]
       call MPI_Cart_sub(this%cart_comm, remain, col_comm, ierr)
       y_offset = 0.0_SP
-      call MPI_Exscan(sum(dy(1,:)), y_offset, 1, MPI_SP, MPI_SUM, col_comm, ierr)
+      call MPI_Exscan(sum(dy(1, :)), y_offset, 1, MPI_SP, MPI_SUM, col_comm, ierr)
       call MPI_Comm_free(col_comm, ierr)
 
       ! Build x/y as global physical coordinates.
       ! Assumes separable spacing: dx varies only in i, dy varies only in j.
       ! x(:,j) and y(i,:) are uniform across the other axis — column 1 / row 1 are representative.
-      allocate(this%x(this%local_nx, this%local_ny))
-      allocate(this%y(this%local_nx, this%local_ny))
+      allocate (this%x(this%local_nx, this%local_ny))
+      allocate (this%y(this%local_nx, this%local_ny))
 
-      this%x(1,:) = x_offset
+      this%x(1, :) = x_offset
       do i = 2, this%local_nx
-         this%x(i,:) = this%x(i-1,:) + dx(i-1, 1)
+         this%x(i, :) = this%x(i - 1, :) + dx(i - 1, 1)
       end do
 
-      this%y(:,1) = y_offset
+      this%y(:, 1) = y_offset
       do j = 2, this%local_ny
-         this%y(:,j) = this%y(:,j-1) + dy(1, j-1)
+         this%y(:, j) = this%y(:, j - 1) + dy(1, j - 1)
       end do
 
    end subroutine init_spacing_variable
@@ -418,51 +418,50 @@ contains
       integer  :: i, j
       real(SP) :: dlon_r, dlat_r, lat_j_r, lat_ref_r, dx_ref, dy0_val
 
-      this%dx0         = 0.0_SP
-      this%dy0         = 0.0_SP
+      this%dx0 = 0.0_SP
+      this%dy0 = 0.0_SP
       this%is_spherical = .true.
-      this%crs%mode    = CRS_GEOGRAPHIC
+      this%crs%mode = CRS_GEOGRAPHIC
       this%crs%origin_x = lon0
       this%crs%origin_y = lat0
-      this%crs%theta   = 0.0_SP
+      this%crs%theta = 0.0_SP
 
       call grid_finalize(this)
 
-      dlon_r    = dlon * PI / 180.0_SP
-      dlat_r    = dlat * PI / 180.0_SP
-      lat_ref_r = lat0 * PI / 180.0_SP
-      dx_ref    = R_EARTH * cos(lat_ref_r) * dlon_r
-      dy0_val   = R_EARTH * dlat_r
+      dlon_r = dlon*PI/180.0_SP
+      dlat_r = dlat*PI/180.0_SP
+      lat_ref_r = lat0*PI/180.0_SP
+      dx_ref = R_EARTH*cos(lat_ref_r)*dlon_r
+      dy0_val = R_EARTH*dlat_r
 
-      allocate(this%dx    (this%local_nx, this%local_ny))
-      allocate(this%dy    (this%local_nx, this%local_ny))
-      allocate(this%inv_dx(this%local_nx, this%local_ny))
-      allocate(this%inv_dy(this%local_nx, this%local_ny))
-      allocate(this%x(this%local_nx, this%local_ny))
-      allocate(this%y(this%local_nx, this%local_ny))
+      allocate (this%dx(this%local_nx, this%local_ny))
+      allocate (this%dy(this%local_nx, this%local_ny))
+      allocate (this%inv_dx(this%local_nx, this%local_ny))
+      allocate (this%inv_dy(this%local_nx, this%local_ny))
+      allocate (this%x(this%local_nx, this%local_ny))
+      allocate (this%y(this%local_nx, this%local_ny))
 
       do j = 1, this%local_ny
-         lat_j_r = lat_ref_r + real(this%jbegin + j - 2, SP) * dlat_r
+         lat_j_r = lat_ref_r + real(this%jbegin + j - 2, SP)*dlat_r
          do i = 1, this%local_nx
-            this%dx(i,j)     = R_EARTH * cos(lat_j_r) * dlon_r
-            this%dy(i,j)     = dy0_val
-            this%inv_dx(i,j) = 1.0_SP / this%dx(i,j)
-            this%inv_dy(i,j) = 1.0_SP / dy0_val
-            this%x(i,j)      = real(this%ibegin + i - 2, SP) * dx_ref
-            this%y(i,j)      = real(this%jbegin + j - 2, SP) * dy0_val
+            this%dx(i, j) = R_EARTH*cos(lat_j_r)*dlon_r
+            this%dy(i, j) = dy0_val
+            this%inv_dx(i, j) = 1.0_SP/this%dx(i, j)
+            this%inv_dy(i, j) = 1.0_SP/dy0_val
+            this%x(i, j) = real(this%ibegin + i - 2, SP)*dx_ref
+            this%y(i, j) = real(this%jbegin + j - 2, SP)*dy0_val
          end do
       end do
    end subroutine init_spacing_spherical
 
    subroutine grid_finalize(this)
       class(type_grid_2d), intent(inout) :: this
-      if (allocated(this%dx))     deallocate(this%dx)
-      if (allocated(this%dy))     deallocate(this%dy)
-      if (allocated(this%inv_dx)) deallocate(this%inv_dx)
-      if (allocated(this%inv_dy)) deallocate(this%inv_dy)
-      if (allocated(this%x))      deallocate(this%x)
-      if (allocated(this%y))      deallocate(this%y)
+      if (allocated(this%dx)) deallocate (this%dx)
+      if (allocated(this%dy)) deallocate (this%dy)
+      if (allocated(this%inv_dx)) deallocate (this%inv_dx)
+      if (allocated(this%inv_dy)) deallocate (this%inv_dy)
+      if (allocated(this%x)) deallocate (this%x)
+      if (allocated(this%y)) deallocate (this%y)
    end subroutine grid_finalize
-
 
 end module core_grid_mod

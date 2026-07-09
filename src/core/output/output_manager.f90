@@ -20,9 +20,9 @@
 !-------------------------------------------------
 
 module core_output_manager_mod
-   use core_constants_mod,      only: SP
-   use core_comm_mod,           only: type_comm
-   use core_grid_mod,           only: type_grid_2d
+   use core_constants_mod, only: SP
+   use core_comm_mod, only: type_comm
+   use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
    use core_output_channel_mod, only: type_output_channel
    implicit none
@@ -34,7 +34,7 @@ module core_output_manager_mod
       type(type_output_channel), allocatable :: channels(:)
       integer :: n_channels = 0
    contains
-      procedure :: step    => manager_step
+      procedure :: step => manager_step
       procedure :: finalize => manager_finalize
    end type type_output_manager
 
@@ -43,9 +43,9 @@ contains
    ! Called every timestep. Dispatches to each active channel.
    subroutine manager_step(this, t, dt, registry, comm)
       class(type_output_manager), intent(inout) :: this
-      real(SP),                   intent(in)    :: t, dt
-      type(type_field_registry),  intent(in)    :: registry
-      type(type_comm),            intent(inout) :: comm
+      real(SP), intent(in)    :: t, dt
+      type(type_field_registry), intent(in)    :: registry
+      type(type_comm), intent(inout) :: comm
 
       integer :: k
       do k = 1, this%n_channels
@@ -60,7 +60,7 @@ contains
          do k = 1, this%n_channels
             call this%channels(k)%finalize()
          end do
-         deallocate(this%channels)
+         deallocate (this%channels)
       end if
       this%n_channels = 0
    end subroutine manager_finalize

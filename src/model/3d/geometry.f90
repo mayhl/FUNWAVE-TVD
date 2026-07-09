@@ -41,13 +41,13 @@ module model_3d_geometry_mod
 
    type, extends(type_model_base) :: type_model_3d_geometry
 
-      integer  :: nx      = 0
-      integer  :: ny      = 0
-      integer  :: nz      = 0
-      real(SP) :: dx      = 0.0_SP
-      real(SP) :: dy      = 0.0_SP
-      integer  :: ivgrd   = 1
-      real(SP) :: grd_r   = 1.0_SP
+      integer  :: nx = 0
+      integer  :: ny = 0
+      integer  :: nz = 0
+      real(SP) :: dx = 0.0_SP
+      real(SP) :: dy = 0.0_SP
+      integer  :: ivgrd = 1
+      real(SP) :: grd_r = 1.0_SP
       integer  :: nx_proc = 0
       integer  :: ny_proc = 0
 
@@ -56,9 +56,9 @@ module model_3d_geometry_mod
       logical  :: ana_bathy = .false.
 
       integer  :: roughness_type = 1
-      real(SP) :: cd             = 0.0_SP
-      real(SP) :: zob            = 0.0_SP
-      real(SP) :: min_depth      = 0.001_SP
+      real(SP) :: cd = 0.0_SP
+      real(SP) :: zob = 0.0_SP
+      real(SP) :: min_depth = 0.001_SP
 
    contains
       procedure :: read_input => geometry_3d_read_input
@@ -104,9 +104,9 @@ contains
 
       bot_yaml = sub_env%yaml%cast_dictionary("bottom")
       call bot_yaml%read("roughness_type", val=this%roughness_type, default="1")
-      call bot_yaml%read("cd",             val=this%cd,             default="0.0")
-      call bot_yaml%read("zob",            val=this%zob,            default="0.0")
-      call bot_yaml%read("min_depth",      val=this%min_depth,      default="0.001")
+      call bot_yaml%read("cd", val=this%cd, default="0.0")
+      call bot_yaml%read("zob", val=this%zob, default="0.0")
+      call bot_yaml%read("min_depth", val=this%min_depth, default="0.001")
 
    end subroutine geometry_3d_read_input
 

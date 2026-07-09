@@ -30,7 +30,7 @@
 !-------------------------------------------------
 
 module model_3d_mod
-   use core_env_mod,   only: type_env
+   use core_env_mod, only: type_env
    use model_base_mod, only: type_model_base
 
    implicit none
@@ -40,7 +40,7 @@ module model_3d_mod
    type, extends(type_model_base) :: type_model_3d
    contains
       procedure :: read_input => model_3d_read_input
-      procedure :: run        => model_3d_run
+      procedure :: run => model_3d_run
    end type type_model_3d
 
 contains
@@ -48,7 +48,7 @@ contains
    ! Delegate to legacy READ_INPUT (reads input.txt from CWD).
    subroutine model_3d_read_input(this, env)
       class(type_model_3d), intent(inout) :: this
-      type(type_env),       intent(inout), target :: env
+      type(type_env), intent(inout), target :: env
 
       external :: CALL_READ_INPUT_3D, INIT_3D_GLOBAL
       ! Seed myid/NumP in MODULE GLOBAL before READ_INPUT so that MPI-conditional
@@ -67,15 +67,15 @@ contains
    ! correct myid / NumP by the time run() is entered.
    subroutine model_3d_run(this, env)
       class(type_model_3d), intent(inout) :: this
-      type(type_env),       intent(inout), target :: env
+      type(type_env), intent(inout), target :: env
 
       ! ALLOCATE_VARIABLES and INITIALIZATION are also defined in the 2D legacy
       ! code; on macOS the main-binary symbols preempt the dylib versions.  Call
       ! through bridge wrappers (defined in bridge.F, internal to the dylib) so
       ! the 3D MODULE GLOBAL is used.
       external :: PARALLEL_CARTESIAN, INDEX_LOCAL, &
-                  CALL_ALLOCATE_VARIABLES_3D, read_bathymetry, &
-                  CALL_INITIALIZATION_3D, generate_grid, SINGLE_GRID_LOOP
+         CALL_ALLOCATE_VARIABLES_3D, read_bathymetry, &
+         CALL_INITIALIZATION_3D, generate_grid, SINGLE_GRID_LOOP
 
       call PARALLEL_CARTESIAN()
       call INDEX_LOCAL(1)

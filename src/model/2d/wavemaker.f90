@@ -72,30 +72,30 @@ module model_wavemaker_mod
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_WAVEMAKER_A0_NWAVE, DEF_WAVEMAKER_ALPHA_C, &
-                                          DEF_WAVEMAKER_AMP, DEF_WAVEMAKER_AMP_WK, &
-                                          DEF_WAVEMAKER_A_SPONGE_WAVEMAKER, &
-                                          DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP, &
-                                          DEF_WAVEMAKER_DEPTHWAVEMAKER, &
-                                          DEF_WAVEMAKER_DEP_NWAVE, DEF_WAVEMAKER_DEP_WK, &
-                                          DEF_WAVEMAKER_EQUALENERGY, &
-                                          DEF_WAVEMAKER_ETA_LIMITER, DEF_WAVEMAKER_FREQMAX, &
-                                          DEF_WAVEMAKER_FREQMIN, DEF_WAVEMAKER_FREQPEAK, &
-                                          DEF_WAVEMAKER_GAMMATMA, DEF_WAVEMAKER_GAMMA_NWAVE, &
-                                          DEF_WAVEMAKER_HMO, DEF_WAVEMAKER_LAGTIME, &
-                                          DEF_WAVEMAKER_NFREQ, DEF_WAVEMAKER_NTHETA, &
-                                          DEF_WAVEMAKER_NUMWAVECOMP, DEF_WAVEMAKER_PEAKPERIOD, &
-                                          DEF_WAVEMAKER_R_SPONGE_WAVEMAKER, &
-                                          DEF_WAVEMAKER_SIGMA_THETA, &
-                                          DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION, &
-                                          DEF_WAVEMAKER_THETAPEAK, DEF_WAVEMAKER_THETA_WK, &
-                                          DEF_WAVEMAKER_TIME_RAMP, DEF_WAVEMAKER_TPERIOD, &
-                                          DEF_WAVEMAKER_TYPE, DEF_WAVEMAKER_WAVEMAKERCD, &
-                                          DEF_WAVEMAKER_WAVE_DATA_TYPE, DEF_WAVEMAKER_WID, &
-                                          DEF_WAVEMAKER_WIDTHWAVEMAKER, &
-                                          DEF_WAVEMAKER_X1_NWAVE, DEF_WAVEMAKER_X2_NWAVE, &
-                                          DEF_WAVEMAKER_XC, DEF_WAVEMAKER_XC_WK, &
-                                          DEF_WAVEMAKER_XWAVEMAKER, DEF_WAVEMAKER_YC, &
-                                          DEF_WAVEMAKER_YC_WK, DEF_WAVEMAKER_YWIDTH_WK
+                                        DEF_WAVEMAKER_AMP, DEF_WAVEMAKER_AMP_WK, &
+                                        DEF_WAVEMAKER_A_SPONGE_WAVEMAKER, &
+                                        DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP, &
+                                        DEF_WAVEMAKER_DEPTHWAVEMAKER, &
+                                        DEF_WAVEMAKER_DEP_NWAVE, DEF_WAVEMAKER_DEP_WK, &
+                                        DEF_WAVEMAKER_EQUALENERGY, &
+                                        DEF_WAVEMAKER_ETA_LIMITER, DEF_WAVEMAKER_FREQMAX, &
+                                        DEF_WAVEMAKER_FREQMIN, DEF_WAVEMAKER_FREQPEAK, &
+                                        DEF_WAVEMAKER_GAMMATMA, DEF_WAVEMAKER_GAMMA_NWAVE, &
+                                        DEF_WAVEMAKER_HMO, DEF_WAVEMAKER_LAGTIME, &
+                                        DEF_WAVEMAKER_NFREQ, DEF_WAVEMAKER_NTHETA, &
+                                        DEF_WAVEMAKER_NUMWAVECOMP, DEF_WAVEMAKER_PEAKPERIOD, &
+                                        DEF_WAVEMAKER_R_SPONGE_WAVEMAKER, &
+                                        DEF_WAVEMAKER_SIGMA_THETA, &
+                                        DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION, &
+                                        DEF_WAVEMAKER_THETAPEAK, DEF_WAVEMAKER_THETA_WK, &
+                                        DEF_WAVEMAKER_TIME_RAMP, DEF_WAVEMAKER_TPERIOD, &
+                                        DEF_WAVEMAKER_TYPE, DEF_WAVEMAKER_WAVEMAKERCD, &
+                                        DEF_WAVEMAKER_WAVE_DATA_TYPE, DEF_WAVEMAKER_WID, &
+                                        DEF_WAVEMAKER_WIDTHWAVEMAKER, &
+                                        DEF_WAVEMAKER_X1_NWAVE, DEF_WAVEMAKER_X2_NWAVE, &
+                                        DEF_WAVEMAKER_XC, DEF_WAVEMAKER_XC_WK, &
+                                        DEF_WAVEMAKER_XWAVEMAKER, DEF_WAVEMAKER_YC, &
+                                        DEF_WAVEMAKER_YC_WK, DEF_WAVEMAKER_YWIDTH_WK
 
    implicit none
 
@@ -110,72 +110,72 @@ module model_wavemaker_mod
       character(:), allocatable :: WAVE_DATA_TYPE    ! YAML key: WAVE_DATA_TYPE
 
       ! Shared position / depth / ramp
-      real(SP) :: Xc_WK     = 0.0_SP
-      real(SP) :: Yc_WK     = 0.0_SP
-      real(SP) :: DEP_WK    = 0.0_SP
+      real(SP) :: Xc_WK = 0.0_SP
+      real(SP) :: Yc_WK = 0.0_SP
+      real(SP) :: DEP_WK = 0.0_SP
       real(SP) :: Time_ramp = 0.0_SP
-      real(SP) :: Delta_WK  = 0.5_SP
+      real(SP) :: Delta_WK = 0.5_SP
       real(SP) :: Ywidth_WK = 999999.0_SP   ! LARGE in old code
 
       ! Solitary wave — LEF_SOL, INI_SOL
-      real(SP) :: AMP_SOLI   = 0.0_SP   ! YAML key: AMP
-      real(SP) :: DEP_SOLI   = 0.0_SP   ! YAML key: DEP
-      real(SP) :: LAG_SOLI   = 0.0_SP   ! YAML key: LAGTIME
+      real(SP) :: AMP_SOLI = 0.0_SP   ! YAML key: AMP
+      real(SP) :: DEP_SOLI = 0.0_SP   ! YAML key: DEP
+      real(SP) :: LAG_SOLI = 0.0_SP   ! YAML key: LAGTIME
       real(SP) :: XWAVEMAKER = 0.0_SP
       logical  :: SolitaryPositiveDirection = .true.
 
       ! Initial condition wavemakers — INI_REC, INI_GAU, INI_DIP
-      real(SP) :: Xc  = 0.0_SP
-      real(SP) :: Yc  = 0.0_SP
+      real(SP) :: Xc = 0.0_SP
+      real(SP) :: Yc = 0.0_SP
       real(SP) :: WID = 0.0_SP
 
       ! N-wave — N_WAVE
-      real(SP) :: x1_Nwave    = 0.0_SP
-      real(SP) :: x2_Nwave    = 0.0_SP
-      real(SP) :: a0_Nwave    = 0.0_SP
+      real(SP) :: x1_Nwave = 0.0_SP
+      real(SP) :: x2_Nwave = 0.0_SP
+      real(SP) :: a0_Nwave = 0.0_SP
       real(SP) :: gamma_Nwave = 0.0_SP
-      real(SP) :: dep_Nwave   = 0.0_SP
+      real(SP) :: dep_Nwave = 0.0_SP
 
       ! Regular wave — WK_REG
-      real(SP) :: Tperiod  = 0.0_SP
-      real(SP) :: AMP_WK   = 0.0_SP
+      real(SP) :: Tperiod = 0.0_SP
+      real(SP) :: AMP_WK = 0.0_SP
       real(SP) :: Theta_WK = 0.0_SP
 
       ! Multi-component time series — WK_TIME
       integer  :: NumWaveComp = 1
-      real(SP) :: PeakPeriod  = 0.0_SP
+      real(SP) :: PeakPeriod = 0.0_SP
 
       ! Spectral — WK_IRR, TMA_1D, JON_1D, JON_2D, WK_NEW_IRR, WK_NEW_DATA2D
-      real(SP) :: FreqPeak    = 0.0_SP
-      real(SP) :: FreqMin     = 0.0_SP
-      real(SP) :: FreqMax     = 0.0_SP
-      real(SP) :: Hmo         = 0.0_SP
-      real(SP) :: GammaTMA    = 3.3_SP
-      integer  :: Nfreq       = 45
-      real(SP) :: ThetaPeak   = 0.0_SP
-      integer  :: Ntheta      = 1
+      real(SP) :: FreqPeak = 0.0_SP
+      real(SP) :: FreqMin = 0.0_SP
+      real(SP) :: FreqMax = 0.0_SP
+      real(SP) :: Hmo = 0.0_SP
+      real(SP) :: GammaTMA = 3.3_SP
+      integer  :: Nfreq = 45
+      real(SP) :: ThetaPeak = 0.0_SP
+      integer  :: Ntheta = 1
       real(SP) :: Sigma_Theta = 0.0_SP
-      real(SP) :: alpha_c     = 0.0_SP   ! WK_NEW_IRR only
+      real(SP) :: alpha_c = 0.0_SP   ! WK_NEW_IRR only
 
       ! Eta limiter (type-independent)
-      logical  :: ETA_LIMITER  = .false.
-      real(SP) :: CrestLimit   = 0.0_SP
-      real(SP) :: TroughLimit  = 0.0_SP
+      logical  :: ETA_LIMITER = .false.
+      real(SP) :: CrestLimit = 0.0_SP
+      real(SP) :: TroughLimit = 0.0_SP
 
       ! Absorbing-generating — ABS, LEFT_BC_IRR
-      real(SP) :: DepthWaveMaker    = 0.0_SP   ! DepthWaveMaker / DEP_WK fallback → DEP_Ser
-      real(SP) :: WidthWaveMaker    = 0.0_SP
+      real(SP) :: DepthWaveMaker = 0.0_SP   ! DepthWaveMaker / DEP_WK fallback → DEP_Ser
+      real(SP) :: WidthWaveMaker = 0.0_SP
       real(SP) :: R_sponge_wavemaker = 0.0_SP
       real(SP) :: A_sponge_wavemaker = 0.0_SP
-      logical  :: EqualEnergy        = .false.
+      logical  :: EqualEnergy = .false.
 
       ! Wavemaker current balance — presence of WaveMakerCd enables balance
       logical  :: WaveMakerCurrentBalance = .false.
-      real(SP) :: WaveMakerCd             = 0.0_SP
+      real(SP) :: WaveMakerCd = 0.0_SP
 
    contains
       procedure :: read_input => wavemaker_read_input
-      procedure :: apply_ic   => wavemaker_apply_ic
+      procedure :: apply_ic => wavemaker_apply_ic
    end type type_model_wavemaker
 
 contains
@@ -195,59 +195,59 @@ contains
       call sub_env%yaml%read("type", val=this%wavemaker_type, default=DEF_WAVEMAKER_TYPE)
 
       ! Shared position / depth / ramp
-      call sub_env%yaml%read("Xc_WK",     silent=no_key, val=this%Xc_WK,     default=DEF_WAVEMAKER_XC_WK)
-      call sub_env%yaml%read("Yc_WK",     silent=no_key, val=this%Yc_WK,     default=DEF_WAVEMAKER_YC_WK)
-      call sub_env%yaml%read("DEP_WK",    silent=no_key, val=this%DEP_WK,    default=DEF_WAVEMAKER_DEP_WK)
-      call sub_env%yaml%read("Time_ramp", silent=no_key, val=this%Time_ramp,  default=DEF_WAVEMAKER_TIME_RAMP)
-      call sub_env%yaml%read("Delta_WK",  silent=no_key, val=this%Delta_WK,   default=DEF_WAVEMAKER_DELTA_WK)
-      call sub_env%yaml%read("Ywidth_WK", silent=no_key, val=this%Ywidth_WK,  default=DEF_WAVEMAKER_YWIDTH_WK)
+      call sub_env%yaml%read("Xc_WK", silent=no_key, val=this%Xc_WK, default=DEF_WAVEMAKER_XC_WK)
+      call sub_env%yaml%read("Yc_WK", silent=no_key, val=this%Yc_WK, default=DEF_WAVEMAKER_YC_WK)
+      call sub_env%yaml%read("DEP_WK", silent=no_key, val=this%DEP_WK, default=DEF_WAVEMAKER_DEP_WK)
+      call sub_env%yaml%read("Time_ramp", silent=no_key, val=this%Time_ramp, default=DEF_WAVEMAKER_TIME_RAMP)
+      call sub_env%yaml%read("Delta_WK", silent=no_key, val=this%Delta_WK, default=DEF_WAVEMAKER_DELTA_WK)
+      call sub_env%yaml%read("Ywidth_WK", silent=no_key, val=this%Ywidth_WK, default=DEF_WAVEMAKER_YWIDTH_WK)
 
       ! Solitary
-      call sub_env%yaml%read("AMP",                       silent=no_key, val=this%AMP_SOLI,  default=DEF_WAVEMAKER_AMP)
-      call sub_env%yaml%read("DEP",                       silent=no_key, val=this%DEP_SOLI,  default=DEF_WAVEMAKER_DEP)
-      call sub_env%yaml%read("LAGTIME",                   silent=no_key, val=this%LAG_SOLI,  default=DEF_WAVEMAKER_LAGTIME)
-      call sub_env%yaml%read("XWAVEMAKER",                silent=no_key, val=this%XWAVEMAKER, default=DEF_WAVEMAKER_XWAVEMAKER)
+      call sub_env%yaml%read("AMP", silent=no_key, val=this%AMP_SOLI, default=DEF_WAVEMAKER_AMP)
+      call sub_env%yaml%read("DEP", silent=no_key, val=this%DEP_SOLI, default=DEF_WAVEMAKER_DEP)
+      call sub_env%yaml%read("LAGTIME", silent=no_key, val=this%LAG_SOLI, default=DEF_WAVEMAKER_LAGTIME)
+      call sub_env%yaml%read("XWAVEMAKER", silent=no_key, val=this%XWAVEMAKER, default=DEF_WAVEMAKER_XWAVEMAKER)
       call sub_env%yaml%read("SolitaryPositiveDirection", silent=no_key, &
-                              val=this%SolitaryPositiveDirection, default=DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION)
+                             val=this%SolitaryPositiveDirection, default=DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION)
 
       ! Initial condition
-      call sub_env%yaml%read("Xc",  silent=no_key, val=this%Xc,  default=DEF_WAVEMAKER_XC)
-      call sub_env%yaml%read("Yc",  silent=no_key, val=this%Yc,  default=DEF_WAVEMAKER_YC)
+      call sub_env%yaml%read("Xc", silent=no_key, val=this%Xc, default=DEF_WAVEMAKER_XC)
+      call sub_env%yaml%read("Yc", silent=no_key, val=this%Yc, default=DEF_WAVEMAKER_YC)
       call sub_env%yaml%read("WID", silent=no_key, val=this%WID, default=DEF_WAVEMAKER_WID)
 
       ! N-wave
-      call sub_env%yaml%read("x1_Nwave",    silent=no_key, val=this%x1_Nwave,    default=DEF_WAVEMAKER_X1_NWAVE)
-      call sub_env%yaml%read("x2_Nwave",    silent=no_key, val=this%x2_Nwave,    default=DEF_WAVEMAKER_X2_NWAVE)
-      call sub_env%yaml%read("a0_Nwave",    silent=no_key, val=this%a0_Nwave,    default=DEF_WAVEMAKER_A0_NWAVE)
+      call sub_env%yaml%read("x1_Nwave", silent=no_key, val=this%x1_Nwave, default=DEF_WAVEMAKER_X1_NWAVE)
+      call sub_env%yaml%read("x2_Nwave", silent=no_key, val=this%x2_Nwave, default=DEF_WAVEMAKER_X2_NWAVE)
+      call sub_env%yaml%read("a0_Nwave", silent=no_key, val=this%a0_Nwave, default=DEF_WAVEMAKER_A0_NWAVE)
       call sub_env%yaml%read("gamma_Nwave", silent=no_key, val=this%gamma_Nwave, default=DEF_WAVEMAKER_GAMMA_NWAVE)
-      call sub_env%yaml%read("dep_Nwave",   silent=no_key, val=this%dep_Nwave,   default=DEF_WAVEMAKER_DEP_NWAVE)
+      call sub_env%yaml%read("dep_Nwave", silent=no_key, val=this%dep_Nwave, default=DEF_WAVEMAKER_DEP_NWAVE)
 
       ! Regular wave
-      call sub_env%yaml%read("Tperiod",  silent=no_key, val=this%Tperiod,  default=DEF_WAVEMAKER_TPERIOD)
-      call sub_env%yaml%read("AMP_WK",   silent=no_key, val=this%AMP_WK,   default=DEF_WAVEMAKER_AMP_WK)
+      call sub_env%yaml%read("Tperiod", silent=no_key, val=this%Tperiod, default=DEF_WAVEMAKER_TPERIOD)
+      call sub_env%yaml%read("AMP_WK", silent=no_key, val=this%AMP_WK, default=DEF_WAVEMAKER_AMP_WK)
       call sub_env%yaml%read("Theta_WK", silent=no_key, val=this%Theta_WK, default=DEF_WAVEMAKER_THETA_WK)
 
       ! Multi-component time series
-      call sub_env%yaml%read("NumWaveComp",  silent=no_key, val=this%NumWaveComp, default=DEF_WAVEMAKER_NUMWAVECOMP)
-      call sub_env%yaml%read("PeakPeriod",   silent=no_key, val=this%PeakPeriod,  default=DEF_WAVEMAKER_PEAKPERIOD)
+      call sub_env%yaml%read("NumWaveComp", silent=no_key, val=this%NumWaveComp, default=DEF_WAVEMAKER_NUMWAVECOMP)
+      call sub_env%yaml%read("PeakPeriod", silent=no_key, val=this%PeakPeriod, default=DEF_WAVEMAKER_PEAKPERIOD)
       call sub_env%yaml%read("WaveCompFile", silent=no_key, val=this%WaveCompFile)
 
       ! Spectral
-      call sub_env%yaml%read("FreqPeak",    silent=no_key, val=this%FreqPeak,    default=DEF_WAVEMAKER_FREQPEAK)
-      call sub_env%yaml%read("FreqMin",     silent=no_key, val=this%FreqMin,     default=DEF_WAVEMAKER_FREQMIN)
-      call sub_env%yaml%read("FreqMax",     silent=no_key, val=this%FreqMax,     default=DEF_WAVEMAKER_FREQMAX)
-      call sub_env%yaml%read("Hmo",         silent=no_key, val=this%Hmo,         default=DEF_WAVEMAKER_HMO)
-      call sub_env%yaml%read("GammaTMA",    silent=no_key, val=this%GammaTMA,    default=DEF_WAVEMAKER_GAMMATMA)
-      call sub_env%yaml%read("Nfreq",       silent=no_key, val=this%Nfreq,       default=DEF_WAVEMAKER_NFREQ)
-      call sub_env%yaml%read("ThetaPeak",   silent=no_key, val=this%ThetaPeak,   default=DEF_WAVEMAKER_THETAPEAK)
-      call sub_env%yaml%read("Ntheta",      silent=no_key, val=this%Ntheta,      default=DEF_WAVEMAKER_NTHETA)
+      call sub_env%yaml%read("FreqPeak", silent=no_key, val=this%FreqPeak, default=DEF_WAVEMAKER_FREQPEAK)
+      call sub_env%yaml%read("FreqMin", silent=no_key, val=this%FreqMin, default=DEF_WAVEMAKER_FREQMIN)
+      call sub_env%yaml%read("FreqMax", silent=no_key, val=this%FreqMax, default=DEF_WAVEMAKER_FREQMAX)
+      call sub_env%yaml%read("Hmo", silent=no_key, val=this%Hmo, default=DEF_WAVEMAKER_HMO)
+      call sub_env%yaml%read("GammaTMA", silent=no_key, val=this%GammaTMA, default=DEF_WAVEMAKER_GAMMATMA)
+      call sub_env%yaml%read("Nfreq", silent=no_key, val=this%Nfreq, default=DEF_WAVEMAKER_NFREQ)
+      call sub_env%yaml%read("ThetaPeak", silent=no_key, val=this%ThetaPeak, default=DEF_WAVEMAKER_THETAPEAK)
+      call sub_env%yaml%read("Ntheta", silent=no_key, val=this%Ntheta, default=DEF_WAVEMAKER_NTHETA)
       call sub_env%yaml%read("Sigma_Theta", silent=no_key, val=this%Sigma_Theta, default=DEF_WAVEMAKER_SIGMA_THETA)
-      call sub_env%yaml%read("alpha_c",     silent=no_key, val=this%alpha_c,     default=DEF_WAVEMAKER_ALPHA_C)
+      call sub_env%yaml%read("alpha_c", silent=no_key, val=this%alpha_c, default=DEF_WAVEMAKER_ALPHA_C)
 
       ! Eta limiter
       call sub_env%yaml%read("ETA_LIMITER", val=this%ETA_LIMITER, default=DEF_WAVEMAKER_ETA_LIMITER)
       if (this%ETA_LIMITER) then
-         call sub_env%yaml%read("CrestLimit",  val=this%CrestLimit)
+         call sub_env%yaml%read("CrestLimit", val=this%CrestLimit)
          call sub_env%yaml%read("TroughLimit", val=this%TroughLimit)
       end if
 
@@ -256,10 +256,10 @@ contains
       call sub_env%yaml%read("DepthWaveMaker", silent=no_key, val=this%DepthWaveMaker, default=DEF_WAVEMAKER_DEPTHWAVEMAKER)
       if (no_key) &
          call sub_env%yaml%read("DEP_WK", silent=no_key, val=this%DepthWaveMaker, default=DEF_WAVEMAKER_DEP_WK)
-      call sub_env%yaml%read("WidthWaveMaker",     silent=no_key, val=this%WidthWaveMaker,     default=DEF_WAVEMAKER_WIDTHWAVEMAKER)
-      call sub_env%yaml%read("R_sponge_wavemaker", silent=no_key, val=this%R_sponge_wavemaker, default=DEF_WAVEMAKER_R_SPONGE_WAVEMAKER)
-      call sub_env%yaml%read("A_sponge_wavemaker", silent=no_key, val=this%A_sponge_wavemaker, default=DEF_WAVEMAKER_A_SPONGE_WAVEMAKER)
-      call sub_env%yaml%read("EqualEnergy",        val=this%EqualEnergy, default=DEF_WAVEMAKER_EQUALENERGY)
+      call sub_env%yaml%read("WidthWaveMaker", silent=no_key, val=this%WidthWaveMaker, default=DEF_WAVEMAKER_WIDTHWAVEMAKER)
+  call sub_env%yaml%read("R_sponge_wavemaker", silent=no_key, val=this%R_sponge_wavemaker, default=DEF_WAVEMAKER_R_SPONGE_WAVEMAKER)
+  call sub_env%yaml%read("A_sponge_wavemaker", silent=no_key, val=this%A_sponge_wavemaker, default=DEF_WAVEMAKER_A_SPONGE_WAVEMAKER)
+      call sub_env%yaml%read("EqualEnergy", val=this%EqualEnergy, default=DEF_WAVEMAKER_EQUALENERGY)
 
       ! WaveMakerCd presence enables WaveMakerCurrentBalance
       call sub_env%yaml%read("WaveMakerCd", silent=no_key, val=this%WaveMakerCd, default=DEF_WAVEMAKER_WAVEMAKERCD)
@@ -287,15 +287,15 @@ contains
    subroutine wavemaker_apply_ic(this, grid, eta, u, v)
       use core_grid_mod, only: type_grid_2d
       class(type_model_wavemaker), intent(in)  :: this
-      type(type_grid_2d),          intent(in)  :: grid
-      real(SP),                    intent(out) :: eta(:,:), u(:,:), v(:,:)
+      type(type_grid_2d), intent(in)  :: grid
+      real(SP), intent(out) :: eta(:, :), u(:, :), v(:, :)
 
       real(SP) :: c_ph, b, a1, a2, au, sc, usign
       integer  :: i, j
 
       eta = 0.0_SP
-      u   = 0.0_SP
-      v   = 0.0_SP
+      u = 0.0_SP
+      v = 0.0_SP
 
       if (this%wavemaker_type /= "INI_SOLITARY") return
 
@@ -306,10 +306,10 @@ contains
 
       do j = 1, grid%lp%nloc
          do i = 1, grid%lp%mloc
-            sc = 1.0_SP / cosh(b * (real(grid%ibegin - 1 + i, SP) &
-                                    - this%XWAVEMAKER/grid%dx0 - 1.0_SP) * grid%dx0)
+            sc = 1.0_SP/cosh(b*(real(grid%ibegin - 1 + i, SP) &
+                                - this%XWAVEMAKER/grid%dx0 - 1.0_SP)*grid%dx0)
             eta(i, j) = a1*sc*sc + a2*sc*sc*sc*sc
-            u(i, j)   = usign * au * sc*sc
+            u(i, j) = usign*au*sc*sc
          end do
       end do
 
@@ -344,29 +344,29 @@ contains
       integer  :: ite
 
       alp2 = alpha + 1.0_SP/3.0_SP
-      eps  = amp / dep
+      eps = amp/dep
 
-      p = -(alp2 + 2.0_SP*alpha*(1.0_SP + eps)) / (2.0_SP*alpha)
+      p = -(alp2 + 2.0_SP*alpha*(1.0_SP + eps))/(2.0_SP*alpha)
       q = eps*alp2/alpha
       r = alp2/(2.0_SP*alpha)
 
       x = 1.2_SP
       do ite = 1, 10
-         fx  = r + x*(q + x*(p + x))
+         fx = r + x*(q + x*(p + x))
          fpx = q + x*(2.0_SP*p + 3.0_SP*x)
-         x   = x - fx/fpx
+         x = x - fx/fpx
          if (abs(fx) < 1e-5_SP) exit
       end do
       if (abs(fx) >= 1e-5_SP) then
          error stop "wavemaker: no solitary wave solution (check eps = AMP/DEP)"
       end if
 
-      rx   = sqrt(x)
-      cph  = sqrt(GRAV*dep)
+      rx = sqrt(x)
+      cph = sqrt(GRAV*dep)
       c_ph = rx*cph
 
       au = (x - 1.0_SP)/(eps*rx)*cph*eps
-      b  = sqrt((x - 1.0_SP)/(4.0_SP*(alp2 - alpha*x)))/dep
+      b = sqrt((x - 1.0_SP)/(4.0_SP*(alp2 - alpha*x)))/dep
       a1 = (x - 1.0_SP)/(eps*3.0_SP*(alp2 - alpha*x))*amp
       a2 = -(x - 1.0_SP)/(2.0_SP*eps)*(x - 1.0_SP)*(2.0_SP*alpha*x + alp2) &
            /(x*(alp2 - alpha*x))*amp

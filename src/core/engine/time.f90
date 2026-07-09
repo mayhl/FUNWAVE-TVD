@@ -16,7 +16,7 @@ module core_simulation_time_mod
       procedure :: is_finished
    end type type_simulation_control
 
-   contains
+contains
 
    subroutine init_from_yaml(this, reader)
       class(type_simulation_control), intent(inout) :: this

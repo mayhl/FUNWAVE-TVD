@@ -39,7 +39,7 @@ module model_hot_start_mod
       type(type_path) :: u_file
       type(type_path) :: v_file
       type(type_path) :: mask_file
-      logical :: no_uv_file   = .true.
+      logical :: no_uv_file = .true.
       logical :: no_mask_file = .true.
       logical :: bed_deformation = .false.
       real(SP) :: time = 0.0_SP
@@ -63,10 +63,10 @@ contains
       if (.not. this%is_activated) return
 
       call sub_env%yaml%read_input_path("eta_file", val=this%eta_file)
-      call sub_env%yaml%read_input_path("u_file",    silent=no_u,    val=this%u_file)
-      call sub_env%yaml%read_input_path("v_file",    silent=no_v,    val=this%v_file)
+      call sub_env%yaml%read_input_path("u_file", silent=no_u, val=this%u_file)
+      call sub_env%yaml%read_input_path("v_file", silent=no_v, val=this%v_file)
       call sub_env%yaml%read_input_path("mask_file", silent=no_mask, val=this%mask_file)
-      this%no_uv_file   = no_u .or. no_v
+      this%no_uv_file = no_u .or. no_v
       this%no_mask_file = no_mask
 
       call sub_env%yaml%read("bed_deformation", val=this%bed_deformation, default="NO")

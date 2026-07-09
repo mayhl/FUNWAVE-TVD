@@ -28,7 +28,7 @@ contains
       integer(c_size_t) :: rounded_size
 
       ! aligned_alloc requires size to be a multiple of alignment
-      rounded_size = ((size + alignment - 1_c_size_t) / alignment) * alignment
+      rounded_size = ((size + alignment - 1_c_size_t)/alignment)*alignment
       ptr = c_aligned_alloc(alignment, rounded_size)
    end subroutine core_alloc_aligned
 

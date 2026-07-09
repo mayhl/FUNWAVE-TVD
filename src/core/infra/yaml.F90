@@ -677,7 +677,7 @@ contains
    ! the value copy, on the SOURCE object.
    subroutine transfer_ownership(this)
       class(type_yaml_reader), intent(inout) :: this
-      nullify(this%file%root)
+      nullify (this%file%root)
    end subroutine transfer_ownership
 
 end module core_yaml_file_mod

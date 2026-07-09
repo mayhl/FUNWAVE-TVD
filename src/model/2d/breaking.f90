@@ -29,11 +29,11 @@ module model_breaking_mod
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_BREAKING_CBRK1, DEF_BREAKING_CBRK2, &
-                                          DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER_EFFECT, &
-                                          DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK, &
-                                          DEF_BREAKING_WAVEMAKER_CBRK, &
-                                          DEF_BREAKING_WAVEMAKER_VIS, &
-                                          DEF_BREAKING_WAVEMAKER_VISBRK
+                                        DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER_EFFECT, &
+                                        DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK, &
+                                        DEF_BREAKING_WAVEMAKER_CBRK, &
+                                        DEF_BREAKING_WAVEMAKER_VIS, &
+                                        DEF_BREAKING_WAVEMAKER_VISBRK
 
    implicit none
 
@@ -42,15 +42,15 @@ module model_breaking_mod
 
    type, extends(type_model_base) :: type_model_breaking
 
-      logical  :: roller        = .false.
+      logical  :: roller = .false.
       logical  :: show_breaking = .true.
 
-      real(SP) :: Cbrk1          = 0.65_SP
-      real(SP) :: Cbrk2          = 0.35_SP
+      real(SP) :: Cbrk1 = 0.65_SP
+      real(SP) :: Cbrk2 = 0.35_SP
       real(SP) :: WAVEMAKER_Cbrk = 1.0_SP
 
-      logical  :: WAVEMAKER_VIS    = .false.
-      real(SP) :: visbrk           = 0.0_SP
+      logical  :: WAVEMAKER_VIS = .false.
+      real(SP) :: visbrk = 0.0_SP
       real(SP) :: WAVEMAKER_visbrk = 0.0_SP
 
       real(SP) :: nu_bkg = 0.0_SP   ! background kinematic viscosity floor for nu_break
@@ -72,17 +72,17 @@ contains
       this%is_activated = .not. no_blk
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read("roller_effect", val=this%roller,        default=DEF_BREAKING_ROLLER_EFFECT)
+      call sub_env%yaml%read("roller_effect", val=this%roller, default=DEF_BREAKING_ROLLER_EFFECT)
       call sub_env%yaml%read("show_breaking", val=this%show_breaking, default=DEF_BREAKING_SHOW_BREAKING)
 
-      call sub_env%yaml%read("Cbrk1",          silent=no_key, val=this%Cbrk1,          default=DEF_BREAKING_CBRK1)
-      call sub_env%yaml%read("Cbrk2",          silent=no_key, val=this%Cbrk2,          default=DEF_BREAKING_CBRK2)
+      call sub_env%yaml%read("Cbrk1", silent=no_key, val=this%Cbrk1, default=DEF_BREAKING_CBRK1)
+      call sub_env%yaml%read("Cbrk2", silent=no_key, val=this%Cbrk2, default=DEF_BREAKING_CBRK2)
       call sub_env%yaml%read("WAVEMAKER_Cbrk", silent=no_key, val=this%WAVEMAKER_Cbrk, default=DEF_BREAKING_WAVEMAKER_CBRK)
 
-      call sub_env%yaml%read("WAVEMAKER_VIS",    val=this%WAVEMAKER_VIS, default=DEF_BREAKING_WAVEMAKER_VIS)
-      call sub_env%yaml%read("visbrk",           silent=no_key, val=this%visbrk,           default=DEF_BREAKING_VISBRK)
+      call sub_env%yaml%read("WAVEMAKER_VIS", val=this%WAVEMAKER_VIS, default=DEF_BREAKING_WAVEMAKER_VIS)
+      call sub_env%yaml%read("visbrk", silent=no_key, val=this%visbrk, default=DEF_BREAKING_VISBRK)
       call sub_env%yaml%read("WAVEMAKER_visbrk", silent=no_key, val=this%WAVEMAKER_visbrk, default=DEF_BREAKING_WAVEMAKER_VISBRK)
-      call sub_env%yaml%read("nu_bkg",           silent=no_key, val=this%nu_bkg,           default=DEF_BREAKING_NU_BKG)
+      call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default=DEF_BREAKING_NU_BKG)
 
    end subroutine breaking_read_input
 

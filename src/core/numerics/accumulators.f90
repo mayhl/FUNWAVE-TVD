@@ -49,13 +49,13 @@ module core_accumulators_mod
       !! used as the normalisation denominator for mean and RMS.
       real(SP) :: total_dt = 0.0_SP
       !> Running sum \f$\sum_n f^{(n)} \Delta t_n\f$ (allocated for "mean" and "rms").
-      real(SP), allocatable :: val_sum(:,:)
+      real(SP), allocatable :: val_sum(:, :)
       !> Running sum of squares \f$\sum_n (f^{(n)})^2 \Delta t_n\f$ (allocated for "rms").
-      real(SP), allocatable :: val_sum_sq(:,:)
+      real(SP), allocatable :: val_sum_sq(:, :)
       !> Point-wise maximum over all accumulated steps (allocated for "max").
-      real(SP), allocatable :: val_max(:,:)
+      real(SP), allocatable :: val_max(:, :)
       !> Point-wise minimum over all accumulated steps (allocated for "min").
-      real(SP), allocatable :: val_min(:,:)
+      real(SP), allocatable :: val_min(:, :)
    contains
       procedure, public :: init
       procedure, public :: allocate_stat
@@ -77,11 +77,11 @@ contains
    !! @param[in]  quantity  Label for the accumulated field (max 32 chars).
    subroutine init(this, d1, d2, quantity)
       class(type_accumulator), intent(inout) :: this
-      integer,      intent(in) :: d1, d2
+      integer, intent(in) :: d1, d2
       character(*), intent(in) :: quantity
       call this%finalize()
-      this%dim1     = d1
-      this%dim2     = d2
+      this%dim1 = d1
+      this%dim2 = d2
       this%quantity = quantity
       this%total_dt = 0.0_SP
    end subroutine init
@@ -107,20 +107,20 @@ contains
       select case (trim(op))
       case ("min")
          if (.not. allocated(this%val_min)) &
-            allocate(this%val_min(this%dim1, this%dim2), source=huge(1.0_SP))
+            allocate (this%val_min(this%dim1, this%dim2), source=huge(1.0_SP))
       case ("max")
          if (.not. allocated(this%val_max)) &
-            allocate(this%val_max(this%dim1, this%dim2), source=-huge(1.0_SP))
+            allocate (this%val_max(this%dim1, this%dim2), source=-huge(1.0_SP))
       case ("mean")
          if (.not. allocated(this%val_sum)) &
-            allocate(this%val_sum(this%dim1, this%dim2), source=0.0_SP)
+            allocate (this%val_sum(this%dim1, this%dim2), source=0.0_SP)
       case ("rms")
          if (.not. allocated(this%val_sum)) &
-            allocate(this%val_sum(this%dim1, this%dim2), source=0.0_SP)
+            allocate (this%val_sum(this%dim1, this%dim2), source=0.0_SP)
          if (.not. allocated(this%val_sum_sq)) &
-            allocate(this%val_sum_sq(this%dim1, this%dim2), source=0.0_SP)
+            allocate (this%val_sum_sq(this%dim1, this%dim2), source=0.0_SP)
       case default
-         error stop "Unknown statistic operation: " // trim(op)
+         error stop "Unknown statistic operation: "//trim(op)
       end select
    end subroutine allocate_stat
 
@@ -138,14 +138,14 @@ contains
    !! @param[in]  dt     Time-step size \f$\Delta t > 0\f$.
    subroutine accumulate(this, value, dt)
       class(type_accumulator), intent(inout) :: this
-      real(SP), intent(in) :: value(:,:)
+      real(SP), intent(in) :: value(:, :)
       real(SP), intent(in) :: dt
 
       this%total_dt = this%total_dt + dt
-      if (allocated(this%val_min))    this%val_min    = min(this%val_min, value)
-      if (allocated(this%val_max))    this%val_max    = max(this%val_max, value)
-      if (allocated(this%val_sum))    this%val_sum    = this%val_sum    + value      * dt
-      if (allocated(this%val_sum_sq)) this%val_sum_sq = this%val_sum_sq + value**2  * dt
+      if (allocated(this%val_min)) this%val_min = min(this%val_min, value)
+      if (allocated(this%val_max)) this%val_max = max(this%val_max, value)
+      if (allocated(this%val_sum)) this%val_sum = this%val_sum + value*dt
+      if (allocated(this%val_sum_sq)) this%val_sum_sq = this%val_sum_sq + value**2*dt
    end subroutine accumulate
 
    !> Retrieve the final statistic as a 2-D array.
@@ -167,9 +167,9 @@ contains
    function get_stat(this, op) result(stat)
       class(type_accumulator), intent(in) :: this
       character(*), intent(in) :: op
-      real(SP), allocatable :: stat(:,:)
+      real(SP), allocatable :: stat(:, :)
 
-      allocate(stat(this%dim1, this%dim2), source=0.0_SP)
+      allocate (stat(this%dim1, this%dim2), source=0.0_SP)
 
       select case (trim(op))
       case ("min")
@@ -178,12 +178,12 @@ contains
          if (allocated(this%val_max)) stat = this%val_max
       case ("mean")
          if (allocated(this%val_sum) .and. this%total_dt > 0.0_SP) &
-            stat = this%val_sum / this%total_dt
+            stat = this%val_sum/this%total_dt
       case ("rms")
          if (allocated(this%val_sum_sq) .and. this%total_dt > 0.0_SP) &
-            stat = sqrt(max(0.0_SP, this%val_sum_sq / this%total_dt))
+            stat = sqrt(max(0.0_SP, this%val_sum_sq/this%total_dt))
       case default
-         error stop "Unknown statistic operation: " // trim(op)
+         error stop "Unknown statistic operation: "//trim(op)
       end select
    end function get_stat
 
@@ -194,21 +194,21 @@ contains
    subroutine reset(this)
       class(type_accumulator), intent(inout) :: this
       this%total_dt = 0.0_SP
-      if (allocated(this%val_sum))    this%val_sum    = 0.0_SP
+      if (allocated(this%val_sum)) this%val_sum = 0.0_SP
       if (allocated(this%val_sum_sq)) this%val_sum_sq = 0.0_SP
-      if (allocated(this%val_max))    this%val_max    = -huge(1.0_SP)
-      if (allocated(this%val_min))    this%val_min    =  huge(1.0_SP)
+      if (allocated(this%val_max)) this%val_max = -huge(1.0_SP)
+      if (allocated(this%val_min)) this%val_min = huge(1.0_SP)
    end subroutine reset
 
    !> Free all allocated arrays and reset dimensions to zero.
    subroutine finalize(this)
       class(type_accumulator), intent(inout) :: this
-      if (allocated(this%val_min))    deallocate(this%val_min)
-      if (allocated(this%val_max))    deallocate(this%val_max)
-      if (allocated(this%val_sum))    deallocate(this%val_sum)
-      if (allocated(this%val_sum_sq)) deallocate(this%val_sum_sq)
-      this%dim1     = 0
-      this%dim2     = 0
+      if (allocated(this%val_min)) deallocate (this%val_min)
+      if (allocated(this%val_max)) deallocate (this%val_max)
+      if (allocated(this%val_sum)) deallocate (this%val_sum)
+      if (allocated(this%val_sum_sq)) deallocate (this%val_sum_sq)
+      this%dim1 = 0
+      this%dim2 = 0
       this%total_dt = 0.0_SP
    end subroutine finalize
 

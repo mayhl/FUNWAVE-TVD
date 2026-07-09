@@ -15,20 +15,20 @@
 
 module model_3d_config_mod
 
-   use core_env_mod,            only: type_env, new_env, get_sub_env
+   use core_env_mod, only: type_env, new_env, get_sub_env
 
-   use model_3d_geometry_mod,   only: type_model_3d_geometry
+   use model_3d_geometry_mod, only: type_model_3d_geometry
    use model_3d_simulation_mod, only: type_model_3d_simulation
-   use model_3d_physics_mod,    only: type_model_3d_physics
+   use model_3d_physics_mod, only: type_model_3d_physics
    use model_3d_turbulence_mod, only: type_model_3d_turbulence
-   use model_3d_solver_mod,     only: type_model_3d_solver
-   use model_3d_wavemaker_mod,  only: type_model_3d_wavemaker
-   use model_3d_bc_mod,         only: type_model_3d_bc
-   use model_3d_sponge_mod,     only: type_model_3d_sponge
-   use model_3d_hotstart_mod,   only: type_model_3d_hotstart
+   use model_3d_solver_mod, only: type_model_3d_solver
+   use model_3d_wavemaker_mod, only: type_model_3d_wavemaker
+   use model_3d_bc_mod, only: type_model_3d_bc
+   use model_3d_sponge_mod, only: type_model_3d_sponge
+   use model_3d_hotstart_mod, only: type_model_3d_hotstart
    use model_3d_baroclinic_mod, only: type_model_3d_baroclinic
-   use model_3d_output_mod,     only: type_model_3d_output
-   use model_coupling_mod,      only: type_model_coupling
+   use model_3d_output_mod, only: type_model_3d_output
+   use model_coupling_mod, only: type_model_coupling
 
    implicit none
 
@@ -49,18 +49,18 @@ module model_3d_config_mod
       type(type_model_coupling)      :: coupling
 
 # if defined (SEDIMENT)
-      character(80) :: sed_type   = ""
-      character(80) :: sed_load   = ""
-      logical  :: couple_fs       = .false.
-      real     :: sd50            = 0.0
-      real     :: shields_c       = 0.0
-      real     :: af              = 0.0
-      real     :: tau_ce          = 0.0
-      real     :: tau_cd          = 0.0
-      real     :: erate           = 0.0
-      real     :: mud_visc        = 0.0
-      real     :: tim_sedi        = 0.0
-      logical  :: bed_change      = .false.
+      character(80) :: sed_type = ""
+      character(80) :: sed_load = ""
+      logical  :: couple_fs = .false.
+      real     :: sd50 = 0.0
+      real     :: shields_c = 0.0
+      real     :: af = 0.0
+      real     :: tau_ce = 0.0
+      real     :: tau_cd = 0.0
+      real     :: erate = 0.0
+      real     :: mud_visc = 0.0
+      real     :: tim_sedi = 0.0
+      logical  :: bed_change = .false.
 # endif
 
 # if defined (OBSTACLE)
@@ -98,17 +98,17 @@ contains
 
 # if defined (SEDIMENT)
       sed_env = get_sub_env(this%env, "sediment")
-      call sed_env%yaml%read("sed_type",   silent=no_key, val=this%sed_type,   default="")
-      call sed_env%yaml%read("sed_load",   silent=no_key, val=this%sed_load,   default="")
-      call sed_env%yaml%read("couple_fs",  silent=no_key, val=this%couple_fs,  default="NO")
-      call sed_env%yaml%read("d50",        silent=no_key, val=this%sd50,       default="0.0")
-      call sed_env%yaml%read("shields_c",  silent=no_key, val=this%shields_c,  default="0.0")
-      call sed_env%yaml%read("af",         silent=no_key, val=this%af,         default="0.0")
-      call sed_env%yaml%read("tau_ce",     silent=no_key, val=this%tau_ce,     default="0.0")
-      call sed_env%yaml%read("tau_cd",     silent=no_key, val=this%tau_cd,     default="0.0")
-      call sed_env%yaml%read("erate",      silent=no_key, val=this%erate,      default="0.0")
-      call sed_env%yaml%read("mud_visc",   silent=no_key, val=this%mud_visc,   default="0.0")
-      call sed_env%yaml%read("tim_sedi",   silent=no_key, val=this%tim_sedi,   default="0.0")
+      call sed_env%yaml%read("sed_type", silent=no_key, val=this%sed_type, default="")
+      call sed_env%yaml%read("sed_load", silent=no_key, val=this%sed_load, default="")
+      call sed_env%yaml%read("couple_fs", silent=no_key, val=this%couple_fs, default="NO")
+      call sed_env%yaml%read("d50", silent=no_key, val=this%sd50, default="0.0")
+      call sed_env%yaml%read("shields_c", silent=no_key, val=this%shields_c, default="0.0")
+      call sed_env%yaml%read("af", silent=no_key, val=this%af, default="0.0")
+      call sed_env%yaml%read("tau_ce", silent=no_key, val=this%tau_ce, default="0.0")
+      call sed_env%yaml%read("tau_cd", silent=no_key, val=this%tau_cd, default="0.0")
+      call sed_env%yaml%read("erate", silent=no_key, val=this%erate, default="0.0")
+      call sed_env%yaml%read("mud_visc", silent=no_key, val=this%mud_visc, default="0.0")
+      call sed_env%yaml%read("tim_sedi", silent=no_key, val=this%tim_sedi, default="0.0")
       call sed_env%yaml%read("bed_change", silent=no_key, val=this%bed_change, default="NO")
 # endif
 

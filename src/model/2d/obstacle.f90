@@ -33,7 +33,7 @@ module model_obstacle_mod
       type(type_path) :: obstacle_file
       type(type_path) :: breakwater_file
 
-      logical  :: obstacle   = .false.
+      logical  :: obstacle = .false.
       logical  :: breakwater = .false.
 
       real(SP) :: BreakWaterAbsorbCoef = 10.0_SP
@@ -55,14 +55,14 @@ contains
       this%is_activated = .not. no_blk
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read_input_path("obstacle_file",   silent=no_obs, val=this%obstacle_file)
-      call sub_env%yaml%read_input_path("breakwater_file", silent=no_bw,  val=this%breakwater_file)
+      call sub_env%yaml%read_input_path("obstacle_file", silent=no_obs, val=this%obstacle_file)
+      call sub_env%yaml%read_input_path("breakwater_file", silent=no_bw, val=this%breakwater_file)
 
-      this%obstacle   = .not. no_obs
+      this%obstacle = .not. no_obs
       this%breakwater = .not. no_bw
 
       call sub_env%yaml%read("BreakWaterAbsorbCoef", silent=no_key, &
-                              val=this%BreakWaterAbsorbCoef, default=DEF_OBSTACLE_BREAKWATERABSORBCOEF)
+                             val=this%BreakWaterAbsorbCoef, default=DEF_OBSTACLE_BREAKWATERABSORBCOEF)
 
    end subroutine obstacle_read_input
 

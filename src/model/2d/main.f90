@@ -19,20 +19,20 @@ module model_main_mod
    use core_field_registry_mod, only: type_field_registry
    use probe_mod, only: dump_state, reset_state
 
-   use model_geometry_mod,   only: type_model_geometry
+   use model_geometry_mod, only: type_model_geometry
    use model_simulation_mod, only: type_model_simulation
-   use model_hot_start_mod,  only: type_model_hot_start
-   use model_wavemaker_mod,  only: type_model_wavemaker
-   use model_sponge_mod,     only: type_model_sponge
-   use model_obstacle_mod,   only: type_model_obstacle
-   use model_friction_mod,   only: type_model_friction
-   use model_numerics_mod,   only: type_model_numerics
-   use model_breaking_mod,   only: type_model_breaking
-   use model_output_mod,     only: type_model_output
-   use model_physics_mod,    only: type_model_physics
-   use model_coupling_mod,   only: type_model_coupling
+   use model_hot_start_mod, only: type_model_hot_start
+   use model_wavemaker_mod, only: type_model_wavemaker
+   use model_sponge_mod, only: type_model_sponge
+   use model_obstacle_mod, only: type_model_obstacle
+   use model_friction_mod, only: type_model_friction
+   use model_numerics_mod, only: type_model_numerics
+   use model_breaking_mod, only: type_model_breaking
+   use model_output_mod, only: type_model_output
+   use model_physics_mod, only: type_model_physics
+   use model_coupling_mod, only: type_model_coupling
 
-   use model_fields_2d_mod,    only: type_fields_2d
+   use model_fields_2d_mod, only: type_fields_2d
    use model_kernel_masks_mod, only: update_mask9
 
    implicit none
@@ -105,7 +105,7 @@ contains
    subroutine model_init_from_env(this, env)
       use core_env_mod, only: get_sub_env
       class(type_model_main), intent(inout) :: this
-      type(type_env),         intent(inout) :: env
+      type(type_env), intent(inout) :: env
 
       call reset_state()
       call dump_state(5.0d0, "main_init_test")
@@ -174,21 +174,21 @@ contains
          do i = 1, lp%mloc
             if (f%eta(i, j) < -f%depth(i, j)) then
                f%mask(i, j) = 0
-               f%eta(i, j)  = -this%numerics%MinDepth - f%depth(i, j)
+               f%eta(i, j) = -this%numerics%MinDepth - f%depth(i, j)
             else
                f%mask(i, j) = 1
             end if
          end do
       end do
-      f%mask = f%mask * f%mask_struc
+      f%mask = f%mask*f%mask_struc
 
       call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
                         this%numerics%MinDepthFrc, this%physics%SWE_ETA_DEP, &
                         this%physics%viscosity_breaking)
 
-      f%h = max(this%physics%Gamma3 * f%eta + f%depth, this%numerics%MinDepthFrc)
-      f%p = f%h * f%u
-      f%q = f%h * f%v
+      f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
+      f%p = f%h*f%u
+      f%q = f%h*f%v
       end associate
 
       call this%fields%register(this%registry)

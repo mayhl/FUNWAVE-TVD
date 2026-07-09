@@ -52,9 +52,9 @@ module core_crs_mod
    implicit none
 
    !> Ungeoreferenced local grid — identity transform.
-   integer, parameter, public :: CRS_LOCAL      = 0
+   integer, parameter, public :: CRS_LOCAL = 0
    !> Projected CRS (UTM, state-plane, metres) — translation only.
-   integer, parameter, public :: CRS_PROJECTED  = 1
+   integer, parameter, public :: CRS_PROJECTED = 1
    !> Geographic CRS (lon/lat degrees) — flat-Earth approximation.
    integer, parameter, public :: CRS_GEOGRAPHIC = 2
 

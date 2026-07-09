@@ -11,7 +11,7 @@
 !! staging assumptions to the message paths.
 module core_solver_tridiag_mod
    use core_constants_mod, only: SP, MPI_SP
-   use core_grid_mod,      only: type_loop_bounds, type_grid_2d
+   use core_grid_mod, only: type_loop_bounds, type_grid_2d
    use mpi_f08
    implicit none
    private
@@ -25,13 +25,13 @@ module core_solver_tridiag_mod
    ! (mloc×nloc), reused every stage/step — no per-call heap traffic.
    type, public :: type_trid_workspace
       integer :: m = 0, n = 0
-      real(SP), allocatable :: a_loc(:,:)
-      real(SP), allocatable :: c1(:,:), c2(:,:)
-      real(SP), allocatable :: d1(:,:), d2(:,:)
-      real(SP), allocatable :: y1(:,:), y2(:,:)
+      real(SP), allocatable :: a_loc(:, :)
+      real(SP), allocatable :: c1(:, :), c2(:, :)
+      real(SP), allocatable :: d1(:, :), d2(:, :)
+      real(SP), allocatable :: y1(:, :), y2(:, :)
    contains
       procedure :: alloc => tws_alloc
-      procedure :: free  => tws_free
+      procedure :: free => tws_free
    end type type_trid_workspace
 
 contains
@@ -39,17 +39,17 @@ contains
    subroutine tws_alloc(ws, m, n)
       class(type_trid_workspace), intent(inout) :: ws
       integer, intent(in) :: m, n
-      ws%m = m;  ws%n = n
-      allocate(ws%a_loc(m,n), &
-               ws%c1(m,n), ws%c2(m,n), &
-               ws%d1(m,n), ws%d2(m,n), &
-               ws%y1(m,n), ws%y2(m,n))
+      ws%m = m; ws%n = n
+      allocate (ws%a_loc(m, n), &
+                ws%c1(m, n), ws%c2(m, n), &
+                ws%d1(m, n), ws%d2(m, n), &
+                ws%y1(m, n), ws%y2(m, n))
    end subroutine tws_alloc
 
    subroutine tws_free(ws)
       class(type_trid_workspace), intent(inout) :: ws
-      ws%m = 0;  ws%n = 0
-      deallocate(ws%a_loc, ws%c1, ws%c2, ws%d1, ws%d2, ws%y1, ws%y2)
+      ws%m = 0; ws%n = 0
+      deallocate (ws%a_loc, ws%c1, ws%c2, ws%d1, ws%d2, ws%y1, ws%y2)
    end subroutine tws_free
 
    ! ----------------------------------------------------------------
@@ -61,19 +61,19 @@ contains
    ! the pipeline splits each line across ranks.
    ! ----------------------------------------------------------------
    pure subroutine trid_thomas_1d(n, a, c, d, z)
-      integer,  intent(in)    :: n
+      integer, intent(in)    :: n
       real(SP), intent(inout) :: a(n), c(n), d(n)
       real(SP), intent(out)   :: z(n)
       integer :: i
       do i = 2, n
          if (a(i) /= 0.0_SP) then
-            c(i) = c(i) / a(i) / (1.0_SP/a(i) - c(i-1))
-            d(i) = (d(i)/a(i) - d(i-1)) / (1.0_SP/a(i) - c(i-1))
+            c(i) = c(i)/a(i)/(1.0_SP/a(i) - c(i - 1))
+            d(i) = (d(i)/a(i) - d(i - 1))/(1.0_SP/a(i) - c(i - 1))
          end if
       end do
       z(n) = d(n)
-      do i = n-1, 1, -1
-         z(i) = d(i) - c(i)*z(i+1)
+      do i = n - 1, 1, -1
+         z(i) = d(i) - c(i)*z(i + 1)
       end do
    end subroutine trid_thomas_1d
 
@@ -86,10 +86,10 @@ contains
    ! ----------------------------------------------------------------
    subroutine trid_x(lp, grid, a, c, d, f)
       type(type_loop_bounds), intent(in)    :: lp
-      type(type_grid_2d),     intent(in)    :: grid
-      real(SP), intent(in)    :: a(:,:)
-      real(SP), intent(inout) :: c(:,:), d(:,:)
-      real(SP), intent(out)   :: f(:,:)
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d(:, :)
+      real(SP), intent(out)   :: f(:, :)
 
       real(SP)          :: smsg(lp%nloc, 2), rmsg(lp%nloc, 2)
       type(MPI_Request) :: req
@@ -103,9 +103,9 @@ contains
          do j = lp%jb, lp%je
             if (a(lp%ib, j) /= 0.0_SP) then
                c(lp%ib, j) = c(lp%ib, j)/a(lp%ib, j) &
-                             / (1.0_SP/a(lp%ib, j) - rmsg(j, 2))
+                             /(1.0_SP/a(lp%ib, j) - rmsg(j, 2))
                d(lp%ib, j) = (d(lp%ib, j)/a(lp%ib, j) - rmsg(j, 1)) &
-                             / (1.0_SP/a(lp%ib, j) - rmsg(j, 2))
+                             /(1.0_SP/a(lp%ib, j) - rmsg(j, 2))
             end if
          end do
       end if
@@ -113,8 +113,8 @@ contains
       do j = lp%jb, lp%je
          do i = lp%ib + 1, lp%ie
             if (a(i, j) /= 0.0_SP) then
-               c(i, j) = c(i, j)/a(i, j) / (1.0_SP/a(i, j) - c(i-1, j))
-               d(i, j) = (d(i, j)/a(i, j) - d(i-1, j)) / (1.0_SP/a(i, j) - c(i-1, j))
+               c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i - 1, j))
+               d(i, j) = (d(i, j)/a(i, j) - d(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
             end if
          end do
       end do
@@ -143,7 +143,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ie - 1, lp%ib, -1
-            f(i, j) = d(i, j) - c(i, j)*f(i+1, j)
+            f(i, j) = d(i, j) - c(i, j)*f(i + 1, j)
          end do
       end do
 
@@ -164,10 +164,10 @@ contains
    ! ----------------------------------------------------------------
    subroutine trid_y(lp, grid, a, c, d, f)
       type(type_loop_bounds), intent(in)    :: lp
-      type(type_grid_2d),     intent(in)    :: grid
-      real(SP), intent(in)    :: a(:,:)
-      real(SP), intent(inout) :: c(:,:), d(:,:)
-      real(SP), intent(out)   :: f(:,:)
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d(:, :)
+      real(SP), intent(out)   :: f(:, :)
 
       real(SP)          :: smsg(lp%mloc, 2), rmsg(lp%mloc, 2)
       type(MPI_Request) :: req
@@ -181,9 +181,9 @@ contains
          do i = lp%ib, lp%ie
             if (a(i, lp%jb) /= 0.0_SP) then
                c(i, lp%jb) = c(i, lp%jb)/a(i, lp%jb) &
-                             / (1.0_SP/a(i, lp%jb) - rmsg(i, 2))
+                             /(1.0_SP/a(i, lp%jb) - rmsg(i, 2))
                d(i, lp%jb) = (d(i, lp%jb)/a(i, lp%jb) - rmsg(i, 1)) &
-                             / (1.0_SP/a(i, lp%jb) - rmsg(i, 2))
+                             /(1.0_SP/a(i, lp%jb) - rmsg(i, 2))
             end if
          end do
       end if
@@ -191,8 +191,8 @@ contains
       do j = lp%jb + 1, lp%je
          do i = lp%ib, lp%ie
             if (a(i, j) /= 0.0_SP) then
-               c(i, j) = c(i, j)/a(i, j) / (1.0_SP/a(i, j) - c(i, j-1))
-               d(i, j) = (d(i, j)/a(i, j) - d(i, j-1)) / (1.0_SP/a(i, j) - c(i, j-1))
+               c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i, j - 1))
+               d(i, j) = (d(i, j)/a(i, j) - d(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
             end if
          end do
       end do
@@ -221,7 +221,7 @@ contains
 
       do j = lp%je - 1, lp%jb, -1
          do i = lp%ib, lp%ie
-            f(i, j) = d(i, j) - c(i, j)*f(i, j+1)
+            f(i, j) = d(i, j) - c(i, j)*f(i, j + 1)
          end do
       end do
 
@@ -242,12 +242,12 @@ contains
    ! Based on Thomas (1995) Sec. 5.6.1, x-direction analogue of trid_y_periodic.
    ! ----------------------------------------------------------------
    subroutine trid_x_periodic(lp, grid, a, c, d, ws, f)
-      type(type_loop_bounds),     intent(in)    :: lp
-      type(type_grid_2d),         intent(in)    :: grid
-      real(SP), intent(in)    :: a(:,:)
-      real(SP), intent(inout) :: c(:,:), d(:,:)
-      type(type_trid_workspace),  intent(inout) :: ws
-      real(SP), intent(out)   :: f(:,:)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d(:, :)
+      type(type_trid_workspace), intent(inout) :: ws
+      real(SP), intent(out)   :: f(:, :)
 
       real(SP) :: a_beg(lp%nloc), c_end(lp%nloc)
       real(SP) :: y1_end(lp%nloc), y2_end(lp%nloc), beta(lp%nloc)
@@ -258,108 +258,108 @@ contains
       associate (a_loc => ws%a_loc, c1 => ws%c1, c2 => ws%c2, &
                  d1 => ws%d1, d2 => ws%d2, y1 => ws%y1, y2 => ws%y2)
 
-      a_loc = a
-      c1    = c
-      d1    = d
+         a_loc = a
+         c1 = c
+         d1 = d
 
-      ! --- Step 1: exchange boundary off-diagonal values ---
-      call MPI_Cart_rank(grid%cart_comm, [0,               grid%jproc], west_rank, ierr)
-      call MPI_Cart_rank(grid%cart_comm, [grid%nx_proc-1,  grid%jproc], east_rank, ierr)
+         ! --- Step 1: exchange boundary off-diagonal values ---
+         call MPI_Cart_rank(grid%cart_comm, [0, grid%jproc], west_rank, ierr)
+         call MPI_Cart_rank(grid%cart_comm, [grid%nx_proc - 1, grid%jproc], east_rank, ierr)
 
-      if (grid%nx_proc == 1) then
-         a_beg = a_loc(lp%ib, :)
-         c_end = c1(lp%ie, :)
-      else
-         if (grid%is_back_boundary) then
+         if (grid%nx_proc == 1) then
             a_beg = a_loc(lp%ib, :)
-            call MPI_Send(a_beg, lp%nloc, MPI_SP, east_rank, 20, grid%cart_comm, ierr)
-            call MPI_Recv(c_end, lp%nloc, MPI_SP, east_rank, 21, grid%cart_comm, stat, ierr)
+            c_end = c1(lp%ie, :)
+         else
+            if (grid%is_back_boundary) then
+               a_beg = a_loc(lp%ib, :)
+               call MPI_Send(a_beg, lp%nloc, MPI_SP, east_rank, 20, grid%cart_comm, ierr)
+               call MPI_Recv(c_end, lp%nloc, MPI_SP, east_rank, 21, grid%cart_comm, stat, ierr)
+            end if
+            if (grid%is_shore_boundary) then
+               c_end = c1(lp%ie, :)
+               call MPI_Send(c_end, lp%nloc, MPI_SP, west_rank, 21, grid%cart_comm, ierr)
+               call MPI_Recv(a_beg, lp%nloc, MPI_SP, west_rank, 20, grid%cart_comm, stat, ierr)
+            end if
+         end if
+
+         ! --- Step 2: normalise and save ---
+         if (grid%is_back_boundary) then
+            do j = lp%jb, lp%je
+               c1(lp%ib, j) = c1(lp%ib, j)/(1.0_SP + c_end(j))
+               d1(lp%ib, j) = d1(lp%ib, j)/(1.0_SP + c_end(j))
+            end do
          end if
          if (grid%is_shore_boundary) then
-            c_end = c1(lp%ie, :)
-            call MPI_Send(c_end, lp%nloc, MPI_SP, west_rank, 21, grid%cart_comm, ierr)
-            call MPI_Recv(a_beg, lp%nloc, MPI_SP, west_rank, 20, grid%cart_comm, stat, ierr)
-         end if
-      end if
-
-      ! --- Step 2: normalise and save ---
-      if (grid%is_back_boundary) then
-         do j = lp%jb, lp%je
-            c1(lp%ib, j) = c1(lp%ib, j) / (1.0_SP + c_end(j))
-            d1(lp%ib, j) = d1(lp%ib, j) / (1.0_SP + c_end(j))
-         end do
-      end if
-      if (grid%is_shore_boundary) then
-         do j = lp%jb, lp%je
-            a_loc(lp%ie, j) = a_loc(lp%ie, j) / (1.0_SP + a_beg(j))
-            d1(lp%ie, j)    = d1(lp%ie, j)    / (1.0_SP + a_beg(j))
-         end do
-      end if
-
-      c2 = c1   ! both solves use the same normalised c
-
-      ! --- Step 3: first solve B*y1 = d1 ---
-      call trid_x(lp, grid, a_loc, c1, d1, y1)
-
-      ! --- Step 4: build RHS for second solve ---
-      d2 = 0.0_SP
-      if (grid%is_back_boundary) then
-         do j = lp%jb, lp%je
-            d2(lp%ib, j) =  1.0_SP / (1.0_SP + c_end(j))
-         end do
-      end if
-      if (grid%is_shore_boundary) then
-         do j = lp%jb, lp%je
-            d2(lp%ie, j) = -1.0_SP / (1.0_SP + a_beg(j))
-         end do
-      end if
-
-      ! --- Step 5: second solve B*y2 = d2 ---
-      call trid_x(lp, grid, a_loc, c2, d2, y2)
-
-      ! --- Step 6: gather y1(ie,j) and y2(ie,j) to west rank ---
-      if (grid%is_shore_boundary .and. grid%nx_proc > 1) then
-         y1_end = y1(lp%ie, :)
-         y2_end = y2(lp%ie, :)
-         call MPI_Send(y1_end, lp%nloc, MPI_SP, west_rank, 22, grid%cart_comm, ierr)
-         call MPI_Send(y2_end, lp%nloc, MPI_SP, west_rank, 23, grid%cart_comm, ierr)
-      end if
-      if (grid%is_back_boundary .and. grid%nx_proc > 1) then
-         call MPI_Recv(y1_end, lp%nloc, MPI_SP, east_rank, 22, grid%cart_comm, stat, ierr)
-         call MPI_Recv(y2_end, lp%nloc, MPI_SP, east_rank, 23, grid%cart_comm, stat, ierr)
-      end if
-      if (grid%nx_proc == 1) then
-         y1_end = y1(lp%ie, :)
-         y2_end = y2(lp%ie, :)
-      end if
-
-      ! --- Step 7: west rank computes beta ---
-      beta = 0.0_SP
-      if (grid%is_back_boundary) then
-         do j = lp%jb, lp%je
-            beta(j) = (c_end(j)*y1(lp%ib, j) - a_beg(j)*y1_end(j)) &
-                    / (1.0_SP - (c_end(j)*y2(lp%ib, j) - a_beg(j)*y2_end(j)))
-         end do
-      end if
-
-      ! --- Step 8: broadcast beta along x-row (same jproc) ---
-      if (grid%nx_proc > 1) then
-         if (grid%is_back_boundary) then
-            do k = 1, grid%nx_proc - 1
-               call MPI_Cart_rank(grid%cart_comm, [k, grid%jproc], dest_rank, ierr)
-               call MPI_Send(beta, lp%nloc, MPI_SP, dest_rank, 24, grid%cart_comm, ierr)
+            do j = lp%jb, lp%je
+               a_loc(lp%ie, j) = a_loc(lp%ie, j)/(1.0_SP + a_beg(j))
+               d1(lp%ie, j) = d1(lp%ie, j)/(1.0_SP + a_beg(j))
             end do
-         else
-            call MPI_Recv(beta, lp%nloc, MPI_SP, west_rank, 24, grid%cart_comm, stat, ierr)
          end if
-      end if
 
-      ! --- Step 9: combine ---
-      do j = lp%jb, lp%je
-         do k = lp%ib, lp%ie
-            f(k, j) = y1(k, j) + beta(j)*y2(k, j)
+         c2 = c1   ! both solves use the same normalised c
+
+         ! --- Step 3: first solve B*y1 = d1 ---
+         call trid_x(lp, grid, a_loc, c1, d1, y1)
+
+         ! --- Step 4: build RHS for second solve ---
+         d2 = 0.0_SP
+         if (grid%is_back_boundary) then
+            do j = lp%jb, lp%je
+               d2(lp%ib, j) = 1.0_SP/(1.0_SP + c_end(j))
+            end do
+         end if
+         if (grid%is_shore_boundary) then
+            do j = lp%jb, lp%je
+               d2(lp%ie, j) = -1.0_SP/(1.0_SP + a_beg(j))
+            end do
+         end if
+
+         ! --- Step 5: second solve B*y2 = d2 ---
+         call trid_x(lp, grid, a_loc, c2, d2, y2)
+
+         ! --- Step 6: gather y1(ie,j) and y2(ie,j) to west rank ---
+         if (grid%is_shore_boundary .and. grid%nx_proc > 1) then
+            y1_end = y1(lp%ie, :)
+            y2_end = y2(lp%ie, :)
+            call MPI_Send(y1_end, lp%nloc, MPI_SP, west_rank, 22, grid%cart_comm, ierr)
+            call MPI_Send(y2_end, lp%nloc, MPI_SP, west_rank, 23, grid%cart_comm, ierr)
+         end if
+         if (grid%is_back_boundary .and. grid%nx_proc > 1) then
+            call MPI_Recv(y1_end, lp%nloc, MPI_SP, east_rank, 22, grid%cart_comm, stat, ierr)
+            call MPI_Recv(y2_end, lp%nloc, MPI_SP, east_rank, 23, grid%cart_comm, stat, ierr)
+         end if
+         if (grid%nx_proc == 1) then
+            y1_end = y1(lp%ie, :)
+            y2_end = y2(lp%ie, :)
+         end if
+
+         ! --- Step 7: west rank computes beta ---
+         beta = 0.0_SP
+         if (grid%is_back_boundary) then
+            do j = lp%jb, lp%je
+               beta(j) = (c_end(j)*y1(lp%ib, j) - a_beg(j)*y1_end(j)) &
+                         /(1.0_SP - (c_end(j)*y2(lp%ib, j) - a_beg(j)*y2_end(j)))
+            end do
+         end if
+
+         ! --- Step 8: broadcast beta along x-row (same jproc) ---
+         if (grid%nx_proc > 1) then
+            if (grid%is_back_boundary) then
+               do k = 1, grid%nx_proc - 1
+                  call MPI_Cart_rank(grid%cart_comm, [k, grid%jproc], dest_rank, ierr)
+                  call MPI_Send(beta, lp%nloc, MPI_SP, dest_rank, 24, grid%cart_comm, ierr)
+               end do
+            else
+               call MPI_Recv(beta, lp%nloc, MPI_SP, west_rank, 24, grid%cart_comm, stat, ierr)
+            end if
+         end if
+
+         ! --- Step 9: combine ---
+         do j = lp%jb, lp%je
+            do k = lp%ib, lp%ie
+               f(k, j) = y1(k, j) + beta(j)*y2(k, j)
+            end do
          end do
-      end do
 
       end associate
 
@@ -373,12 +373,12 @@ contains
    ! north boundary rank = grid%is_left_boundary  (left_rank ==NULL).
    ! ----------------------------------------------------------------
    subroutine trid_y_periodic(lp, grid, a, c, d, ws, f)
-      type(type_loop_bounds),     intent(in)    :: lp
-      type(type_grid_2d),         intent(in)    :: grid
-      real(SP), intent(in)    :: a(:,:)
-      real(SP), intent(inout) :: c(:,:), d(:,:)
-      type(type_trid_workspace),  intent(inout) :: ws
-      real(SP), intent(out)   :: f(:,:)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d(:, :)
+      type(type_trid_workspace), intent(inout) :: ws
+      real(SP), intent(out)   :: f(:, :)
 
       real(SP) :: a_beg(lp%mloc), c_end(lp%mloc)
       real(SP) :: y1_end(lp%mloc), y2_end(lp%mloc), beta(lp%mloc)
@@ -389,108 +389,108 @@ contains
       associate (a_loc => ws%a_loc, c1 => ws%c1, c2 => ws%c2, &
                  d1 => ws%d1, d2 => ws%d2, y1 => ws%y1, y2 => ws%y2)
 
-      a_loc = a
-      c1    = c
-      d1    = d
+         a_loc = a
+         c1 = c
+         d1 = d
 
-      ! --- Step 1: exchange boundary off-diagonal values ---
-      call MPI_Cart_rank(grid%cart_comm, [grid%iproc, 0              ], south_rank, ierr)
-      call MPI_Cart_rank(grid%cart_comm, [grid%iproc, grid%ny_proc-1 ], north_rank, ierr)
+         ! --- Step 1: exchange boundary off-diagonal values ---
+         call MPI_Cart_rank(grid%cart_comm, [grid%iproc, 0], south_rank, ierr)
+         call MPI_Cart_rank(grid%cart_comm, [grid%iproc, grid%ny_proc - 1], north_rank, ierr)
 
-      if (grid%ny_proc == 1) then
-         a_beg = a_loc(:, lp%jb)
-         c_end = c1(:, lp%je)
-      else
-         if (grid%is_right_boundary) then   ! southernmost (jproc=0)
+         if (grid%ny_proc == 1) then
             a_beg = a_loc(:, lp%jb)
-            call MPI_Send(a_beg, lp%mloc, MPI_SP, north_rank, 30, grid%cart_comm, ierr)
-            call MPI_Recv(c_end, lp%mloc, MPI_SP, north_rank, 31, grid%cart_comm, stat, ierr)
-         end if
-         if (grid%is_left_boundary) then    ! northernmost (jproc=PY-1)
             c_end = c1(:, lp%je)
-            call MPI_Send(c_end, lp%mloc, MPI_SP, south_rank, 31, grid%cart_comm, ierr)
-            call MPI_Recv(a_beg, lp%mloc, MPI_SP, south_rank, 30, grid%cart_comm, stat, ierr)
-         end if
-      end if
-
-      ! --- Step 2: normalise and save ---
-      if (grid%is_right_boundary) then
-         do i = lp%ib, lp%ie
-            c1(i, lp%jb) = c1(i, lp%jb) / (1.0_SP + c_end(i))
-            d1(i, lp%jb) = d1(i, lp%jb) / (1.0_SP + c_end(i))
-         end do
-      end if
-      if (grid%is_left_boundary) then
-         do i = lp%ib, lp%ie
-            a_loc(i, lp%je) = a_loc(i, lp%je) / (1.0_SP + a_beg(i))
-            d1(i, lp%je)    = d1(i, lp%je)    / (1.0_SP + a_beg(i))
-         end do
-      end if
-
-      c2 = c1
-
-      ! --- Step 3: first solve B*y1 = d1 ---
-      call trid_y(lp, grid, a_loc, c1, d1, y1)
-
-      ! --- Step 4: build RHS for second solve ---
-      d2 = 0.0_SP
-      if (grid%is_right_boundary) then
-         do i = lp%ib, lp%ie
-            d2(i, lp%jb) =  1.0_SP / (1.0_SP + c_end(i))
-         end do
-      end if
-      if (grid%is_left_boundary) then
-         do i = lp%ib, lp%ie
-            d2(i, lp%je) = -1.0_SP / (1.0_SP + a_beg(i))
-         end do
-      end if
-
-      ! --- Step 5: second solve B*y2 = d2 ---
-      call trid_y(lp, grid, a_loc, c2, d2, y2)
-
-      ! --- Step 6: gather y1(i,je) and y2(i,je) to south rank ---
-      if (grid%is_left_boundary .and. grid%ny_proc > 1) then
-         y1_end = y1(:, lp%je)
-         y2_end = y2(:, lp%je)
-         call MPI_Send(y1_end, lp%mloc, MPI_SP, south_rank, 32, grid%cart_comm, ierr)
-         call MPI_Send(y2_end, lp%mloc, MPI_SP, south_rank, 33, grid%cart_comm, ierr)
-      end if
-      if (grid%is_right_boundary .and. grid%ny_proc > 1) then
-         call MPI_Recv(y1_end, lp%mloc, MPI_SP, north_rank, 32, grid%cart_comm, stat, ierr)
-         call MPI_Recv(y2_end, lp%mloc, MPI_SP, north_rank, 33, grid%cart_comm, stat, ierr)
-      end if
-      if (grid%ny_proc == 1) then
-         y1_end = y1(:, lp%je)
-         y2_end = y2(:, lp%je)
-      end if
-
-      ! --- Step 7: south rank computes beta ---
-      beta = 0.0_SP
-      if (grid%is_right_boundary) then
-         do i = lp%ib, lp%ie
-            beta(i) = (c_end(i)*y1(i, lp%jb) - a_beg(i)*y1_end(i)) &
-                    / (1.0_SP - (c_end(i)*y2(i, lp%jb) - a_beg(i)*y2_end(i)))
-         end do
-      end if
-
-      ! --- Step 8: broadcast beta along y-column (same iproc) ---
-      if (grid%ny_proc > 1) then
-         if (grid%is_right_boundary) then
-            do k = 1, grid%ny_proc - 1
-               call MPI_Cart_rank(grid%cart_comm, [grid%iproc, k], dest_rank, ierr)
-               call MPI_Send(beta, lp%mloc, MPI_SP, dest_rank, 34, grid%cart_comm, ierr)
-            end do
          else
-            call MPI_Recv(beta, lp%mloc, MPI_SP, south_rank, 34, grid%cart_comm, stat, ierr)
+            if (grid%is_right_boundary) then   ! southernmost (jproc=0)
+               a_beg = a_loc(:, lp%jb)
+               call MPI_Send(a_beg, lp%mloc, MPI_SP, north_rank, 30, grid%cart_comm, ierr)
+               call MPI_Recv(c_end, lp%mloc, MPI_SP, north_rank, 31, grid%cart_comm, stat, ierr)
+            end if
+            if (grid%is_left_boundary) then    ! northernmost (jproc=PY-1)
+               c_end = c1(:, lp%je)
+               call MPI_Send(c_end, lp%mloc, MPI_SP, south_rank, 31, grid%cart_comm, ierr)
+               call MPI_Recv(a_beg, lp%mloc, MPI_SP, south_rank, 30, grid%cart_comm, stat, ierr)
+            end if
          end if
-      end if
 
-      ! --- Step 9: combine ---
-      do j = lp%jb, lp%je
-         do i = lp%ib, lp%ie
-            f(i, j) = y1(i, j) + beta(i)*y2(i, j)
+         ! --- Step 2: normalise and save ---
+         if (grid%is_right_boundary) then
+            do i = lp%ib, lp%ie
+               c1(i, lp%jb) = c1(i, lp%jb)/(1.0_SP + c_end(i))
+               d1(i, lp%jb) = d1(i, lp%jb)/(1.0_SP + c_end(i))
+            end do
+         end if
+         if (grid%is_left_boundary) then
+            do i = lp%ib, lp%ie
+               a_loc(i, lp%je) = a_loc(i, lp%je)/(1.0_SP + a_beg(i))
+               d1(i, lp%je) = d1(i, lp%je)/(1.0_SP + a_beg(i))
+            end do
+         end if
+
+         c2 = c1
+
+         ! --- Step 3: first solve B*y1 = d1 ---
+         call trid_y(lp, grid, a_loc, c1, d1, y1)
+
+         ! --- Step 4: build RHS for second solve ---
+         d2 = 0.0_SP
+         if (grid%is_right_boundary) then
+            do i = lp%ib, lp%ie
+               d2(i, lp%jb) = 1.0_SP/(1.0_SP + c_end(i))
+            end do
+         end if
+         if (grid%is_left_boundary) then
+            do i = lp%ib, lp%ie
+               d2(i, lp%je) = -1.0_SP/(1.0_SP + a_beg(i))
+            end do
+         end if
+
+         ! --- Step 5: second solve B*y2 = d2 ---
+         call trid_y(lp, grid, a_loc, c2, d2, y2)
+
+         ! --- Step 6: gather y1(i,je) and y2(i,je) to south rank ---
+         if (grid%is_left_boundary .and. grid%ny_proc > 1) then
+            y1_end = y1(:, lp%je)
+            y2_end = y2(:, lp%je)
+            call MPI_Send(y1_end, lp%mloc, MPI_SP, south_rank, 32, grid%cart_comm, ierr)
+            call MPI_Send(y2_end, lp%mloc, MPI_SP, south_rank, 33, grid%cart_comm, ierr)
+         end if
+         if (grid%is_right_boundary .and. grid%ny_proc > 1) then
+            call MPI_Recv(y1_end, lp%mloc, MPI_SP, north_rank, 32, grid%cart_comm, stat, ierr)
+            call MPI_Recv(y2_end, lp%mloc, MPI_SP, north_rank, 33, grid%cart_comm, stat, ierr)
+         end if
+         if (grid%ny_proc == 1) then
+            y1_end = y1(:, lp%je)
+            y2_end = y2(:, lp%je)
+         end if
+
+         ! --- Step 7: south rank computes beta ---
+         beta = 0.0_SP
+         if (grid%is_right_boundary) then
+            do i = lp%ib, lp%ie
+               beta(i) = (c_end(i)*y1(i, lp%jb) - a_beg(i)*y1_end(i)) &
+                         /(1.0_SP - (c_end(i)*y2(i, lp%jb) - a_beg(i)*y2_end(i)))
+            end do
+         end if
+
+         ! --- Step 8: broadcast beta along y-column (same iproc) ---
+         if (grid%ny_proc > 1) then
+            if (grid%is_right_boundary) then
+               do k = 1, grid%ny_proc - 1
+                  call MPI_Cart_rank(grid%cart_comm, [grid%iproc, k], dest_rank, ierr)
+                  call MPI_Send(beta, lp%mloc, MPI_SP, dest_rank, 34, grid%cart_comm, ierr)
+               end do
+            else
+               call MPI_Recv(beta, lp%mloc, MPI_SP, south_rank, 34, grid%cart_comm, stat, ierr)
+            end if
+         end if
+
+         ! --- Step 9: combine ---
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               f(i, j) = y1(i, j) + beta(i)*y2(i, j)
+            end do
          end do
-      end do
 
       end associate
 
