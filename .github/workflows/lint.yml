@@ -12,17 +12,15 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
       
-      # Fortran formatting (advisory: fprettify 0.3.7 has no --check and cannot
-      # preserve the current manual column alignment; blocking is deferred until a
-      # one-time canonical reformat. -d is diff-only; exclude legacy old/ and the
-      # regression worktrees, matching fortitude.toml.)
-      - name: Check Fortran formatting (advisory)
-        continue-on-error: true
+      # Fortran formatting (blocking, post canonical reformat). fprettify 0.3.7 has
+      # no --check, so gate on a non-empty -d diff. -d is diff-only; exclude legacy
+      # old/ and the regression worktrees, matching fortitude.toml. Default indent 3.
+      - name: Check Fortran formatting
         run: |
           diff=$(uv run fprettify -d --recursive src/ test/ -e old -e worktrees 2>&1) || true
           if [ -n "$diff" ]; then
             printf '%s\n' "$diff"
-            echo "::warning::fprettify would reformat the files above (advisory, not blocking)"
+            echo "::error::fprettify formatting drift; run: fprettify --recursive src/ test/ -e old -e worktrees"
             exit 1
           fi
 
