@@ -26,6 +26,11 @@ jobs:
             exit 1
           fi
 
+      # Fortran lint (advisory: fortitude reads fortitude.toml, incl. its excludes)
+      - name: Lint Fortran (advisory)
+        continue-on-error: true
+        run: uv run --with fortitude-lint==0.9.0 fortitude check
+
       # Python
       - name: Check Python formatting
         run: uv run ruff format --check
