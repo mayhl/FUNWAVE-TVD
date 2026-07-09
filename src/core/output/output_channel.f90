@@ -15,6 +15,17 @@
 !  Snapshot (instantaneous write) reads directly from field_registry,
 !  bypassing the accumulator.
 !
+!  File layout (all files under result_folder, which must exist and
+!  include a trailing path separator):
+!   field snapshot   <var>_NNNNN            (legacy PREVIEW naming, 5-digit
+!   field statistic  <var>_<stat>_NNNNN      flush counter starting at 1)
+!   point snapshot   <id>_<var>.dat          one row per flush: t, v(1..n)
+!   point statistic  <id>_<var>_<stat>.dat   in point order
+!  Field format follows the 'format' setting: 'ascii' writes one row of
+!  M E16.6 values per J (legacy PutFileASCII layout); 'binary' writes the
+!  raw real(SP) global interior array as a stream (Fortran order).
+!  Point files are always ASCII and are truncated at init.
+!
 !  Call order:
 !   1. init(config, grid, comm)   — after grid%setup()
 !   2. step(t, dt, registry)      — every timestep from output_manager
@@ -57,6 +68,10 @@ module core_output_channel_mod
       real(SP)                       :: t_start  = 0.0_SP
       real(SP)                       :: interval = 0.0_SP
 
+      ! Output destination and flush counter
+      character(:), allocatable :: result_folder
+      integer                   :: icount = 0
+
       ! Timing
       type(type_timing_control) :: trigger
 
@@ -84,6 +99,7 @@ contains
 
    subroutine channel_init(this, id, geom_type, variables, n_vars, &
                            statistics, n_stats, snapshot, t_start, interval, &
+                           result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm)
       class(type_output_channel), intent(inout) :: this
       character(*),    intent(in) :: id, geom_type
@@ -93,15 +109,19 @@ contains
       integer,         intent(in) :: n_stats
       logical,         intent(in) :: snapshot
       real(SP),        intent(in) :: t_start, interval
+      character(*),    intent(in) :: result_folder  ! must include trailing separator
+      character(*),    intent(in) :: format         ! 'ascii' or 'binary' (field only)
       real(SP),        intent(in) :: coords_x(*), coords_y(*)  ! global query coords
       integer,         intent(in) :: n_coords   ! n_stations or n_transect_points (0 for field)
       type(type_grid_2d), intent(in)    :: grid
       type(type_comm),    intent(inout) :: comm
 
       integer :: iv, is
+      integer, allocatable :: pids(:)
 
       this%id        = id
       this%geom_type = geom_type
+      this%format    = format
       this%snapshot  = snapshot
       this%t_start   = t_start
       this%interval  = interval
@@ -109,6 +129,8 @@ contains
       this%n_stats   = n_stats
       this%local_nx  = grid%local_nx
       this%local_ny  = grid%local_ny
+      this%result_folder = trim(result_folder)
+      this%icount    = 0
 
       this%variables(1:n_vars) = variables(1:n_vars)
       this%statistics(1:n_stats) = statistics(1:n_stats)
@@ -125,7 +147,15 @@ contains
          call this%interp%init(coords_x(1:n_coords), coords_y(1:n_coords), grid)
          this%n_local  = this%interp%n_points
          this%n_global = n_coords
-         call this%gatherer%init_points(n_coords, this%n_local, comm)
+         if (this%n_local > 0) then
+            pids = this%interp%point_id
+         else
+            allocate(pids(0))
+         end if
+         call this%gatherer%init_points(n_coords, this%n_local, comm, local_ids=pids)
+
+         ! Point files append per flush; start each run from empty files.
+         if (comm%is_io_node()) call truncate_point_files(this)
 
          ! Accumulators: (n_local, 1)
          allocate(this%accum(n_vars))
@@ -139,6 +169,7 @@ contains
       case ('field')
          this%n_local  = grid%local_nx * grid%local_ny
          this%n_global = grid%M * grid%N
+         call this%gatherer%init_field(grid, comm)
 
          ! Accumulators: (local_nx, local_ny)
          allocate(this%accum(n_vars))
@@ -170,6 +201,7 @@ contains
       if (t < this%t_start) return
 
       do_flush = this%trigger%should_trigger(t)
+      if (do_flush) this%icount = this%icount + 1
 
       ! --- Snapshot: write current field directly from registry ---
       if (do_flush .and. this%snapshot) then
@@ -221,12 +253,24 @@ contains
       real(SP), pointer,intent(in) :: fld(:,:)
       real(SP),        intent(in) :: t
       type(type_comm), intent(inout) :: comm
-      ! TODO: implement ascii write via output_gatherer
-      !   field:           MPI_Gatherv subdomains → global 2D write
-      !   station/transect: gatherer_gather_vals → sorted write
+
+      real(SP), allocatable :: local_vals(:)
+
+      select case (trim(this%geom_type))
+      case ('field')
+         associate(ng => N_GHOST, nx => this%local_nx, ny => this%local_ny)
+            call channel_flush_field(this, fld(ng+1:ng+nx, ng+1:ng+ny), &
+                                     trim(this%variables(iv)), comm)
+         end associate
+      case ('station', 'transect')
+         allocate(local_vals(this%n_local))
+         call this%interp%gather(fld, local_vals)
+         call channel_flush_points(this, local_vals, &
+                                   trim(this%variables(iv)), t, comm)
+      end select
    end subroutine channel_write_snapshot
 
-   ! Write one accumulated statistic for variable iv. Host-only I/O on IO rank.
+   ! Write all accumulated statistics for variable iv. Host-only I/O on IO rank.
    subroutine channel_write_stats(this, iv, t, comm)
       class(type_output_channel), intent(inout) :: this
       integer,         intent(in)    :: iv
@@ -234,14 +278,125 @@ contains
       type(type_comm), intent(inout) :: comm
 
       integer :: is
-      real(SP), allocatable :: stat_vals(:,:), global_vals(:)
-      ! TODO: implement ascii write
-      !   For each stat, call accum%get_stat, then gatherer/write
+      character(:), allocatable :: name
+      real(SP), allocatable :: stat_vals(:,:)
+
       do is = 1, this%n_stats
          stat_vals = this%accum(iv)%get_stat(trim(this%statistics(is)))
-         ! TODO: channel_write_field or channel_write_points depending on geom_type
+         name = trim(this%variables(iv)) // '_' // trim(this%statistics(is))
+         select case (trim(this%geom_type))
+         case ('field')
+            call channel_flush_field(this, stat_vals, name, comm)
+         case ('station', 'transect')
+            call channel_flush_points(this, stat_vals(:, 1), name, t, comm)
+         end select
       end do
    end subroutine channel_write_stats
+
+   ! Gather one field-geometry interior array and write <name>_NNNNN on IO rank.
+   subroutine channel_flush_field(this, vals, name, comm)
+      class(type_output_channel), intent(inout) :: this
+      real(SP),        intent(in)    :: vals(:,:)   ! (local_nx, local_ny)
+      character(*),    intent(in)    :: name
+      type(type_comm), intent(inout) :: comm
+
+      real(SP), allocatable :: glob(:,:)
+      character(5) :: cnt
+
+      if (comm%is_io_node()) then
+         allocate(glob(this%gatherer%M, this%gatherer%N))
+      else
+         allocate(glob(1, 1))
+      end if
+      call this%gatherer%gather_field(vals, glob, comm)
+
+      if (comm%is_io_node()) then
+         write (cnt, '(I5.5)') this%icount
+         call write_field_file(this%result_folder // name // '_' // cnt, &
+                               glob, trim(this%format))
+      end if
+   end subroutine channel_flush_field
+
+   ! Gather one point-geometry value set and append a "t, v(1..n)" row
+   ! (in point order) to <id>_<name>.dat on the IO rank.
+   subroutine channel_flush_points(this, local_vals, name, t, comm)
+      class(type_output_channel), intent(inout) :: this
+      real(SP),        intent(in)    :: local_vals(:)   ! (n_local)
+      character(*),    intent(in)    :: name
+      real(SP),        intent(in)    :: t
+      type(type_comm), intent(inout) :: comm
+
+      real(SP), allocatable :: gathered(:), sorted(:)
+      integer :: k, unit
+
+      allocate(gathered(merge(this%n_global, 1, comm%is_io_node())))
+      call this%gatherer%gather_vals(local_vals, gathered, comm)
+
+      if (comm%is_io_node()) then
+         ! Restore point order: gathered is rank-ordered.
+         allocate(sorted(this%n_global), source=0.0_SP)
+         do k = 1, this%n_global
+            sorted(this%gatherer%point_ids(k)) = gathered(k)
+         end do
+         open (newunit=unit, file=point_file_name(this, name), &
+               status='unknown', position='append', action='write')
+         write (unit, '(*(E16.6))') t, sorted
+         close (unit)
+      end if
+   end subroutine channel_flush_points
+
+   function point_file_name(this, name) result(fname)
+      class(type_output_channel), intent(in) :: this
+      character(*), intent(in) :: name
+      character(:), allocatable :: fname
+      fname = this%result_folder // trim(this%id) // '_' // trim(name) // '.dat'
+   end function point_file_name
+
+   ! Truncate all point files this channel will append to (IO rank only).
+   subroutine truncate_point_files(this)
+      class(type_output_channel), intent(in) :: this
+      integer :: iv, is, unit
+
+      do iv = 1, this%n_vars
+         if (this%snapshot) then
+            open (newunit=unit, file=point_file_name(this, trim(this%variables(iv))), &
+                  status='replace', action='write')
+            close (unit)
+         end if
+         do is = 1, this%n_stats
+            open (newunit=unit, file=point_file_name(this, &
+                  trim(this%variables(iv)) // '_' // trim(this%statistics(is))), &
+                  status='replace', action='write')
+            close (unit)
+         end do
+      end do
+   end subroutine truncate_point_files
+
+   ! Write one global interior array. ascii: one row of M E16.6 values per J
+   ! (legacy PutFileASCII layout); binary: raw real(SP) stream, Fortran order.
+   subroutine write_field_file(fname, g, format)
+      character(*), intent(in) :: fname
+      real(SP),     intent(in) :: g(:,:)
+      character(*), intent(in) :: format
+
+      integer :: j, unit
+      character(20) :: row_fmt
+
+      select case (format)
+      case ('binary')
+         open (newunit=unit, file=fname, access='stream', &
+               form='unformatted', status='replace', action='write')
+         write (unit) g
+         close (unit)
+      case default   ! 'ascii'
+         write (row_fmt, '(A,I0,A)') '(', size(g, 1), 'E16.6)'
+         open (newunit=unit, file=fname, status='replace', action='write')
+         do j = 1, size(g, 2)
+            write (unit, row_fmt) g(:, j)
+         end do
+         close (unit)
+      end select
+   end subroutine write_field_file
 
    subroutine channel_finalize(this)
       class(type_output_channel), intent(inout) :: this
@@ -254,8 +409,10 @@ contains
          end do
          deallocate(this%accum)
       end if
+      if (allocated(this%result_folder)) deallocate(this%result_folder)
       this%n_vars = 0
       this%n_stats = 0
+      this%icount = 0
    end subroutine channel_finalize
 
 end module core_output_channel_mod

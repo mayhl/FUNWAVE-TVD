@@ -1,0 +1,273 @@
+! allow(E001)
+module test_output_channel
+
+   use mpi_f08
+   use pFUnit
+   use core_constants_mod,       only: SP, N_GHOST
+   use core_comm_mod,            only: type_comm, new_comm
+   use core_grid_mod,            only: type_grid_2d
+   use core_field_registry_mod,  only: type_field_registry
+   use core_output_channel_mod,  only: type_output_channel
+   implicit none
+
+   integer, parameter :: TEST_M = 8
+   integer, parameter :: TEST_N = 4
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! 8x4 global grid split 2x1 in x: rank 0 owns i=1..4, rank 1 owns i=5..8.
+   ! Node (ig, jg) sits at x = ig-1, y = jg-1.
+   subroutine open_grid(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M       = TEST_M
+      grid%N       = TEST_N
+      grid%nx_proc = 2
+      grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+   end subroutine open_grid
+
+   ! Fill the interior of a ghost-inclusive field with 2*x + 3*y
+   ! (linear, so bilinear interpolation reproduces it exactly).
+   subroutine fill_linear(grid, fld)
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP),           intent(inout) :: fld(:,:)
+      integer  :: i, j
+      real(SP) :: x, y
+
+      do j = 1, grid%local_ny
+         do i = 1, grid%local_nx
+            x = real(grid%ibegin + i - 2, SP)
+            y = real(grid%jbegin + j - 2, SP)
+            fld(N_GHOST + i, N_GHOST + j) = 2.0_SP*x + 3.0_SP*y
+         end do
+      end do
+   end subroutine fill_linear
+
+   subroutine alloc_field(grid, fld)
+      type(type_grid_2d),    intent(in)    :: grid
+      real(SP), allocatable, intent(inout) :: fld(:,:)
+      allocate(fld(grid%local_nx + 2*N_GHOST, grid%local_ny + 2*N_GHOST), &
+               source=0.0_SP)
+   end subroutine alloc_field
+
+   ! ----------------------------------------------------------------
+   ! field snapshot, ascii: eta_00001 holds the assembled global
+   ! interior, one row of M values per J
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_snapshot_ascii(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), row(TEST_M), x, y
+      integer  :: i, j, unit
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='snap_f', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='ascii', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm)
+
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+
+      if (comm%is_io_node()) then
+         open (newunit=unit, file='./eta_00001', status='old', action='read')
+         do j = 1, TEST_N
+            read (unit, *) row
+            do i = 1, TEST_M
+               x = real(i - 1, SP)
+               y = real(j - 1, SP)
+               @assertEqual(2.0_SP*x + 3.0_SP*y, row(i), tolerance=1e-4_SP)
+            end do
+         end do
+         close (unit, status='delete')
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_snapshot_ascii
+
+   ! ----------------------------------------------------------------
+   ! field snapshot, binary: raw real(SP) stream of the (M, N) global
+   ! interior array in Fortran order
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_snapshot_binary(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), x, y
+      integer  :: i, j, unit
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='snap_b', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='binary', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm)
+
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+
+      if (comm%is_io_node()) then
+         open (newunit=unit, file='./eta_00001', access='stream', &
+               form='unformatted', status='old', action='read')
+         read (unit) glob
+         close (unit, status='delete')
+         do j = 1, TEST_N
+            do i = 1, TEST_M
+               x = real(i - 1, SP)
+               y = real(j - 1, SP)
+               @assertEqual(2.0_SP*x + 3.0_SP*y, glob(i,j), tolerance=1e-6_SP)
+            end do
+         end do
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_snapshot_binary
+
+   ! ----------------------------------------------------------------
+   ! station snapshot: values land in point order (point 1 lives on
+   ! rank 1, point 2 on rank 0 — exercises the point_id re-sort),
+   ! one "t v1 v2" row appended per flush
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_station_snapshot(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(2), cy(2), tval, v1, v2
+      integer  :: unit
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      ! point 1 at (5, 2) -> rank 1; point 2 at (2, 1) -> rank 0
+      cx = [5.0_SP, 2.0_SP]
+      cy = [2.0_SP, 1.0_SP]
+      vars(1) = 'eta';  stats(1) = ''
+      call ch%init(id='sta', geom_type='station', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='ascii', &
+                   coords_x=cx, coords_y=cy, n_coords=2, grid=grid, comm=comm)
+
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+
+      if (comm%is_io_node()) then
+         open (newunit=unit, file='./sta_eta.dat', status='old', action='read')
+         read (unit, *) tval, v1, v2
+         @assertEqual(0.0_SP, tval, tolerance=1e-6_SP)
+         @assertEqual(2.0_SP*5.0_SP + 3.0_SP*2.0_SP, v1, tolerance=1e-4_SP)
+         @assertEqual(2.0_SP*2.0_SP + 3.0_SP*1.0_SP, v2, tolerance=1e-4_SP)
+         read (unit, *) tval, v1, v2
+         @assertEqual(1.0_SP, tval, tolerance=1e-6_SP)
+         close (unit, status='delete')
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_station_snapshot
+
+   ! ----------------------------------------------------------------
+   ! field mean statistic: two accumulation windows; the second window
+   ! averages two equal-dt samples -> (B + C) / 2 in eta_mean_00002
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_mean(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), row(TEST_M)
+      integer  :: j, unit
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = 'mean'
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='avg_f', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=1, snapshot=.false., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='ascii', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm)
+
+      eta = 2.0_SP
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = 4.0_SP
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      eta = 8.0_SP
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+
+      if (comm%is_io_node()) then
+         ! window 1: single sample at t=0
+         open (newunit=unit, file='./eta_mean_00001', status='old', action='read')
+         read (unit, *) row
+         close (unit, status='delete')
+         @assertEqual(2.0_SP, row(1), tolerance=1e-4_SP)
+
+         ! window 2: samples 4 and 8 with equal dt
+         open (newunit=unit, file='./eta_mean_00002', status='old', action='read')
+         do j = 1, TEST_N
+            read (unit, *) row
+         end do
+         close (unit, status='delete')
+         @assertEqual(6.0_SP, row(TEST_M), tolerance=1e-4_SP)
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_mean
+
+end module test_output_channel
