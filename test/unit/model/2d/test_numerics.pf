@@ -1,0 +1,126 @@
+! allow(E001)
+module test_numerics
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP, GRAV
+   use core_grid_mod, only: type_grid_2d
+   use model_numerics_mod, only: type_model_numerics
+
+   implicit none
+
+   integer, parameter :: TEST_M = 16
+   integer, parameter :: TEST_N = 8
+
+   real(SP), parameter :: DX_SP = 2.0_SP
+   real(SP), parameter :: DEPTH_SP = 10.0_SP
+   real(SP), parameter :: CFL_SP = 0.5_SP
+   real(SP), parameter :: FAST_U = 5.0_SP
+   real(SP), parameter :: TOL_SP = 1.0e-6_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine open_grid(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 2; grid%ny_proc = 2
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+   end subroutine open_grid
+
+   ! ----------------------------------------------------------------
+   ! Still water: dt = CFL * dx / sqrt(g h), identical on all ranks.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_dt_still_water(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm) :: comm
+      type(type_model_numerics) :: num
+      real(SP), allocatable :: u(:, :), v(:, :), h(:, :)
+      real(SP) :: dt
+
+      call open_grid(this, grid, comm)
+      num%CFL = CFL_SP
+      num%MinDepthFrc = 0.1_SP
+
+      allocate (u(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (v(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (h(grid%lp%mloc, grid%lp%nloc), source=DEPTH_SP)
+
+      call num%estimate_dt(grid, u, v, h, fixed_dt=.false., dt_fixed=0.0_SP, dt=dt)
+
+      @assertEqual(CFL_SP*DX_SP/sqrt(GRAV*DEPTH_SP), dt, TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_dt_still_water
+
+   ! ----------------------------------------------------------------
+   ! One rank carries a fast current — its limit reaches every rank
+   ! through the allreduce.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_dt_global_min(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm) :: comm
+      type(type_model_numerics) :: num
+      real(SP), allocatable :: u(:, :), v(:, :), h(:, :)
+      real(SP) :: dt
+
+      call open_grid(this, grid, comm)
+      num%CFL = CFL_SP
+      num%MinDepthFrc = 0.1_SP
+
+      allocate (u(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (v(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (h(grid%lp%mloc, grid%lp%nloc), source=DEPTH_SP)
+
+      if (comm%rank_id == 0) u(grid%lp%ib, grid%lp%jb) = FAST_U
+
+      call num%estimate_dt(grid, u, v, h, fixed_dt=.false., dt_fixed=0.0_SP, dt=dt)
+
+      @assertEqual(CFL_SP*DX_SP/(FAST_U + sqrt(GRAV*DEPTH_SP)), dt, TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_dt_global_min
+
+   ! ----------------------------------------------------------------
+   ! Fixed dt snaps down by halving until it satisfies the CFL bound.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_dt_fixed_halving(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm) :: comm
+      type(type_model_numerics) :: num
+      real(SP), allocatable :: u(:, :), v(:, :), h(:, :)
+      real(SP) :: dt, dt_cfl, dt_fix
+
+      call open_grid(this, grid, comm)
+      num%CFL = CFL_SP
+      num%MinDepthFrc = 0.1_SP
+
+      allocate (u(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (v(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (h(grid%lp%mloc, grid%lp%nloc), source=DEPTH_SP)
+
+      dt_cfl = CFL_SP*DX_SP/sqrt(GRAV*DEPTH_SP)
+      dt_fix = 3.0_SP*dt_cfl
+
+      call num%estimate_dt(grid, u, v, h, fixed_dt=.true., dt_fixed=dt_fix, dt=dt)
+
+      ! 3*dt_cfl -> /2 = 1.5*dt_cfl -> /2 = 0.75*dt_cfl <= dt_cfl
+      @assertEqual(0.75_SP*dt_cfl, dt, TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_dt_fixed_halving
+
+end module test_numerics
