@@ -1,0 +1,210 @@
+! allow(E001)
+module test_geometry
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod,       only: type_comm, new_comm
+   use core_constants_mod,  only: SP, N_GHOST
+   use core_grid_mod,       only: type_grid_2d
+   use model_geometry_mod,  only: type_model_geometry
+
+   implicit none
+
+   ! 16 columns across 4 ranks in x; 4 rows
+   integer, parameter :: TEST_M = 16
+   integer, parameter :: TEST_N = 4
+   integer, parameter :: NG     = N_GHOST
+
+   ! Module-level SP literals (gfortran 15 kind-suffix quirk, see test_sponge)
+   real(SP), parameter :: DX_SP    = 1.0_SP
+   real(SP), parameter :: DEPTH_SP = 10.0_SP
+   real(SP), parameter :: SLOPE_SP = 0.1_SP
+   real(SP), parameter :: XSLP_SP  = 4.0_SP
+   real(SP), parameter :: HALF_SP  = 0.5_SP
+   real(SP), parameter :: THREE_SP = 3.0_SP
+   real(SP), parameter :: TOL_SP   = 1.0e-6_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_geom(geom, bathy_type)
+      type(type_model_geometry), intent(inout) :: geom
+      character(*),              intent(in)    :: bathy_type
+      geom%dx = DX_SP;  geom%dy = DX_SP
+      geom%grid_nx = TEST_M;  geom%grid_ny = TEST_N
+      geom%nx_proc = 4;  geom%ny_proc = 1
+      geom%bathy_type     = bathy_type
+      geom%bathy_depth    = DEPTH_SP
+      geom%bathy_slope    = SLOPE_SP
+      geom%bathy_slope_x0 = XSLP_SP
+   end subroutine make_geom
+
+   ! Analytic depth at global interior index gi (legacy SLO branch)
+   function slope_depth(gi) result(d)
+      integer, intent(in) :: gi
+      real(SP) :: d
+      integer  :: i_slp
+      i_slp = int(XSLP_SP / DX_SP) + 1
+      if (gi >= i_slp) then
+         d = DEPTH_SP - SLOPE_SP * real(gi - i_slp, SP) * DX_SP
+      else
+         d = DEPTH_SP
+      end if
+   end function slope_depth
+
+   ! ----------------------------------------------------------------
+   ! build_grid: explicit decomposition, dims, spacing
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_build_grid_explicit_decomp(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_geometry) :: geom
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      call make_geom(geom, 'flat')
+
+      call geom%build_grid(comm, grid, periodic_y=.false.)
+
+      @assertEqual(TEST_M, grid%M)
+      @assertEqual(4, grid%nx_proc)
+      @assertEqual(1, grid%ny_proc)
+      @assertEqual(4, grid%local_nx)
+      @assertEqual(TEST_N, grid%local_ny)
+      @assertEqual(DX_SP, grid%dx0, TOL_SP)
+      ! global x of first interior cell on this rank: (ibegin-1)*dx
+      @assertEqual(real(grid%ibegin - 1, SP) * DX_SP, grid%x(1,1), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_build_grid_explicit_decomp
+
+   ! ----------------------------------------------------------------
+   ! init_depth flat: uniform everywhere including ghosts and faces
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_init_depth_flat(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_geometry) :: geom
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      real(SP), allocatable :: depth(:,:), depth_x(:,:), depth_y(:,:)
+
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      call make_geom(geom, 'flat')
+      call geom%build_grid(comm, grid, periodic_y=.false.)
+
+      allocate(depth  (grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(depth_x(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(depth_y(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
+      call geom%init_depth(grid, depth, depth_x, depth_y)
+
+      @assertEqual(DEPTH_SP, minval(depth),   TOL_SP)
+      @assertEqual(DEPTH_SP, maxval(depth),   TOL_SP)
+      @assertEqual(DEPTH_SP, minval(depth_x), TOL_SP)
+      @assertEqual(DEPTH_SP, maxval(depth_x), TOL_SP)
+      @assertEqual(DEPTH_SP, minval(depth_y), TOL_SP)
+      @assertEqual(DEPTH_SP, maxval(depth_y), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_init_depth_flat
+
+   ! ----------------------------------------------------------------
+   ! init_depth slope: interior matches the legacy global-index
+   ! formula; interior-rank x-ghosts are the analytic continuation
+   ! (halo); physical-boundary ghosts are mirrors; faces are centred.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_init_depth_slope(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_geometry) :: geom
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      real(SP), allocatable :: depth(:,:), depth_x(:,:), depth_y(:,:)
+      integer :: i, j, k, gi
+
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      call make_geom(geom, 'slope')
+      call geom%build_grid(comm, grid, periodic_y=.false.)
+
+      allocate(depth  (grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(depth_x(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(depth_y(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
+      call geom%init_depth(grid, depth, depth_x, depth_y)
+
+      associate (lp => grid%lp)
+
+      ! interior + any ghost whose global index is inside the domain
+      do j = lp%jb, lp%je
+         do i = 1, lp%mloc
+            gi = grid%ibegin + (i - lp%ib)
+            if (gi >= 1 .and. gi <= TEST_M) then
+               @assertEqual(slope_depth(gi), depth(i,j), TOL_SP)
+            end if
+         end do
+      end do
+
+      ! physical west mirror on the first rank
+      if (grid%is_back_boundary) then
+         do j = lp%jb, lp%je
+            do k = 1, NG
+               @assertEqual(depth(2*NG + 1 - k, j), depth(k, j), TOL_SP)
+            end do
+         end do
+      end if
+
+      ! south mirror (ny_proc=1, non-periodic)
+      do k = 1, NG
+         @assertEqual(depth(lp%ib, 2*NG + 1 - k), depth(lp%ib, k), TOL_SP)
+      end do
+
+      ! centred face and one-sided low edge
+      i = lp%ib + 1;  j = lp%jb
+      @assertEqual(HALF_SP*(depth(i-1,j) + depth(i,j)), depth_x(i,j), TOL_SP)
+      @assertEqual(HALF_SP*(THREE_SP*depth(1,j) - depth(2,j)), depth_x(1,j), TOL_SP)
+
+      end associate
+
+      call dummy_fix_lint()
+   end subroutine test_init_depth_slope
+
+   ! ----------------------------------------------------------------
+   ! periodic_y: no rank reports a y-boundary; y-ghosts filled by wrap
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_periodic_y_flags(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_geometry) :: geom
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      real(SP), allocatable :: depth(:,:), depth_x(:,:), depth_y(:,:)
+      integer :: k
+
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      call make_geom(geom, 'slope')
+      call geom%build_grid(comm, grid, periodic_y=.true.)
+
+      @assertFalse(grid%is_left_boundary)
+      @assertFalse(grid%is_right_boundary)
+
+      allocate(depth  (grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(depth_x(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(depth_y(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
+      call geom%init_depth(grid, depth, depth_x, depth_y)
+
+      ! wrap: south ghosts equal the top interior rows
+      associate (lp => grid%lp)
+      do k = 1, NG
+         @assertEqual(depth(lp%ib, lp%je - NG + k), depth(lp%ib, k), TOL_SP)
+      end do
+      end associate
+
+      call dummy_fix_lint()
+   end subroutine test_periodic_y_flags
+
+end module test_geometry

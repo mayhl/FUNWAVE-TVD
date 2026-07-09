@@ -31,10 +31,13 @@
 
 module model_geometry_mod
    use core_constants_mod, only: SP
+   use core_comm_mod, only: type_comm
    use core_env_mod, only: type_env, get_sub_env
+   use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
+   use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR
 
    implicit none
 
@@ -74,6 +77,8 @@ module model_geometry_mod
 
    contains
       procedure :: read_input => geometry_read_input
+      procedure :: build_grid => geometry_build_grid
+      procedure :: init_depth => geometry_init_depth
    end type type_model_geometry
 
 contains
@@ -157,5 +162,113 @@ contains
       end select
 
    end subroutine geometry_read_input
+
+   ! ----------------------------------------------------------------
+   ! Build the distributed grid from the parsed geometry config:
+   ! decomposition (explicit or auto), cart topology, uniform spacing.
+   ! periodic_y comes from physics%periodic (legacy PERIODIC, y only).
+   ! Config validity is checked at read_input; the guards here are
+   ! unimplemented-feature stops, not user-error handling.
+   ! ----------------------------------------------------------------
+   subroutine geometry_build_grid(this, comm, grid, periodic_y)
+      class(type_model_geometry), intent(in)    :: this
+      type(type_comm),            intent(in)    :: comm
+      type(type_grid_2d),         intent(inout) :: grid
+      logical,                    intent(in)    :: periodic_y
+
+      logical :: create_partition
+
+      if (trim(this%bathy_type) == 'file') then
+         error stop 'geometry: file bathymetry grid build not yet implemented in new path'
+      end if
+      if (allocated(this%dx_file)) then
+         error stop 'geometry: variable spacing not yet implemented in new path'
+      end if
+
+      grid%M = this%grid_nx
+      grid%N = this%grid_ny
+
+      create_partition = (this%nx_proc <= 0)
+      if (.not. create_partition) then
+         if (this%nx_proc * this%ny_proc /= comm%size) then
+            error stop 'geometry/decomposition: nx_proc*ny_proc must equal MPI size'
+         end if
+         grid%nx_proc = this%nx_proc
+         grid%ny_proc = this%ny_proc
+      end if
+
+      call grid%setup(comm, create_partition, periodic_y=periodic_y)
+      call grid%init_spacing(this%dx, this%dy, this%x0, this%y0)
+
+   end subroutine geometry_build_grid
+
+   ! ----------------------------------------------------------------
+   ! Fill still-water depth and face-staggered depths (ghost-inclusive
+   ! arrays, fields_alloc layout).  Ports legacy init.F:
+   !   interior:  flat  $d_i = d_0$, or slope (legacy io.F SLO branch)
+   !              $$ d_i = d_0 - s\,(i - i_{slp})\,\Delta x, \quad
+   !                 i \ge i_{slp} = \lfloor x_{slp}/\Delta x \rfloor + 1 $$
+   !              with $d_i = d_0$ shoreward of $i_{slp}$ (global index);
+   !   ghosts:    MPI halo exchange, then wall-mirror at physical
+   !              boundaries (PHI_COLL VTYPE=1); y wraps when the cart
+   !              topology is periodic;
+   !   staggering: centred faces
+   !              $$ d_{i-1/2} = \tfrac{1}{2}(d_{i-1} + d_i) $$
+   !              one-sided extrapolation at the low array edge
+   !              $$ d_{1/2} = \tfrac{1}{2}(3 d_1 - d_2) $$
+   ! depth_x/depth_y are (mloc,nloc): the legacy Mloc1/Nloc1 high-edge
+   ! face is dropped — kernels read faces up to ie+1/je+1 <= mloc/nloc.
+   ! Legacy WaterLevel offset is not yet in the YAML schema (assumed 0).
+   ! ----------------------------------------------------------------
+   subroutine geometry_init_depth(this, grid, depth, depth_x, depth_y)
+      class(type_model_geometry), intent(in)    :: this
+      type(type_grid_2d),         intent(in)    :: grid
+      real(SP),                   intent(inout) :: depth(:,:), depth_x(:,:), depth_y(:,:)
+
+      integer :: i, j, gi, i_slp
+
+      associate (lp => grid%lp)
+
+      select case (trim(this%bathy_type))
+      case ('flat')
+         depth = this%bathy_depth
+      case ('slope')
+         i_slp = int(this%bathy_slope_x0 / this%dx) + 1
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               gi = grid%ibegin + (i - lp%ib)
+               if (gi >= i_slp) then
+                  depth(i, j) = this%bathy_depth - this%bathy_slope * real(gi - i_slp, SP) * this%dx
+               else
+                  depth(i, j) = this%bathy_depth
+               end if
+            end do
+         end do
+      case default
+         error stop 'geometry: init_depth supports flat and slope only'
+      end select
+
+      call grid%halo_exchange(depth)
+      call fill_ghost_wall(lp, grid%is_back_boundary, grid%is_shore_boundary, &
+                           grid%is_right_boundary, grid%is_left_boundary, &
+                           SIGN_MIRROR, SIGN_MIRROR, depth)
+
+      do j = 1, lp%nloc
+         do i = 2, lp%mloc
+            depth_x(i, j) = 0.5_SP * (depth(i - 1, j) + depth(i, j))
+         end do
+         depth_x(1, j) = 0.5_SP * (3.0_SP * depth(1, j) - depth(2, j))
+      end do
+
+      do j = 2, lp%nloc
+         do i = 1, lp%mloc
+            depth_y(i, j) = 0.5_SP * (depth(i, j - 1) + depth(i, j))
+         end do
+      end do
+      depth_y(:, 1) = 0.5_SP * (3.0_SP * depth(:, 1) - depth(:, 2))
+
+      end associate
+
+   end subroutine geometry_init_depth
 
 end module model_geometry_mod
