@@ -1,0 +1,180 @@
+! allow(E001)
+module test_bc
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP, N_GHOST
+   use core_grid_mod, only: type_grid_2d
+   use model_bc_mod, only: type_model_bc
+   use model_fields_2d_mod, only: type_fields_2d
+
+   implicit none
+
+   integer, parameter :: TEST_M = 16
+   integer, parameter :: TEST_N = 8
+   integer, parameter :: NG = N_GHOST
+
+   real(SP), parameter :: DX_SP = 1.0_SP
+   real(SP), parameter :: TOL_SP = 1.0e-6_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine open_state(this, grid, comm, fields, periodic_y)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
+      type(type_fields_2d), intent(inout) :: fields
+      logical, intent(in) :: periodic_y
+      integer :: i, j, gi, gj
+
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 2; grid%ny_proc = 2
+      call grid%setup(comm, create_partition=.false., periodic_y=periodic_y)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+      call fields%alloc(grid)
+
+      ! unique interior values keyed by global index; ghosts poisoned
+      fields%eta = -999.0_SP
+      fields%u = -999.0_SP
+      fields%v = -999.0_SP
+      do j = grid%lp%jb, grid%lp%je
+         do i = grid%lp%ib, grid%lp%ie
+            gi = grid%ibegin + (i - grid%lp%ib)
+            gj = grid%jbegin + (j - grid%lp%jb)
+            fields%eta(i, j) = real(100*gi + gj, SP)
+            fields%u(i, j) = real(100*gi + gj, SP) + 0.25_SP
+            fields%v(i, j) = real(100*gi + gj, SP) + 0.5_SP
+         end do
+      end do
+      fields%p = fields%u
+      fields%q = fields%v
+      fields%mask = 1
+
+   end subroutine open_state
+
+   ! ----------------------------------------------------------------
+   ! Walls everywhere: eta mirrors, u antisymmetric at x-walls,
+   ! v antisymmetric at y-walls; halo ghosts continue the global
+   ! numbering across rank seams.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_exchange_state_walls(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm) :: comm
+      type(type_fields_2d) :: fields
+      type(type_model_bc) :: bc
+      integer :: k, j, gj
+
+      call open_state(this, grid, comm, fields, periodic_y=.false.)
+      call bc%init(grid, "INI_SOLITARY")
+      call bc%exchange_state(grid, fields)
+
+      associate (lp => grid%lp)
+
+      ! halo continuity across an interior x-seam: ghost columns carry
+      ! the neighbour's global-keyed values
+      if (.not. grid%is_back_boundary) then
+         j = lp%jb
+         gj = grid%jbegin
+         do k = 1, NG
+            @assertEqual(real(100*(grid%ibegin - k) + gj, SP), fields%eta(lp%ib - k, j), TOL_SP)
+         end do
+      end if
+
+      ! physical west wall: eta mirror, u antisymmetric
+      if (grid%is_back_boundary) then
+         j = lp%jb
+         do k = 1, NG
+            @assertEqual(fields%eta(2*NG + 1 - k, j), fields%eta(k, j), TOL_SP)
+            @assertEqual(-fields%u(2*NG + 1 - k, j), fields%u(k, j), TOL_SP)
+            @assertEqual(fields%v(2*NG + 1 - k, j), fields%v(k, j), TOL_SP)
+         end do
+      end if
+
+      ! physical south wall: v antisymmetric, eta mirror
+      if (grid%is_right_boundary) then
+         do k = 1, NG
+            @assertEqual(fields%eta(lp%ib, 2*NG + 1 - k), fields%eta(lp%ib, k), TOL_SP)
+            @assertEqual(-fields%v(lp%ib, 2*NG + 1 - k), fields%v(lp%ib, k), TOL_SP)
+         end do
+      end if
+
+      end associate
+
+      call dummy_fix_lint()
+   end subroutine test_exchange_state_walls
+
+   ! ----------------------------------------------------------------
+   ! periodic_y: y-ghosts wrap the global numbering instead of
+   ! mirroring — check on a y-boundary rank.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_exchange_state_periodic_y(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm) :: comm
+      type(type_fields_2d) :: fields
+      type(type_model_bc) :: bc
+      integer :: k, gi, gj_wrap
+
+      call open_state(this, grid, comm, fields, periodic_y=.true.)
+      call bc%init(grid, "INI_SOLITARY")
+
+      @assertFalse(grid%is_left_boundary)
+      @assertFalse(grid%is_right_boundary)
+
+      call bc%exchange_state(grid, fields)
+
+      associate (lp => grid%lp)
+      ! south ghosts on the globally-lowest row wrap to the top rows
+      if (grid%jbegin == 1) then
+         gi = grid%ibegin
+         do k = 1, NG
+            gj_wrap = TEST_N - k + 1
+            @assertEqual(real(100*gi + gj_wrap, SP), fields%eta(lp%ib, lp%jb - k), TOL_SP)
+         end do
+      end if
+      end associate
+
+      call dummy_fix_lint()
+   end subroutine test_exchange_state_periodic_y
+
+   ! ----------------------------------------------------------------
+   ! Wavemaker-owned west face: no mirror written there; dry-cell
+   ! masking zeroes velocities.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_west_exempt_and_mask(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm) :: comm
+      type(type_fields_2d) :: fields
+      type(type_model_bc) :: bc
+
+      call open_state(this, grid, comm, fields, periodic_y=.false.)
+      call bc%init(grid, "ABS")
+
+      ! one dry interior cell
+      fields%mask(grid%lp%ib + 1, grid%lp%jb + 1) = 0
+
+      call bc%exchange_state(grid, fields)
+
+      if (grid%is_back_boundary) then
+         @assertFalse(bc%fill_west)
+         ! west ghosts keep the poison value — nothing wrote them
+         @assertEqual(-999.0_SP, fields%eta(1, grid%lp%jb), TOL_SP)
+      end if
+
+      @assertEqual(0.0_SP, fields%u(grid%lp%ib + 1, grid%lp%jb + 1), TOL_SP)
+      @assertEqual(0.0_SP, fields%q(grid%lp%ib + 1, grid%lp%jb + 1), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_west_exempt_and_mask
+
+end module test_bc

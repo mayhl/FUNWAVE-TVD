@@ -11,6 +11,7 @@ target_sources(${main_lib}_model PRIVATE
    kernel_etauv.f90
    kernel_sources.f90
    geometry.f90
+   bc.f90
    simulation.f90
    hotstart.f90
    wavemaker.f90
