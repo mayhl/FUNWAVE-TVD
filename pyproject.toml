@@ -89,12 +89,9 @@ dev = [
 [tool.ruff.lint.isort]
 known-first-party = ["test"]
 
-[tool.fprettify]
-indent = 2
-whitespace = 2
-max-line-length = 132
-recursive = true
-
+# NOTE: cmake-format and shfmt do NOT read pyproject.toml; these tables are inert.
+# The live settings are the CLI args in .pre-commit-config.yaml. Kept here only to
+# record intent until wired via each tool's own config (-c / .cmake-format / etc.).
 [tool.cmake-format]
 line_width = 132
 tab_size = 2
