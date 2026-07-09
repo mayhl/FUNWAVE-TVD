@@ -11,13 +11,13 @@ module core_units_mod
    ! Global registry of supported units
    type(type_unit), parameter, public :: &
       UNIT_REGISTRY(*) = [ &
-      type_unit('sec', 'time', 1.0_SP), &
-      type_unit('min', 'time', 60.0_SP), &
-      type_unit('hour', 'time', 3600.0_SP), &
-      type_unit('hertz', 'time', 1.0_SP), &
-      type_unit('m', 'length', 1.0_SP), &
-      type_unit('cm', 'length', 0.01_SP), &
-      type_unit('km', 'length', 1000.0_SP)]
+      type_unit("sec", "time", 1.0_SP), &
+      type_unit("min", "time", 60.0_SP), &
+      type_unit("hour", "time", 3600.0_SP), &
+      type_unit("hertz", "time", 1.0_SP), &
+      type_unit("m", "length", 1.0_SP), &
+      type_unit("cm", "length", 0.01_SP), &
+      type_unit("km", "length", 1000.0_SP)]
 
 contains
 
@@ -79,7 +79,7 @@ contains
 
       if (allocated(err)) deallocate (err)
 
-      if (trim(unit_str) == 'hertz') then
+      if (trim(unit_str) == "hertz") then
          converted_val = 1.0_SP/val
       else
          converted_val = val*factor

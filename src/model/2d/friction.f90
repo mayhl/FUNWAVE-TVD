@@ -69,14 +69,14 @@ contains
       type(type_env) :: sub_env
       logical :: no_fr, no_key
 
-      sub_env = get_sub_env(env, 'friction', is_empty=no_fr)
+      sub_env = get_sub_env(env, "friction", is_empty=no_fr)
       this%is_activated = .not. no_fr
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('friction_matrix', val=this%friction_matrix, default=DEF_FRICTION_FRICTION_MATRIX)
-      call sub_env%yaml%read_input_path('friction_file', silent=this%no_cd_file, val=this%cd_file)
-      call sub_env%yaml%read('manning', silent=no_key, val=this%manning, default=DEF_FRICTION_MANNING)
-      call sub_env%yaml%read('Cd', silent=no_key, val=this%Cd_fixed, default=DEF_FRICTION_CD)
+      call sub_env%yaml%read("friction_matrix", val=this%friction_matrix, default=DEF_FRICTION_FRICTION_MATRIX)
+      call sub_env%yaml%read_input_path("friction_file", silent=this%no_cd_file, val=this%cd_file)
+      call sub_env%yaml%read("manning", silent=no_key, val=this%manning, default=DEF_FRICTION_MANNING)
+      call sub_env%yaml%read("Cd", silent=no_key, val=this%Cd_fixed, default=DEF_FRICTION_CD)
 
    end subroutine friction_read_input
 

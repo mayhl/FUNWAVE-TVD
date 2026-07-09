@@ -50,11 +50,11 @@ module model_output_mod
    public :: type_channel_config, type_model_output
 
    character(len=10), parameter :: GEOM_TYPES(3) = &
-      [character(len=10) :: 'field', 'station', 'transect']
+      [character(len=10) :: "field", "station", "transect"]
    character(len=8), parameter :: STAT_TYPES(4) = &
-      [character(len=8) :: 'min', 'max', 'mean', 'rms']
+      [character(len=8) :: "min", "max", "mean", "rms"]
    character(len=8), parameter :: FORMAT_TYPES(1) = &
-      [character(len=8) :: 'ascii']
+      [character(len=8) :: "ascii"]
 
    type :: type_channel_config
       character(:), allocatable :: id
@@ -146,69 +146,69 @@ contains
       logical :: is_empty, no_key, no_vars
 
       ! Initialize string fields before possible early return so io.F always gets valid values
-      this%result_folder = './output/'
-      this%field_io_type = 'ASCII'
-      this%stations_file = ''
+      this%result_folder = "./output/"
+      this%field_io_type = "ASCII"
+      this%stations_file = ""
 
-      sub_env = get_sub_env(env, 'output', is_empty)
+      sub_env = get_sub_env(env, "output", is_empty)
       this%is_activated = .not. is_empty
       this%n_channels = 0
       if (allocated(this%channels)) deallocate(this%channels)
       if (is_empty) return
 
-      call sub_env%yaml%read('result_folder',         val=this%result_folder,       default=DEF_OUTPUT_RESULT_FOLDER)
-      call sub_env%yaml%read('field_io_type',         val=this%field_io_type,       default=DEF_OUTPUT_FIELD_IO_TYPE)
-      call sub_env%yaml%read('number_stations',       val=this%number_stations,     default=DEF_OUTPUT_NUMBER_STATIONS)
+      call sub_env%yaml%read("result_folder",         val=this%result_folder,       default=DEF_OUTPUT_RESULT_FOLDER)
+      call sub_env%yaml%read("field_io_type",         val=this%field_io_type,       default=DEF_OUTPUT_FIELD_IO_TYPE)
+      call sub_env%yaml%read("number_stations",       val=this%number_stations,     default=DEF_OUTPUT_NUMBER_STATIONS)
       if (this%number_stations > 0) then
-         call sub_env%yaml%read('stations_file', val=this%stations_file, default='')
+         call sub_env%yaml%read("stations_file", val=this%stations_file, default="")
       end if
-      call sub_env%yaml%read('output_res', val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
-      call sub_env%yaml%read('EtaBlowVal',             silent=no_key, val=this%EtaBlowVal,  default=DEF_OUTPUT_ETABLOWVAL)
-      call sub_env%yaml%read('depth_out',             val=this%depth_out,            default=DEF_OUTPUT_DEPTH_OUT)
-      call sub_env%yaml%read('T_INTV_mean',           silent=no_key, val=this%T_INTV_mean, default=DEF_OUTPUT_T_INTV_MEAN)
-      call sub_env%yaml%read('STEADY_TIME',           silent=no_key, val=this%STEADY_TIME,  default=DEF_OUTPUT_STEADY_TIME)
+      call sub_env%yaml%read("output_res", val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
+      call sub_env%yaml%read("EtaBlowVal",             silent=no_key, val=this%EtaBlowVal,  default=DEF_OUTPUT_ETABLOWVAL)
+      call sub_env%yaml%read("depth_out",             val=this%depth_out,            default=DEF_OUTPUT_DEPTH_OUT)
+      call sub_env%yaml%read("T_INTV_mean",           silent=no_key, val=this%T_INTV_mean, default=DEF_OUTPUT_T_INTV_MEAN)
+      call sub_env%yaml%read("STEADY_TIME",           silent=no_key, val=this%STEADY_TIME,  default=DEF_OUTPUT_STEADY_TIME)
 
-      call sub_env%yaml%read_string_array('variables', silent=no_vars, val=var_list)
+      call sub_env%yaml%read_string_array("variables", silent=no_vars, val=var_list)
       if (.not. no_vars) then
          do iv = 1, size(var_list)
             select case (trim(var_list(iv)%s))
-            case ('U');          this%OUT_U          = .true.
-            case ('V');          this%OUT_V          = .true.
-            case ('ETA');        this%OUT_ETA        = .true.
-            case ('ETAscreen');  this%OUT_EtaScreen  = .true.
-            case ('Hmax');       this%OUT_Hmax       = .true.
-            case ('Hmin');       this%OUT_Hmin       = .true.
-            case ('Umax');       this%OUT_Umax       = .true.
-            case ('MFmax');      this%OUT_MFmax      = .true.
-            case ('VORmax');     this%OUT_VORmax     = .true.
-            case ('MASK');       this%OUT_MASK       = .true.
-            case ('MASK9');      this%OUT_MASK9      = .true.
-            case ('Umean');      this%OUT_Umean      = .true.
-            case ('Vmean');      this%OUT_Vmean      = .true.
-            case ('ETAmean');    this%OUT_ETAmean    = .true.
-            case ('WaveHeight'); this%OUT_WaveHeight = .true.
-            case ('SXL');        this%OUT_SXL        = .true.
-            case ('SXR');        this%OUT_SXR        = .true.
-            case ('SYL');        this%OUT_SYL        = .true.
-            case ('SYR');        this%OUT_SYR        = .true.
-            case ('SourceX');    this%OUT_SourceX    = .true.
-            case ('SourceY');    this%OUT_SourceY    = .true.
-            case ('FrcX');       this%OUT_FrcX       = .true.
-            case ('FrcY');       this%OUT_FrcY       = .true.
-            case ('BrkdisX');    this%OUT_BrkdisX    = .true.
-            case ('BrkdisY');    this%OUT_BrkdisY    = .true.
-            case ('P');          this%OUT_P          = .true.
-            case ('Q');          this%OUT_Q          = .true.
-            case ('Fx');         this%OUT_Fx         = .true.
-            case ('Fy');         this%OUT_Fy         = .true.
-            case ('Gx');         this%OUT_Gx         = .true.
-            case ('Gy');         this%OUT_Gy         = .true.
-            case ('AGE');        this%OUT_AGE        = .true.
-            case ('ROLLER');     this%OUT_ROLLER     = .true.
-            case ('UNDERTOW');   this%OUT_UNDERTOW   = .true.
-            case ('NU');         this%OUT_NU         = .true.
-            case ('TMP');        this%OUT_TMP        = .true.
-            case ('Radiation');  this%OUT_Radiation  = .true.
+            case ("U");          this%OUT_U          = .true.
+            case ("V");          this%OUT_V          = .true.
+            case ("ETA");        this%OUT_ETA        = .true.
+            case ("ETAscreen");  this%OUT_EtaScreen  = .true.
+            case ("Hmax");       this%OUT_Hmax       = .true.
+            case ("Hmin");       this%OUT_Hmin       = .true.
+            case ("Umax");       this%OUT_Umax       = .true.
+            case ("MFmax");      this%OUT_MFmax      = .true.
+            case ("VORmax");     this%OUT_VORmax     = .true.
+            case ("MASK");       this%OUT_MASK       = .true.
+            case ("MASK9");      this%OUT_MASK9      = .true.
+            case ("Umean");      this%OUT_Umean      = .true.
+            case ("Vmean");      this%OUT_Vmean      = .true.
+            case ("ETAmean");    this%OUT_ETAmean    = .true.
+            case ("WaveHeight"); this%OUT_WaveHeight = .true.
+            case ("SXL");        this%OUT_SXL        = .true.
+            case ("SXR");        this%OUT_SXR        = .true.
+            case ("SYL");        this%OUT_SYL        = .true.
+            case ("SYR");        this%OUT_SYR        = .true.
+            case ("SourceX");    this%OUT_SourceX    = .true.
+            case ("SourceY");    this%OUT_SourceY    = .true.
+            case ("FrcX");       this%OUT_FrcX       = .true.
+            case ("FrcY");       this%OUT_FrcY       = .true.
+            case ("BrkdisX");    this%OUT_BrkdisX    = .true.
+            case ("BrkdisY");    this%OUT_BrkdisY    = .true.
+            case ("P");          this%OUT_P          = .true.
+            case ("Q");          this%OUT_Q          = .true.
+            case ("Fx");         this%OUT_Fx         = .true.
+            case ("Fy");         this%OUT_Fy         = .true.
+            case ("Gx");         this%OUT_Gx         = .true.
+            case ("Gy");         this%OUT_Gy         = .true.
+            case ("AGE");        this%OUT_AGE        = .true.
+            case ("ROLLER");     this%OUT_ROLLER     = .true.
+            case ("UNDERTOW");   this%OUT_UNDERTOW   = .true.
+            case ("NU");         this%OUT_NU         = .true.
+            case ("TMP");        this%OUT_TMP        = .true.
+            case ("Radiation");  this%OUT_Radiation  = .true.
             end select
          end do
       end if

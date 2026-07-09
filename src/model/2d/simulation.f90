@@ -64,26 +64,26 @@ contains
       type(type_yaml_reader) :: ts_yaml
       logical :: no_ts, no_title, no_tstart, no_screen
 
-      sub_env = get_sub_env(env, 'simulation')
+      sub_env = get_sub_env(env, "simulation")
       this%is_activated = .true.
 
-      call sub_env%yaml%read('title', silent=no_title, val=this%title)
-      call sub_env%yaml%read_positive('total_time', val=this%total_time)
-      call sub_env%yaml%read('t_start', silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)
-      call sub_env%yaml%read_positive('output_interval', val=this%plot_intv)
-      call sub_env%yaml%read('screen_interval', silent=no_screen, &
+      call sub_env%yaml%read("title", silent=no_title, val=this%title)
+      call sub_env%yaml%read_positive("total_time", val=this%total_time)
+      call sub_env%yaml%read("t_start", silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)
+      call sub_env%yaml%read_positive("output_interval", val=this%plot_intv)
+      call sub_env%yaml%read("screen_interval", silent=no_screen, &
                               val=this%screen_interval, default=DEF_SIMULATION_SCREEN_INTERVAL)
-      call sub_env%yaml%read('plot_intv_station',     silent=no_ts, &
+      call sub_env%yaml%read("plot_intv_station",     silent=no_ts, &
                               val=this%plot_intv_station,    default=DEF_SIMULATION_PLOT_INTV_STATION)
-      call sub_env%yaml%read('station_output_buffer', silent=no_ts, &
+      call sub_env%yaml%read("station_output_buffer", silent=no_ts, &
                               val=this%station_output_buffer, default=DEF_SIMULATION_STATION_OUTPUT_BUFFER)
 
       ! Time stepping sub-block (optional)
-      ts_yaml = sub_env%yaml%cast_dictionary('time_stepping', no_ts)
+      ts_yaml = sub_env%yaml%cast_dictionary("time_stepping", no_ts)
       if (.not. no_ts) then
-         call ts_yaml%read('fixed_dt', val=this%fixed_dt, default='NO')
+         call ts_yaml%read("fixed_dt", val=this%fixed_dt, default="NO")
          if (this%fixed_dt) then
-            call ts_yaml%read_positive('dt', val=this%dt_fixed)
+            call ts_yaml%read_positive("dt", val=this%dt_fixed)
          end if
       end if
 

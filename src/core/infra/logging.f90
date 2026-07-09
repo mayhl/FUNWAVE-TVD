@@ -62,7 +62,7 @@ contains
       character(len=*), intent(in) :: filename
       integer :: stat
       if (this%file_unit /= -1) close (this%file_unit)
-      open (newunit=this%file_unit, file=trim(filename), status='replace', action='write', iostat=stat)
+      open (newunit=this%file_unit, file=trim(filename), status="replace", action="write", iostat=stat)
    end subroutine log_set_file
 
    subroutine debug(this, message)
@@ -119,15 +119,15 @@ contains
 
       ! Apply colors using FACE
       select case (level)
-      case (log_level_info); colored_prefix = colorize(prefix, color_fg='green')
-      case (log_level_debug); colored_prefix = colorize(prefix, color_fg='blue')
-      case (log_level_warn); colored_prefix = colorize(prefix, color_fg='yellow')
-      case (log_level_error); colored_prefix = colorize(prefix, color_fg='red')
-      case (log_level_fatal); colored_prefix = colorize(prefix, color_fg='red', style='inverse_on')
+      case (log_level_info); colored_prefix = colorize(prefix, color_fg="green")
+      case (log_level_debug); colored_prefix = colorize(prefix, color_fg="blue")
+      case (log_level_warn); colored_prefix = colorize(prefix, color_fg="yellow")
+      case (log_level_error); colored_prefix = colorize(prefix, color_fg="red")
+      case (log_level_fatal); colored_prefix = colorize(prefix, color_fg="red", style="inverse_on")
       case default; colored_prefix = prefix
       end select
 
-      write (output_unit, '(A)') trim(format_log_line(this, timestamp, colored_prefix, msg))
+      write (output_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
       if (this%file_unit /= -1) write (this%file_unit, *) trim(format_log_line(this, timestamp, prefix, msg))
    end subroutine write_log
 

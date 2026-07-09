@@ -77,33 +77,33 @@ contains
       integer :: kglob_local, i
       integer, allocatable :: grid_size(:)
 
-      sub_env = get_sub_env(env, 'boundary_conditions')
+      sub_env = get_sub_env(env, "boundary_conditions")
       this%is_activated = .true.
 
-      call sub_env%yaml%read('bc_x0', silent=no_key, val=this%bc_x0, default='0')
-      call sub_env%yaml%read('bc_xn', silent=no_key, val=this%bc_xn, default='0')
-      call sub_env%yaml%read('bc_y0', silent=no_key, val=this%bc_y0, default='0')
-      call sub_env%yaml%read('bc_yn', silent=no_key, val=this%bc_yn, default='0')
-      call sub_env%yaml%read('bc_z0', silent=no_key, val=this%bc_z0, default='0')
-      call sub_env%yaml%read('bc_zn', silent=no_key, val=this%bc_zn, default='0')
-      call sub_env%yaml%read('boundary_type', val=this%boundary_type, default='NONE')
+      call sub_env%yaml%read("bc_x0", silent=no_key, val=this%bc_x0, default="0")
+      call sub_env%yaml%read("bc_xn", silent=no_key, val=this%bc_xn, default="0")
+      call sub_env%yaml%read("bc_y0", silent=no_key, val=this%bc_y0, default="0")
+      call sub_env%yaml%read("bc_yn", silent=no_key, val=this%bc_yn, default="0")
+      call sub_env%yaml%read("bc_z0", silent=no_key, val=this%bc_z0, default="0")
+      call sub_env%yaml%read("bc_zn", silent=no_key, val=this%bc_zn, default="0")
+      call sub_env%yaml%read("boundary_type", val=this%boundary_type, default="NONE")
 
-      if (index(this%boundary_type, 'TID_FLX_LR') == 1) then
+      if (index(this%boundary_type, "TID_FLX_LR") == 1) then
          this%bc_x0 = 3
          this%bc_xn = 3
-      else if (index(this%boundary_type, 'TID_ELE_LR') == 1) then
+      else if (index(this%boundary_type, "TID_ELE_LR") == 1) then
          this%bc_x0 = 1
          this%bc_xn = 1
       end if
 
-      if (index(this%boundary_type, 'TID_FLX_LR') == 1 .or. &
-          index(this%boundary_type, 'TID_ELE_LR') == 1) then
-         call sub_env%yaml%read('boundary_file', val=this%boundary_file)
+      if (index(this%boundary_type, "TID_FLX_LR") == 1 .or. &
+          index(this%boundary_type, "TID_ELE_LR") == 1) then
+         call sub_env%yaml%read("boundary_file", val=this%boundary_file)
 
          ! Read nz (Kglob) directly from the geometry block of the same YAML
-         geom_env = get_sub_env(env, 'geometry', geom_empty)
+         geom_env = get_sub_env(env, "geometry", geom_empty)
          if (.not. geom_empty) then
-            call geom_env%yaml%read('grid_size', val=grid_size)
+            call geom_env%yaml%read("grid_size", val=grid_size)
             kglob_local = grid_size(3)
          else
             kglob_local = 0

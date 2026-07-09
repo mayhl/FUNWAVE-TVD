@@ -129,7 +129,7 @@ contains
       this%p_is_valid = .true.
 
       ! Count commas to check for basic split
-      count = count_char(range_str, ',')
+      count = count_char(range_str, ",")
       if (count /= 1) then
          this%p_is_valid = .false.
          return
@@ -213,14 +213,14 @@ contains
       if (.not. this%p_is_valid) return
 
       if (this%is_lower_set) then
-         read (this%lower_str, '(I20)', iostat=stat) this%lower
+         read (this%lower_str, "(I20)", iostat=stat) this%lower
          is_lower_ok = (stat == 0)
       else
          is_lower_ok = .true.
       end if
 
       if (this%is_upper_set) then
-         read (this%upper_str, '(I20)', iostat=stat) this%upper
+         read (this%upper_str, "(I20)", iostat=stat) this%upper
          is_upper_ok = (stat == 0)
       else
          is_upper_ok = .true.

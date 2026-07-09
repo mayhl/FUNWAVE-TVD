@@ -128,7 +128,7 @@ contains
          this%root => root
 
       class default
-         call this%log%exit_on_error('Input file does not appear to be a valid YAML file.')
+         call this%log%exit_on_error("Input file does not appear to be a valid YAML file.")
       end select
 
    end subroutine init
@@ -292,17 +292,17 @@ contains
       type(type_yaml_reader) :: child
       character(:), allocatable :: unit
       character(len=5), dimension(4) :: utypes
-      data utypes/'sec', 'min', 'hour', 'hertz'/
+      data utypes/"sec", "min", "hour", "hertz"/
       if (this%is_dictionary(key)) then
          child = this%cast_dictionary(key)
          call child%read_enum("units", utypes, val=unit)
          call child%read_positive_real("value", default=default, silent=silent, val=val)
          select case (unit)
-         case ('min')
+         case ("min")
             val = val*60_SP
-         case ('hour')
+         case ("hour")
             val = val*3600_SP
-         case ('hertz')
+         case ("hertz")
             val = 1.0_SP/val
          end select
          if (allocated(unit)) deallocate (unit)
@@ -334,9 +334,9 @@ contains
          msg = "which is not in the allowable list of values. Valid values: "
          msg = msg//trim(values(1))
          do i = 2, len - 1
-            msg = msg//', '//trim(values(i))
+            msg = msg//", "//trim(values(i))
          end do
-         msg = msg//', & '//trim(values(len))//"."
+         msg = msg//", & "//trim(values(len))//"."
          msg = this%prep_msg_val(key, msg)
          call this%log%exit_on_error(msg)
       end if
@@ -369,9 +369,9 @@ contains
             msg = "which is not in the allowable list of values. Valid values: "
             msg = msg//trim(values(1))
             do i = 2, n - 1
-               msg = msg//', '//trim(values(i))
+               msg = msg//", "//trim(values(i))
             end do
-            msg = msg//', & '//trim(values(n))//"."
+            msg = msg//", & "//trim(values(n))//"."
             msg = this%prep_msg_val(key, msg)
             call this%log%exit_on_error(msg)
          end if
@@ -420,7 +420,7 @@ contains
       if (present(default)) then
          if (is_no_key_err(io_err)) then
             is_default = .true.
-            buff = " not found, using default value "//trim(default)//'.'
+            buff = " not found, using default value "//trim(default)//"."
             call this%log%info(this%prep_msg(key, buff))
             call this%root%set_string(key, default)
             node => this%root%get(key)
@@ -458,7 +458,7 @@ contains
          end if
       end do
       if (n > 0) then
-         if (new_path(1:1) == '.') then
+         if (new_path(1:1) == ".") then
             new_path = new_path(2:n)
          end if
          new_path = new_path//"."//key

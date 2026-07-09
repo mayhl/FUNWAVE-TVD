@@ -49,8 +49,8 @@ module model_3d_config_mod
       type(type_model_coupling)      :: coupling
 
 # if defined (SEDIMENT)
-      character(80) :: sed_type   = ''
-      character(80) :: sed_load   = ''
+      character(80) :: sed_type   = ""
+      character(80) :: sed_load   = ""
       logical  :: couple_fs       = .false.
       real     :: sd50            = 0.0
       real     :: shields_c       = 0.0
@@ -64,7 +64,7 @@ module model_3d_config_mod
 # endif
 
 # if defined (OBSTACLE)
-      character(80) :: mask3d_file = ''
+      character(80) :: mask3d_file = ""
 # endif
 
    contains
@@ -81,7 +81,7 @@ contains
       logical :: no_key, obs_empty
 
       call getarg(1, yaml_path)
-      call new_env(this%env, label='3d_config', yaml_path=trim(yaml_path), log_path='LOG.txt')
+      call new_env(this%env, label="3d_config", yaml_path=trim(yaml_path), log_path="LOG.txt")
 
       call this%geometry%read_input(this%env)
       call this%simulation%read_input(this%env)
@@ -97,25 +97,25 @@ contains
       call this%coupling%read_input(this%env)
 
 # if defined (SEDIMENT)
-      sed_env = get_sub_env(this%env, 'sediment')
-      call sed_env%yaml%read('sed_type',   silent=no_key, val=this%sed_type,   default='')
-      call sed_env%yaml%read('sed_load',   silent=no_key, val=this%sed_load,   default='')
-      call sed_env%yaml%read('couple_fs',  silent=no_key, val=this%couple_fs,  default='NO')
-      call sed_env%yaml%read('d50',        silent=no_key, val=this%sd50,       default='0.0')
-      call sed_env%yaml%read('shields_c',  silent=no_key, val=this%shields_c,  default='0.0')
-      call sed_env%yaml%read('af',         silent=no_key, val=this%af,         default='0.0')
-      call sed_env%yaml%read('tau_ce',     silent=no_key, val=this%tau_ce,     default='0.0')
-      call sed_env%yaml%read('tau_cd',     silent=no_key, val=this%tau_cd,     default='0.0')
-      call sed_env%yaml%read('erate',      silent=no_key, val=this%erate,      default='0.0')
-      call sed_env%yaml%read('mud_visc',   silent=no_key, val=this%mud_visc,   default='0.0')
-      call sed_env%yaml%read('tim_sedi',   silent=no_key, val=this%tim_sedi,   default='0.0')
-      call sed_env%yaml%read('bed_change', silent=no_key, val=this%bed_change, default='NO')
+      sed_env = get_sub_env(this%env, "sediment")
+      call sed_env%yaml%read("sed_type",   silent=no_key, val=this%sed_type,   default="")
+      call sed_env%yaml%read("sed_load",   silent=no_key, val=this%sed_load,   default="")
+      call sed_env%yaml%read("couple_fs",  silent=no_key, val=this%couple_fs,  default="NO")
+      call sed_env%yaml%read("d50",        silent=no_key, val=this%sd50,       default="0.0")
+      call sed_env%yaml%read("shields_c",  silent=no_key, val=this%shields_c,  default="0.0")
+      call sed_env%yaml%read("af",         silent=no_key, val=this%af,         default="0.0")
+      call sed_env%yaml%read("tau_ce",     silent=no_key, val=this%tau_ce,     default="0.0")
+      call sed_env%yaml%read("tau_cd",     silent=no_key, val=this%tau_cd,     default="0.0")
+      call sed_env%yaml%read("erate",      silent=no_key, val=this%erate,      default="0.0")
+      call sed_env%yaml%read("mud_visc",   silent=no_key, val=this%mud_visc,   default="0.0")
+      call sed_env%yaml%read("tim_sedi",   silent=no_key, val=this%tim_sedi,   default="0.0")
+      call sed_env%yaml%read("bed_change", silent=no_key, val=this%bed_change, default="NO")
 # endif
 
 # if defined (OBSTACLE)
-      obs_env = get_sub_env(this%env, 'obstacle', obs_empty)
+      obs_env = get_sub_env(this%env, "obstacle", obs_empty)
       if (.not. obs_empty) then
-         call obs_env%yaml%read('mask3d_file', silent=no_key, val=this%mask3d_file, default='')
+         call obs_env%yaml%read("mask3d_file", silent=no_key, val=this%mask3d_file, default="")
       end if
 # endif
 

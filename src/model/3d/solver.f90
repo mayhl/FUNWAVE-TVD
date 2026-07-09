@@ -44,12 +44,12 @@ contains
       type(type_env) :: sub_env
       logical :: no_key
 
-      sub_env = get_sub_env(env, 'solver')
+      sub_env = get_sub_env(env, "solver")
       this%is_activated = .true.
 
-      call sub_env%yaml%read('solver_type', silent=no_key, val=this%solver_type, default='1')
-      call sub_env%yaml%read('max_iter',    silent=no_key, val=this%max_iter,    default='500')
-      call sub_env%yaml%read('tolerance',   silent=no_key, val=this%tolerance,   default='1.0e-6')
+      call sub_env%yaml%read("solver_type", silent=no_key, val=this%solver_type, default="1")
+      call sub_env%yaml%read("max_iter",    silent=no_key, val=this%max_iter,    default="500")
+      call sub_env%yaml%read("tolerance",   silent=no_key, val=this%tolerance,   default="1.0e-6")
 
    end subroutine solver_3d_read_input
 

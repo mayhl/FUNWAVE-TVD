@@ -45,9 +45,9 @@ module model_geometry_mod
    public :: type_model_geometry
 
    character(len=8), parameter :: BATHY_TYPES(3) = &
-      [character(len=8) :: 'file', 'flat', 'slope']
+      [character(len=8) :: "file", "flat", "slope"]
    character(len=8), parameter :: FILE_TYPES(1) = &
-      [character(len=8) :: 'ascii']
+      [character(len=8) :: "ascii"]
 
    type, extends(type_model_base) :: type_model_geometry
 
@@ -95,68 +95,68 @@ contains
       logical :: no_nx_proc, no_ny_proc, no_dx_file, no_dy_file
       logical :: no_bathy_nx, no_bathy_ny
 
-      sub_env = get_sub_env(env, 'geometry')
+      sub_env = get_sub_env(env, "geometry")
       this%is_activated = .true.
 
       ! --- Spacing ---
-      call sub_env%yaml%read('cell_size', silent=no_cell_size, val=cell_size)
+      call sub_env%yaml%read("cell_size", silent=no_cell_size, val=cell_size)
       if (.not. no_cell_size) then
          this%dx = cell_size(1)
          this%dy = cell_size(2)
       else
-         call sub_env%yaml%read('dx_file', silent=no_dx_file, val=this%dx_file)
-         call sub_env%yaml%read('dy_file', silent=no_dy_file, val=this%dy_file)
+         call sub_env%yaml%read("dx_file", silent=no_dx_file, val=this%dx_file)
+         call sub_env%yaml%read("dy_file", silent=no_dy_file, val=this%dy_file)
          if (no_dx_file .and. no_dy_file) then
             call sub_env%log%exit_on_error( &
-               'geometry: cell_size or dx_file/dy_file required')
+               "geometry: cell_size or dx_file/dy_file required")
          end if
          if (no_dx_file .neqv. no_dy_file) then
             call sub_env%log%exit_on_error( &
-               'geometry: dx_file and dy_file must both be specified')
+               "geometry: dx_file and dy_file must both be specified")
          end if
       end if
 
       ! --- Origin (optional) ---
-      call sub_env%yaml%read('origin', silent=no_origin, val=origin)
+      call sub_env%yaml%read("origin", silent=no_origin, val=origin)
       if (.not. no_origin) then
          this%x0 = origin(1)
          this%y0 = origin(2)
       end if
 
       ! --- Decomposition (optional) ---
-      decomp_yaml = sub_env%yaml%cast_dictionary('decomposition', no_decomp)
+      decomp_yaml = sub_env%yaml%cast_dictionary("decomposition", no_decomp)
       if (.not. no_decomp) then
-         call decomp_yaml%read_positive('nx_proc', silent=no_nx_proc, val=this%nx_proc)
-         call decomp_yaml%read_positive('ny_proc', silent=no_ny_proc, val=this%ny_proc)
+         call decomp_yaml%read_positive("nx_proc", silent=no_nx_proc, val=this%nx_proc)
+         call decomp_yaml%read_positive("ny_proc", silent=no_ny_proc, val=this%ny_proc)
          if (no_nx_proc .neqv. no_ny_proc) then
             call sub_env%log%exit_on_error( &
-               'geometry/decomposition: nx_proc and ny_proc must both be specified')
+               "geometry/decomposition: nx_proc and ny_proc must both be specified")
          end if
       end if
 
       ! --- Bathymetry ---
-      bathy_yaml = sub_env%yaml%cast_dictionary('bathymetry')
-      call bathy_yaml%read_enum('type', BATHY_TYPES, val=this%bathy_type, default='file')
+      bathy_yaml = sub_env%yaml%cast_dictionary("bathymetry")
+      call bathy_yaml%read_enum("type", BATHY_TYPES, val=this%bathy_type, default="file")
 
       select case (trim(this%bathy_type))
-      case ('file')
-         call bathy_yaml%read_enum('file_type', FILE_TYPES, val=this%bathy_ftype, default='ascii')
-         call bathy_yaml%read_input_path('file', val=this%bathy_file)
-         call bathy_yaml%read('correction', val=this%bathy_correction, default='NO')
-         call bathy_yaml%read_positive('nx', silent=no_bathy_nx, val=this%bathy_nx)
-         call bathy_yaml%read_positive('ny', silent=no_bathy_ny, val=this%bathy_ny)
+      case ("file")
+         call bathy_yaml%read_enum("file_type", FILE_TYPES, val=this%bathy_ftype, default="ascii")
+         call bathy_yaml%read_input_path("file", val=this%bathy_file)
+         call bathy_yaml%read("correction", val=this%bathy_correction, default="NO")
+         call bathy_yaml%read_positive("nx", silent=no_bathy_nx, val=this%bathy_nx)
+         call bathy_yaml%read_positive("ny", silent=no_bathy_ny, val=this%bathy_ny)
 
-      case ('flat')
-         call bathy_yaml%read_positive('depth', val=this%bathy_depth)
-         call sub_env%yaml%read('grid_size', val=grid_size)
+      case ("flat")
+         call bathy_yaml%read_positive("depth", val=this%bathy_depth)
+         call sub_env%yaml%read("grid_size", val=grid_size)
          this%grid_nx = grid_size(1)
          this%grid_ny = grid_size(2)
 
-      case ('slope')
-         call bathy_yaml%read_positive('depth', val=this%bathy_depth)
-         call bathy_yaml%read('slope', val=this%bathy_slope)
-         call bathy_yaml%read('x0', val=this%bathy_slope_x0, default='0.0')
-         call sub_env%yaml%read('grid_size', val=grid_size)
+      case ("slope")
+         call bathy_yaml%read_positive("depth", val=this%bathy_depth)
+         call bathy_yaml%read("slope", val=this%bathy_slope)
+         call bathy_yaml%read("x0", val=this%bathy_slope_x0, default="0.0")
+         call sub_env%yaml%read("grid_size", val=grid_size)
          this%grid_nx = grid_size(1)
          this%grid_ny = grid_size(2)
       end select
@@ -178,11 +178,11 @@ contains
 
       logical :: create_partition
 
-      if (trim(this%bathy_type) == 'file') then
-         error stop 'geometry: file bathymetry grid build not yet implemented in new path'
+      if (trim(this%bathy_type) == "file") then
+         error stop "geometry: file bathymetry grid build not yet implemented in new path"
       end if
       if (allocated(this%dx_file)) then
-         error stop 'geometry: variable spacing not yet implemented in new path'
+         error stop "geometry: variable spacing not yet implemented in new path"
       end if
 
       grid%M = this%grid_nx
@@ -191,7 +191,7 @@ contains
       create_partition = (this%nx_proc <= 0)
       if (.not. create_partition) then
          if (this%nx_proc * this%ny_proc /= comm%size) then
-            error stop 'geometry/decomposition: nx_proc*ny_proc must equal MPI size'
+            error stop "geometry/decomposition: nx_proc*ny_proc must equal MPI size"
          end if
          grid%nx_proc = this%nx_proc
          grid%ny_proc = this%ny_proc
@@ -230,9 +230,9 @@ contains
       associate (lp => grid%lp)
 
       select case (trim(this%bathy_type))
-      case ('flat')
+      case ("flat")
          depth = this%bathy_depth
-      case ('slope')
+      case ("slope")
          i_slp = int(this%bathy_slope_x0 / this%dx) + 1
          do j = lp%jb, lp%je
             do i = lp%ib, lp%ie
@@ -245,7 +245,7 @@ contains
             end do
          end do
       case default
-         error stop 'geometry: init_depth supports flat and slope only'
+         error stop "geometry: init_depth supports flat and slope only"
       end select
 
       call grid%halo_exchange(depth)

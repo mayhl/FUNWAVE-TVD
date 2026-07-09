@@ -75,7 +75,7 @@ contains
       call get_command_argument(1, yaml_path)
 
       ! Initialize environment (Comm, Log, YAML)
-      call new_env(this%env, label='main', yaml_path=trim(yaml_path), log_path='test.log')
+      call new_env(this%env, label="main", yaml_path=trim(yaml_path), log_path="test.log")
 
       ! Read component inputs using environment resources
       call this%env%comm%barrier()

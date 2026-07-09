@@ -66,38 +66,38 @@ contains
       integer :: iv
       logical :: is_empty, no_vars
 
-      this%result_folder = './output/'
-      this%field_io_type = 'ASCII'
+      this%result_folder = "./output/"
+      this%field_io_type = "ASCII"
 
-      sub_env = get_sub_env(env, 'output', is_empty)
+      sub_env = get_sub_env(env, "output", is_empty)
       this%is_activated = .not. is_empty
       if (is_empty) return
 
-      call sub_env%yaml%read('result_folder', val=this%result_folder, default='./output/')
-      call sub_env%yaml%read('field_io_type', val=this%field_io_type, default='ASCII')
+      call sub_env%yaml%read("result_folder", val=this%result_folder, default="./output/")
+      call sub_env%yaml%read("field_io_type", val=this%field_io_type, default="ASCII")
 
-      call sub_env%yaml%read_string_array('variables', silent=no_vars, val=var_list)
+      call sub_env%yaml%read_string_array("variables", silent=no_vars, val=var_list)
       if (.not. no_vars) then
          do iv = 1, size(var_list)
             select case (trim(var_list(iv)%s))
-            case ('DEP');  this%out_dep  = .true.
-            case ('ETA');  this%out_eta  = .true.
-            case ('U');    this%out_u    = .true.
-            case ('V');    this%out_v    = .true.
-            case ('W');    this%out_w    = .true.
-            case ('P');    this%out_p    = .true.
-            case ('TKE');  this%out_tke  = .true.
-            case ('EPS');  this%out_eps  = .true.
-            case ('S');    this%out_s    = .true.
-            case ('MU');   this%out_mu   = .true.
-            case ('BUB');  this%out_bub  = .true.
-            case ('A');    this%out_a    = .true.
-            case ('F');    this%out_f    = .true.
-            case ('T');    this%out_t    = .true.
-            case ('G');    this%out_g    = .true.
-            case ('SALI'); this%out_sali = .true.
-            case ('TEMP'); this%out_temp = .true.
-            case ('RHO');  this%out_rho  = .true.
+            case ("DEP");  this%out_dep  = .true.
+            case ("ETA");  this%out_eta  = .true.
+            case ("U");    this%out_u    = .true.
+            case ("V");    this%out_v    = .true.
+            case ("W");    this%out_w    = .true.
+            case ("P");    this%out_p    = .true.
+            case ("TKE");  this%out_tke  = .true.
+            case ("EPS");  this%out_eps  = .true.
+            case ("S");    this%out_s    = .true.
+            case ("MU");   this%out_mu   = .true.
+            case ("BUB");  this%out_bub  = .true.
+            case ("A");    this%out_a    = .true.
+            case ("F");    this%out_f    = .true.
+            case ("T");    this%out_t    = .true.
+            case ("G");    this%out_g    = .true.
+            case ("SALI"); this%out_sali = .true.
+            case ("TEMP"); this%out_temp = .true.
+            case ("RHO");  this%out_rho  = .true.
             end select
          end do
       end if

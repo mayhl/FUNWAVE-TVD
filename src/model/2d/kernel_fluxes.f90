@@ -1044,16 +1044,16 @@ contains
       type(type_flux_workspace), intent(inout) :: ws
 
       select case (high_order(1:3))
-      case ('FOU')
+      case ("FOU")
          call construction_ho(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
                                mask, mask9, gamma1, gamma3, dispersion, ws)
-      case ('FMI')
+      case ("FMI")
          call construction_ho_minmod(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
                                      mask, mask9, gamma1, gamma3, dispersion, ws)
-      case ('WEN')
+      case ("WEN")
          call construction_weno(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
                                  mask9, gamma1, gamma3, dispersion, ws)
-      case ('MLP')
+      case ("MLP")
          call construction_ho_mlp(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
                                    mask, mask9, gamma1, gamma3, dispersion, ws)
       case default
@@ -1065,7 +1065,7 @@ contains
                       ws%hxl, ws%hxr, ws%hyl, ws%hyr, &
                       ws%sxl, ws%sxr, ws%syl, ws%syr)
 
-      if (constr(1:3) == 'HLL') then
+      if (constr(1:3) == "HLL") then
          call flux_at_interface_hll(ws)
       else
          call flux_at_interface(ws)

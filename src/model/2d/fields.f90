@@ -148,28 +148,28 @@ contains
       class(type_fields_2d), target, intent(in)    :: this
       type(type_field_registry),     intent(inout) :: registry
 
-      call registry%register('eta',        this%eta)
-      call registry%register('p',          this%p)
-      call registry%register('q',          this%q)
-      call registry%register('u',          this%u)
-      call registry%register('v',          this%v)
-      call registry%register('h',          this%h)
+      call registry%register("eta",        this%eta)
+      call registry%register("p",          this%p)
+      call registry%register("q",          this%q)
+      call registry%register("u",          this%u)
+      call registry%register("v",          this%v)
+      call registry%register("h",          this%h)
 
-      call registry%register('depth',      this%depth)
-      call registry%register('depth_node', this%depth_node)
-      call registry%register('depth_x',    this%depth_x)
-      call registry%register('depth_y',    this%depth_y)
+      call registry%register("depth",      this%depth)
+      call registry%register("depth_node", this%depth_node)
+      call registry%register("depth_x",    this%depth_x)
+      call registry%register("depth_y",    this%depth_y)
 
-      call registry%register('h_max',      this%h_max)
-      call registry%register('h_min',      this%h_min)
-      call registry%register('u_max',      this%u_max)
-      call registry%register('mf_max',     this%mf_max)
-      call registry%register('vort_max',   this%vort_max)
-      call registry%register('arr_time',   this%arr_time)
+      call registry%register("h_max",      this%h_max)
+      call registry%register("h_min",      this%h_min)
+      call registry%register("u_max",      this%u_max)
+      call registry%register("mf_max",     this%mf_max)
+      call registry%register("vort_max",   this%vort_max)
+      call registry%register("arr_time",   this%arr_time)
 
       ! Optional breaking-physics fields: present only after alloc_breaking().
-      if (allocated(this%nu_break)) call registry%register('nu_break', this%nu_break)
-      if (allocated(this%d_break))  call registry%register('d_break',  this%d_break)
+      if (allocated(this%nu_break)) call registry%register("nu_break", this%nu_break)
+      if (allocated(this%d_break))  call registry%register("d_break",  this%d_break)
    end subroutine fields_register
 
    !> Deallocate all field arrays.

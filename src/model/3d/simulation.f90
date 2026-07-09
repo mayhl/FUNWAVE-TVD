@@ -68,29 +68,29 @@ contains
       type(type_yaml_reader) :: ts_yaml, stat_yaml
       logical :: no_ts, no_stat, no_key
 
-      sub_env = get_sub_env(env, 'simulation')
+      sub_env = get_sub_env(env, "simulation")
       this%is_activated = .true.
 
-      call sub_env%yaml%read_positive('total_time', val=this%total_time)
-      call sub_env%yaml%read('sim_steps',   silent=no_key, val=this%sim_steps,   default='0')
-      call sub_env%yaml%read('plot_start',  silent=no_key, val=this%plot_start,  default='0.0')
-      call sub_env%yaml%read_positive('plot_intv', val=this%plot_intv)
-      call sub_env%yaml%read('screen_intv', silent=no_key, val=this%screen_intv, default='1.0')
-      call sub_env%yaml%read('cfl',         silent=no_key, val=this%cfl,         default='0.5')
+      call sub_env%yaml%read_positive("total_time", val=this%total_time)
+      call sub_env%yaml%read("sim_steps",   silent=no_key, val=this%sim_steps,   default="0")
+      call sub_env%yaml%read("plot_start",  silent=no_key, val=this%plot_start,  default="0.0")
+      call sub_env%yaml%read_positive("plot_intv", val=this%plot_intv)
+      call sub_env%yaml%read("screen_intv", silent=no_key, val=this%screen_intv, default="1.0")
+      call sub_env%yaml%read("cfl",         silent=no_key, val=this%cfl,         default="0.5")
 
-      ts_yaml = sub_env%yaml%cast_dictionary('time_stepping', no_ts)
+      ts_yaml = sub_env%yaml%cast_dictionary("time_stepping", no_ts)
       if (.not. no_ts) then
-         call ts_yaml%read('dt_ini', silent=no_key, val=this%dt_ini, default='0.1')
-         call ts_yaml%read('dt_min', silent=no_key, val=this%dt_min, default='1.0e-6')
-         call ts_yaml%read('dt_max', silent=no_key, val=this%dt_max, default='1.0')
+         call ts_yaml%read("dt_ini", silent=no_key, val=this%dt_ini, default="0.1")
+         call ts_yaml%read("dt_min", silent=no_key, val=this%dt_min, default="1.0e-6")
+         call ts_yaml%read("dt_max", silent=no_key, val=this%dt_max, default="1.0")
       end if
 
-      stat_yaml = sub_env%yaml%cast_dictionary('stations', no_stat)
+      stat_yaml = sub_env%yaml%cast_dictionary("stations", no_stat)
       if (.not. no_stat) then
-         call stat_yaml%read('count',    silent=no_key, val=this%nstat,          default='0')
-         call stat_yaml%read('interval', silent=no_key, val=this%plot_intv_stat, default='1.0')
+         call stat_yaml%read("count",    silent=no_key, val=this%nstat,          default="0")
+         call stat_yaml%read("interval", silent=no_key, val=this%plot_intv_stat, default="1.0")
          if (this%nstat > 0) then
-            call stat_yaml%read('file', val=this%stations_file)
+            call stat_yaml%read("file", val=this%stations_file)
          end if
       end if
 

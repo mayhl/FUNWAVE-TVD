@@ -76,37 +76,37 @@ contains
       real(SP), allocatable :: cell_size(:)
       logical :: no_decomp, no_grd_r
 
-      sub_env = get_sub_env(env, 'geometry')
+      sub_env = get_sub_env(env, "geometry")
       this%is_activated = .true.
 
-      call sub_env%yaml%read('grid_size', val=grid_size)
+      call sub_env%yaml%read("grid_size", val=grid_size)
       this%nx = grid_size(1)
       this%ny = grid_size(2)
       this%nz = grid_size(3)
 
-      call sub_env%yaml%read('cell_size', val=cell_size)
+      call sub_env%yaml%read("cell_size", val=cell_size)
       this%dx = cell_size(1)
       this%dy = cell_size(2)
 
-      call sub_env%yaml%read('ivgrd', val=this%ivgrd, default='1')
-      call sub_env%yaml%read('grd_r', silent=no_grd_r, val=this%grd_r, default='1.0')
+      call sub_env%yaml%read("ivgrd", val=this%ivgrd, default="1")
+      call sub_env%yaml%read("grd_r", silent=no_grd_r, val=this%grd_r, default="1.0")
 
-      decomp_yaml = sub_env%yaml%cast_dictionary('decomposition', no_decomp)
+      decomp_yaml = sub_env%yaml%cast_dictionary("decomposition", no_decomp)
       if (.not. no_decomp) then
-         call decomp_yaml%read_positive('nx_proc', val=this%nx_proc, default='0')
-         call decomp_yaml%read_positive('ny_proc', val=this%ny_proc, default='0')
+         call decomp_yaml%read_positive("nx_proc", val=this%nx_proc, default="0")
+         call decomp_yaml%read_positive("ny_proc", val=this%ny_proc, default="0")
       end if
 
-      bathy_yaml = sub_env%yaml%cast_dictionary('bathymetry')
-      call bathy_yaml%read('type', val=this%bathy_type, default='data')
-      call bathy_yaml%read('file', silent=no_grd_r, val=this%depth_file, default='')
-      call bathy_yaml%read('analytic', val=this%ana_bathy, default='NO')
+      bathy_yaml = sub_env%yaml%cast_dictionary("bathymetry")
+      call bathy_yaml%read("type", val=this%bathy_type, default="data")
+      call bathy_yaml%read("file", silent=no_grd_r, val=this%depth_file, default="")
+      call bathy_yaml%read("analytic", val=this%ana_bathy, default="NO")
 
-      bot_yaml = sub_env%yaml%cast_dictionary('bottom')
-      call bot_yaml%read('roughness_type', val=this%roughness_type, default='1')
-      call bot_yaml%read('cd',             val=this%cd,             default='0.0')
-      call bot_yaml%read('zob',            val=this%zob,            default='0.0')
-      call bot_yaml%read('min_depth',      val=this%min_depth,      default='0.001')
+      bot_yaml = sub_env%yaml%cast_dictionary("bottom")
+      call bot_yaml%read("roughness_type", val=this%roughness_type, default="1")
+      call bot_yaml%read("cd",             val=this%cd,             default="0.0")
+      call bot_yaml%read("zob",            val=this%zob,            default="0.0")
+      call bot_yaml%read("min_depth",      val=this%min_depth,      default="0.001")
 
    end subroutine geometry_3d_read_input
 

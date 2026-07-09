@@ -54,25 +54,25 @@ contains
       type(type_env) :: sub_env
       logical :: is_empty, no_key
 
-      sub_env = get_sub_env(env, 'baroclinic', is_empty)
+      sub_env = get_sub_env(env, "baroclinic", is_empty)
       this%is_activated = .not. is_empty
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('ini_sali_input', val=this%ini_sali_input, default='CONST')
-      if (this%ini_sali_input(1:4) == 'CONS') then
-         call sub_env%yaml%read('ini_sali', silent=no_key, val=this%ini_sali, default='35.0')
-      else if (this%ini_sali_input(1:4) == 'DATA') then
-         call sub_env%yaml%read('ini_sali_file', val=this%ini_sali_file)
+      call sub_env%yaml%read("ini_sali_input", val=this%ini_sali_input, default="CONST")
+      if (this%ini_sali_input(1:4) == "CONS") then
+         call sub_env%yaml%read("ini_sali", silent=no_key, val=this%ini_sali, default="35.0")
+      else if (this%ini_sali_input(1:4) == "DATA") then
+         call sub_env%yaml%read("ini_sali_file", val=this%ini_sali_file)
       end if
 
-      call sub_env%yaml%read('ini_temp_input', val=this%ini_temp_input, default='CONST')
-      if (this%ini_temp_input(1:4) == 'CONS') then
-         call sub_env%yaml%read('ini_temp', silent=no_key, val=this%ini_temp, default='0.0')
-      else if (this%ini_temp_input(1:4) == 'DATA') then
-         call sub_env%yaml%read('ini_temp_file', val=this%ini_temp_file)
+      call sub_env%yaml%read("ini_temp_input", val=this%ini_temp_input, default="CONST")
+      if (this%ini_temp_input(1:4) == "CONS") then
+         call sub_env%yaml%read("ini_temp", silent=no_key, val=this%ini_temp, default="0.0")
+      else if (this%ini_temp_input(1:4) == "DATA") then
+         call sub_env%yaml%read("ini_temp_file", val=this%ini_temp_file)
       end if
 
-      call sub_env%yaml%read('tid_low_pass', silent=no_key, val=this%tid_low_pass, default='NO')
+      call sub_env%yaml%read("tid_low_pass", silent=no_key, val=this%tid_low_pass, default="NO")
 
    end subroutine baroclinic_3d_read_input
 

@@ -6,9 +6,9 @@ module core_path_mod
 
    ! Determine path separator based on OS
 #ifdef _WIN32
-   character(len=1), parameter :: SEP = '\'
+   character(len=1), parameter :: SEP = "\"
 #else
-   character(len=1), parameter :: SEP = '/'
+   character(len=1), parameter :: SEP = "/"
 #endif
 
    interface
@@ -111,7 +111,7 @@ contains
    subroutine path_touch(this)
       class(type_path), intent(in) :: this
       integer :: unit, stat
-      open (newunit=unit, file=trim(this%root), access='append', action='write', iostat=stat)
+      open (newunit=unit, file=trim(this%root), access="append", action="write", iostat=stat)
       if (stat == 0) close (unit)
    end subroutine path_touch
 
@@ -124,8 +124,8 @@ contains
       if (this%is_dir()) then
          success = rmdir_wrapper(trim(this%root)//c_null_char)
       else
-         open (newunit=unit, file=trim(this%root), status='old', iostat=stat)
-         if (stat == 0) close (unit, status='delete')
+         open (newunit=unit, file=trim(this%root), status="old", iostat=stat)
+         if (stat == 0) close (unit, status="delete")
       end if
    end subroutine path_remove
 

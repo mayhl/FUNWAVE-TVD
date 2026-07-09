@@ -50,16 +50,16 @@ contains
       type(type_env) :: sub_env
       logical :: is_empty, no_key
 
-      sub_env = get_sub_env(env, 'sponge', is_empty)
+      sub_env = get_sub_env(env, "sponge", is_empty)
       this%is_activated = .not. is_empty
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('west_width',  silent=no_key, val=this%west_width,  default='0.0')
-      call sub_env%yaml%read('east_width',  silent=no_key, val=this%east_width,  default='0.0')
-      call sub_env%yaml%read('south_width', silent=no_key, val=this%south_width, default='0.0')
-      call sub_env%yaml%read('north_width', silent=no_key, val=this%north_width, default='0.0')
-      call sub_env%yaml%read('r_sponge',    silent=no_key, val=this%r_sponge,    default='0.85')
-      call sub_env%yaml%read('a_sponge',    silent=no_key, val=this%a_sponge,    default='5.0')
+      call sub_env%yaml%read("west_width",  silent=no_key, val=this%west_width,  default="0.0")
+      call sub_env%yaml%read("east_width",  silent=no_key, val=this%east_width,  default="0.0")
+      call sub_env%yaml%read("south_width", silent=no_key, val=this%south_width, default="0.0")
+      call sub_env%yaml%read("north_width", silent=no_key, val=this%north_width, default="0.0")
+      call sub_env%yaml%read("r_sponge",    silent=no_key, val=this%r_sponge,    default="0.85")
+      call sub_env%yaml%read("a_sponge",    silent=no_key, val=this%a_sponge,    default="5.0")
 
    end subroutine sponge_3d_read_input
 

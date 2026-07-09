@@ -42,11 +42,11 @@ contains
       type(type_env) :: sub_env
       logical :: is_empty, no_key
 
-      sub_env = get_sub_env(env, 'coupling', is_empty)
+      sub_env = get_sub_env(env, "coupling", is_empty)
       this%is_activated = .not. is_empty
       if (is_empty) return
 
-      call sub_env%yaml%read_input_path('coupling_file', silent=no_key, val=this%coupling_file)
+      call sub_env%yaml%read_input_path("coupling_file", silent=no_key, val=this%coupling_file)
 
    end subroutine coupling_read_input
 

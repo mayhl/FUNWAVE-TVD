@@ -47,17 +47,17 @@ contains
 
       call get_command_argument(1, yaml_path)
       if (len_trim(yaml_path) == 0) then
-         write(*, '(a)') 'Usage: funwave <input.yaml>'
+         write(*, "(a)") "Usage: funwave <input.yaml>"
          stop 1
       end if
 
       ! Initialise environment once — owns MPI, YAML, and logging for this run.
-      call new_env(env, label='funwave', yaml_path=trim(yaml_path), log_path='funwave.log')
+      call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path="funwave.log")
 
       ! Peek at grid_size under the geometry section to decide dimensionality.
       ! 2 elements → 2D path; 3 elements → 3D path.  Matches the 2D YAML layout.
-      grid_env = get_sub_env(env, 'geometry')
-      call grid_env%yaml%read_integer_array('grid_size', val=dims, silent=missing)
+      grid_env = get_sub_env(env, "geometry")
+      call grid_env%yaml%read_integer_array("grid_size", val=dims, silent=missing)
       ndim = 0
       if (.not. missing .and. allocated(dims)) ndim = size(dims)
 
@@ -67,7 +67,7 @@ contains
 # if defined (ENABLE_3D)
          call run_3d(model_3d, env)
 # else
-         write(*, '(a)') 'ERROR: 3D grid detected but HYPRE not linked — rebuild with -DHYPRE_DIR=<path>.'
+         write(*, "(a)") "ERROR: 3D grid detected but HYPRE not linked — rebuild with -DHYPRE_DIR=<path>."
          stop 1
 # endif
       end if

@@ -2,4 +2,5 @@
 select = ["C", "E", "S"]
 ignore = ["C003", "S001", "S082", "S091"]
 line-length = 100
-exclude = ["src/old/**", "build_*/", "test/regression/worktrees/"]
+# legacy/vendored trees are reference code — never lint or reformat
+exclude = ["src/model/2d/old/**", "src/model/3d/old/**", "build_*/", "test/regression/worktrees/", "workspaces/**"]

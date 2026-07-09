@@ -86,7 +86,7 @@ contains
             return
          end if
       end do
-      error stop 'type_scratch_pool: acquire failed — all slots in use'
+      error stop "type_scratch_pool: acquire failed — all slots in use"
    end function pool_acquire
 
    subroutine pool_release(this, k)

@@ -115,17 +115,17 @@ contains
       real(SP), parameter :: pi = 3.14159265358979_SP
       real(SP), parameter :: zero = 0.0_SP
 
-      sub_env = get_sub_env(env, 'wavemaker', is_empty)
+      sub_env = get_sub_env(env, "wavemaker", is_empty)
       this%is_activated = .not. is_empty
       if (is_empty) then
-         this%wavemaker_type = 'nothing'
+         this%wavemaker_type = "nothing"
          return
       end if
 
-      call sub_env%yaml%read('type', val=this%wavemaker_type, default='nothing')
+      call sub_env%yaml%read("type", val=this%wavemaker_type, default="nothing")
 
-      if (this%wavemaker_type(1:3) == 'ABS') then
-         call sub_env%yaml%read('wave_comp_file', val=this%wave_comp_file)
+      if (this%wavemaker_type(1:3) == "ABS") then
+         call sub_env%yaml%read("wave_comp_file", val=this%wave_comp_file)
          open(1, file=trim(this%wave_comp_file))
             read(1, *)
             read(1, *) this%dep_ser
@@ -142,36 +142,36 @@ contains
                read(1, *) this%amp_ser(i), this%per_ser(i), &
                           this%phase_ser(i), this%theta_ser(i)
                if (this%per_ser(i) == zero) then
-                  write(*, *) 'input wave frequency is zero, stop'
+                  write(*, *) "input wave frequency is zero, stop"
                   stop
                else
                   this%per_ser(i) = 1.0_SP / this%per_ser(i)
                end if
             end do
          close(1)
-         call sub_env%yaml%read('west_width',   silent=no_key, val=this%west_width,  default='0.0')
-         call sub_env%yaml%read('east_width',   silent=no_key, val=this%east_width,  default='0.0')
-         call sub_env%yaml%read('r_wavemaker',  silent=no_key, val=this%r_wavemaker, default='0.0')
-         call sub_env%yaml%read('a_wavemaker',  silent=no_key, val=this%a_wavemaker, default='0.0')
+         call sub_env%yaml%read("west_width",   silent=no_key, val=this%west_width,  default="0.0")
+         call sub_env%yaml%read("east_width",   silent=no_key, val=this%east_width,  default="0.0")
+         call sub_env%yaml%read("r_wavemaker",  silent=no_key, val=this%r_wavemaker, default="0.0")
+         call sub_env%yaml%read("a_wavemaker",  silent=no_key, val=this%a_wavemaker, default="0.0")
       end if
 
-      if (this%wavemaker_type(1:3) == 'LEF' .or. &
-          this%wavemaker_type(1:3) == 'INT' .or. &
-          this%wavemaker_type(1:3) == 'FLU') then
-         call sub_env%yaml%read('amp',   val=this%amp_wave)
-         call sub_env%yaml%read('per',   val=this%per_wave)
-         call sub_env%yaml%read('dep',   val=this%dep_wave)
-         call sub_env%yaml%read('theta', val=this%theta_wave, default='0.0')
-         if (this%wavemaker_type(1:3) == 'INT') then
-            call sub_env%yaml%read('xsource_west', silent=no_key, val=this%xsource_west, default='0.0')
-            call sub_env%yaml%read('xsource_east', silent=no_key, val=this%xsource_east, default='0.0')
-            call sub_env%yaml%read('ysource_suth', silent=no_key, val=this%ysource_suth, default='0.0')
-            call sub_env%yaml%read('ysource_nrth', silent=no_key, val=this%ysource_nrth, default='0.0')
+      if (this%wavemaker_type(1:3) == "LEF" .or. &
+          this%wavemaker_type(1:3) == "INT" .or. &
+          this%wavemaker_type(1:3) == "FLU") then
+         call sub_env%yaml%read("amp",   val=this%amp_wave)
+         call sub_env%yaml%read("per",   val=this%per_wave)
+         call sub_env%yaml%read("dep",   val=this%dep_wave)
+         call sub_env%yaml%read("theta", val=this%theta_wave, default="0.0")
+         if (this%wavemaker_type(1:3) == "INT") then
+            call sub_env%yaml%read("xsource_west", silent=no_key, val=this%xsource_west, default="0.0")
+            call sub_env%yaml%read("xsource_east", silent=no_key, val=this%xsource_east, default="0.0")
+            call sub_env%yaml%read("ysource_suth", silent=no_key, val=this%ysource_suth, default="0.0")
+            call sub_env%yaml%read("ysource_nrth", silent=no_key, val=this%ysource_nrth, default="0.0")
          end if
       end if
 
-      if (this%wavemaker_type(5:7) == 'SPC') then
-         open(14, file='spc2d.txt')
+      if (this%wavemaker_type(5:7) == "SPC") then
+         open(14, file="spc2d.txt")
             read(14, *) this%num_freq, this%num_dir
             do i = 1, this%num_freq
                read(14, *) this%freq(i)
@@ -192,12 +192,12 @@ contains
          end do
       end if
 
-      if (this%wavemaker_type(5:7) == 'JON') then
-         call sub_env%yaml%read('hm0',      val=this%hm0)
-         call sub_env%yaml%read('tp',       val=this%tp)
-         call sub_env%yaml%read('freq_min', val=this%freq_min)
-         call sub_env%yaml%read('freq_max', val=this%freq_max)
-         call sub_env%yaml%read('num_freq', val=this%num_freq)
+      if (this%wavemaker_type(5:7) == "JON") then
+         call sub_env%yaml%read("hm0",      val=this%hm0)
+         call sub_env%yaml%read("tp",       val=this%tp)
+         call sub_env%yaml%read("freq_min", val=this%freq_min)
+         call sub_env%yaml%read("freq_max", val=this%freq_max)
+         call sub_env%yaml%read("num_freq", val=this%num_freq)
 
          dfreq     = (this%freq_max - this%freq_min) / this%num_freq
          do i = 1, this%num_freq

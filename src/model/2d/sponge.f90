@@ -100,24 +100,24 @@ contains
       type(type_env) :: sub_env
       logical :: no_sp, no_key
 
-      sub_env = get_sub_env(env, 'sponge', is_empty=no_sp)
+      sub_env = get_sub_env(env, "sponge", is_empty=no_sp)
       this%is_activated = .not. no_sp
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read('diffusion_sponge', val=this%diffusion_sponge, default=DEF_SPONGE_DIFFUSION_SPONGE)
-      call sub_env%yaml%read('direct_sponge',    val=this%direct_sponge,    default=DEF_SPONGE_DIRECT_SPONGE)
-      call sub_env%yaml%read('friction_sponge',  val=this%friction_sponge,  default=DEF_SPONGE_FRICTION_SPONGE)
+      call sub_env%yaml%read("diffusion_sponge", val=this%diffusion_sponge, default=DEF_SPONGE_DIFFUSION_SPONGE)
+      call sub_env%yaml%read("direct_sponge",    val=this%direct_sponge,    default=DEF_SPONGE_DIRECT_SPONGE)
+      call sub_env%yaml%read("friction_sponge",  val=this%friction_sponge,  default=DEF_SPONGE_FRICTION_SPONGE)
 
-      call sub_env%yaml%read('Csp',      silent=no_key, val=this%Csp,      default=DEF_SPONGE_CSP)
-      call sub_env%yaml%read('CDsponge', silent=no_key, val=this%CDsponge, default=DEF_SPONGE_CDSPONGE)
+      call sub_env%yaml%read("Csp",      silent=no_key, val=this%Csp,      default=DEF_SPONGE_CSP)
+      call sub_env%yaml%read("CDsponge", silent=no_key, val=this%CDsponge, default=DEF_SPONGE_CDSPONGE)
 
-      call sub_env%yaml%read('Sponge_west_width',  silent=no_key, val=this%Sponge_west_width,  default=DEF_SPONGE_SPONGE_WEST_WIDTH)
-      call sub_env%yaml%read('Sponge_east_width',  silent=no_key, val=this%Sponge_east_width,  default=DEF_SPONGE_SPONGE_EAST_WIDTH)
-      call sub_env%yaml%read('Sponge_south_width', silent=no_key, val=this%Sponge_south_width, default=DEF_SPONGE_SPONGE_SOUTH_WIDTH)
-      call sub_env%yaml%read('Sponge_north_width', silent=no_key, val=this%Sponge_north_width, default=DEF_SPONGE_SPONGE_NORTH_WIDTH)
+      call sub_env%yaml%read("Sponge_west_width",  silent=no_key, val=this%Sponge_west_width,  default=DEF_SPONGE_SPONGE_WEST_WIDTH)
+      call sub_env%yaml%read("Sponge_east_width",  silent=no_key, val=this%Sponge_east_width,  default=DEF_SPONGE_SPONGE_EAST_WIDTH)
+      call sub_env%yaml%read("Sponge_south_width", silent=no_key, val=this%Sponge_south_width, default=DEF_SPONGE_SPONGE_SOUTH_WIDTH)
+      call sub_env%yaml%read("Sponge_north_width", silent=no_key, val=this%Sponge_north_width, default=DEF_SPONGE_SPONGE_NORTH_WIDTH)
 
-      call sub_env%yaml%read('R_sponge', silent=no_key, val=this%R_sponge, default=DEF_SPONGE_R_SPONGE)
-      call sub_env%yaml%read('A_sponge', silent=no_key, val=this%A_sponge, default=DEF_SPONGE_A_SPONGE)
+      call sub_env%yaml%read("R_sponge", silent=no_key, val=this%R_sponge, default=DEF_SPONGE_R_SPONGE)
+      call sub_env%yaml%read("A_sponge", silent=no_key, val=this%A_sponge, default=DEF_SPONGE_A_SPONGE)
 
    end subroutine sponge_read_input
 

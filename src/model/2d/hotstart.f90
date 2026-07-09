@@ -58,20 +58,20 @@ contains
       type(type_env) :: sub_env
       logical :: no_hs, no_u, no_v, no_mask
 
-      sub_env = get_sub_env(env, 'hot_start', is_empty=no_hs)
+      sub_env = get_sub_env(env, "hot_start", is_empty=no_hs)
       this%is_activated = .not. no_hs
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read_input_path('eta_file', val=this%eta_file)
-      call sub_env%yaml%read_input_path('u_file',    silent=no_u,    val=this%u_file)
-      call sub_env%yaml%read_input_path('v_file',    silent=no_v,    val=this%v_file)
-      call sub_env%yaml%read_input_path('mask_file', silent=no_mask, val=this%mask_file)
+      call sub_env%yaml%read_input_path("eta_file", val=this%eta_file)
+      call sub_env%yaml%read_input_path("u_file",    silent=no_u,    val=this%u_file)
+      call sub_env%yaml%read_input_path("v_file",    silent=no_v,    val=this%v_file)
+      call sub_env%yaml%read_input_path("mask_file", silent=no_mask, val=this%mask_file)
       this%no_uv_file   = no_u .or. no_v
       this%no_mask_file = no_mask
 
-      call sub_env%yaml%read('bed_deformation', val=this%bed_deformation, default='NO')
-      call sub_env%yaml%read_nonnegative('time', val=this%time, default='0.0')
-      call sub_env%yaml%read_positive('output_start_number', val=this%output_start_number, default='1')
+      call sub_env%yaml%read("bed_deformation", val=this%bed_deformation, default="NO")
+      call sub_env%yaml%read_nonnegative("time", val=this%time, default="0.0")
+      call sub_env%yaml%read_positive("output_start_number", val=this%output_start_number, default="1")
 
    end subroutine hot_start_read_input
 

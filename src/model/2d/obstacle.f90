@@ -51,17 +51,17 @@ contains
       type(type_env) :: sub_env
       logical :: no_blk, no_obs, no_bw, no_key
 
-      sub_env = get_sub_env(env, 'obstacle', is_empty=no_blk)
+      sub_env = get_sub_env(env, "obstacle", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read_input_path('obstacle_file',   silent=no_obs, val=this%obstacle_file)
-      call sub_env%yaml%read_input_path('breakwater_file', silent=no_bw,  val=this%breakwater_file)
+      call sub_env%yaml%read_input_path("obstacle_file",   silent=no_obs, val=this%obstacle_file)
+      call sub_env%yaml%read_input_path("breakwater_file", silent=no_bw,  val=this%breakwater_file)
 
       this%obstacle   = .not. no_obs
       this%breakwater = .not. no_bw
 
-      call sub_env%yaml%read('BreakWaterAbsorbCoef', silent=no_key, &
+      call sub_env%yaml%read("BreakWaterAbsorbCoef", silent=no_key, &
                               val=this%BreakWaterAbsorbCoef, default=DEF_OBSTACLE_BREAKWATERABSORBCOEF)
 
    end subroutine obstacle_read_input
