@@ -7,6 +7,9 @@ target_link_libraries(test_scratch_pool libfunwave_model)
 qadd_pfunit_ctest(test_sponge 2)
 target_link_libraries(test_sponge libfunwave_model)
 
+qadd_pfunit_ctest(test_wavemaker 4)
+target_link_libraries(test_wavemaker libfunwave_model)
+
 qadd_pfunit_ctest(test_geometry 4)
 target_link_libraries(test_geometry libfunwave_model)
 

@@ -5,6 +5,16 @@
 !
 !  Wavemaker parameters YAML reader (bridge)
 !
+!  Wavemaker taxonomy — three distinct integration points in the engine:
+!    * initial-condition types (INI_SOLITARY, INI_REC/GAU/DIP, N_WAVE):
+!      one-shot state fill at t=0 via apply_ic(); no per-step work.
+!    * internal source types (WK_REG, WK_IRR, TMA_1D/JON_1D/JON_2D,
+!      WK_TIME, WK_NEW_*): continuous generation — per-step source
+!      arrays (wavemaker_mass) consumed by kernel_sources (Step 6d).
+!    * boundary types (ABS, LEFT_BC_IRR, LEF_SOL): own the west ghost
+!      strip each step — the BC service must skip the wall mirror there
+!      (fill_west=.false. in kernel_bc).
+!
 !  YAML block: wavemaker:       (top-level; omit for no wavemaker)
 !    type: <string>             default 'nothing'
 !    --- shared position/ramp ---
@@ -91,6 +101,7 @@ module model_wavemaker_mod
 
    private
    public :: type_model_wavemaker
+   public :: solitary_coefficients
 
    type, extends(type_model_base) :: type_model_wavemaker
 
@@ -164,6 +175,7 @@ module model_wavemaker_mod
 
    contains
       procedure :: read_input => wavemaker_read_input
+      procedure :: apply_ic   => wavemaker_apply_ic
    end type type_model_wavemaker
 
 contains
@@ -254,5 +266,111 @@ contains
       this%WaveMakerCurrentBalance = .not. no_key
 
    end subroutine wavemaker_read_input
+
+   ! ----------------------------------------------------------------
+   ! Initial-condition wavemakers: fill eta/u/v at t=0.
+   ! Currently INI_SOLITARY only (legacy INITIAL_SOLITARY_WAVE,
+   ! old/samples.F); INI_REC/INI_GAU/INI_DIP/N_WAVE to follow.
+   ! No-op (still water) for source/BC wavemaker types.
+   !
+   ! WKN-B solitary solution (Wei & Kirby Boussinesq, Nwogu form):
+   !   $$ \eta(\xi) = a_1\,\mathrm{sech}^2(B\xi) + a_2\,\mathrm{sech}^4(B\xi) $$
+   !   $$ u(\xi)    = \pm a_u\,\mathrm{sech}^2(B\xi), \qquad v = 0 $$
+   ! with $\xi$ measured from the crest at $x_{wm}$ (XWAVEMAKER).
+   ! The legacy index form is preserved exactly: for ghost-inclusive
+   ! local index i,
+   !   $$ \xi = \big[(i_{beg}-1) + i - x_{wm}/\Delta x - 1\big]\Delta x $$
+   ! which lands the crest at global ghost-inclusive index
+   ! $x_{wm}/\Delta x + 1$, i.e. N_GHOST cells shoreward of interior
+   ! $x = x_{wm}$ — kept for legacy parity.
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_apply_ic(this, grid, eta, u, v)
+      use core_grid_mod, only: type_grid_2d
+      class(type_model_wavemaker), intent(in)  :: this
+      type(type_grid_2d),          intent(in)  :: grid
+      real(SP),                    intent(out) :: eta(:,:), u(:,:), v(:,:)
+
+      real(SP) :: c_ph, b, a1, a2, au, sc, usign
+      integer  :: i, j
+
+      eta = 0.0_SP
+      u   = 0.0_SP
+      v   = 0.0_SP
+
+      if (this%wavemaker_type /= 'INI_SOLITARY') return
+
+      call solitary_coefficients(this%AMP_SOLI, this%DEP_SOLI, c_ph, b, a1, a2, au)
+
+      usign = 1.0_SP
+      if (.not. this%SolitaryPositiveDirection) usign = -1.0_SP
+
+      do j = 1, grid%lp%nloc
+         do i = 1, grid%lp%mloc
+            sc = 1.0_SP / cosh(b * (real(grid%ibegin - 1 + i, SP) &
+                                    - this%XWAVEMAKER/grid%dx0 - 1.0_SP) * grid%dx0)
+            eta(i, j) = a1*sc*sc + a2*sc*sc*sc*sc
+            u(i, j)   = usign * au * sc*sc
+         end do
+      end do
+
+   end subroutine wavemaker_apply_ic
+
+   ! ----------------------------------------------------------------
+   ! Solitary-wave coefficients (legacy SUB_SLTRY, old/samples.F).
+   ! For amplitude $a_0$, depth $h$, Nwogu reference-level parameter
+   ! $\alpha$ ($\alpha_2 = \alpha + 1/3$, $\epsilon = a_0/h$), solve
+   !   $$ x^3 + p x^2 + q x + r = 0, \qquad x > 1 $$
+   !   $$ p = -\frac{\alpha_2 + 2\alpha(1+\epsilon)}{2\alpha}, \quad
+   !      q = \frac{\epsilon\,\alpha_2}{\alpha}, \quad
+   !      r = \frac{\alpha_2}{2\alpha} $$
+   ! by Newton iteration from $x = 1.2$.  Then, with $c = \sqrt{gh}$:
+   !   $$ C_{ph} = c\sqrt{x}, \qquad
+   !      a_u = \frac{(x-1)\,c}{\sqrt{x}}, \qquad
+   !      B = \frac{1}{h}\sqrt{\frac{x-1}{4(\alpha_2 - \alpha x)}} $$
+   !   $$ a_1 = \frac{(x-1)}{3\epsilon\,(\alpha_2 - \alpha x)}\,a_0, \qquad
+   !      a_2 = -\frac{(x-1)^2\,(2\alpha x + \alpha_2)}
+   !                  {2\epsilon\,x\,(\alpha_2 - \alpha x)}\,a_0 $$
+   ! alpha is fixed at -0.39: legacy notes that the analytic
+   ! $\alpha = \beta^2/2 + \beta$ with $\beta = -0.531$ mismatches the
+   ! wave shape and keeps -0.39 empirically.
+   ! ----------------------------------------------------------------
+   subroutine solitary_coefficients(amp, dep, c_ph, b, a1, a2, au)
+      use core_constants_mod, only: GRAV
+      real(SP), intent(in)  :: amp, dep
+      real(SP), intent(out) :: c_ph, b, a1, a2, au
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: alp2, eps, p, q, r, x, fx, fpx, rx, cph
+      integer  :: ite
+
+      alp2 = alpha + 1.0_SP/3.0_SP
+      eps  = amp / dep
+
+      p = -(alp2 + 2.0_SP*alpha*(1.0_SP + eps)) / (2.0_SP*alpha)
+      q = eps*alp2/alpha
+      r = alp2/(2.0_SP*alpha)
+
+      x = 1.2_SP
+      do ite = 1, 10
+         fx  = r + x*(q + x*(p + x))
+         fpx = q + x*(2.0_SP*p + 3.0_SP*x)
+         x   = x - fx/fpx
+         if (abs(fx) < 1e-5_SP) exit
+      end do
+      if (abs(fx) >= 1e-5_SP) then
+         error stop 'wavemaker: no solitary wave solution (check eps = AMP/DEP)'
+      end if
+
+      rx   = sqrt(x)
+      cph  = sqrt(GRAV*dep)
+      c_ph = rx*cph
+
+      au = (x - 1.0_SP)/(eps*rx)*cph*eps
+      b  = sqrt((x - 1.0_SP)/(4.0_SP*(alp2 - alpha*x)))/dep
+      a1 = (x - 1.0_SP)/(eps*3.0_SP*(alp2 - alpha*x))*amp
+      a2 = -(x - 1.0_SP)/(2.0_SP*eps)*(x - 1.0_SP)*(2.0_SP*alpha*x + alp2) &
+           /(x*(alp2 - alpha*x))*amp
+
+   end subroutine solitary_coefficients
 
 end module model_wavemaker_mod
