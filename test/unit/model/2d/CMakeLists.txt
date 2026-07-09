@@ -7,6 +7,9 @@ target_link_libraries(test_scratch_pool libfunwave_model)
 qadd_pfunit_ctest(test_sponge 2)
 target_link_libraries(test_sponge libfunwave_model)
 
+qadd_pfunit_ctest(test_kernel_bc)
+target_link_libraries(test_kernel_bc libfunwave_model)
+
 qadd_pfunit_ctest(test_kernel_derivatives)
 target_link_libraries(test_kernel_derivatives libfunwave_model)
 

@@ -1,0 +1,175 @@
+! allow(E001)
+module test_kernel_bc
+
+   use pFUnit
+   use core_constants_mod,  only: SP
+   use core_grid_mod,       only: type_loop_bounds
+   use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR, SIGN_ANTI
+
+   implicit none
+
+   integer, parameter :: NG   = 3
+   integer, parameter :: LNX  = 6
+   integer, parameter :: LNY  = 5
+   integer, parameter :: MLOC = LNX + 2*NG   ! 12
+   integer, parameter :: NLOC = LNY + 2*NG   ! 11
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_lp(lp)
+      type(type_loop_bounds), intent(out) :: lp
+      lp%ib = NG + 1;  lp%ie = NG + LNX
+      lp%jb = NG + 1;  lp%je = NG + LNY
+      lp%mloc = MLOC;  lp%nloc = NLOC
+   end subroutine make_lp
+
+   ! Interior filled with a unique value per cell; ghosts poisoned.
+   subroutine make_field(lp, f)
+      type(type_loop_bounds), intent(in)  :: lp
+      real(SP),               intent(out) :: f(MLOC, NLOC)
+      integer :: i, j
+      f = -999.0_SP
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            f(i, j) = real(100*i + j, SP)
+         end do
+      end do
+   end subroutine make_field
+
+   ! ----------------------------------------------------------------
+   ! Scalar mirror (VTYPE=1): ghost k reflects interior cell across
+   ! the boundary face on all four sides.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_scalar_mirror_all_sides()
+      type(type_loop_bounds) :: lp
+      real(SP) :: f(MLOC, NLOC)
+      integer  :: j, k
+
+      call make_lp(lp)
+      call make_field(lp, f)
+
+      call fill_ghost_wall(lp, .true., .true., .true., .true., &
+                           SIGN_MIRROR, SIGN_MIRROR, f)
+
+      do j = lp%jb, lp%je
+         do k = 1, NG
+            ! west: f(k) = f(2*NG+1-k)
+            @assertEqual(f(2*NG + 1 - k, j), f(k, j))
+            ! east: f(ie+k) = f(ie-k+1)
+            @assertEqual(f(lp%ie - k + 1, j), f(lp%ie + k, j))
+         end do
+      end do
+      do k = 1, NG
+         ! south/north mirror along y (checked on an interior column)
+         @assertEqual(f(lp%ib + 2, 2*NG + 1 - k), f(lp%ib + 2, k))
+         @assertEqual(f(lp%ib + 2, lp%je - k + 1), f(lp%ib + 2, lp%je + k))
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_scalar_mirror_all_sides
+
+   ! ----------------------------------------------------------------
+   ! Corner ghosts: y-fill sweeps i = 1..mloc after the x-fill, so a
+   ! corner ghost equals the y-mirror of an x-ghost column.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_corner_from_x_ghost_column()
+      type(type_loop_bounds) :: lp
+      real(SP) :: f(MLOC, NLOC)
+
+      call make_lp(lp)
+      call make_field(lp, f)
+
+      call fill_ghost_wall(lp, .true., .true., .true., .true., &
+                           SIGN_MIRROR, SIGN_MIRROR, f)
+
+      ! southwest corner (1,1): y-mirror of x-ghost f(1, 2*NG) which
+      ! itself mirrors interior f(2*NG, 2*NG)
+      @assertEqual(f(2*NG, 2*NG), f(1, 1))
+      ! no poison left anywhere
+      @assertFalse(any(f == -999.0_SP))
+
+      call dummy_fix_lint()
+   end subroutine test_corner_from_x_ghost_column
+
+   ! ----------------------------------------------------------------
+   ! u-velocity (VTYPE=2): antisymmetric across x-walls, symmetric
+   ! across y-walls.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_u_antisymmetric_x()
+      type(type_loop_bounds) :: lp
+      real(SP) :: f(MLOC, NLOC)
+      integer  :: j, k
+
+      call make_lp(lp)
+      call make_field(lp, f)
+
+      call fill_ghost_wall(lp, .true., .true., .true., .true., &
+                           SIGN_ANTI, SIGN_MIRROR, f)
+
+      do j = lp%jb, lp%je
+         do k = 1, NG
+            @assertEqual(-f(2*NG + 1 - k, j), f(k, j))
+            @assertEqual(-f(lp%ie - k + 1, j), f(lp%ie + k, j))
+         end do
+      end do
+      do k = 1, NG
+         @assertEqual(f(lp%ib + 1, 2*NG + 1 - k), f(lp%ib + 1, k))
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_u_antisymmetric_x
+
+   ! ----------------------------------------------------------------
+   ! v-velocity (VTYPE=3): symmetric across x-walls, antisymmetric
+   ! across y-walls.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_v_antisymmetric_y()
+      type(type_loop_bounds) :: lp
+      real(SP) :: f(MLOC, NLOC)
+      integer  :: k
+
+      call make_lp(lp)
+      call make_field(lp, f)
+
+      call fill_ghost_wall(lp, .true., .true., .true., .true., &
+                           SIGN_MIRROR, SIGN_ANTI, f)
+
+      do k = 1, NG
+         @assertEqual(f(lp%ib, 2*NG + 1 - k), -f(lp%ib, k))
+         @assertEqual(f(lp%ib, lp%je - k + 1), -f(lp%ib, lp%je + k))
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_v_antisymmetric_y
+
+   ! ----------------------------------------------------------------
+   ! Unflagged sides stay untouched (interior-rank / periodic /
+   ! wavemaker-exempt case).
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_unflagged_sides_untouched()
+      type(type_loop_bounds) :: lp
+      real(SP) :: f(MLOC, NLOC)
+
+      call make_lp(lp)
+      call make_field(lp, f)
+
+      call fill_ghost_wall(lp, .true., .false., .false., .false., &
+                           SIGN_MIRROR, SIGN_MIRROR, f)
+
+      ! east x-ghost strip and both y-ghost strips keep the poison value
+      @assertTrue(all(f(lp%ie+1:, lp%jb:lp%je) == -999.0_SP))
+      @assertTrue(all(f(:, 1:NG) == -999.0_SP))
+      @assertTrue(all(f(:, lp%je+1:) == -999.0_SP))
+
+      call dummy_fix_lint()
+   end subroutine test_unflagged_sides_untouched
+
+end module test_kernel_bc

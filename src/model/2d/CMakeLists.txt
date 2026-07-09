@@ -2,6 +2,7 @@ target_sources(${main_lib}_model PRIVATE
    config_defaults.f90
    fields.f90
    scratch.f90
+   kernel_bc.f90
    kernel_derivatives.f90
    kernel_fluxes.f90
    kernel_masks.f90
