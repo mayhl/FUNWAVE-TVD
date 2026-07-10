@@ -38,6 +38,7 @@ module model_main_mod
    use model_coupling_mod, only: type_model_coupling
 
    use model_fields_2d_mod, only: type_fields_2d
+   use model_means_mod, only: type_model_means
    use model_stepper_2d_mod, only: type_model_stepper_2d
 
    implicit none
@@ -73,6 +74,9 @@ module model_main_mod
       type(type_grid_2d)        :: grid
       type(type_fields_2d)      :: fields
       type(type_field_registry) :: registry
+      ! Time-averaged statistics (legacy MIXING_STUFF port) — engine
+      ! path only, initialised in run()
+      type(type_model_means)    :: means
    contains
       procedure :: init
       procedure :: init_from_env => model_init_from_env
@@ -261,11 +265,12 @@ contains
       call this%sponge%merge_friction(this%friction%Cd, this%fields%depth)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
+      call this%means%init_compute(this%grid, this%env%comm, this%output)
 
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
-                        this%sponge)
+                        this%sponge, this%means)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -279,6 +284,7 @@ contains
 
       call output_mgr%finalize()
       call stepper%free()
+      call this%means%free()
 
    end subroutine model_run
 

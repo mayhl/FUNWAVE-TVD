@@ -15,8 +15,7 @@
 !    [-> wavemaker BC (ABS/LEFT_BC_IRR): later 6d rung] -> sponge damping.
 !
 !  Not yet ported (deferred, with their features):
-!    - MIXING_STUFF time-averaged statistics (post_step TODO)
-!    - radiation-stress diagnostics U_davg/V_davg (means port covers
+!    - radiation-stress diagnostics U_davg/V_davg (means.f90 covers
 !      the compared P_center/Q_center sums only)
 !    - Wsurf surface vertical velocity (foam / 3D coupling)
 !    - tidal BC, sediment, foam, meteo, vessel, tracker hooks
@@ -49,6 +48,7 @@ module model_stepper_2d_mod
    use model_output_mod, only: type_model_output
    use model_wavemaker_mod, only: type_model_wavemaker
    use model_sponge_mod, only: type_model_sponge
+   use model_means_mod, only: type_model_means
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -88,6 +88,7 @@ module model_stepper_2d_mod
       type(type_model_output), pointer :: output => null()
       type(type_model_wavemaker), pointer :: wavemaker => null()
       type(type_model_sponge), pointer :: sponge => null()
+      type(type_model_means), pointer :: means => null()
 
       type(type_model_bc) :: bc
 
@@ -99,6 +100,9 @@ module model_stepper_2d_mod
 
       ! Breaking-age threshold (legacy T_brk; wavemaker may override)
       real(SP) :: t_brk = T_BRK_LEGACY
+
+      ! dt of the step in flight (estimate_dt -> post_step means/stats)
+      real(SP) :: dt_step = 0.0_SP
 
       ! LEFT_BC_IRR west exemptions (ledger 11): skip the west
       ! cross-derivative zeroing and fold the known ghost U into the
@@ -135,7 +139,6 @@ module model_stepper_2d_mod
       real(SP), allocatable :: zeros(:, :)             ! inactive-source stand-in
 
       ! Breaking extras (allocated when viscosity_breaking).
-      real(SP), allocatable :: etamean(:, :)           ! mixing port pending: 0
       real(SP), allocatable :: roller_flux(:, :)
       real(SP), allocatable :: undertow_u(:, :), undertow_v(:, :)
       logical, allocatable :: in_wm_zone(:, :)         ! breaker's wavemaker-zone flags
@@ -169,7 +172,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker, sponge)
+                           wavemaker, sponge, means)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -188,6 +191,8 @@ contains
       ! likewise sponge%init_compute (direct-sponge coeff)
       type(type_model_wavemaker), intent(inout), target :: wavemaker
       type(type_model_sponge), intent(inout), target :: sponge
+      ! means%init_compute must have run (the breaker reads etamean)
+      type(type_model_means), intent(inout), target :: means
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -202,6 +207,7 @@ contains
       this%output => output
       this%wavemaker => wavemaker
       this%sponge => sponge
+      this%means => means
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -303,7 +309,6 @@ contains
       end if
 
       if (this%physics%viscosity_breaking) then
-         allocate (this%etamean(mloc, nloc), source=0.0_SP)
          allocate (this%roller_flux(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_u(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_v(mloc, nloc), source=0.0_SP)
@@ -362,6 +367,7 @@ contains
                                         this%simulation%fixed_dt, &
                                         this%simulation%dt_fixed, dt)
       end associate
+      this%dt_step = dt
 
    end subroutine stepper_estimate_dt
 
@@ -478,10 +484,9 @@ contains
                            phy%viscosity_breaking)
 
          if (phy%viscosity_breaking) then
-            ! TODO(6d/6e): vis_scheme selection, wavemaker zone flags, and
-            ! ETAmean (mixing port) — untestable until the wavemaker rungs.
+            ! TODO(6e+): vis_scheme selection beyond DEFAULT
             call wave_breaking(lp, this%etax, this%etay, this%etat, &
-                               f%eta, f%depth, f%h, f%u, f%v, this%etamean, &
+                               f%eta, f%depth, f%h, f%u, f%v, this%means%etamean, &
                                this%dx, this%dy, dt, this%t_brk, &
                                num%MinDepthFrc, this%breaking%Cbrk1, &
                                this%breaking%Cbrk2, this%breaking%WAVEMAKER_Cbrk, &
@@ -556,7 +561,10 @@ contains
       real(SP) :: max_abs_eta
       integer :: ierr
 
-      ! TODO: MIXING_STUFF (time-averaged statistics) — deferred port
+      ! Legacy MIXING_STUFF: means accumulate on the completed step
+      ! (last-stage interface fluxes feed the P_center/Q_center sums)
+      call this%means%update(this%fields, this%fws%p, this%fws%q, &
+                             this%numerics%MinDepthFrc, this%dt_step, time)
 
       call update_max_min(this, time)
 
@@ -716,8 +724,8 @@ contains
                                           this%u1pp, this%v1pp, this%u2, this%v2, &
                                           this%u3, this%v3, this%src_x, this%src_y, &
                                           this%zeros)
-      if (allocated(this%etamean)) deallocate (this%etamean, this%roller_flux, &
-                                               this%undertow_u, this%undertow_v)
+      if (allocated(this%roller_flux)) deallocate (this%roller_flux, &
+                                                   this%undertow_u, this%undertow_v)
       if (allocated(this%in_wm_zone)) deallocate (this%in_wm_zone)
       if (allocated(this%nu_vis)) deallocate (this%nu_vis)
       if (allocated(this%mask_out)) deallocate (this%mask_out)
@@ -734,6 +742,7 @@ contains
       this%output => null()
       this%wavemaker => null()
       this%sponge => null()
+      this%means => null()
 
    end subroutine stepper_free
 
