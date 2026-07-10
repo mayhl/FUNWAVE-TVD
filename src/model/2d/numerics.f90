@@ -84,6 +84,10 @@ contains
       call sub_env%yaml%read("FroudeCap", silent=no_key, val=this%FroudeCap, default=DEF_NUMERICS_FROUDECAP)
       call sub_env%yaml%read("MinDepth", silent=no_key, val=this%MinDepth, default=DEF_NUMERICS_MINDEPTH)
       call sub_env%yaml%read("MinDepthFrc", silent=no_key, val=this%MinDepthFrc, default=DEF_NUMERICS_MINDEPTHFRC)
+      ! legacy io.F folds the pair to their minimum (both floors track
+      ! the smaller of the two; setting only MinDepth is the common case)
+      this%MinDepthFrc = min(this%MinDepthFrc, this%MinDepth)
+      this%MinDepth = this%MinDepthFrc
 
       call sub_env%yaml%read("OUT_Time", val=this%OUT_Time, default=DEF_NUMERICS_OUT_TIME)
       call sub_env%yaml%read("ArrTimeMinH", silent=no_key, val=this%ArrTimeMin, default=DEF_NUMERICS_ARRTIMEMINH)
