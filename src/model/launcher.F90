@@ -83,15 +83,14 @@ contains
       external :: run_legacy_2d  ! src/model/2d/old/legacy_runner.F
 
       call model%init_from_env(env)
-      if (model%simulation%engine == "modern") then
-         ! Phase 6c stepper-engine path (opt-in via simulation: engine:
-         ! modern until the 6e switchover).
-         call model%run()
-      else
-         ! Bridge: run_legacy_2d calls READ_INPUT (which re-reads via
-         ! model%init() internally) to populate MODULE GLOBALs, then runs
-         ! the full simulation loop.
+      if (model%simulation%engine == "legacy") then
+         ! Parity escape hatch (simulation: engine: legacy):
+         ! run_legacy_2d calls READ_INPUT (re-reads via model%init()
+         ! internally) to populate MODULE GLOBALs, then runs the full
+         ! legacy loop.  Default is the stepper engine since 6e.
          call run_legacy_2d()
+      else
+         call model%run()
       end if
       call model%finalize()
    end subroutine run_2d
