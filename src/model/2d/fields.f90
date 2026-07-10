@@ -26,6 +26,8 @@ module model_fields_2d_mod
       real(SP), allocatable :: u(:, :)     !< depth-averaged x-velocity p/H    [m/s]  (U)
       real(SP), allocatable :: v(:, :)     !< depth-averaged y-velocity q/H    [m/s]  (V)
       real(SP), allocatable :: h(:, :)     !< total water depth eta+depth       [m]    (H)
+      real(SP), allocatable :: hu(:, :)    !< cell-centred x volume flux H*u   [m2/s] (HU)
+      real(SP), allocatable :: hv(:, :)    !< cell-centred y volume flux H*v   [m2/s] (HV)
 
       ! ── Bathymetry ───────────────────────────────────────────────────────
       ! Set at initialisation; static unless bed-deformation is enabled.
@@ -59,6 +61,7 @@ module model_fields_2d_mod
       ! Allocated by alloc_breaking(); unallocated = breaking disabled.
       ! Velocity gradients are recomputed each step (same stencil as dispersion.F).
       real(SP), allocatable :: nu_break(:, :) !< breaking eddy viscosity        [m2/s]  (nu_break)
+      real(SP), allocatable :: age_break(:, :)!< breaking-event age             [s]     (AGE_BREAKING)
       real(SP), allocatable :: ux(:, :)       !< du/dx                          [1/s]   (Ux)
       real(SP), allocatable :: uy(:, :)       !< du/dy                          [1/s]   (Uy)
       real(SP), allocatable :: vx(:, :)       !< dv/dx                          [1/s]   (Vx)
@@ -95,6 +98,8 @@ contains
       allocate (this%u(mloc, nloc), source=0.0_SP)
       allocate (this%v(mloc, nloc), source=0.0_SP)
       allocate (this%h(mloc, nloc), source=0.0_SP)
+      allocate (this%hu(mloc, nloc), source=0.0_SP)
+      allocate (this%hv(mloc, nloc), source=0.0_SP)
 
       allocate (this%depth(mloc, nloc), source=0.0_SP)
       allocate (this%depth_node(mloc, nloc), source=0.0_SP)
@@ -129,6 +134,7 @@ contains
       nloc = grid%local_ny + 2*ng
 
       allocate (this%nu_break(mloc, nloc), source=0.0_SP)
+      allocate (this%age_break(mloc, nloc), source=0.0_SP)
       allocate (this%ux(mloc, nloc), source=0.0_SP)
       allocate (this%uy(mloc, nloc), source=0.0_SP)
       allocate (this%vx(mloc, nloc), source=0.0_SP)
@@ -182,6 +188,8 @@ contains
       if (allocated(this%u)) deallocate (this%u)
       if (allocated(this%v)) deallocate (this%v)
       if (allocated(this%h)) deallocate (this%h)
+      if (allocated(this%hu)) deallocate (this%hu)
+      if (allocated(this%hv)) deallocate (this%hv)
 
       if (allocated(this%depth)) deallocate (this%depth)
       if (allocated(this%depth_node)) deallocate (this%depth_node)
@@ -204,6 +212,7 @@ contains
       if (allocated(this%arr_time)) deallocate (this%arr_time)
 
       if (allocated(this%nu_break)) deallocate (this%nu_break)
+      if (allocated(this%age_break)) deallocate (this%age_break)
       if (allocated(this%ux)) deallocate (this%ux)
       if (allocated(this%uy)) deallocate (this%uy)
       if (allocated(this%vx)) deallocate (this%vx)
