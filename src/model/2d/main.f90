@@ -229,12 +229,17 @@ contains
 
       call this%setup()
       call this%friction%init_compute(this%grid)
+      call this%sponge%init_compute(this%grid)
+      ! NOTE: max-merge, where legacy adds the sponge drag on top of Cd
+      ! — identical while Cd = 0 in the sponge zone (all current tests)
+      call this%sponge%merge_friction(this%friction%Cd, this%fields%depth)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env)
 
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &
-                        this%simulation, this%output, this%wavemaker)
+                        this%simulation, this%output, this%wavemaker, &
+                        this%sponge)
 
       call build_field_channel(this, output_mgr)
       monitor%mgr => output_mgr

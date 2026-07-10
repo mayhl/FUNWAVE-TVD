@@ -221,11 +221,14 @@ contains
 
    ! ── Apply (direct sponge only) ────────────────────────────────────────────
 
-   !> Apply Larsen-Dancy (1983) post-step damping to the prognostic state.
+   !> Apply Larsen-Dancy (1983) per-stage damping to the state
+   !> (legacy SPONGE_DAMPING, old/sponge.F).
    !>
-   !> Divides eta/p/q by coeff(i,j) at every ghost-inclusive cell.
-   !> eta is only damped at wet cells (mask > 0).
-   !> p and q are always damped (consistent with FUNWAVE-TVD legacy behaviour).
+   !> Divides eta/u/v by coeff(i,j) at every ghost-inclusive cell.
+   !> eta is only damped at wet cells (mask > 0); u/v always.  Legacy
+   !> damps the velocities, NOT the conserved Ubar/Vbar — the damped
+   !> u/v feed the next stage's fluxes/sources while the tridiagonal
+   !> solves rebuild u/v from the undamped Ubar/Vbar.  Kept as is.
    !>
    !> Friction and diffusion sponge terms are RHS source contributions;
    !> their apply is in sources.f90 (refactor TODO).
@@ -247,8 +250,8 @@ contains
          do i = 1, mloc_g
             if (fields%mask(i, j) > 0) &
                fields%eta(i, j) = fields%eta(i, j)/this%coeff(i, j)
-            fields%p(i, j) = fields%p(i, j)/this%coeff(i, j)
-            fields%q(i, j) = fields%q(i, j)/this%coeff(i, j)
+            fields%u(i, j) = fields%u(i, j)/this%coeff(i, j)
+            fields%v(i, j) = fields%v(i, j)/this%coeff(i, j)
          end do
       end do
 

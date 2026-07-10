@@ -12,7 +12,7 @@
 !    dispersion -> fluxes -> wavemaker source -> sources -> RK update
 !    -> H -> tridiagonal U/V solves -> mask/HU/HV/Froude ->
 !    update_mask(9) -> breaking -> ghost exchange
-!    [-> wavemaker BC (ABS/LEFT_BC_IRR), sponge damping: later 6d rungs].
+!    [-> wavemaker BC (ABS/LEFT_BC_IRR): later 6d rung] -> sponge damping.
 !
 !  Not yet ported (deferred, with their features):
 !    - MIXING_STUFF time-averaged statistics (post_step TODO)
@@ -48,6 +48,7 @@ module model_stepper_2d_mod
    use model_simulation_mod, only: type_model_simulation
    use model_output_mod, only: type_model_output
    use model_wavemaker_mod, only: type_model_wavemaker
+   use model_sponge_mod, only: type_model_sponge
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, cal_dispersion
    use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, flux_wall_bc
@@ -81,6 +82,7 @@ module model_stepper_2d_mod
       type(type_model_simulation), pointer :: simulation => null()
       type(type_model_output), pointer :: output => null()
       type(type_model_wavemaker), pointer :: wavemaker => null()
+      type(type_model_sponge), pointer :: sponge => null()
 
       type(type_model_bc) :: bc
 
@@ -143,7 +145,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker)
+                           wavemaker, sponge)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -158,8 +160,10 @@ contains
       type(type_model_simulation), intent(inout), target :: simulation
       type(type_model_output), intent(inout), target :: output
       ! wavemaker%init_compute must have run (source coefficients and
-      ! zone box feed the mass source and the breaker zone flags)
+      ! zone box feed the mass source and the breaker zone flags);
+      ! likewise sponge%init_compute (direct-sponge coeff)
       type(type_model_wavemaker), intent(inout), target :: wavemaker
+      type(type_model_sponge), intent(inout), target :: sponge
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -173,6 +177,7 @@ contains
       this%simulation => simulation
       this%output => output
       this%wavemaker => wavemaker
+      this%sponge => sponge
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -415,8 +420,9 @@ contains
 
          call this%bc%exchange_state(this%grid, f)
 
-         ! wavemaker boundary injection (ABS / LEFT_BC_IRR) — Step 6d
-         ! direct sponge damping — Step 6d
+         ! wavemaker boundary injection (ABS / LEFT_BC_IRR) — later 6d rung
+
+         call this%sponge%apply(f, this%grid)
 
       end associate
 
@@ -586,6 +592,7 @@ contains
       this%simulation => null()
       this%output => null()
       this%wavemaker => null()
+      this%sponge => null()
 
    end subroutine stepper_free
 
