@@ -9,8 +9,9 @@
 !    * initial-condition types (INI_SOLITARY, INI_REC/GAU/DIP, N_WAVE):
 !      one-shot state fill at t=0 via apply_ic(); no per-step work.
 !    * internal source types (WK_REG, WK_IRR, TMA_1D/JON_1D/JON_2D,
-!      WK_TIME, WK_NEW_*): continuous generation — per-step source
-!      arrays (wavemaker_mass) consumed by kernel_sources (Step 6d).
+!      WK_TIME, WK_NEW_*): continuous generation — init_compute derives
+!      the generation coefficients, update_source refreshes the mass
+!      array each stage (WK_REG live; spectral types pending).
 !    * boundary types (ABS, LEFT_BC_IRR, LEF_SOL): own the west ghost
 !      strip each step — the BC service must skip the wall mirror there
 !      (fill_west=.false. in kernel_bc).
@@ -102,6 +103,7 @@ module model_wavemaker_mod
    private
    public :: type_model_wavemaker
    public :: solitary_coefficients
+   public :: wk_regular_coefficients
 
    type, extends(type_model_base) :: type_model_wavemaker
 
@@ -173,9 +175,26 @@ module model_wavemaker_mod
       logical  :: WaveMakerCurrentBalance = .false.
       real(SP) :: WaveMakerCd = 0.0_SP
 
+      ! Internal-source machinery (init_compute products; WK_REG so far)
+      logical  :: has_mass_source = .false.
+      real(SP) :: D_gen = 0.0_SP      ! source magnitude
+      real(SP) :: rlamda = 0.0_SP     ! along-crest wavenumber k sin(theta)
+      real(SP) :: Beta_gen = 0.0_SP   ! Gaussian shape factor
+      real(SP) :: Width_WK = 0.0_SP   ! source half-width delta*L/2
+      ! Wavemaker-frame coordinates (legacy xmk_wk/ymk_wk): x = 0 at the
+      ! first interior cell of the global domain; ghost entries follow
+      ! the same line (legacy recomputes them inline in breaker.F)
+      real(SP), allocatable :: xmk_wk(:), ymk_wk(:)
+      integer  :: ilo = 1, ihi = 0, jlo = 1, jhi = 0  ! interior cells inside the source box
+      real(SP), allocatable :: mass(:, :)             ! eta-equation source (legacy WaveMaker_Mass)
+
    contains
       procedure :: read_input => wavemaker_read_input
+      procedure :: init_compute => wavemaker_init_compute
       procedure :: apply_ic => wavemaker_apply_ic
+      procedure :: update_source => wavemaker_update_source
+      procedure :: fill_in_zone => wavemaker_fill_in_zone
+      procedure :: free => wavemaker_free
    end type type_model_wavemaker
 
 contains
@@ -266,6 +285,199 @@ contains
       this%WaveMakerCurrentBalance = .not. no_key
 
    end subroutine wavemaker_read_input
+
+   ! ----------------------------------------------------------------
+   ! Internal-source wavemaker setup (legacy WAVEMAKER_INITIALIZATION,
+   ! old/wavemaker.F + the xmk_wk/zone block of old/init.F).  WK_REG
+   ! only so far; spectral types join at their 6d rungs.  No-op for
+   ! IC/boundary wavemaker types.
+   !
+   ! Under periodic-y the wave angle must fit an integer number of
+   ! along-crest wavelengths in the domain: snap $\theta$ to the
+   ! nearest admissible $\sin\theta = m\,\frac{2\pi}{k\,\Delta y\,(N_{glob}-1)}$
+   ! (legacy loop, kept verbatim including the $N_{glob}-1$ measure).
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_init_compute(this, grid, periodic, env)
+      use core_grid_mod, only: type_grid_2d
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+
+      integer :: i, j, mloc, nloc
+
+      if (this%wavemaker_type /= "WK_REG") return
+      this%has_mass_source = .true.
+
+      ! legacy uses the scalar spacing (DXg) throughout the wavemaker
+      if (grid%dx0 <= 0.0_SP .or. grid%dy0 <= 0.0_SP) &
+         error stop "wavemaker: WK_REG requires uniform grid spacing"
+
+      if (periodic .and. this%Theta_WK /= 0.0_SP) &
+         call periodic_theta_snap(this, grid, env)
+
+      call wk_regular_coefficients(this%Tperiod, this%AMP_WK, this%Theta_WK, &
+                                   this%DEP_WK, this%Delta_WK, this%D_gen, &
+                                   this%rlamda, this%Beta_gen, this%Width_WK)
+
+      mloc = grid%lp%mloc
+      nloc = grid%lp%nloc
+      allocate (this%xmk_wk(mloc), this%ymk_wk(nloc))
+      ! two-term legacy form (I-Ibeg)*DXg + (iista-1)*DXg kept for parity
+      do i = 1, mloc
+         this%xmk_wk(i) = real(i - grid%lp%ib, SP)*grid%dx0 &
+                          + real(grid%ibegin - 1, SP)*grid%dx0
+      end do
+      do j = 1, nloc
+         this%ymk_wk(j) = real(j - grid%lp%jb, SP)*grid%dy0 &
+                          + real(grid%jbegin - 1, SP)*grid%dy0
+      end do
+
+      ! interior bounding box of the source region (legacy ilo/ihi/jlo/jhi)
+      this%ilo = grid%lp%ie + 1
+      this%ihi = grid%lp%ib - 1
+      this%jlo = grid%lp%je + 1
+      this%jhi = grid%lp%jb - 1
+      do i = grid%lp%ib, grid%lp%ie
+         if (abs(this%xmk_wk(i) - this%Xc_WK) < this%Width_WK) then
+            this%ilo = min(this%ilo, i)
+            this%ihi = max(this%ihi, i)
+         end if
+      end do
+      do j = grid%lp%jb, grid%lp%je
+         if (abs(this%ymk_wk(j) - this%Yc_WK) < this%Ywidth_WK/2.0_SP) then
+            this%jlo = min(this%jlo, j)
+            this%jhi = max(this%jhi, j)
+         end if
+      end do
+
+      allocate (this%mass(mloc, nloc), source=0.0_SP)
+
+   end subroutine wavemaker_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Per-stage mass source refresh (legacy SourceTerms head,
+   ! old/sources.F).  WK_REG:
+   !   $$ M(x,y,t) = r(t)\,D\,e^{-\beta(x - x_c)^2}
+   !                 \sin\!\big(\lambda y - \omega t\big), \qquad
+   !      r(t) = \tanh\!\Big(\frac{\pi t}{\tau T}\Big) $$
+   ! Cells outside the source box stay zero, which makes the
+   ! unconditional adds in cal_rk_update/cal_sources identical to the
+   ! legacy per-cell zone tests.  time is constant across RK stages
+   ! (legacy TIME advances in ESTIMATE_DT), so the per-stage call
+   ! recomputes the same values — kept legacy-shaped.
+   ! FUTURE: hoist to once per step
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_update_source(this, time)
+      use core_constants_mod, only: PI
+      class(type_model_wavemaker), intent(inout) :: this
+      real(SP), intent(in) :: time
+
+      real(SP) :: aa, ramp, omg
+      integer :: i, j
+
+      if (.not. this%has_mass_source) return
+
+      ! legacy leans on IEEE tanh(inf) = 1 when Time_ramp = 0; guard
+      ! gives the same value without the divide-by-zero
+      ramp = 1.0_SP
+      if (this%Time_ramp > 0.0_SP) &
+         ramp = tanh(PI/(this%Time_ramp*this%Tperiod)*time)
+      aa = ramp*this%D_gen
+      omg = 2.0_SP*PI/this%Tperiod
+
+      do j = this%jlo, this%jhi
+         do i = this%ilo, this%ihi
+            this%mass(i, j) = aa*exp(-this%Beta_gen*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                              *sin(this%rlamda*this%ymk_wk(j) - omg*time)
+         end do
+      end do
+
+   end subroutine wavemaker_update_source
+
+   ! ----------------------------------------------------------------
+   ! Wavemaker-zone flags for the breaker (legacy per-cell box test in
+   ! old/breaker.F; there WAVEMAKER_Cbrk replaces the breaking-age
+   ! scheme).  All false for non-source wavemakers — legacy gets the
+   ! same from Width_WK = 0.
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_fill_in_zone(this, in_zone)
+      class(type_model_wavemaker), intent(in) :: this
+      logical, intent(out) :: in_zone(:, :)
+
+      integer :: i, j
+
+      in_zone = .false.
+      if (.not. this%has_mass_source) return
+
+      do j = 1, size(in_zone, 2)
+         do i = 1, size(in_zone, 1)
+            in_zone(i, j) = abs(this%xmk_wk(i) - this%Xc_WK) < this%Width_WK &
+                            .and. abs(this%ymk_wk(j) - this%Yc_WK) < this%Ywidth_WK/2.0_SP
+         end do
+      end do
+
+   end subroutine wavemaker_fill_in_zone
+
+   subroutine wavemaker_free(this)
+      class(type_model_wavemaker), intent(inout) :: this
+
+      if (allocated(this%xmk_wk)) deallocate (this%xmk_wk, this%ymk_wk)
+      if (allocated(this%mass)) deallocate (this%mass)
+      this%has_mass_source = .false.
+
+   end subroutine wavemaker_free
+
+   ! ----------------------------------------------------------------
+   ! Private: periodic-y wave-angle snap (legacy WAVEMAKER_INITIALIZATION
+   ! WK_REG PERIODIC branch).  Walks admissible along-crest mode numbers
+   ! m until the snapped angle passes the requested one; error-stops if
+   ! the first admissible mode already exceeds the wavenumber (domain
+   ! too narrow) or none is found within 1000 modes.
+   ! ----------------------------------------------------------------
+   subroutine periodic_theta_snap(this, grid, env)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: PI, GRAV
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: alpha1, tb, tc, wkn, rlamda_m, theta
+      integer :: m
+      character(64) :: msg
+
+      if (this%DEP_WK == 0.0_SP .or. this%Tperiod == 0.0_SP) &
+         error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+
+      ! wave number from the same dispersion relation as the
+      ! coefficient solve (legacy recomputes it inline here)
+      alpha1 = -0.39_SP + 1.0_SP/3.0_SP
+      tb = (2.0_SP*PI/this%Tperiod)**2*this%DEP_WK/GRAV
+      tc = 1.0_SP + tb*(-0.39_SP)
+      wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                 /(2.0_SP*alpha1))/this%DEP_WK
+
+      ! |theta| < |Theta_WK| folds the two sign-mirrored legacy loops
+      theta = 0.0_SP
+      m = 0
+      do while (abs(theta) < abs(this%Theta_WK))
+         m = m + 1
+         rlamda_m = real(m, SP)*2.0_SP*PI/grid%dy0/(real(grid%N, SP) - 1.0_SP)
+         if (rlamda_m >= wkn) &
+            error stop "wavemaker: should enlarge domain for periodic "// &
+            "boundary with this wave angle"
+         theta = sign(asin(rlamda_m/wkn)*180.0_SP/PI, this%Theta_WK)
+         if (m > 1000) &
+            error stop "wavemaker: could not find a wave angle for "// &
+            "periodic boundary condition"
+      end do
+
+      write (msg, '(A,F8.3,A,F8.3)') "wave angle set: ", this%Theta_WK, &
+         " -> periodic-adjusted: ", theta
+      call env%log%info(trim(msg))
+      this%Theta_WK = theta
+
+   end subroutine periodic_theta_snap
 
    ! ----------------------------------------------------------------
    ! Initial-condition wavemakers: fill eta/u/v at t=0.
@@ -372,5 +584,57 @@ contains
            /(x*(alp2 - alpha*x))*amp
 
    end subroutine solitary_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Wei & Kirby internal-source coefficients for a regular wave
+   ! (legacy WK_WAVEMAKER_REGULAR_WAVE, old/wavemaker.F).  With
+   ! $\alpha = -0.39$, $\alpha_1 = \alpha + 1/3$, $\omega = 2\pi/T$:
+   ! wavenumber from the Nwogu dispersion relation
+   !   $$ (kh)^2 = \frac{t_c - \sqrt{t_c^2 - 4\alpha_1 t_b}}{2\alpha_1},
+   !      \qquad t_b = \frac{\omega^2 h}{g},\ \ t_c = 1 + \alpha\,t_b $$
+   ! then, with wavelength $L = C_p T$ and source width parameter
+   ! $\delta$:
+   !   $$ \lambda = k\sin\theta, \qquad W = \frac{\delta L}{2}, \qquad
+   !      \beta = \frac{80}{\delta^2 L^2} $$
+   !   $$ I = \sqrt{\pi/\beta}\;e^{-l^2/4\beta}, \qquad l = k\cos\theta $$
+   !   $$ D = \frac{2 a \cos\theta\,(\omega^2 - \alpha_1 g k^4 h^3)}
+   !               {\omega k I \left(1 - \alpha (kh)^2\right)} $$
+   ! ----------------------------------------------------------------
+   subroutine wk_regular_coefficients(Tperiod, amp, theta_deg, h_gen, delta, &
+                                      D_gen, rlamda, beta_gen, width)
+      use core_constants_mod, only: GRAV, PI
+      real(SP), intent(in)  :: Tperiod, amp, theta_deg, h_gen, delta
+      real(SP), intent(out) :: D_gen, rlamda, beta_gen, width
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: alpha1, theta, omgn, tb, tc, wkn, c_phase, wave_length
+      real(SP) :: rl_gen, ri
+
+      if (h_gen == 0.0_SP .or. Tperiod == 0.0_SP) &
+         error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+
+      alpha1 = alpha + 1.0_SP/3.0_SP
+      theta = theta_deg*PI/180.0_SP
+      omgn = 2.0_SP*PI/Tperiod
+
+      tb = omgn*omgn*h_gen/GRAV
+      tc = 1.0_SP + tb*alpha
+      wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                 /(2.0_SP*alpha1))/h_gen
+      c_phase = 1.0_SP/wkn/Tperiod*2.0_SP*PI
+      wave_length = c_phase*Tperiod
+
+      rlamda = wkn*sin(theta)
+      width = delta*wave_length/2.0_SP
+      beta_gen = 80.0_SP/delta**2/wave_length**2
+      rl_gen = wkn*cos(theta)
+      ! legacy uses the truncated literal 3.14159 here (not pi) — kept
+      ri = sqrt(3.14159_SP/beta_gen)*exp(-rl_gen**2/4.0_SP/beta_gen)
+
+      D_gen = 2.0_SP*amp &
+              *cos(theta)*(omgn**2 - alpha1*GRAV*wkn**4*h_gen**3) &
+              /(omgn*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
+
+   end subroutine wk_regular_coefficients
 
 end module model_wavemaker_mod
