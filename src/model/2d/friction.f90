@@ -86,14 +86,14 @@ contains
 
       integer :: ng, mloc_g, nloc_g
 
-      if (.not. this%is_activated) return
-
       call this%free()
 
       ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
 
+      ! No friction: block => zero drag; Cd is always allocated so
+      ! cal_sources can take it unconditionally (Cd_fixed defaults 0).
       allocate (this%Cd(mloc_g, nloc_g), source=this%Cd_fixed)
 
       ! TODO: overwrite with spatially varying values read from this%cd_file
