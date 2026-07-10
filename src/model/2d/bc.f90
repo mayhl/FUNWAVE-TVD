@@ -85,10 +85,10 @@ contains
    ! allocated (legacy VISCOSITY_BREAKING branch).
    ! Dry-cell velocities are then zeroed (legacy U = U*MASK):
    !   $$ u := u\,m, \quad v := v\,m, \quad hu := hu\,m, \quad hv := hv\,m $$
-   ! Legacy does not zero Ubar/Vbar here (their ghosts are never
-   ! read); the extra p/q masking below deviates only on cells dried
-   ! by UPDATE_MASK in the same stage — revisit at the wet/dry
-   ! (runup) regression rungs.
+   ! Ubar/Vbar are exchanged (their ghosts are unread in legacy —
+   ! harmless) but NOT masked: legacy keeps a freshly-dried cell's
+   ! Ubar until the etauv dry zeroing of the next stage.  Masking
+   ! them here was a ~2e-2 runup u deviation on flume_1d_wk_reg.
    ! ----------------------------------------------------------------
    subroutine bc_exchange_state(this, grid, fields)
       class(type_model_bc), intent(in) :: this
@@ -118,8 +118,6 @@ contains
 
       fields%u = fields%u*fields%mask
       fields%v = fields%v*fields%mask
-      fields%p = fields%p*fields%mask
-      fields%q = fields%q*fields%mask
       fields%hu = fields%hu*fields%mask
       fields%hv = fields%hv*fields%mask
 

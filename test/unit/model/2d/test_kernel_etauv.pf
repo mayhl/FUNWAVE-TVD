@@ -85,7 +85,7 @@ contains
       real(SP), intent(in)  :: inv_dx(:,:), inv_dy(:,:)
       integer,  intent(in)  :: mask(:,:), mask9(:,:)
       real(SP), intent(in)  :: depth(:,:), h(:,:), eta(:,:)
-      real(SP), intent(in)  :: ubar(:,:), vbar(:,:)
+      real(SP), intent(inout) :: ubar(:,:), vbar(:,:)
       real(SP), intent(in)  :: vxy(:,:), dvxy(:,:), uxy(:,:), duxy(:,:)
       real(SP), intent(in)  :: ux(:,:), dux(:,:)
       type(type_etauv_workspace), intent(inout) :: ws
@@ -115,7 +115,8 @@ contains
          call cal_uv_no_dispersion(lp, min_depth, h, ubar, vbar, u, v)
       end if
 
-      call cal_etauv_update(lp, froude_cap, min_depth, mask, h, u, v, hu, hv)
+      call cal_etauv_update(lp, froude_cap, min_depth, mask, h, u, v, hu, hv, &
+                            ubar, vbar)
 
    end subroutine drive_etauv
 

@@ -301,13 +301,14 @@ contains
    ! Runs after U and V are final for the stage (either path).
    ! ----------------------------------------------------------------
    pure subroutine cal_etauv_update(lp, froude_cap, min_depth, mask, h, &
-                                    u, v, hu, hv)
+                                    u, v, hu, hv, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)    :: froude_cap, min_depth
       integer, intent(in)    :: mask(:, :)
       real(SP), intent(in)    :: h(:, :)
       real(SP), intent(inout) :: u(:, :), v(:, :)
       real(SP), intent(out)   :: hu(:, :), hv(:, :)
+      real(SP), intent(inout) :: ubar(:, :), vbar(:, :)
 
       real(SP) :: heff, utotal, fr_speed, utheta
       integer  :: i, j
@@ -315,6 +316,9 @@ contains
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             if (mask(i, j) < 1) then
+               ! legacy zeroes the conserved Ubar/Vbar here (with the
+               ! stage's pre-UPDATE_MASK mask), not at the exchange
+               ubar(i, j) = 0.0_SP; vbar(i, j) = 0.0_SP
                u(i, j) = 0.0_SP; v(i, j) = 0.0_SP
                hu(i, j) = 0.0_SP; hv(i, j) = 0.0_SP
             else

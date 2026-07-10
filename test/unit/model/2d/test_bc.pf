@@ -171,8 +171,11 @@ contains
          @assertEqual(-999.0_SP, fields%eta(1, grid%lp%jb), TOL_SP)
       end if
 
+      ! velocities and cell fluxes masked; conserved q untouched (legacy
+      ! zeroes Ubar/Vbar in the etauv update, not at the exchange)
       @assertEqual(0.0_SP, fields%u(grid%lp%ib + 1, grid%lp%jb + 1), TOL_SP)
-      @assertEqual(0.0_SP, fields%q(grid%lp%ib + 1, grid%lp%jb + 1), TOL_SP)
+      @assertEqual(0.0_SP, fields%hv(grid%lp%ib + 1, grid%lp%jb + 1), TOL_SP)
+      @assertFalse(abs(fields%q(grid%lp%ib + 1, grid%lp%jb + 1)) < TOL_SP)
 
       call dummy_fix_lint()
    end subroutine test_west_exempt_and_mask

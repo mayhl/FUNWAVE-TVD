@@ -400,7 +400,7 @@ contains
          end if
 
          call cal_etauv_update(lp, num%FroudeCap, num%MinDepthFrc, f%mask, &
-                               f%h, f%u, f%v, f%hu, f%hv)
+                               f%h, f%u, f%v, f%hu, f%hv, f%p, f%q)
          if (.not. phy%dispersion) then
             ! legacy: without dispersion the conserved flux IS the
             ! (Froude-capped, mask-zeroed) cell flux
