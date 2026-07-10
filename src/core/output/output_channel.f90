@@ -200,7 +200,8 @@ contains
 
       if (t < this%t_start) return
 
-      do_flush = this%trigger%should_trigger(t)
+      ! dt-accumulator mode: legacy PLOT_COUNT frame cadence
+      do_flush = this%trigger%should_trigger(t, dt)
       if (do_flush) this%icount = this%icount + 1
 
       ! --- Snapshot: write current field directly from registry ---

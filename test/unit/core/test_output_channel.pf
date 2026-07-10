@@ -194,7 +194,10 @@ contains
                    result_folder='./', format='ascii', &
                    coords_x=cx, coords_y=cy, n_coords=2, grid=grid, comm=comm)
 
+      ! consecutive steps: the trigger accumulates dt (legacy
+      ! PLOT_COUNT), so t must advance consistently with dt
       call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
       call ch%step(1.0_SP, 0.5_SP, reg, comm)
 
       if (comm%is_io_node()) then

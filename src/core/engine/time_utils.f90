@@ -17,6 +17,7 @@ module core_time_utils_mod
       real(SP)      :: dt = 0.0
       real(SP)      :: current_time = 0.0
       real(SP)      :: last_triggered = -1.0
+      real(SP)      :: accum = 0.0   ! legacy PLOT_COUNT (dt-accumulator mode)
       integer       :: step = 0
 
       ! Dynamic list of operations
@@ -31,9 +32,17 @@ module core_time_utils_mod
    end type type_timing_control
 contains
 
-   function should_trigger(this, current_time) result(trigger)
+   ! When dt is passed (the per-step output path), the trigger runs in
+   ! dt-accumulator mode — the exact legacy PLOT_COUNT arithmetic
+   ! (PLOT_COUNT += DT; fire and subtract PLOT_INTV on overflow), so
+   ! frame times are bit-compatible with the legacy loop given the
+   ! same dt sequence.  Without dt, marker mode: fire when an interval
+   ! has elapsed since the last ideal fire time (residual carries so
+   ! the per-fire overshoot never accumulates as lateness).
+   function should_trigger(this, current_time, dt) result(trigger)
       class(type_timing_control), intent(inout) :: this
       real(SP), intent(in) :: current_time
+      real(SP), intent(in), optional :: dt
       logical :: trigger
 
       ! Check if we have passed the spin-up time
@@ -42,12 +51,21 @@ contains
          return
       end if
 
-      ! Check if interval has elapsed
-      if (this%last_triggered < 0.0 .or. (current_time - this%last_triggered >= this%interval)) then
+      if (this%last_triggered < 0.0) then
+         ! first call at/after t_start always fires (legacy writes the
+         ! initial condition as frame one)
          trigger = .true.
          this%last_triggered = current_time
+         return
+      end if
+
+      if (present(dt)) then
+         this%accum = this%accum + dt
+         trigger = this%accum >= this%interval
+         if (trigger) this%accum = this%accum - this%interval
       else
-         trigger = .false.
+         trigger = current_time - this%last_triggered >= this%interval
+         if (trigger) this%last_triggered = this%last_triggered + this%interval
       end if
    end function should_trigger
 
