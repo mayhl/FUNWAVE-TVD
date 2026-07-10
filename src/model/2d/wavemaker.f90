@@ -1096,7 +1096,9 @@ contains
    ! Builds the six dense series modes at the linear-theory reference
    ! level $z = |1 + \beta_{ref}|\,h_s$ (legacy CALCULATE_TMA_Cm_Sm[_
    ! EQUAL_DFREQ]); ABS additionally builds the relaxation sponge.
-   ! WAVE_DATA_TYPE = DATA (WaveCompFile 2D spectrum) is a later rung.
+   ! WAVE_DATA_TYPE = DATA reads a 2D (freq x dir) spectrum from
+   ! WaveCompFile instead (legacy io.F block + CALCULATE_DATA2D_Cm_Sm);
+   ! the file header then overrides Nfreq.
    ! Legacy adds WaterLevel to Dep_Ser for LEFT_BC_IRR (init.F:807) —
    ! WaterLevel is not in the YAML schema yet (assumed 0).
    ! ----------------------------------------------------------------
@@ -1108,12 +1110,20 @@ contains
       type(type_env), intent(inout) :: env
       real(SP), intent(in) :: beta_ref
 
-      logical :: is_jonswap
-      integer :: mloc, nloc
+      logical :: is_jonswap, is_data
+      integer :: mloc, nloc, num_dir
+      real(SP), allocatable :: per_ser(:), theta_ser(:)
+      real(SP), allocatable :: amp_ser(:, :), phase_left(:, :)
 
-      if (len(this%WAVE_DATA_TYPE) >= 4) then
-         if (this%WAVE_DATA_TYPE(1:4) == "DATA") &
-            error stop "wavemaker: WAVE_DATA_TYPE DATA (WaveCompFile) not yet ported"
+      is_data = .false.
+      if (len(this%WAVE_DATA_TYPE) >= 4) &
+         is_data = this%WAVE_DATA_TYPE(1:4) == "DATA"
+
+      ! the DATA file header sets the series length (legacy io.F reads
+      ! the spectrum before WAVEMAKER_INITIALIZATION)
+      if (is_data) then
+         call read_boundary_2d_spectrum(this, num_dir, per_ser, theta_ser, &
+                                        amp_ser, phase_left)
       end if
 
       mloc = grid%lp%mloc
@@ -1126,14 +1136,20 @@ contains
                 this%Sm_v(mloc, nloc, this%Nfreq), &
                 this%Segma_Ser(this%Nfreq), this%Phase_Ser(this%Nfreq))
 
-      ! legacy keys the JONSWAP switch off WAVE_DATA_TYPE here, not
-      ! the wavemaker name
-      is_jonswap = .false.
-      if (len(this%WAVE_DATA_TYPE) >= 3) &
-         is_jonswap = this%WAVE_DATA_TYPE(1:3) == "JON"
+      if (is_data) then
+         call data_series_coefficients(this, grid, periodic, beta_ref, &
+                                       num_dir, per_ser, theta_ser, &
+                                       amp_ser, phase_left)
+      else
+         ! legacy keys the JONSWAP switch off WAVE_DATA_TYPE here, not
+         ! the wavemaker name
+         is_jonswap = .false.
+         if (len(this%WAVE_DATA_TYPE) >= 3) &
+            is_jonswap = this%WAVE_DATA_TYPE(1:3) == "JON"
 
-      call tma_series_coefficients(this, grid, periodic, env, is_jonswap, &
-                                   beta_ref)
+         call tma_series_coefficients(this, grid, periodic, env, is_jonswap, &
+                                      beta_ref)
+      end if
 
       if (this%abs_source) then
          allocate (this%sponge_maker(mloc, nloc), source=1.0_SP)
@@ -1267,6 +1283,169 @@ contains
       end do
 
    end subroutine tma_series_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: read the boundary 2D spectrum from WaveCompFile (legacy
+   ! io.F WAVE_DATA_TYPE DATA block): NumFreq NumDir / PeakPeriod
+   ! (unused) / NumFreq frequencies / NumDir directions (degrees) /
+   ! NumDir rows of NumFreq amplitudes / optional NumDir rows of
+   ! NumFreq phases (degrees).  Frequencies invert to periods (legacy
+   ! bare STOP on zero); directions convert via the coarse legacy
+   ! DEG2RAD = 0.0175; input phases via the truncated-pi literal.
+   ! Missing phases: zero for parity builds, RANDOM_NUMBER otherwise
+   ! (legacy random2() is compiler-specific).  Overrides Nfreq from
+   ! the file header.
+   ! ----------------------------------------------------------------
+   subroutine read_boundary_2d_spectrum(this, num_dir, per_ser, theta_ser, &
+                                        amp_ser, phase_left)
+      use core_build_config_mod, only: BUILD_ZERO_PHASE
+      class(type_model_wavemaker), intent(inout) :: this
+      integer, intent(out) :: num_dir
+      real(SP), allocatable, intent(out) :: per_ser(:), theta_ser(:)
+      real(SP), allocatable, intent(out) :: amp_ser(:, :), phase_left(:, :)
+
+      integer :: unit, ios, i, j, num_freq
+      logical :: input_phase
+      real(SP) :: peak_period
+
+      open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
+            action="read", iostat=ios)
+      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      read (unit, *, iostat=ios) num_freq, num_dir
+      if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+      allocate (per_ser(num_freq), theta_ser(num_dir))
+      allocate (amp_ser(num_freq, num_dir), phase_left(num_freq, num_dir))
+      read (unit, *, iostat=ios) peak_period ! kept for format consistency
+      do j = 1, num_freq
+         read (unit, *, iostat=ios) per_ser(j) ! read in as frequency
+      end do
+      do i = 1, num_dir
+         read (unit, *, iostat=ios) theta_ser(i)
+      end do
+      do i = 1, num_dir
+         read (unit, *, iostat=ios) (amp_ser(j, i), j=1, num_freq)
+      end do
+      if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+      ! phases are optional: EOF leaves input_phase false (legacy END= jump)
+      input_phase = .true.
+      do i = 1, num_dir
+         read (unit, *, iostat=ios) (phase_left(j, i), j=1, num_freq)
+         if (ios /= 0) then
+            input_phase = .false.
+            exit
+         end if
+      end do
+      close (unit)
+
+      if (input_phase) then
+         phase_left = phase_left*3.1415926/180.0_SP
+      elseif (BUILD_ZERO_PHASE) then
+         phase_left = 0.0_SP
+      else
+         call random_number(phase_left)
+         phase_left = phase_left*2.0_SP*PI
+      end if
+
+      do j = 1, num_freq
+         if (per_ser(j) == 0.0_SP) &
+            error stop "wavemaker: zero frequency in WaveCompFile"
+         per_ser(j) = 1.0_SP/per_ser(j)
+      end do
+      theta_ser = theta_ser*DEG2RAD_LEGACY
+
+      this%Nfreq = num_freq
+
+   end subroutine read_boundary_2d_spectrum
+
+   ! ----------------------------------------------------------------
+   ! Private: series modes from the WaveCompFile 2D spectrum (legacy
+   ! CALCULATE_DATA2D_Cm_Sm): component amplitudes enter directly and
+   ! the wave number comes from a Newton solve of the full dispersion
+   ! relation seeded with the shallow-water guess (tol 1e-8, 1000
+   ! iterations — NOT the TMA closed form),
+   !   $$ \sigma = 2\pi/T, \qquad F(k) = g\,k\tanh(k h_s) - \sigma^2 . $$
+   ! The modes are phase-free like the TMA path; the input phases
+   ! enter only through the per-frequency Phase_Ser = column-1 phase
+   ! (legacy collapses the direction axis "to make consistent with cm
+   ! and sm").
+   ! ----------------------------------------------------------------
+   subroutine data_series_coefficients(this, grid, periodic, beta_ref, &
+                                       num_dir, per_ser, theta_ser, &
+                                       amp_ser, phase_left)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: GRAV
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      real(SP), intent(in) :: beta_ref
+      integer, intent(in) :: num_dir
+      real(SP), intent(in) :: per_ser(:), theta_ser(:)
+      real(SP), intent(in) :: amp_ser(:, :), phase_left(:, :)
+
+      real(SP) :: wkn(this%Nfreq)
+      real(SP) :: h_ser, zlev, celerity, fk, fkdif
+      real(SP) :: theta_per, transfer, arg
+      integer :: kf, kdir, i, j, iter
+
+      h_ser = this%DepthWaveMaker
+      if (h_ser == 0.0_SP) &
+         error stop "wavemaker: re-set DepthWaveMaker for wavemaker"
+
+      do kf = 1, this%Nfreq
+         this%Segma_Ser(kf) = 2.0*PI/per_ser(kf)
+         this%Phase_Ser(kf) = phase_left(kf, 1)
+         ! Newton from the shallow-water guess (legacy literals)
+         celerity = sqrt(GRAV*h_ser)
+         wkn(kf) = 2.0*PI/(celerity*per_ser(kf))
+         iter = 0
+         do
+            fk = GRAV*wkn(kf)*tanh(wkn(kf)*h_ser) - this%Segma_Ser(kf)**2
+            if (abs(fk) <= 1.0e-8 .or. iter > 1000) exit
+            fkdif = GRAV*wkn(kf)*h_ser*(1.0 - tanh(wkn(kf)*h_ser)**2) &
+                    + GRAV*tanh(wkn(kf)*h_ser)
+            wkn(kf) = wkn(kf) - fk/fkdif
+            iter = iter + 1
+         end do
+      end do
+
+      ! linear-theory velocity reference level (legacy Zlev)
+      zlev = abs(1.0_SP + beta_ref)*h_ser
+
+      this%Cm_eta = 0.0_SP; this%Sm_eta = 0.0_SP
+      this%Cm_u = 0.0_SP; this%Sm_u = 0.0_SP
+      this%Cm_v = 0.0_SP; this%Sm_v = 0.0_SP
+
+      do kf = 1, this%Nfreq
+         do kdir = 1, num_dir
+            if (periodic) then
+               call calc_periodic_theta(wkn(kf), theta_ser(kdir), grid%dy0, &
+                                        grid%N, theta_per)
+            else
+               theta_per = theta_ser(kdir)
+            end if
+            transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
+            do j = 1, grid%lp%nloc
+               do i = 1, grid%lp%mloc
+                  arg = wkn(kf)*sin(theta_per)*this%ymk_wk(j) &
+                        + wkn(kf)*cos(theta_per)*this%xmk_wk(i)
+                  this%Cm_eta(i, j, kf) = this%Cm_eta(i, j, kf) &
+                                          + amp_ser(kf, kdir)*cos(arg)
+                  this%Sm_eta(i, j, kf) = this%Sm_eta(i, j, kf) &
+                                          + amp_ser(kf, kdir)*sin(arg)
+                  this%Cm_u(i, j, kf) = this%Cm_u(i, j, kf) &
+                                        + amp_ser(kf, kdir)*transfer*cos(theta_per)*cos(arg)
+                  this%Sm_u(i, j, kf) = this%Sm_u(i, j, kf) &
+                                        + amp_ser(kf, kdir)*transfer*cos(theta_per)*sin(arg)
+                  this%Cm_v(i, j, kf) = this%Cm_v(i, j, kf) &
+                                        + amp_ser(kf, kdir)*transfer*sin(theta_per)*cos(arg)
+                  this%Sm_v(i, j, kf) = this%Sm_v(i, j, kf) &
+                                        + amp_ser(kf, kdir)*transfer*sin(theta_per)*sin(arg)
+               end do
+            end do
+         end do
+      end do
+
+   end subroutine data_series_coefficients
 
    ! ----------------------------------------------------------------
    ! Private: ABS relaxation sponge (legacy CALCULATE_SPONGE_MAKER,
