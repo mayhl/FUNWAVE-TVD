@@ -103,6 +103,12 @@ module model_wavemaker_mod
 
    implicit none
 
+   ! Legacy PARAM pi is an UNSUFFIXED single-precision literal promoted
+   ! to SP (old/mod_param.F:71), 2.8e-8 above true pi — every wavemaker
+   ! formula inherits the offset, so parity requires reproducing it
+   ! here.  Reverse to core_constants PI post-6e (parity ledger).
+   real(SP), parameter :: PI = 3.141592653
+
    private
    public :: type_model_wavemaker
    public :: solitary_coefficients
@@ -422,7 +428,6 @@ contains
    ! FUTURE: hoist to once per step
    ! ----------------------------------------------------------------
    subroutine wavemaker_update_source(this, time)
-      use core_constants_mod, only: PI
       class(type_model_wavemaker), intent(inout) :: this
       real(SP), intent(in) :: time
 
@@ -498,7 +503,7 @@ contains
    subroutine wavemaker_apply_boundary(this, grid, istage, dt, time, &
                                        eta, u, v, hu, hv, depth)
       use core_grid_mod, only: type_grid_2d
-      use core_constants_mod, only: PI, N_GHOST
+      use core_constants_mod, only: N_GHOST
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       integer, intent(in) :: istage
@@ -606,7 +611,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine periodic_theta_snap(this, grid, env)
       use core_grid_mod, only: type_grid_2d
-      use core_constants_mod, only: PI, GRAV
+      use core_constants_mod, only: GRAV
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       type(type_env), intent(inout) :: env
@@ -788,7 +793,7 @@ contains
    subroutine tma_series_coefficients(this, grid, periodic, env, is_jonswap, &
                                       beta_ref)
       use core_grid_mod, only: type_grid_2d
-      use core_constants_mod, only: GRAV, PI, SMALL
+      use core_constants_mod, only: GRAV, SMALL
       use core_build_config_mod, only: BUILD_ZERO_PHASE
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
@@ -933,7 +938,7 @@ contains
    ! $|\theta| \ge 90°$.  theta = 0 passes through (legacy SMALL gate).
    ! ----------------------------------------------------------------
    subroutine calc_periodic_theta(wkn, theta_in, dy, nglob, theta_out)
-      use core_constants_mod, only: PI, SMALL
+      use core_constants_mod, only: SMALL
       real(SP), intent(in) :: wkn, theta_in, dy
       integer, intent(in) :: nglob
       real(SP), intent(out) :: theta_out
@@ -1114,7 +1119,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine wk_regular_coefficients(Tperiod, amp, theta_deg, h_gen, delta, &
                                       D_gen, rlamda, beta_gen, width)
-      use core_constants_mod, only: GRAV, PI
+      use core_constants_mod, only: GRAV
       real(SP), intent(in)  :: Tperiod, amp, theta_deg, h_gen, delta
       real(SP), intent(out) :: D_gen, rlamda, beta_gen, width
 
@@ -1172,7 +1177,7 @@ contains
                                         Hmo, theta_peak, sigma_theta_deg, periodic, &
                                         dy, nglob, env, rlamda, beta_gen, D_gen, &
                                         phi1, width, omgn)
-      use core_constants_mod, only: GRAV, PI, SMALL
+      use core_constants_mod, only: GRAV, SMALL
       use core_build_config_mod, only: BUILD_ZERO_PHASE
       logical, intent(in)  :: equal_energy, is_jonswap, periodic
       integer, intent(in)  :: nfreq, ntheta, nglob
@@ -1368,7 +1373,7 @@ contains
    ! $\phi = 1$ for the pure JONSWAP types.
    ! ----------------------------------------------------------------
    function tma_density(is_jonswap, fre, fm, h_gen, gamma_spec) result(etma)
-      use core_constants_mod, only: GRAV, PI
+      use core_constants_mod, only: GRAV
       logical, intent(in)  :: is_jonswap
       real(SP), intent(in) :: fre, fm, h_gen, gamma_spec
       real(SP) :: etma
@@ -1403,7 +1408,6 @@ contains
    ! the value is unused there, so the guard is unobservable.
    ! ----------------------------------------------------------------
    subroutine directional_spreading(ntheta, theta_peak, sigma_theta_deg, ag)
-      use core_constants_mod, only: PI
       integer, intent(in)  :: ntheta
       real(SP), intent(in) :: theta_peak, sigma_theta_deg
       real(SP), intent(out) :: ag(ntheta)
@@ -1450,7 +1454,6 @@ contains
    ! PARAM static-scratch semantics).
    ! ----------------------------------------------------------------
    subroutine spectral_periodic_snap(theta, scratch, wkn, dy, nglob, fre, env)
-      use core_constants_mod, only: PI
       real(SP), intent(inout) :: theta, scratch
       real(SP), intent(in) :: wkn, dy, fre
       integer, intent(in) :: nglob
