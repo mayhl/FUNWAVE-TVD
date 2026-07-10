@@ -42,7 +42,7 @@ module model_geometry_mod
    implicit none
 
    private
-   public :: type_model_geometry
+   public :: type_model_geometry, read_field_ascii
 
    character(len=8), parameter :: BATHY_TYPES(3) = &
                                   [character(len=8) :: "file", "flat", "slope"]
@@ -145,6 +145,11 @@ contains
          call bathy_yaml%read("correction", val=this%bathy_correction, default="NO")
          call bathy_yaml%read_positive("nx", silent=no_bathy_nx, val=this%bathy_nx)
          call bathy_yaml%read_positive("ny", silent=no_bathy_ny, val=this%bathy_ny)
+         ! headerless ASCII: dimensions must come from the bathymetry block
+         if (no_bathy_nx .or. no_bathy_ny) then
+            call sub_env%log%exit_on_error( &
+               "geometry/bathymetry: file type needs nx and ny")
+         end if
 
       case ("flat")
          call bathy_yaml%read_positive("depth", val=this%bathy_depth)
@@ -178,15 +183,18 @@ contains
 
       logical :: create_partition
 
-      if (trim(this%bathy_type) == "file") then
-         error stop "geometry: file bathymetry grid build not yet implemented in new path"
-      end if
       if (allocated(this%dx_file)) then
          error stop "geometry: variable spacing not yet implemented in new path"
       end if
 
-      grid%M = this%grid_nx
-      grid%N = this%grid_ny
+      if (trim(this%bathy_type) == "file") then
+         ! dimensions validated at read_input (headerless ASCII)
+         grid%M = this%bathy_nx
+         grid%N = this%bathy_ny
+      else
+         grid%M = this%grid_nx
+         grid%N = this%grid_ny
+      end if
 
       create_partition = (this%nx_proc <= 0)
       if (.not. create_partition) then
@@ -230,6 +238,9 @@ contains
       associate (lp => grid%lp)
 
          select case (trim(this%bathy_type))
+         case ("file")
+            ! interior pre-loaded by the caller via read_field_ascii
+            ! (keeps this routine env-free); ghosts/faces below
          case ("flat")
             depth = this%bathy_depth
          case ("slope")
@@ -245,7 +256,7 @@ contains
                end do
             end do
          case default
-            error stop "geometry: init_depth supports flat and slope only"
+            error stop "geometry: unknown bathy type"
          end select
 
          call grid%halo_exchange(depth)
@@ -270,5 +281,40 @@ contains
       end associate
 
    end subroutine geometry_init_depth
+
+   ! ----------------------------------------------------------------
+   ! Read a global-interior ASCII field (legacy GetFile row layout:
+   ! one row of Mglob values per global J) and slice this rank's
+   ! interior into arr.  Every rank reads the file — init-time only,
+   ! no scatter.  Ghosts are the caller's concern.
+   ! ----------------------------------------------------------------
+   subroutine read_field_ascii(env, fname, grid, arr)
+      type(type_env), intent(inout) :: env
+      character(*), intent(in) :: fname
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: arr(:, :)
+
+      real(SP), allocatable :: row(:)
+      logical :: exists
+      integer :: gj, unit
+
+      inquire (file=trim(fname), exist=exists)
+      if (.not. exists) then
+         call env%log%exit_on_error( &
+            "read_field_ascii: cannot find "//trim(fname))
+      end if
+
+      allocate (row(grid%M))
+      open (newunit=unit, file=trim(fname), status="old", action="read")
+      do gj = 1, grid%N
+         read (unit, *) row
+         if (gj >= grid%jbegin .and. gj <= grid%jstop) then
+            arr(grid%lp%ib:grid%lp%ie, grid%lp%jb + gj - grid%jbegin) = &
+               row(grid%ibegin:grid%istop)
+         end if
+      end do
+      close (unit)
+
+   end subroutine read_field_ascii
 
 end module model_geometry_mod
