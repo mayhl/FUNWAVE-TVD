@@ -234,7 +234,7 @@ contains
       ! — identical while Cd = 0 in the sponge zone (all current tests)
       call this%sponge%merge_friction(this%friction%Cd, this%fields%depth)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
-                                       this%env)
+                                       this%env, this%physics%Beta_ref)
 
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &

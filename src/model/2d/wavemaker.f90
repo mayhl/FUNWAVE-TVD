@@ -15,7 +15,9 @@
 !      WK_NEW_* pending).
 !    * boundary types (ABS, LEFT_BC_IRR, LEF_SOL): own the west ghost
 !      strip each step — the BC service must skip the wall mirror there
-!      (fill_west=.false. in kernel_bc).
+!      (fill_west=.false. in kernel_bc).  ABS/LEFT_BC_IRR with the TMA/
+!      JON spectrum live (apply_boundary per stage); the DATA
+!      (WaveCompFile) spectrum and LEF_SOL are pending.
 !
 !  YAML block: wavemaker:       (top-level; omit for no wavemaker)
 !    type: <string>             default 'nothing'
@@ -196,11 +198,23 @@ module model_wavemaker_mod
       real(SP), allocatable :: omgn_ir(:)             ! component frequencies 2 pi f
       real(SP) :: T_brk = 0.0_SP                      ! breaking-age override 1/FreqMax; 0 = none
 
+      ! Boundary wavemaker (ABS / LEFT_BC_IRR): dense eta/u/v series
+      ! modes (legacy Cm_eta..Sm_v), component frequencies + phases,
+      ! and the ABS relaxation sponge
+      logical  :: left_bc_source = .false.            ! LEFT_BC_IRR ghost-strip fill
+      logical  :: abs_source = .false.                ! ABS relaxation
+      real(SP), allocatable :: Cm_eta(:, :, :), Sm_eta(:, :, :)
+      real(SP), allocatable :: Cm_u(:, :, :), Sm_u(:, :, :)
+      real(SP), allocatable :: Cm_v(:, :, :), Sm_v(:, :, :)
+      real(SP), allocatable :: Segma_Ser(:), Phase_Ser(:)
+      real(SP), allocatable :: sponge_maker(:, :)
+
    contains
       procedure :: read_input => wavemaker_read_input
       procedure :: init_compute => wavemaker_init_compute
       procedure :: apply_ic => wavemaker_apply_ic
       procedure :: update_source => wavemaker_update_source
+      procedure :: apply_boundary => wavemaker_apply_boundary
       procedure :: fill_in_zone => wavemaker_fill_in_zone
       procedure :: free => wavemaker_free
    end type type_model_wavemaker
@@ -308,24 +322,29 @@ contains
    ! The spectral family snaps per component inside the coefficient
    ! loop instead — different legacy algorithm, kept separate.
    ! ----------------------------------------------------------------
-   subroutine wavemaker_init_compute(this, grid, periodic, env)
+   subroutine wavemaker_init_compute(this, grid, periodic, env, beta_ref)
       use core_grid_mod, only: type_grid_2d
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
       type(type_env), intent(inout) :: env
+      real(SP), intent(in) :: beta_ref
 
       integer :: i, j, mloc, nloc
 
       select case (this%wavemaker_type)
       case ("WK_REG")
-         this%spectral_source = .false.
+         this%has_mass_source = .true.
       case ("WK_IRR", "TMA_1D", "JON_1D", "JON_2D")
+         this%has_mass_source = .true.
          this%spectral_source = .true.
+      case ("ABS")
+         this%abs_source = .true.
+      case ("LEFT_BC_IRR")
+         this%left_bc_source = .true.
       case default
          return
       end select
-      this%has_mass_source = .true.
 
       ! legacy uses the scalar spacing (DXg) throughout the wavemaker
       if (grid%dx0 <= 0.0_SP .or. grid%dy0 <= 0.0_SP) &
@@ -343,6 +362,13 @@ contains
          this%ymk_wk(j) = real(j - grid%lp%jb, SP)*grid%dy0 &
                           + real(grid%jbegin - 1, SP)*grid%dy0
       end do
+
+      ! boundary wavemakers build the series modes only — no mass
+      ! source, zone box, or breaker zone
+      if (this%abs_source .or. this%left_bc_source) then
+         call boundary_init_compute(this, grid, periodic, env, beta_ref)
+         return
+      end if
 
       if (this%spectral_source) then
          call spectral_init_compute(this, grid, periodic, env)
@@ -445,6 +471,92 @@ contains
    end subroutine wavemaker_update_source
 
    ! ----------------------------------------------------------------
+   ! Boundary wavemaker state overwrite at stage end, after the ghost
+   ! exchange and before the sponge (legacy call order).  No-op for
+   ! non-boundary types.
+   !
+   ! LEFT_BC_IRR (legacy IRREGULAR_LEFT_BC): on the west-boundary rank
+   ! only, overwrite the ghost strip $i \le N_{ghost}$ (all j, ghosts
+   ! included) with the series state at the legacy stage time
+   !   $$ t_s = t + (s - 1)\,\Delta t/3 $$
+   !   $$ \eta = \sum_k C_{m,k}\cos(\sigma_k t_s + \phi_k)
+   !             + S_{m,k}\sin(\sigma_k t_s + \phi_k) $$
+   ! (u, v likewise), then hu = (d + eta) u, hv = (d + eta) v.
+   !
+   ! ABS (legacy ABSORBING_GENERATING_BC): relax eta toward the series
+   ! over the whole domain through the wavemaker sponge,
+   !   $$ \eta := \eta_{in} + (\eta - \eta_{in})/s(i), \qquad
+   !      \eta_{in} = \sum_k C_{m,k}\cos(\tfrac{\pi}{2} + \sigma_k t + \phi_k)
+   !                  + S_{m,k}\sin(\cdot) $$
+   ! at the step time (no stage offset), u/v untouched (legacy comments
+   ! them out), hu/hv rebuilt everywhere.  NOTE: this is the original
+   ! SpongeMaker form — the vendored legacy's Salatin-2021 rewrite
+   ! reads the TIDE module's SPONGE_TIDE_WEST, which is UNALLOCATED
+   ! without tidal BC flags (upstream bug; no legacy parity possible),
+   ! and drops the phases from the time factors.
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_apply_boundary(this, grid, istage, dt, time, &
+                                       eta, u, v, hu, hv, depth)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: PI, N_GHOST
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      integer, intent(in) :: istage
+      real(SP), intent(in) :: dt, time
+      real(SP), intent(inout) :: eta(:, :), u(:, :), v(:, :)
+      real(SP), intent(inout) :: hu(:, :), hv(:, :)
+      real(SP), intent(in) :: depth(:, :)
+
+      real(SP) :: bb(this%Nfreq), cc(this%Nfreq)
+      real(SP) :: rtime, ein, uin, vin
+      integer :: i, j, kf
+
+      if (this%left_bc_source) then
+         if (.not. grid%is_back_boundary) return
+         rtime = time + real(istage - 1, SP)*dt/3.0_SP
+         do kf = 1, this%Nfreq
+            bb(kf) = cos(this%Segma_Ser(kf)*rtime + this%Phase_Ser(kf))
+            cc(kf) = sin(this%Segma_Ser(kf)*rtime + this%Phase_Ser(kf))
+         end do
+         do j = 1, grid%lp%nloc
+            do i = 1, N_GHOST
+               ein = 0.0_SP; uin = 0.0_SP; vin = 0.0_SP
+               do kf = 1, this%Nfreq
+                  ein = ein + this%Cm_eta(i, j, kf)*bb(kf) + this%Sm_eta(i, j, kf)*cc(kf)
+                  uin = uin + this%Cm_u(i, j, kf)*bb(kf) + this%Sm_u(i, j, kf)*cc(kf)
+                  vin = vin + this%Cm_v(i, j, kf)*bb(kf) + this%Sm_v(i, j, kf)*cc(kf)
+               end do
+               eta(i, j) = ein
+               u(i, j) = uin
+               v(i, j) = vin
+               hu(i, j) = (depth(i, j) + eta(i, j))*u(i, j)
+               hv(i, j) = (depth(i, j) + eta(i, j))*v(i, j)
+            end do
+         end do
+         return
+      end if
+
+      if (this%abs_source) then
+         do kf = 1, this%Nfreq
+            bb(kf) = cos(PI/2.0_SP + this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
+            cc(kf) = sin(PI/2.0_SP + this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
+         end do
+         do j = 1, grid%lp%nloc
+            do i = 1, grid%lp%mloc
+               ein = 0.0_SP
+               do kf = 1, this%Nfreq
+                  ein = ein + this%Cm_eta(i, j, kf)*bb(kf) + this%Sm_eta(i, j, kf)*cc(kf)
+               end do
+               eta(i, j) = ein + (eta(i, j) - ein)/this%sponge_maker(i, j)
+               hu(i, j) = (depth(i, j) + eta(i, j))*u(i, j)
+               hv(i, j) = (depth(i, j) + eta(i, j))*v(i, j)
+            end do
+         end do
+      end if
+
+   end subroutine wavemaker_apply_boundary
+
+   ! ----------------------------------------------------------------
    ! Wavemaker-zone flags for the breaker (legacy per-cell box test in
    ! old/breaker.F; there WAVEMAKER_Cbrk replaces the breaking-age
    ! scheme).  All false for non-source wavemakers — legacy gets the
@@ -474,8 +586,14 @@ contains
       if (allocated(this%xmk_wk)) deallocate (this%xmk_wk, this%ymk_wk)
       if (allocated(this%mass)) deallocate (this%mass)
       if (allocated(this%Cm)) deallocate (this%Cm, this%Sm, this%omgn_ir)
+      if (allocated(this%Cm_eta)) &
+         deallocate (this%Cm_eta, this%Sm_eta, this%Cm_u, this%Sm_u, &
+                     this%Cm_v, this%Sm_v, this%Segma_Ser, this%Phase_Ser)
+      if (allocated(this%sponge_maker)) deallocate (this%sponge_maker)
       this%has_mass_source = .false.
       this%spectral_source = .false.
+      this%left_bc_source = .false.
+      this%abs_source = .false.
 
    end subroutine wavemaker_free
 
@@ -597,6 +715,281 @@ contains
       this%T_brk = 1.0_SP/this%FreqMax
 
    end subroutine spectral_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: boundary wavemaker setup (legacy ABS / LEFT_BC_IRR block
+   ! of WAVEMAKER_INITIALIZATION + init.F CALCULATE_SPONGE_MAKER).
+   ! Builds the six dense series modes at the linear-theory reference
+   ! level $z = |1 + \beta_{ref}|\,h_s$ (legacy CALCULATE_TMA_Cm_Sm[_
+   ! EQUAL_DFREQ]); ABS additionally builds the relaxation sponge.
+   ! WAVE_DATA_TYPE = DATA (WaveCompFile 2D spectrum) is a later rung.
+   ! Legacy adds WaterLevel to Dep_Ser for LEFT_BC_IRR (init.F:807) —
+   ! WaterLevel is not in the YAML schema yet (assumed 0).
+   ! ----------------------------------------------------------------
+   subroutine boundary_init_compute(this, grid, periodic, env, beta_ref)
+      use core_grid_mod, only: type_grid_2d
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+      real(SP), intent(in) :: beta_ref
+
+      logical :: is_jonswap
+      integer :: mloc, nloc
+
+      if (len(this%WAVE_DATA_TYPE) >= 4) then
+         if (this%WAVE_DATA_TYPE(1:4) == "DATA") &
+            error stop "wavemaker: WAVE_DATA_TYPE DATA (WaveCompFile) not yet ported"
+      end if
+
+      mloc = grid%lp%mloc
+      nloc = grid%lp%nloc
+      allocate (this%Cm_eta(mloc, nloc, this%Nfreq), &
+                this%Sm_eta(mloc, nloc, this%Nfreq), &
+                this%Cm_u(mloc, nloc, this%Nfreq), &
+                this%Sm_u(mloc, nloc, this%Nfreq), &
+                this%Cm_v(mloc, nloc, this%Nfreq), &
+                this%Sm_v(mloc, nloc, this%Nfreq), &
+                this%Segma_Ser(this%Nfreq), this%Phase_Ser(this%Nfreq))
+
+      ! legacy keys the JONSWAP switch off WAVE_DATA_TYPE here, not
+      ! the wavemaker name
+      is_jonswap = .false.
+      if (len(this%WAVE_DATA_TYPE) >= 3) &
+         is_jonswap = this%WAVE_DATA_TYPE(1:3) == "JON"
+
+      call tma_series_coefficients(this, grid, periodic, env, is_jonswap, &
+                                   beta_ref)
+
+      if (this%abs_source) then
+         allocate (this%sponge_maker(mloc, nloc), source=1.0_SP)
+         call fill_sponge_maker(grid, this%WidthWaveMaker, &
+                                this%R_sponge_wavemaker, &
+                                this%A_sponge_wavemaker, this%sponge_maker)
+      end if
+
+   end subroutine boundary_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: eta/u/v series modes for the boundary wavemakers (legacy
+   ! CALCULATE_TMA_Cm_Sm_EQUAL_DFREQ, default, and CALCULATE_TMA_Cm_Sm
+   ! for EqualEnergy).  Frequency bins and spreading share the WK_IRR
+   ! helpers; the component amplitude is used directly (no Wei & Kirby
+   ! source solve):
+   !   $$ \eta:\ a\cos(k(x\cos\theta + y\sin\theta)), \qquad
+   !      u,v:\ a\,\sigma\,\frac{\cosh(k z_{lev})}{\sinh(k h_s)}
+   !            \{\cos,\sin\}\theta\,\cos(\cdot) $$
+   ! with the sin-mode partners for the time expansion.  Under
+   ! periodic-y each component snaps via the nearest-mode rule
+   ! (calc_periodic_theta — a THIRD legacy snap algorithm).  Phases:
+   ! zero for parity builds, RANDOM_NUMBER otherwise (legacy
+   ! rand()*2*3.1415926 is compiler-specific).
+   ! ----------------------------------------------------------------
+   subroutine tma_series_coefficients(this, grid, periodic, env, is_jonswap, &
+                                      beta_ref)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: GRAV, PI, SMALL
+      use core_build_config_mod, only: BUILD_ZERO_PHASE
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic, is_jonswap
+      type(type_env), intent(inout) :: env
+      real(SP), intent(in) :: beta_ref
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: freq(this%Nfreq), energy_bin(this%Nfreq)
+      real(SP) :: wkn(this%Nfreq), theta(this%Ntheta), ag(this%Ntheta)
+      real(SP) :: amp(this%Nfreq, this%Ntheta)
+      real(SP) :: Ef, alpha_spec, alpha1, tb, tc, h_ser, zlev
+      real(SP) :: theta_per, transfer, arg
+      integer :: kf, ktheta, i, j
+
+      h_ser = this%DepthWaveMaker
+      if (h_ser == 0.0_SP .or. this%FreqPeak == 0.0_SP .or. this%FreqMax == 0.0_SP) &
+         error stop "wavemaker: re-set DepthWaveMaker, FreqPeak, FreqMax for wavemaker"
+
+      if (BUILD_ZERO_PHASE) then
+         this%Phase_Ser = 0.0_SP
+      else
+         call random_number(this%Phase_Ser)
+         this%Phase_Ser = this%Phase_Ser*2.0_SP*PI
+      end if
+
+      if (this%EqualEnergy) then
+         call freq_bins_equal_energy(is_jonswap, this%Nfreq, h_ser, &
+                                     this%FreqPeak, this%FreqMax, this%FreqMin, &
+                                     this%GammaTMA, freq, energy_bin, Ef)
+      else
+         call freq_bins_equal_dfreq(is_jonswap, this%Nfreq, h_ser, &
+                                    this%FreqPeak, this%FreqMax, this%FreqMin, &
+                                    this%GammaTMA, freq, energy_bin, Ef)
+      end if
+
+      call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, ag)
+
+      alpha_spec = this%Hmo**2/16.0_SP/Ef
+      alpha1 = alpha + 1.0_SP/3.0_SP
+
+      do ktheta = 1, this%Ntheta
+         if (this%Ntheta == 1) then
+            theta(ktheta) = this%ThetaPeak*PI/180.0_SP
+         else
+            theta(ktheta) = -PI/3.0_SP + this%ThetaPeak*PI/180.0_SP &
+                            + 2.0_SP/3.0_SP*PI/(real(this%Ntheta, SP) - 1.0_SP) &
+                            *(real(ktheta, SP) - 1.0_SP)
+            if (theta(ktheta) > 0.5_SP*PI) theta(ktheta) = 0.5_SP*PI
+            if (theta(ktheta) < -0.5_SP*PI) theta(ktheta) = -0.5_SP*PI
+         end if
+      end do
+
+      do kf = 1, this%Nfreq
+         this%Segma_Ser(kf) = 2.0_SP*PI*freq(kf)
+         tb = this%Segma_Ser(kf)**2*h_ser/GRAV
+         tc = 1.0_SP + tb*alpha
+         wkn(kf) = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                        /(2.0_SP*alpha1))/h_ser
+         if (wkn(kf) == 0.0_SP) wkn(kf) = SMALL
+         do ktheta = 1, this%Ntheta
+            amp(kf, ktheta) = 4.0_SP*sqrt(alpha_spec*energy_bin(kf)*ag(ktheta)) &
+                              /sqrt(2.0_SP)/2.0_SP
+         end do
+      end do
+
+      ! linear-theory velocity reference level (legacy Zlev)
+      zlev = abs(1.0_SP + beta_ref)*h_ser
+
+      this%Cm_eta = 0.0_SP; this%Sm_eta = 0.0_SP
+      this%Cm_u = 0.0_SP; this%Sm_u = 0.0_SP
+      this%Cm_v = 0.0_SP; this%Sm_v = 0.0_SP
+
+      do kf = 1, this%Nfreq
+         do ktheta = 1, this%Ntheta
+            if (periodic) then
+               call calc_periodic_theta(wkn(kf), theta(ktheta), grid%dy0, &
+                                        grid%N, theta_per)
+            else
+               theta_per = theta(ktheta)
+            end if
+            transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
+            do j = 1, grid%lp%nloc
+               do i = 1, grid%lp%mloc
+                  arg = wkn(kf)*sin(theta_per)*this%ymk_wk(j) &
+                        + wkn(kf)*cos(theta_per)*this%xmk_wk(i)
+                  this%Cm_eta(i, j, kf) = this%Cm_eta(i, j, kf) &
+                                          + amp(kf, ktheta)*cos(arg)
+                  this%Sm_eta(i, j, kf) = this%Sm_eta(i, j, kf) &
+                                          + amp(kf, ktheta)*sin(arg)
+                  this%Cm_u(i, j, kf) = this%Cm_u(i, j, kf) &
+                                        + amp(kf, ktheta)*transfer*cos(theta_per)*cos(arg)
+                  this%Sm_u(i, j, kf) = this%Sm_u(i, j, kf) &
+                                        + amp(kf, ktheta)*transfer*cos(theta_per)*sin(arg)
+                  this%Cm_v(i, j, kf) = this%Cm_v(i, j, kf) &
+                                        + amp(kf, ktheta)*transfer*sin(theta_per)*cos(arg)
+                  this%Sm_v(i, j, kf) = this%Sm_v(i, j, kf) &
+                                        + amp(kf, ktheta)*transfer*sin(theta_per)*sin(arg)
+               end do
+            end do
+         end do
+      end do
+
+   end subroutine tma_series_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: ABS relaxation sponge (legacy CALCULATE_SPONGE_MAKER,
+   ! old/sponge.F): west strip of global width $W/\Delta x + N_{ghost}$,
+   !   $$ s(i) = \max\!\big(A^{\,r}, 1\big), \qquad
+   !      r = R^{\lfloor 50 (i_g - 1) / (I_w - 1) \rfloor} $$
+   ! (both exponent divisions are truncating integer arithmetic).
+   ! Legacy loops i = 1..Iwidth on every rank regardless of the local
+   ! extent — clamped to mloc here (identical values in range).
+   ! ----------------------------------------------------------------
+   subroutine fill_sponge_maker(grid, width, r_sponge, a_sponge, sponge)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: N_GHOST
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: width, r_sponge, a_sponge
+      real(SP), intent(inout) :: sponge(:, :)
+
+      real(SP) :: ri, lim
+      integer :: i, j, iwidth
+
+      iwidth = int(width/grid%dx0) + N_GHOST
+      do j = 1, size(sponge, 2)
+         do i = 1, min(iwidth, size(sponge, 1))
+            lim = 1.0_SP
+            if (sponge(i, j) > 1.0_SP) lim = sponge(i, j)
+            ri = r_sponge**((50*(i + grid%ibegin - 2))/(iwidth - 1))
+            sponge(i, j) = max(a_sponge**ri, lim)
+         end do
+      end do
+
+   end subroutine fill_sponge_maker
+
+   ! ----------------------------------------------------------------
+   ! Private: nearest-mode periodic wave-angle snap for the boundary
+   ! wavemakers (legacy CalcPeriodicTheta — a THIRD snap algorithm):
+   ! walk modes up past the target, then pick whichever of the modes
+   ! m-1, m is CLOSER; caps at $\pi/2 - \epsilon$; error-stops for
+   ! $|\theta| \ge 90°$.  theta = 0 passes through (legacy SMALL gate).
+   ! ----------------------------------------------------------------
+   subroutine calc_periodic_theta(wkn, theta_in, dy, nglob, theta_out)
+      use core_constants_mod, only: PI, SMALL
+      real(SP), intent(in) :: wkn, theta_in, dy
+      integer, intent(in) :: nglob
+      real(SP), intent(out) :: theta_out
+
+      real(SP) :: walked, rlamda_m, nearest
+      integer :: m
+
+      if (theta_in*180.0_SP/PI >= 90.0_SP .or. theta_in*180.0_SP/PI <= -90.0_SP) &
+         error stop "wavemaker: input angle out of range of -90 -> 90"
+
+      theta_out = theta_in
+      if (abs(theta_in) <= SMALL) return
+
+      if (theta_in > 0.0_SP) then
+         walked = 0.0_SP
+         m = 0
+         do while (walked < theta_in)
+            m = m + 1
+            rlamda_m = real(m, SP)*2.0_SP*PI/dy/(real(nglob, SP) - 1.0_SP)
+            if (rlamda_m >= wkn) then
+               walked = PI*0.5_SP - SMALL
+            else
+               walked = asin(rlamda_m/wkn)
+            end if
+            if (m > 1000) walked = PI*0.5_SP - SMALL
+         end do
+         nearest = asin(real(m - 1, SP)*2.0_SP*PI/dy &
+                        /(real(nglob, SP) - 1.0_SP)/wkn)
+         if (abs(nearest - theta_in) < abs(theta_in - walked)) then
+            theta_out = nearest
+         else
+            theta_out = walked
+         end if
+      else
+         walked = 0.0_SP
+         m = 0
+         do while (walked > theta_in)
+            m = m + 1
+            rlamda_m = real(m, SP)*2.0_SP*PI/dy/(real(nglob, SP) - 1.0_SP)
+            if (rlamda_m >= wkn) then
+               walked = -PI*0.5_SP + SMALL
+            else
+               walked = -asin(rlamda_m/wkn)
+            end if
+            if (m > 1000) walked = -PI*0.5_SP + SMALL
+         end do
+         nearest = -asin(real(m - 1, SP)*2.0_SP*PI/dy &
+                         /(real(nglob, SP) - 1.0_SP)/wkn)
+         if (abs(nearest - theta_in) < abs(theta_in - walked)) then
+            theta_out = nearest
+         else
+            theta_out = walked
+         end if
+      end if
+
+   end subroutine calc_periodic_theta
 
    ! ----------------------------------------------------------------
    ! Initial-condition wavemakers: fill eta/u/v at t=0.
