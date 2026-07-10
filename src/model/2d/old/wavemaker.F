@@ -2846,7 +2846,10 @@ SUBROUTINE WK_NEW_EQUAL_DFREQ_IRREGULAR_WAVE &
       theta(1) = theta_input*pi/180.0_SP
       AG(1) = 1.0_SP
    ELSE
-      displace_theta = minloc(abs(Freq - fm))
+      ! MINLOC returns a size-1 array; the full-array assignment is
+      ! nonconforming and traps under runtime bounds checking.  Only
+      ! element 1 is ever consumed — slice preserves unchecked behavior.
+      displace_theta(1:1) = minloc(abs(Freq - fm))
       idx_theta = MOD(displace_theta(1), mtheta)
       DO kf = 1, mfreq !new method
          ktheta_temp = MOD(kf - idx_theta, mtheta)
