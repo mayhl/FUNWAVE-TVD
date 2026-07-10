@@ -266,6 +266,7 @@ contains
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge)
+      call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
       monitor%mgr => output_mgr
@@ -304,8 +305,8 @@ contains
    ! channel (full output-block YAML: Step 7).  File naming and frame
    ! numbering follow legacy PREVIEW: <prefix>_NNNNN with the
    ! initial-condition frame at 00000 (icount_start=-1), plus dep.out
-   ! and a truncated time_dt.out.  MASK/MASK9 (integer) and the
-   ! legacy P/Q interface fluxes are skipped with a warning.
+   ! and a truncated time_dt.out.  MASK/MASK9 and the legacy P/Q
+   ! interface fluxes ride the stepper's register_output entries.
    ! ----------------------------------------------------------------
    subroutine build_field_channel(this, mgr)
       class(type_model_main), intent(inout), target :: this
@@ -334,16 +335,11 @@ contains
          ! Legacy gates the nubrk write on VISCOSITY_BREAKING, not OUT_NU alone
          if (out%OUT_NU .and. this%physics%viscosity_breaking) &
             call add_var(vars, prefs, nv, "nu_break", "nubrk")
-
-         if (out%OUT_MASK .or. out%OUT_MASK9) then
-            call this%env%log%warning( &
-               "output: MASK/MASK9 not yet available on the modern path")
-         end if
-         if (out%OUT_P .or. out%OUT_Q) then
-            call this%env%log%warning( &
-               "output: legacy P/Q (interface fluxes) not yet available "// &
-               "on the modern path")
-         end if
+         if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")
+         if (out%OUT_MASK9) call add_var(vars, prefs, nv, "mask9", "mask9")
+         ! Legacy P/Q are the interface fluxes, not the registry p/q (Ubar)
+         if (out%OUT_P) call add_var(vars, prefs, nv, "p_flux", "p")
+         if (out%OUT_Q) call add_var(vars, prefs, nv, "q_flux", "q")
 
          folder = trim(out%result_folder)
          if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"

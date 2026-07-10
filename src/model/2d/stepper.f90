@@ -145,8 +145,14 @@ module model_stepper_2d_mod
       ! single-source cases alias the source array in merge_nu_vis.
       real(SP), allocatable :: nu_vis(:, :)
 
+      ! Output mirrors (registry is real(SP)-only): legacy Int2Flo
+      ! casts of mask/mask9, refreshed at post_step; allocated only
+      ! under their OUT_ flags.
+      real(SP), allocatable :: mask_out(:, :), mask9_out(:, :)
+
    contains
       procedure :: init => stepper_init
+      procedure :: register_output => stepper_register_output
       procedure :: free => stepper_free
       procedure :: pre_step => stepper_pre_step
       procedure :: estimate_dt => stepper_estimate_dt
@@ -506,6 +512,37 @@ contains
    end subroutine stepper_stage
 
    ! ----------------------------------------------------------------
+   ! Register stepper-owned output arrays (after init): the legacy
+   ! interface fluxes P/Q live in the flux workspace (loop-top state =
+   ! last-stage fluxes, exactly what legacy PREVIEW writes), and the
+   ! integer masks ride real mirrors.  fws%p/q are zeroed here so the
+   ! initial-condition frame matches legacy's zero-initialised P/Q.
+   ! ----------------------------------------------------------------
+   subroutine stepper_register_output(this, registry)
+      use core_field_registry_mod, only: type_field_registry
+      class(type_model_stepper_2d), intent(inout), target :: this
+      type(type_field_registry), intent(inout) :: registry
+
+      this%fws%p = 0.0_SP
+      this%fws%q = 0.0_SP
+      call registry%register("p_flux", this%fws%p)
+      call registry%register("q_flux", this%fws%q)
+
+      associate (f => this%fields, lp => this%grid%lp)
+         if (this%output%OUT_MASK) then
+            allocate (this%mask_out(lp%mloc, lp%nloc))
+            this%mask_out = real(f%mask, SP)
+            call registry%register("mask", this%mask_out)
+         end if
+         if (this%output%OUT_MASK9) then
+            allocate (this%mask9_out(lp%mloc, lp%nloc))
+            this%mask9_out = real(f%mask9, SP)
+            call registry%register("mask9", this%mask9_out)
+         end if
+      end associate
+   end subroutine stepper_register_output
+
+   ! ----------------------------------------------------------------
    ! Step tail (legacy): mixing (deferred), max/min envelopes, and the
    ! global blow-up check
    !   $$ \max_{i,j} |\eta| > \eta_{blow} \Rightarrow \text{abort} $$
@@ -522,6 +559,10 @@ contains
       ! TODO: MIXING_STUFF (time-averaged statistics) — deferred port
 
       call update_max_min(this, time)
+
+      ! Refresh integer-mask output mirrors for the loop-top flush
+      if (allocated(this%mask_out)) this%mask_out = real(this%fields%mask, SP)
+      if (allocated(this%mask9_out)) this%mask9_out = real(this%fields%mask9, SP)
 
       associate (f => this%fields, lp => this%grid%lp)
          max_abs_eta = maxval(abs(f%eta(lp%ib:lp%ie, lp%jb:lp%je)))
@@ -677,6 +718,8 @@ contains
                                                this%undertow_u, this%undertow_v)
       if (allocated(this%in_wm_zone)) deallocate (this%in_wm_zone)
       if (allocated(this%nu_vis)) deallocate (this%nu_vis)
+      if (allocated(this%mask_out)) deallocate (this%mask_out)
+      if (allocated(this%mask9_out)) deallocate (this%mask9_out)
 
       this%env => null()
       this%grid => null()
