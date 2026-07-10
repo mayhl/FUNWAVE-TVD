@@ -16,7 +16,8 @@
 !  bypassing the accumulator.
 !
 !  File layout (all files under result_folder, which must exist and
-!  include a trailing path separator):
+!  include a trailing path separator; <var> is the registry name or the
+!  per-variable file_prefixes override, counter base icount_start+1):
 !   field snapshot   <var>_NNNNN            (legacy PREVIEW naming, 5-digit
 !   field statistic  <var>_<stat>_NNNNN      flush counter starting at 1)
 !   point snapshot   <id>_<var>.dat          one row per flush: t, v(1..n)
@@ -48,7 +49,7 @@ module core_output_channel_mod
    implicit none
 
    private
-   public :: type_output_channel
+   public :: type_output_channel, write_field_file
 
    integer, parameter :: VARNAME_LEN = 32
    integer, parameter :: STATNAME_LEN = 8
@@ -61,6 +62,9 @@ module core_output_channel_mod
       character(ID_LEN)              :: geom_type = ''  ! 'field', 'station', 'transect'
       character(8)                   :: format = 'ascii'
       character(VARNAME_LEN)         :: variables(VARS_MAX) = ''
+      ! Per-variable file-name overrides (legacy bridge: registry h_max
+      ! writes legacy hmax_NNNNN); default to the registry names.
+      character(VARNAME_LEN)         :: prefixes(VARS_MAX) = ''
       character(STATNAME_LEN)        :: statistics(STATS_MAX) = ''
       integer                        :: n_vars = 0
       integer                        :: n_stats = 0
@@ -71,6 +75,9 @@ module core_output_channel_mod
       ! Output destination and flush counter
       character(:), allocatable :: result_folder
       integer                   :: icount = 0
+
+      ! Whether the last step() call flushed (loop-top time_dt.out hook)
+      logical                   :: fired = .false.
 
       ! Timing
       type(type_timing_control) :: trigger
@@ -100,7 +107,8 @@ contains
    subroutine channel_init(this, id, geom_type, variables, n_vars, &
                            statistics, n_stats, snapshot, t_start, interval, &
                            result_folder, format, &
-                           coords_x, coords_y, n_coords, grid, comm)
+                           coords_x, coords_y, n_coords, grid, comm, &
+                           file_prefixes, icount_start)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -115,6 +123,8 @@ contains
       integer, intent(in) :: n_coords   ! n_stations or n_transect_points (0 for field)
       type(type_grid_2d), intent(in)    :: grid
       type(type_comm), intent(inout) :: comm
+      character(*), intent(in), optional :: file_prefixes(*)  ! per-var name overrides
+      integer, intent(in), optional :: icount_start  ! pre-increment counter base
 
       integer :: iv, is
       integer, allocatable :: pids(:)
@@ -131,8 +141,14 @@ contains
       this%local_ny = grid%local_ny
       this%result_folder = trim(result_folder)
       this%icount = 0
+      if (present(icount_start)) this%icount = icount_start
 
       this%variables(1:n_vars) = variables(1:n_vars)
+      if (present(file_prefixes)) then
+         this%prefixes(1:n_vars) = file_prefixes(1:n_vars)
+      else
+         this%prefixes(1:n_vars) = variables(1:n_vars)
+      end if
       this%statistics(1:n_stats) = statistics(1:n_stats)
 
       ! Timing control
@@ -198,11 +214,13 @@ contains
       real(SP), allocatable :: interp_vals(:), interp_2d(:, :)
       logical :: do_flush
 
+      this%fired = .false.
       if (t < this%t_start) return
 
       ! dt-accumulator mode: legacy PLOT_COUNT frame cadence
       do_flush = this%trigger%should_trigger(t, dt)
       if (do_flush) this%icount = this%icount + 1
+      this%fired = do_flush
 
       ! --- Snapshot: write current field directly from registry ---
       if (do_flush .and. this%snapshot) then
@@ -261,13 +279,13 @@ contains
       case ('field')
          associate (ng => N_GHOST, nx => this%local_nx, ny => this%local_ny)
             call channel_flush_field(this, fld(ng + 1:ng + nx, ng + 1:ng + ny), &
-                                     trim(this%variables(iv)), comm)
+                                     trim(this%prefixes(iv)), comm)
          end associate
       case ('station', 'transect')
          allocate (local_vals(this%n_local))
          call this%interp%gather(fld, local_vals)
          call channel_flush_points(this, local_vals, &
-                                   trim(this%variables(iv)), t, comm)
+                                   trim(this%prefixes(iv)), t, comm)
       end select
    end subroutine channel_write_snapshot
 
@@ -284,7 +302,7 @@ contains
 
       do is = 1, this%n_stats
          stat_vals = this%accum(iv)%get_stat(trim(this%statistics(is)))
-         name = trim(this%variables(iv))//'_'//trim(this%statistics(is))
+         name = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
          select case (trim(this%geom_type))
          case ('field')
             call channel_flush_field(this, stat_vals, name, comm)
@@ -360,13 +378,13 @@ contains
 
       do iv = 1, this%n_vars
          if (this%snapshot) then
-            open (newunit=unit, file=point_file_name(this, trim(this%variables(iv))), &
+            open (newunit=unit, file=point_file_name(this, trim(this%prefixes(iv))), &
                   status='replace', action='write')
             close (unit)
          end if
          do is = 1, this%n_stats
             open (newunit=unit, file=point_file_name(this, &
-                                                     trim(this%variables(iv))//'_'//trim(this%statistics(is))), &
+                                                     trim(this%prefixes(iv))//'_'//trim(this%statistics(is))), &
                   status='replace', action='write')
             close (unit)
          end do
