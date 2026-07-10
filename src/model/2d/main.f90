@@ -19,7 +19,7 @@ module model_main_mod
    use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
    use core_output_manager_mod, only: type_output_manager
-   use core_output_channel_mod, only: type_output_channel
+   use core_output_channel_mod, only: type_output_channel, write_field_file
    use core_stepper_engine_mod, only: type_stepper_engine, type_engine_monitor
    use core_path_mod, only: type_path
    use probe_mod, only: dump_state, reset_state
@@ -284,42 +284,56 @@ contains
    subroutine output_monitor_step(this, t, dt)
       class(type_output_monitor), intent(inout) :: this
       real(SP), intent(in) :: t, dt
+
+      integer :: unit
+
       call this%mgr%step(t, dt, this%registry, this%comm)
+
+      ! Legacy PREVIEW appends "time dt" to time_dt.out (run dir, not
+      ! result_folder) at every field-frame flush; io rank only here.
+      if (this%mgr%channels(1)%fired .and. this%comm%is_io_node()) then
+         open (newunit=unit, file='time_dt.out', status='unknown', &
+               position='append', action='write')
+         write (unit, *) t, dt
+         close (unit)
+      end if
    end subroutine output_monitor_step
 
    ! ----------------------------------------------------------------
    ! Bridge the legacy-style output flags to one snapshot field
-   ! channel (full output-block YAML: Step 7).  Only registry-backed
-   ! variables map; MASK/MASK9 (integer) and the legacy P/Q interface
-   ! fluxes are skipped with a warning.  Legacy file naming: the
-   ! channel writes <registry_name>_NNNNN (h_max vs legacy hmax —
-   ! reconcile at the 6e regression switchover).
+   ! channel (full output-block YAML: Step 7).  File naming and frame
+   ! numbering follow legacy PREVIEW: <prefix>_NNNNN with the
+   ! initial-condition frame at 00000 (icount_start=-1), plus dep.out
+   ! and a truncated time_dt.out.  MASK/MASK9 (integer) and the
+   ! legacy P/Q interface fluxes are skipped with a warning.
    ! ----------------------------------------------------------------
    subroutine build_field_channel(this, mgr)
       class(type_model_main), intent(inout), target :: this
       type(type_output_manager), intent(inout) :: mgr
 
-      character(len=16) :: vars(24)
+      character(len=16) :: vars(24), prefs(24)
       character(len=8) :: stats(1)
       character(:), allocatable :: folder, fmt
       real(SP) :: dummy_coord(1)
       type(type_path) :: outdir
-      integer :: nv
+      integer :: nv, unit
       logical :: ok
 
       associate (out => this%output)
 
          nv = 0
-         if (out%OUT_ETA) call add_var(vars, nv, "eta")
-         if (out%OUT_U) call add_var(vars, nv, "u")
-         if (out%OUT_V) call add_var(vars, nv, "v")
-         if (out%OUT_Hmax) call add_var(vars, nv, "h_max")
-         if (out%OUT_Hmin) call add_var(vars, nv, "h_min")
-         if (out%OUT_Umax) call add_var(vars, nv, "u_max")
-         if (out%OUT_MFmax) call add_var(vars, nv, "mf_max")
-         if (out%OUT_VORmax) call add_var(vars, nv, "vort_max")
-         if (this%numerics%OUT_Time) call add_var(vars, nv, "arr_time")
-         if (out%OUT_NU) call add_var(vars, nv, "nu_break")
+         if (out%OUT_ETA) call add_var(vars, prefs, nv, "eta", "eta")
+         if (out%OUT_U) call add_var(vars, prefs, nv, "u", "u")
+         if (out%OUT_V) call add_var(vars, prefs, nv, "v", "v")
+         if (out%OUT_Hmax) call add_var(vars, prefs, nv, "h_max", "hmax")
+         if (out%OUT_Hmin) call add_var(vars, prefs, nv, "h_min", "hmin")
+         if (out%OUT_Umax) call add_var(vars, prefs, nv, "u_max", "umax")
+         if (out%OUT_MFmax) call add_var(vars, prefs, nv, "mf_max", "MFmax")
+         if (out%OUT_VORmax) call add_var(vars, prefs, nv, "vort_max", "VORmax")
+         if (this%numerics%OUT_Time) call add_var(vars, prefs, nv, "arr_time", "time")
+         ! Legacy gates the nubrk write on VISCOSITY_BREAKING, not OUT_NU alone
+         if (out%OUT_NU .and. this%physics%viscosity_breaking) &
+            call add_var(vars, prefs, nv, "nu_break", "nubrk")
 
          if (out%OUT_MASK .or. out%OUT_MASK9) then
             call this%env%log%warning( &
@@ -336,6 +350,9 @@ contains
          if (this%env%comm%is_io_node()) then
             outdir = type_path(folder)
             if (.not. outdir%is_dir()) ok = outdir%mkdir()
+            ! Fresh time_dt.out per run (legacy leaves stale tails behind)
+            open (newunit=unit, file='time_dt.out', status='replace', action='write')
+            close (unit)
          end if
          call this%env%comm%barrier()
 
@@ -360,18 +377,47 @@ contains
                                    result_folder=folder, format=fmt, &
                                    coords_x=dummy_coord, coords_y=dummy_coord, &
                                    n_coords=0, grid=this%grid, &
-                                   comm=this%env%comm)
+                                   comm=this%env%comm, &
+                                   file_prefixes=prefs, icount_start=-1)
+
+         if (out%depth_out) call write_static_field(this, mgr%channels(1), &
+                                                    "depth", folder//"dep.out", fmt)
 
       end associate
 
    end subroutine build_field_channel
 
-   subroutine add_var(vars, nv, name)
-      character(len=*), intent(inout) :: vars(:)
+   ! Gather one registry field and write it as a static (non-series)
+   ! file — legacy dep.out.  Reuses the field channel's gatherer.
+   subroutine write_static_field(this, ch, var, fname, fmt)
+      use core_constants_mod, only: N_GHOST
+      class(type_model_main), intent(inout), target :: this
+      type(type_output_channel), intent(inout) :: ch
+      character(*), intent(in) :: var, fname, fmt
+
+      real(SP), pointer :: fld(:, :)
+      real(SP), allocatable :: glob(:, :)
+
+      fld => this%registry%get(var)
+      if (this%env%comm%is_io_node()) then
+         allocate (glob(ch%gatherer%M, ch%gatherer%N))
+      else
+         allocate (glob(1, 1))
+      end if
+      associate (ng => N_GHOST, nx => this%grid%local_nx, ny => this%grid%local_ny)
+         call ch%gatherer%gather_field(fld(ng + 1:ng + nx, ng + 1:ng + ny), &
+                                       glob, this%env%comm)
+      end associate
+      if (this%env%comm%is_io_node()) call write_field_file(fname, glob, fmt)
+   end subroutine write_static_field
+
+   subroutine add_var(vars, prefs, nv, name, prefix)
+      character(len=*), intent(inout) :: vars(:), prefs(:)
       integer, intent(inout) :: nv
-      character(len=*), intent(in) :: name
+      character(len=*), intent(in) :: name, prefix
       nv = nv + 1
       vars(nv) = name
+      prefs(nv) = prefix
    end subroutine add_var
 
    subroutine model_finalize(this)
