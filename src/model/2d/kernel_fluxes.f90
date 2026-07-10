@@ -57,7 +57,7 @@ module model_kernel_fluxes_mod
    public :: construction, construction_ho
    public :: construction_ho_minmod, construction_ho_mlp
    public :: construction_weno
-   public :: fluxes
+   public :: fluxes, flux_wall_bc
 
 contains
 
@@ -1071,6 +1071,65 @@ contains
          call flux_at_interface(ws)
       end if
    end subroutine fluxes
+
+   ! ----------------------------------------------------------------
+   ! flux_wall_bc — wall-face flux enforcement (legacy
+   ! BOUNDARY_CONDITION, old/bc.F): zero normal mass/advective flux
+   ! through closed walls, hydrostatic pressure only in the normal
+   ! momentum flux,
+   !   $$ F_{wall} = \tfrac{1}{2} g\,(\gamma_3\,\xi^2 + 2\,\xi\,d) $$
+   ! with $\xi$ the interior-side face reconstruction of $\eta$.
+   ! Callers pass the bc fill flags: wavemaker-owned west and
+   ! periodic-wrapped faces are excluded there, exactly as legacy.
+   ! ----------------------------------------------------------------
+   subroutine flux_wall_bc(lp, fill_west, fill_east, fill_south, fill_north, &
+                           gamma3, depthx, depthy, ws)
+      type(type_loop_bounds), intent(in) :: lp
+      logical, intent(in) :: fill_west, fill_east, fill_south, fill_north
+      real(SP), intent(in) :: gamma3
+      real(SP), intent(in) :: depthx(:, :), depthy(:, :)
+      type(type_flux_workspace), intent(inout) :: ws
+
+      real(SP) :: xi
+      integer :: i, j
+
+      if (fill_west) then
+         do j = lp%jb, lp%je
+            xi = ws%etarxr(lp%ib, j)
+            ws%p(lp%ib, j) = 0.0_SP
+            ws%fx(lp%ib, j) = 0.5_SP*GRAV*(xi*xi*gamma3 + 2.0_SP*xi*depthx(lp%ib, j))
+            ws%gx(lp%ib, j) = 0.0_SP
+         end do
+      end if
+
+      if (fill_east) then
+         do j = lp%jb, lp%je
+            xi = ws%etarxl(lp%ie + 1, j)
+            ws%p(lp%ie + 1, j) = 0.0_SP
+            ws%fx(lp%ie + 1, j) = 0.5_SP*GRAV*(xi*xi*gamma3 + 2.0_SP*xi*depthx(lp%ie + 1, j))
+            ws%gx(lp%ie + 1, j) = 0.0_SP
+         end do
+      end if
+
+      if (fill_south) then
+         do i = lp%ib, lp%ie
+            xi = ws%etaryr(i, lp%jb)
+            ws%q(i, lp%jb) = 0.0_SP
+            ws%fy(i, lp%jb) = 0.0_SP
+            ws%gy(i, lp%jb) = 0.5_SP*GRAV*(xi*xi*gamma3 + 2.0_SP*xi*depthy(i, lp%jb))
+         end do
+      end if
+
+      if (fill_north) then
+         do i = lp%ib, lp%ie
+            xi = ws%etaryl(i, lp%je + 1)
+            ws%q(i, lp%je + 1) = 0.0_SP
+            ws%fy(i, lp%je + 1) = 0.0_SP
+            ws%gy(i, lp%je + 1) = 0.5_SP*GRAV*(xi*xi*gamma3 + 2.0_SP*xi*depthy(i, lp%je + 1))
+         end do
+      end if
+
+   end subroutine flux_wall_bc
 
    ! ----------------------------------------------------------------
    ! Private: minmod of three values (preserving sign of A).
