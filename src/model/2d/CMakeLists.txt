@@ -23,4 +23,5 @@ target_sources(${main_lib}_model PRIVATE
    output.f90
    physics.f90
    coupling.f90
+   stepper.f90
    main.f90)
