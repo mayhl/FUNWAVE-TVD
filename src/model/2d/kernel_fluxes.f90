@@ -245,7 +245,7 @@ contains
             if (mask(i - 1, j) == 0 .or. mask(i, j) == 0) then
                dvp1 = 0.0_SP; dvp2 = 0.0_SP; dvp3 = 0.0_SP
             end if
-            din(i, j) = txp2 - (dvp3 - 2.0_SP*dvp2 + dvp1)/6.0_SP
+            din(i, j) = txp2 - (1.0_SP/6.0_SP)*(dvp3 - 2.0_SP*dvp2 + dvp1)
          end do
          do i = lp%ib, lp%ie + 1
             tmp1 = din(i - 1, j); tmp2 = din(i, j)
@@ -257,7 +257,7 @@ contains
             rat = tmp1/tmp2
             van2 = 0.0_SP
             if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
-            outl(i, j) = vin(i - 1, j) + (van1*tmp1 + 2.0_SP*van2*tmp2)/6.0_SP
+            outl(i, j) = vin(i - 1, j) + (1.0_SP/6.0_SP)*(van1*tmp1 + 2.0_SP*van2*tmp2)
             tmp1 = din(i, j); tmp2 = din(i + 1, j)
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
@@ -267,7 +267,7 @@ contains
             rat = tmp1/tmp2
             van2 = 0.0_SP
             if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
-            outr(i, j) = vin(i, j) - (2.0_SP*van1*tmp1 + van2*tmp2)/6.0_SP
+            outr(i, j) = vin(i, j) - (1.0_SP/6.0_SP)*(2.0_SP*van1*tmp1 + van2*tmp2)
          end do
       end do
    end subroutine construct_ho_x
@@ -303,7 +303,7 @@ contains
             if (mask(i, j - 1) == 0 .or. mask(i, j) == 0) then
                dvp1 = 0.0_SP; dvp2 = 0.0_SP; dvp3 = 0.0_SP
             end if
-            din(i, j) = typ2 - (dvp3 - 2.0_SP*dvp2 + dvp1)/6.0_SP
+            din(i, j) = typ2 - (1.0_SP/6.0_SP)*(dvp3 - 2.0_SP*dvp2 + dvp1)
          end do
          do j = lp%jb, lp%je + 1
             tmp1 = din(i, j - 1); tmp2 = din(i, j)
@@ -315,7 +315,7 @@ contains
             rat = tmp1/tmp2
             van2 = 0.0_SP
             if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
-            outl(i, j) = vin(i, j - 1) + (van1*tmp1 + 2.0_SP*van2*tmp2)/6.0_SP
+            outl(i, j) = vin(i, j - 1) + (1.0_SP/6.0_SP)*(van1*tmp1 + 2.0_SP*van2*tmp2)
             tmp1 = din(i, j); tmp2 = din(i, j + 1)
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
@@ -325,7 +325,7 @@ contains
             rat = tmp1/tmp2
             van2 = 0.0_SP
             if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
-            outr(i, j) = vin(i, j) - (2.0_SP*van1*tmp1 + van2*tmp2)/6.0_SP
+            outr(i, j) = vin(i, j) - (1.0_SP/6.0_SP)*(2.0_SP*van1*tmp1 + van2*tmp2)
          end do
       end do
    end subroutine construct_ho_y
@@ -361,7 +361,7 @@ contains
             if (mask(i - 1, j) == 0 .or. mask(i, j) == 0) then
                dvp1 = 0.0_SP; dvp2 = 0.0_SP; dvp3 = 0.0_SP
             end if
-            din(i, j) = txp2 - (dvp3 - 2.0_SP*dvp2 + dvp1)/6.0_SP
+            din(i, j) = txp2 - (1.0_SP/6.0_SP)*(dvp3 - 2.0_SP*dvp2 + dvp1)
          end do
          do i = lp%ib, lp%ie + 1
             if (din(i - 1, j) >= 0.0_SP) then
@@ -384,8 +384,8 @@ contains
             else
                txp3 = min(0.0_SP, max(din(i + 1, j), 4.0_SP*din(i, j)))
             end if
-            outl(i, j) = vin(i - 1, j) + (txp1 + 2.0_SP*txp2)/6.0_SP
-            outr(i, j) = vin(i, j) - (txp3 + 2.0_SP*txp4)/6.0_SP
+            outl(i, j) = vin(i - 1, j) + (1.0_SP/6.0_SP)*(txp1 + 2.0_SP*txp2)
+            outr(i, j) = vin(i, j) - (1.0_SP/6.0_SP)*(txp3 + 2.0_SP*txp4)
          end do
       end do
    end subroutine construct_ho_x_minmod
@@ -420,7 +420,7 @@ contains
             if (mask(i, j - 1) == 0 .or. mask(i, j) == 0) then
                dvp1 = 0.0_SP; dvp2 = 0.0_SP; dvp3 = 0.0_SP
             end if
-            din(i, j) = typ2 - (dvp3 - 2.0_SP*dvp2 + dvp1)/6.0_SP
+            din(i, j) = typ2 - (1.0_SP/6.0_SP)*(dvp3 - 2.0_SP*dvp2 + dvp1)
          end do
       end do
       do j = lp%jb, lp%je + 1
@@ -445,8 +445,8 @@ contains
             else
                typ3 = min(0.0_SP, max(din(i, j + 1), 4.0_SP*din(i, j)))
             end if
-            outl(i, j) = vin(i, j - 1) + (typ1 + 2.0_SP*typ2)/6.0_SP
-            outr(i, j) = vin(i, j) - (typ3 + 2.0_SP*typ4)/6.0_SP
+            outl(i, j) = vin(i, j - 1) + (1.0_SP/6.0_SP)*(typ1 + 2.0_SP*typ2)
+            outr(i, j) = vin(i, j) - (1.0_SP/6.0_SP)*(typ3 + 2.0_SP*typ4)
          end do
       end do
    end subroutine construct_ho_y_minmod
