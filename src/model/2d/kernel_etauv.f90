@@ -327,7 +327,9 @@ contains
                hv(i, j) = heff*v(i, j)
                utotal = sqrt(u(i, j)**2 + v(i, j)**2)
                fr_speed = sqrt(GRAV*heff)
-               if (utotal > froude_cap*fr_speed) then
+               ! legacy comparison form Utotal/Fr > FroudeCap kept —
+               ! runup jets sit at the cap and the forms differ by ULPs
+               if (utotal/fr_speed > froude_cap) then
                   utheta = atan2(v(i, j), u(i, j))
                   u(i, j) = froude_cap*fr_speed*cos(utheta)
                   v(i, j) = froude_cap*fr_speed*sin(utheta)
