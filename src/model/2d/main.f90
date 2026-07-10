@@ -39,6 +39,7 @@ module model_main_mod
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
+   use model_stations_mod, only: type_model_stations
    use model_stepper_2d_mod, only: type_model_stepper_2d
 
    implicit none
@@ -50,6 +51,7 @@ module model_main_mod
       type(type_output_manager), pointer :: mgr => null()
       type(type_field_registry), pointer :: registry => null()
       type(type_comm), pointer :: comm => null()
+      type(type_model_stations), pointer :: stations => null()
    contains
       procedure :: step => output_monitor_step
    end type type_output_monitor
@@ -77,6 +79,8 @@ module model_main_mod
       ! Time-averaged statistics (legacy MIXING_STUFF port) — engine
       ! path only, initialised in run()
       type(type_model_means)    :: means
+      ! Station time series (legacy STATIONS port) — engine path only
+      type(type_model_stations) :: stations
    contains
       procedure :: init
       procedure :: init_from_env => model_init_from_env
@@ -274,17 +278,28 @@ contains
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
+      call this%stations%init_compute(this%grid, this%env, this%fields, &
+                                      this%output%number_stations, &
+                                      this%output%stations_file, &
+                                      this%output%result_folder, &
+                                      this%simulation%plot_intv_station, &
+                                      this%simulation%station_output_buffer, &
+                                      this%simulation%total_time)
       monitor%mgr => output_mgr
       monitor%registry => this%registry
       monitor%comm => this%env%comm
+      monitor%stations => this%stations
 
       call engine%init(0.0_SP, this%simulation%total_time, &
                        this%simulation%screen_interval)
       call engine%run(stepper, monitor, this%env%log)
 
+      ! legacy calls STATIONS once after the loop (residual flush)
+      call this%stations%finish()
       call output_mgr%finalize()
       call stepper%free()
       call this%means%free()
+      call this%stations%free()
 
    end subroutine model_run
 
@@ -295,6 +310,7 @@ contains
       integer :: unit
 
       call this%mgr%step(t, dt, this%registry, this%comm)
+      if (associated(this%stations)) call this%stations%update(t, dt)
 
       ! Legacy PREVIEW appends "time dt" to time_dt.out (run dir, not
       ! result_folder) at every field-frame flush; io rank only here.
