@@ -229,11 +229,12 @@ contains
 
       call this%setup()
       call this%friction%init_compute(this%grid)
+      call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
+                                       this%env)
 
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &
-                        this%simulation, this%output, &
-                        this%wavemaker%wavemaker_type)
+                        this%simulation, this%output, this%wavemaker)
 
       call build_field_channel(this, output_mgr)
       monitor%mgr => output_mgr

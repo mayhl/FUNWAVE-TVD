@@ -9,9 +9,10 @@
 !  (old/legacy_runner.F + old/etauv_solver.F).
 !
 !  Per-stage order (legacy):
-!    dispersion -> fluxes -> sources -> RK update -> H -> tridiagonal
-!    U/V solves -> mask/HU/HV/Froude -> update_mask(9) -> breaking ->
-!    ghost exchange [-> wavemaker BC, sponge damping: Step 6d].
+!    dispersion -> fluxes -> wavemaker source -> sources -> RK update
+!    -> H -> tridiagonal U/V solves -> mask/HU/HV/Froude ->
+!    update_mask(9) -> breaking -> ghost exchange
+!    [-> wavemaker BC (ABS/LEFT_BC_IRR), sponge damping: later 6d rungs].
 !
 !  Not yet ported (deferred, with their features):
 !    - MIXING_STUFF time-averaged statistics (post_step TODO)
@@ -46,6 +47,7 @@ module model_stepper_2d_mod
    use model_friction_mod, only: type_model_friction
    use model_simulation_mod, only: type_model_simulation
    use model_output_mod, only: type_model_output
+   use model_wavemaker_mod, only: type_model_wavemaker
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, cal_dispersion
    use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, flux_wall_bc
@@ -78,6 +80,7 @@ module model_stepper_2d_mod
       type(type_model_friction), pointer :: friction => null()
       type(type_model_simulation), pointer :: simulation => null()
       type(type_model_output), pointer :: output => null()
+      type(type_model_wavemaker), pointer :: wavemaker => null()
 
       type(type_model_bc) :: bc
 
@@ -120,7 +123,7 @@ module model_stepper_2d_mod
       real(SP), allocatable :: etamean(:, :)           ! mixing port pending: 0
       real(SP), allocatable :: roller_flux(:, :)
       real(SP), allocatable :: undertow_u(:, :), undertow_v(:, :)
-      logical, allocatable :: in_wm_zone(:, :)         ! wavemaker zone: Step 6d
+      logical, allocatable :: in_wm_zone(:, :)         ! breaker's wavemaker-zone flags
 
    contains
       procedure :: init => stepper_init
@@ -140,7 +143,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker_type)
+                           wavemaker)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -154,7 +157,9 @@ contains
       type(type_model_friction), intent(inout), target :: friction
       type(type_model_simulation), intent(inout), target :: simulation
       type(type_model_output), intent(inout), target :: output
-      character(*), intent(in) :: wavemaker_type
+      ! wavemaker%init_compute must have run (source coefficients and
+      ! zone box feed the mass source and the breaker zone flags)
+      type(type_model_wavemaker), intent(inout), target :: wavemaker
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -167,8 +172,9 @@ contains
       this%friction => friction
       this%simulation => simulation
       this%output => output
+      this%wavemaker => wavemaker
 
-      call this%bc%init(grid, wavemaker_type)
+      call this%bc%init(grid, wavemaker%wavemaker_type)
 
       this%b1 = physics%Beta_ref*physics%Beta_ref
       this%b2 = physics%Beta_ref
@@ -244,7 +250,8 @@ contains
          allocate (this%roller_flux(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_u(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_v(mloc, nloc), source=0.0_SP)
-         allocate (this%in_wm_zone(mloc, nloc), source=.false.)
+         allocate (this%in_wm_zone(mloc, nloc))
+         call wavemaker%fill_in_zone(this%in_wm_zone)
       end if
 
       ! -- initial cell fluxes ---------------------------------------
@@ -296,8 +303,8 @@ contains
    end subroutine stepper_estimate_dt
 
    ! ----------------------------------------------------------------
-   ! One RK3 stage, legacy order.  time (= t + dt, legacy TIME inside
-   ! the stage loop) is unused until the wavemaker source lands (6d).
+   ! One RK3 stage, legacy order.  time = t + dt (legacy TIME inside
+   ! the stage loop — constant across the three stages).
    ! ----------------------------------------------------------------
    subroutine stepper_stage(this, istage, dt, time)
       class(type_model_stepper_2d), intent(inout) :: this
@@ -322,6 +329,9 @@ contains
          ! Manning drag from current H (legacy evaluates inside SourceTerms)
          call this%friction%update_cd(f%h, num%MinDepthFrc)
 
+         ! wavemaker mass source at the stage TIME (legacy SourceTerms head)
+         call this%wavemaker%update_source(time)
+
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
                           this%depth_fx, this%depth_fy, f%eta, f%h, f%u, f%v, &
@@ -329,7 +339,7 @@ contains
                           this%u4, this%v4, this%u1p, this%v1p, &
                           this%u1pp, this%v1pp, this%u2, this%v2, &
                           this%u3, this%v3, &
-                          this%zeros, &   ! wavemaker mass source: Step 6d
+                          wm_mass(this), &
                           this%friction%Cd, &
                           merge_nu_vis(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
@@ -339,7 +349,7 @@ contains
                             this%fws%p, this%fws%q, this%fws%fx, this%fws%fy, &
                             this%fws%gx, this%fws%gy, &
                             this%src_x, this%src_y, &
-                            this%zeros, &   ! wavemaker mass source: Step 6d
+                            wm_mass(this), &
                             f%eta0, f%p0, f%q0, f%eta, f%p, f%q)
 
          ! legacy GET_Eta_U_V_HU_HV: whole-array H (unclamped; ghost eta
@@ -518,6 +528,20 @@ contains
 
    end subroutine run_dispersion
 
+   ! Wavemaker mass source for the eta/momentum RHS: the wavemaker's
+   ! array when an internal source is active, zeros otherwise (the
+   ! kernels add it unconditionally).
+   function wm_mass(this) result(m)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: m(:, :)
+
+      if (this%wavemaker%has_mass_source) then
+         m => this%wavemaker%mass
+      else
+         m => this%zeros
+      end if
+   end function wm_mass
+
    ! Effective eddy viscosity for the momentum source: nu_break when
    ! breaking is active (diffusion-sponge contribution: Step 6d).
    function merge_nu_vis(this) result(nu)
@@ -561,6 +585,7 @@ contains
       this%friction => null()
       this%simulation => null()
       this%output => null()
+      this%wavemaker => null()
 
    end subroutine stepper_free
 
