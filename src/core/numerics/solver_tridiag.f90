@@ -81,7 +81,10 @@ contains
    ! trid_x — MPI pipeline Thomas in x.
    ! Forward sweep west→east; back-sub east→west.
    ! west neighbor = grid%back_rank, east = grid%shore_rank.
-   ! Works for PX=1 (both ranks MPI_PROC_NULL, exchanges skipped).
+   ! Chain endpoints come from the cart POSITION (iproc), never from
+   ! neighbor nullity: under a periodic cart topology the wrap makes
+   ! every rank have neighbors, but the sweep is still linear.
+   ! Works for PX=1 (single x-rank, exchanges skipped).
    ! c and d are overwritten during elimination; a is read-only.
    ! ----------------------------------------------------------------
    subroutine trid_x(lp, grid, a, c, d, f)
@@ -97,7 +100,7 @@ contains
       integer           :: i, j, ierr
 
       ! --- forward sweep ---
-      if (grid%back_rank /= MPI_PROC_NULL) then
+      if (grid%iproc > 0) then
          call MPI_Irecv(rmsg, 2*lp%nloc, MPI_SP, grid%back_rank, 0, grid%cart_comm, req, ierr)
          call MPI_Wait(req, stat, ierr)
          do j = lp%jb, lp%je
@@ -119,7 +122,7 @@ contains
          end do
       end do
 
-      if (grid%shore_rank /= MPI_PROC_NULL) then
+      if (grid%iproc < grid%nx_proc - 1) then
          do j = lp%jb, lp%je
             smsg(j, 1) = d(lp%ie, j)
             smsg(j, 2) = c(lp%ie, j)
@@ -129,7 +132,7 @@ contains
       end if
 
       ! --- back substitution ---
-      if (grid%shore_rank /= MPI_PROC_NULL) then
+      if (grid%iproc < grid%nx_proc - 1) then
          call MPI_Irecv(rmsg, 2*lp%nloc, MPI_SP, grid%shore_rank, 1, grid%cart_comm, req, ierr)
          call MPI_Wait(req, stat, ierr)
          do j = lp%jb, lp%je
@@ -147,7 +150,7 @@ contains
          end do
       end do
 
-      if (grid%back_rank /= MPI_PROC_NULL) then
+      if (grid%iproc > 0) then
          do j = lp%jb, lp%je
             smsg(j, 1) = f(lp%ib, j)
          end do
@@ -161,6 +164,8 @@ contains
    ! trid_y — MPI pipeline Thomas in y.
    ! Forward sweep south→north; back-sub north→south.
    ! south neighbor = grid%right_rank, north = grid%left_rank.
+   ! Chain endpoints from the cart position (jproc), as in trid_x —
+   ! required for periodic-y cart topologies (Sherman-Morrison callers).
    ! ----------------------------------------------------------------
    subroutine trid_y(lp, grid, a, c, d, f)
       type(type_loop_bounds), intent(in)    :: lp
@@ -175,7 +180,7 @@ contains
       integer           :: i, j, ierr
 
       ! --- forward sweep ---
-      if (grid%right_rank /= MPI_PROC_NULL) then
+      if (grid%jproc > 0) then
          call MPI_Irecv(rmsg, 2*lp%mloc, MPI_SP, grid%right_rank, 0, grid%cart_comm, req, ierr)
          call MPI_Wait(req, stat, ierr)
          do i = lp%ib, lp%ie
@@ -197,7 +202,7 @@ contains
          end do
       end do
 
-      if (grid%left_rank /= MPI_PROC_NULL) then
+      if (grid%jproc < grid%ny_proc - 1) then
          do i = lp%ib, lp%ie
             smsg(i, 1) = d(i, lp%je)
             smsg(i, 2) = c(i, lp%je)
@@ -207,7 +212,7 @@ contains
       end if
 
       ! --- back substitution ---
-      if (grid%left_rank /= MPI_PROC_NULL) then
+      if (grid%jproc < grid%ny_proc - 1) then
          call MPI_Irecv(rmsg, 2*lp%mloc, MPI_SP, grid%left_rank, 1, grid%cart_comm, req, ierr)
          call MPI_Wait(req, stat, ierr)
          do i = lp%ib, lp%ie
@@ -225,7 +230,7 @@ contains
          end do
       end do
 
-      if (grid%right_rank /= MPI_PROC_NULL) then
+      if (grid%jproc > 0) then
          do i = lp%ib, lp%ie
             smsg(i, 1) = f(i, lp%jb)
          end do
@@ -270,12 +275,12 @@ contains
             a_beg = a_loc(lp%ib, :)
             c_end = c1(lp%ie, :)
          else
-            if (grid%is_back_boundary) then
+            if (grid%iproc == 0) then
                a_beg = a_loc(lp%ib, :)
                call MPI_Send(a_beg, lp%nloc, MPI_SP, east_rank, 20, grid%cart_comm, ierr)
                call MPI_Recv(c_end, lp%nloc, MPI_SP, east_rank, 21, grid%cart_comm, stat, ierr)
             end if
-            if (grid%is_shore_boundary) then
+            if (grid%iproc == grid%nx_proc - 1) then
                c_end = c1(lp%ie, :)
                call MPI_Send(c_end, lp%nloc, MPI_SP, west_rank, 21, grid%cart_comm, ierr)
                call MPI_Recv(a_beg, lp%nloc, MPI_SP, west_rank, 20, grid%cart_comm, stat, ierr)
@@ -283,13 +288,13 @@ contains
          end if
 
          ! --- Step 2: normalise and save ---
-         if (grid%is_back_boundary) then
+         if (grid%iproc == 0) then
             do j = lp%jb, lp%je
                c1(lp%ib, j) = c1(lp%ib, j)/(1.0_SP + c_end(j))
                d1(lp%ib, j) = d1(lp%ib, j)/(1.0_SP + c_end(j))
             end do
          end if
-         if (grid%is_shore_boundary) then
+         if (grid%iproc == grid%nx_proc - 1) then
             do j = lp%jb, lp%je
                a_loc(lp%ie, j) = a_loc(lp%ie, j)/(1.0_SP + a_beg(j))
                d1(lp%ie, j) = d1(lp%ie, j)/(1.0_SP + a_beg(j))
@@ -303,12 +308,12 @@ contains
 
          ! --- Step 4: build RHS for second solve ---
          d2 = 0.0_SP
-         if (grid%is_back_boundary) then
+         if (grid%iproc == 0) then
             do j = lp%jb, lp%je
                d2(lp%ib, j) = 1.0_SP/(1.0_SP + c_end(j))
             end do
          end if
-         if (grid%is_shore_boundary) then
+         if (grid%iproc == grid%nx_proc - 1) then
             do j = lp%jb, lp%je
                d2(lp%ie, j) = -1.0_SP/(1.0_SP + a_beg(j))
             end do
@@ -318,13 +323,13 @@ contains
          call trid_x(lp, grid, a_loc, c2, d2, y2)
 
          ! --- Step 6: gather y1(ie,j) and y2(ie,j) to west rank ---
-         if (grid%is_shore_boundary .and. grid%nx_proc > 1) then
+         if (grid%iproc == grid%nx_proc - 1 .and. grid%nx_proc > 1) then
             y1_end = y1(lp%ie, :)
             y2_end = y2(lp%ie, :)
             call MPI_Send(y1_end, lp%nloc, MPI_SP, west_rank, 22, grid%cart_comm, ierr)
             call MPI_Send(y2_end, lp%nloc, MPI_SP, west_rank, 23, grid%cart_comm, ierr)
          end if
-         if (grid%is_back_boundary .and. grid%nx_proc > 1) then
+         if (grid%iproc == 0 .and. grid%nx_proc > 1) then
             call MPI_Recv(y1_end, lp%nloc, MPI_SP, east_rank, 22, grid%cart_comm, stat, ierr)
             call MPI_Recv(y2_end, lp%nloc, MPI_SP, east_rank, 23, grid%cart_comm, stat, ierr)
          end if
@@ -335,7 +340,7 @@ contains
 
          ! --- Step 7: west rank computes beta ---
          beta = 0.0_SP
-         if (grid%is_back_boundary) then
+         if (grid%iproc == 0) then
             do j = lp%jb, lp%je
                beta(j) = (c_end(j)*y1(lp%ib, j) - a_beg(j)*y1_end(j)) &
                          /(1.0_SP - (c_end(j)*y2(lp%ib, j) - a_beg(j)*y2_end(j)))
@@ -344,7 +349,7 @@ contains
 
          ! --- Step 8: broadcast beta along x-row (same jproc) ---
          if (grid%nx_proc > 1) then
-            if (grid%is_back_boundary) then
+            if (grid%iproc == 0) then
                do k = 1, grid%nx_proc - 1
                   call MPI_Cart_rank(grid%cart_comm, [k, grid%jproc], dest_rank, ierr)
                   call MPI_Send(beta, lp%nloc, MPI_SP, dest_rank, 24, grid%cart_comm, ierr)
@@ -369,8 +374,8 @@ contains
    ! trid_y_periodic — Sherman-Morrison for y-periodic BC.
    ! Off-diagonal corners: a(i,jb) couples last→first row (south wrap);
    !                       c(i,je) couples first→last row (north wrap).
-   ! south boundary rank = grid%is_right_boundary (right_rank==NULL),
-   ! north boundary rank = grid%is_left_boundary  (left_rank ==NULL).
+   ! south chain-end rank: jproc == 0; north: jproc == ny_proc - 1
+   ! (cart position, valid under the periodic-y cart topology).
    ! ----------------------------------------------------------------
    subroutine trid_y_periodic(lp, grid, a, c, d, ws, f)
       type(type_loop_bounds), intent(in)    :: lp
@@ -401,12 +406,12 @@ contains
             a_beg = a_loc(:, lp%jb)
             c_end = c1(:, lp%je)
          else
-            if (grid%is_right_boundary) then   ! southernmost (jproc=0)
+            if (grid%jproc == 0) then   ! southernmost (jproc=0)
                a_beg = a_loc(:, lp%jb)
                call MPI_Send(a_beg, lp%mloc, MPI_SP, north_rank, 30, grid%cart_comm, ierr)
                call MPI_Recv(c_end, lp%mloc, MPI_SP, north_rank, 31, grid%cart_comm, stat, ierr)
             end if
-            if (grid%is_left_boundary) then    ! northernmost (jproc=PY-1)
+            if (grid%jproc == grid%ny_proc - 1) then    ! northernmost (jproc=PY-1)
                c_end = c1(:, lp%je)
                call MPI_Send(c_end, lp%mloc, MPI_SP, south_rank, 31, grid%cart_comm, ierr)
                call MPI_Recv(a_beg, lp%mloc, MPI_SP, south_rank, 30, grid%cart_comm, stat, ierr)
@@ -414,13 +419,13 @@ contains
          end if
 
          ! --- Step 2: normalise and save ---
-         if (grid%is_right_boundary) then
+         if (grid%jproc == 0) then
             do i = lp%ib, lp%ie
                c1(i, lp%jb) = c1(i, lp%jb)/(1.0_SP + c_end(i))
                d1(i, lp%jb) = d1(i, lp%jb)/(1.0_SP + c_end(i))
             end do
          end if
-         if (grid%is_left_boundary) then
+         if (grid%jproc == grid%ny_proc - 1) then
             do i = lp%ib, lp%ie
                a_loc(i, lp%je) = a_loc(i, lp%je)/(1.0_SP + a_beg(i))
                d1(i, lp%je) = d1(i, lp%je)/(1.0_SP + a_beg(i))
@@ -434,12 +439,12 @@ contains
 
          ! --- Step 4: build RHS for second solve ---
          d2 = 0.0_SP
-         if (grid%is_right_boundary) then
+         if (grid%jproc == 0) then
             do i = lp%ib, lp%ie
                d2(i, lp%jb) = 1.0_SP/(1.0_SP + c_end(i))
             end do
          end if
-         if (grid%is_left_boundary) then
+         if (grid%jproc == grid%ny_proc - 1) then
             do i = lp%ib, lp%ie
                d2(i, lp%je) = -1.0_SP/(1.0_SP + a_beg(i))
             end do
@@ -449,13 +454,13 @@ contains
          call trid_y(lp, grid, a_loc, c2, d2, y2)
 
          ! --- Step 6: gather y1(i,je) and y2(i,je) to south rank ---
-         if (grid%is_left_boundary .and. grid%ny_proc > 1) then
+         if (grid%jproc == grid%ny_proc - 1 .and. grid%ny_proc > 1) then
             y1_end = y1(:, lp%je)
             y2_end = y2(:, lp%je)
             call MPI_Send(y1_end, lp%mloc, MPI_SP, south_rank, 32, grid%cart_comm, ierr)
             call MPI_Send(y2_end, lp%mloc, MPI_SP, south_rank, 33, grid%cart_comm, ierr)
          end if
-         if (grid%is_right_boundary .and. grid%ny_proc > 1) then
+         if (grid%jproc == 0 .and. grid%ny_proc > 1) then
             call MPI_Recv(y1_end, lp%mloc, MPI_SP, north_rank, 32, grid%cart_comm, stat, ierr)
             call MPI_Recv(y2_end, lp%mloc, MPI_SP, north_rank, 33, grid%cart_comm, stat, ierr)
          end if
@@ -466,7 +471,7 @@ contains
 
          ! --- Step 7: south rank computes beta ---
          beta = 0.0_SP
-         if (grid%is_right_boundary) then
+         if (grid%jproc == 0) then
             do i = lp%ib, lp%ie
                beta(i) = (c_end(i)*y1(i, lp%jb) - a_beg(i)*y1_end(i)) &
                          /(1.0_SP - (c_end(i)*y2(i, lp%jb) - a_beg(i)*y2_end(i)))
@@ -475,7 +480,7 @@ contains
 
          ! --- Step 8: broadcast beta along y-column (same iproc) ---
          if (grid%ny_proc > 1) then
-            if (grid%is_right_boundary) then
+            if (grid%jproc == 0) then
                do k = 1, grid%ny_proc - 1
                   call MPI_Cart_rank(grid%cart_comm, [grid%iproc, k], dest_rank, ierr)
                   call MPI_Send(beta, lp%mloc, MPI_SP, dest_rank, 34, grid%cart_comm, ierr)
