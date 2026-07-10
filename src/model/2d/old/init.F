@@ -219,7 +219,9 @@ SUBROUTINE ALLOCATE_VARIABLES
    ALLOCATE (ROLLER_FLUX(Mloc, Nloc), UNDERTOW_U(Mloc, Nloc), UNDERTOW_V(Mloc, Nloc))
 
    IF (WAVEMAKER_VIS) THEN
-      ALLOCATE (nu_break(Mloc, Nloc))
+      ! nu_break is allocated unconditionally above since fyshi 01/15/2024;
+      ! the leftover re-ALLOCATE here was a hard runtime error (WAVEMAKER_VIS
+      ! could not run at all) -- keep only the original zero initialization
       nu_break = ZERO
    END IF
 
