@@ -193,29 +193,41 @@ contains
          call deriv_yy(lp, inv_dy, mask9, ws%dvt, ws%dvtyy)
          call deriv_xy(lp, inv_dx, inv_dy, mask9, ws%dut, ws%dutxy)
          call deriv_xy(lp, inv_dx, inv_dy, mask9, ws%dvt, ws%dvtxy)
+      end if
 
-         ! zero cross-derivatives at domain faces (Neumann-type BC)
+      ! zero cross-derivatives at domain faces (legacy dispersion.F
+      ! boundary conditions — unconditional, NOT gamma2-gated; the
+      ! t-derivative arrays are zeroed only when gamma2 computed them)
+      if (west_bdy) then
+         ws%uxy(lp%ib, :) = 0.0_SP; ws%vxy(lp%ib, :) = 0.0_SP
+         ws%duxy(lp%ib, :) = 0.0_SP; ws%dvxy(lp%ib, :) = 0.0_SP
+      end if
+      if (east_bdy) then
+         ws%uxy(lp%ie, :) = 0.0_SP; ws%vxy(lp%ie, :) = 0.0_SP
+         ws%duxy(lp%ie, :) = 0.0_SP; ws%dvxy(lp%ie, :) = 0.0_SP
+      end if
+      if (south_bdy) then
+         ws%uxy(:, lp%jb) = 0.0_SP; ws%vxy(:, lp%jb) = 0.0_SP
+         ws%duxy(:, lp%jb) = 0.0_SP; ws%dvxy(:, lp%jb) = 0.0_SP
+      end if
+      if (north_bdy) then
+         ws%uxy(:, lp%je) = 0.0_SP; ws%vxy(:, lp%je) = 0.0_SP
+         ws%duxy(:, lp%je) = 0.0_SP; ws%dvxy(:, lp%je) = 0.0_SP
+      end if
+      if (gamma2 > 0.0_SP) then
          if (west_bdy) then
-            ws%uxy(lp%ib, :) = 0.0_SP; ws%vxy(lp%ib, :) = 0.0_SP
-            ws%duxy(lp%ib, :) = 0.0_SP; ws%dvxy(lp%ib, :) = 0.0_SP
             ws%utxy(lp%ib, :) = 0.0_SP; ws%vtxy(lp%ib, :) = 0.0_SP
             ws%dutxy(lp%ib, :) = 0.0_SP; ws%dvtxy(lp%ib, :) = 0.0_SP
          end if
          if (east_bdy) then
-            ws%uxy(lp%ie, :) = 0.0_SP; ws%vxy(lp%ie, :) = 0.0_SP
-            ws%duxy(lp%ie, :) = 0.0_SP; ws%dvxy(lp%ie, :) = 0.0_SP
             ws%utxy(lp%ie, :) = 0.0_SP; ws%vtxy(lp%ie, :) = 0.0_SP
             ws%dutxy(lp%ie, :) = 0.0_SP; ws%dvtxy(lp%ie, :) = 0.0_SP
          end if
          if (south_bdy) then
-            ws%uxy(:, lp%jb) = 0.0_SP; ws%vxy(:, lp%jb) = 0.0_SP
-            ws%duxy(:, lp%jb) = 0.0_SP; ws%dvxy(:, lp%jb) = 0.0_SP
             ws%utxy(:, lp%jb) = 0.0_SP; ws%vtxy(:, lp%jb) = 0.0_SP
             ws%dutxy(:, lp%jb) = 0.0_SP; ws%dvtxy(:, lp%jb) = 0.0_SP
          end if
          if (north_bdy) then
-            ws%uxy(:, lp%je) = 0.0_SP; ws%vxy(:, lp%je) = 0.0_SP
-            ws%duxy(:, lp%je) = 0.0_SP; ws%dvxy(:, lp%je) = 0.0_SP
             ws%utxy(:, lp%je) = 0.0_SP; ws%vtxy(:, lp%je) = 0.0_SP
             ws%dutxy(:, lp%je) = 0.0_SP; ws%dvtxy(:, lp%je) = 0.0_SP
          end if
