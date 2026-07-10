@@ -97,6 +97,11 @@ module model_stepper_2d_mod
       ! Breaking-age threshold (legacy T_brk; wavemaker may override)
       real(SP) :: t_brk = T_BRK_LEGACY
 
+      ! LEFT_BC_IRR west exemptions (ledger 11): skip the west
+      ! cross-derivative zeroing and fold the known ghost U into the
+      ! x-sweep RHS — both only on the west-boundary rank
+      logical :: west_dirichlet = .false.
+
       ! Kernel workspaces — allocated once, reused every stage.
       type(type_flux_workspace) :: fws
       type(type_disp_workspace) :: dws
@@ -188,6 +193,9 @@ contains
 
       this%t_brk = T_BRK_LEGACY
       if (wavemaker%T_brk > 0.0_SP) this%t_brk = wavemaker%T_brk
+
+      this%west_dirichlet = grid%is_back_boundary &
+                            .and. wavemaker%wavemaker_type == "LEFT_BC_IRR"
 
       this%b1 = physics%Beta_ref*physics%Beta_ref
       this%b2 = physics%Beta_ref
@@ -382,7 +390,8 @@ contains
             call cal_etauv_assemble_x(lp, phy%Gamma1, num%MinDepthFrc, &
                                       this%b1, this%b2, this%inv_dx, &
                                       f%mask, f%mask9, f%depth, f%h, f%p, &
-                                      this%dws%vxy, this%dws%dvxy, this%ews)
+                                      this%dws%vxy, this%dws%dvxy, &
+                                      this%west_dirichlet, f%u, this%ews)
             call trid_x(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
                         this%ews%f)
             f%u(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
@@ -437,7 +446,9 @@ contains
 
          call this%bc%exchange_state(this%grid, f)
 
-         ! wavemaker boundary injection (ABS / LEFT_BC_IRR) — later 6d rung
+         call this%wavemaker%apply_boundary(this%grid, istage, dt, time, &
+                                            f%eta, f%u, f%v, f%hu, f%hv, &
+                                            f%depth)
 
          call this%sponge%apply(f, this%grid)
 
@@ -540,7 +551,8 @@ contains
                              f%mask9, this%inv_dx, this%inv_dy, dt, &
                              num%MinDepthFrc, this%beta1, this%beta2, &
                              phy%Gamma2, this%breaking%show_breaking, &
-                             g%is_back_boundary, g%is_shore_boundary, &
+                             g%is_back_boundary .and. .not. this%west_dirichlet, &
+                             g%is_shore_boundary, &
                              g%is_right_boundary, g%is_left_boundary, &
                              this%etat, this%ut, this%vt, this%etax, &
                              this%etay, this%u4, this%v4, this%u1p, &

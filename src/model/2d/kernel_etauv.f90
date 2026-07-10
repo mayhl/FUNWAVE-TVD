@@ -143,16 +143,22 @@ contains
    ! ----------------------------------------------------------------
    ! cal_etauv_assemble_x — x-sweep coefficients for U (Gamma1 only).
    ! Fills ws%a/c/d (zeroed here); solve with trid_x into ws%f.
+   ! west_dirichlet (LEFT_BC_IRR on the west-boundary rank): the ghost
+   ! U written by the boundary wavemaker is a known value — fold it
+   ! into the RHS at the first interior column (legacy etauv_solver
+   ! left_bc block): $d := d - a\,u_{ib-1}$.
    ! ----------------------------------------------------------------
    pure subroutine cal_etauv_assemble_x(lp, gamma1, min_depth, b1, b2, &
                                         inv_dx, mask, mask9, depth, h, &
-                                        ubar, vxy, dvxy, ws)
+                                        ubar, vxy, dvxy, west_dirichlet, u, ws)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: gamma1, min_depth, b1, b2
       real(SP), intent(in)  :: inv_dx(:, :)
       integer, intent(in)  :: mask(:, :), mask9(:, :)
       real(SP), intent(in)  :: depth(:, :), h(:, :)
       real(SP), intent(in)  :: ubar(:, :), vxy(:, :), dvxy(:, :)
+      logical, intent(in)  :: west_dirichlet
+      real(SP), intent(in)  :: u(:, :)
       type(type_etauv_workspace), intent(inout) :: ws
 
       real(SP) :: dep, depl, depr, tmp1, tmp2, tmp3, tmp4
@@ -174,6 +180,9 @@ contains
             tmp3 = gamma1*mask9(i, j)*(b1*0.5_SP*idxsq*dep*dep + b2*idxsq*dep*depr)
             tmp4 = ubar(i, j)*mask(i, j)/heff &
                    + gamma1*mask9(i, j)*(-b1*0.5_SP*dep*dep*vxy(i, j) - b2*dep*dvxy(i, j))
+
+            if (west_dirichlet .and. i == lp%ib) &
+               tmp4 = tmp4 - tmp1*u(i - 1, j)
 
             if (tmp2 /= 0.0_SP) then
                ws%a(i, j) = tmp1/tmp2

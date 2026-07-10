@@ -96,7 +96,8 @@ contains
 
       if (dispersion) then
          call cal_etauv_assemble_x(lp, gamma1, min_depth, b1, b2, inv_dx, &
-                                   mask, mask9, depth, h, ubar, vxy, dvxy, ws)
+                                   mask, mask9, depth, h, ubar, vxy, dvxy, &
+                                   .false., u, ws)
          call trid_x(lp, grid, ws%a, ws%c, ws%d, ws%f)
          u(lp%ib:lp%ie, lp%jb:lp%je) = ws%f(lp%ib:lp%ie, lp%jb:lp%je)
 
