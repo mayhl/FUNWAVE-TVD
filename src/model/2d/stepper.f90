@@ -50,7 +50,9 @@ module model_stepper_2d_mod
    use model_wavemaker_mod, only: type_model_wavemaker
    use model_sponge_mod, only: type_model_sponge
 
-   use model_kernel_dispersion_mod, only: type_disp_workspace, cal_dispersion
+   use model_kernel_dispersion_mod, only: type_disp_workspace, &
+                                          cal_dispersion_derivs, &
+                                          cal_dispersion_assemble
    use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, &
                                       flux_wall_bc, flux_dry_bc
    use model_kernel_sources_mod, only: cal_sources
@@ -230,6 +232,22 @@ contains
          this%depth_fy(:, 1:nloc) = f%depth_y
          this%depth_fy(:, nloc + 1) = 0.5_SP*(3.0_SP*f%depth(:, nloc) &
                                               - f%depth(:, nloc - 1))
+
+         ! legacy init.F dry-cell face flattening: every initially-dry
+         ! cell gets locally flat face depths (the in-loop update_mask
+         ! only flattens on wet/dry TRANSITIONS, so the initial state
+         ! must be pre-flattened or stage 1 sees a spurious depth
+         ! gradient at the mask edge — parity ledger 8c)
+         do j = 2, nloc - 1
+            do i = 2, mloc - 1
+               if (f%mask(i, j) < 1) then
+                  this%depth_fx(i, j) = f%depth(i - 1, j)
+                  this%depth_fx(i + 1, j) = f%depth(i + 1, j)
+                  this%depth_fy(i, j) = f%depth(i, j - 1)
+                  this%depth_fy(i, j + 1) = f%depth(i, j + 1)
+               end if
+            end do
+         end do
       end associate
 
       call this%fws%alloc(mloc, nloc)
@@ -533,12 +551,12 @@ contains
    end subroutine update_max_min
 
    ! ----------------------------------------------------------------
-   ! Private: cal_dispersion call with the stepper's array wiring.
-   ! Boundary flags are the cart-topology walls: back/shore =
-   ! west/east, right/left = south/north; periodic wraps report no
-   ! boundary.  The u4/v4 ghost update afterwards is legacy
-   ! EXCHANGE_DISPERSION: face reconstruction and the source-term
-   ! gradients read u4/v4 in the ghosts.
+   ! Private: dispersion pass with the stepper's array wiring, in the
+   ! legacy Cal_Dispersion order: derivatives -> component ghost
+   ! exchange (legacy EXCHANGE_DISPERSION parities) -> ghost-inclusive
+   ! u4/v4/u1p/v1p assembly.  Boundary flags are the cart-topology
+   ! walls: back/shore = west/east, right/left = south/north; periodic
+   ! wraps report no boundary.
    ! ----------------------------------------------------------------
    subroutine run_dispersion(this, dt)
       class(type_model_stepper_2d), intent(inout) :: this
@@ -546,19 +564,25 @@ contains
 
       associate (f => this%fields, lp => this%grid%lp, g => this%grid, &
                  phy => this%physics, num => this%numerics)
-         call cal_dispersion(lp, this%dws, f%eta, f%depth, f%u, f%v, &
-                             this%u0, this%v0, this%fws%p, this%fws%q, &
-                             f%mask9, this%inv_dx, this%inv_dy, dt, &
-                             num%MinDepthFrc, this%beta1, this%beta2, &
-                             phy%Gamma2, this%breaking%show_breaking, &
-                             g%is_back_boundary .and. .not. this%west_dirichlet, &
-                             g%is_shore_boundary, &
-                             g%is_right_boundary, g%is_left_boundary, &
-                             this%etat, this%ut, this%vt, this%etax, &
-                             this%etay, this%u4, this%v4, this%u1p, &
-                             this%v1p, this%u1pp, this%v1pp, this%u2, &
-                             this%v2, this%u3, this%v3)
-         call this%bc%exchange_dispersion(g, this%u4, this%v4)
+         call cal_dispersion_derivs(lp, this%dws, f%eta, f%depth, f%u, f%v, &
+                                    this%u0, this%v0, this%fws%p, this%fws%q, &
+                                    f%mask9, this%inv_dx, this%inv_dy, dt, &
+                                    num%MinDepthFrc, phy%Gamma2, &
+                                    this%breaking%show_breaking, &
+                                    g%is_back_boundary .and. .not. this%west_dirichlet, &
+                                    g%is_shore_boundary, &
+                                    g%is_right_boundary, g%is_left_boundary, &
+                                    this%etat, this%ut, this%vt, this%etax, &
+                                    this%etay)
+         call this%bc%exchange_dispersion(g, phy%Gamma2, this%dws, this%ut, &
+                                          this%vt, this%etax, this%etay)
+         call cal_dispersion_assemble(lp, this%dws, f%eta, f%depth, f%u, f%v, &
+                                      f%mask9, this%inv_dx, this%inv_dy, &
+                                      this%beta1, this%beta2, phy%Gamma2, &
+                                      this%etat, this%etax, this%etay, &
+                                      this%u4, this%v4, this%u1p, this%v1p, &
+                                      this%u1pp, this%v1pp, this%u2, this%v2, &
+                                      this%u3, this%v3)
       end associate
 
    end subroutine run_dispersion
