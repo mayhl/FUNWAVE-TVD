@@ -33,10 +33,12 @@ contains
    !        d/dx[(νa+νb)*dHU/dx] + d/dy[(νa+νb)*dHU/dy]
    !      nu_vis = nu_break + nu_sponge assembled by caller.
    !      Pass zero array when eddy viscosity is inactive.
+   !      hu/hv are the CELL-CENTRED fluxes (legacy HU/HV) — the
+   !      interface p/q feed div(p,q) only.
    ! ----------------------------------------------------------------
    subroutine cal_sources(lp, gamma1, gamma2, dispersion, &
                           mask, mask9, inv_dx, inv_dy, &
-                          depth_x, depth_y, eta, h, u, v, p, q, &
+                          depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, &
                           min_depth_frc, src_x, src_y)
@@ -47,7 +49,7 @@ contains
       real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)  :: depth_x(:, :), depth_y(:, :)
       real(SP), intent(in)  :: eta(:, :), h(:, :), u(:, :), v(:, :)
-      real(SP), intent(in)  :: p(:, :), q(:, :)
+      real(SP), intent(in)  :: p(:, :), q(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :), u1p(:, :), v1p(:, :)
       real(SP), intent(in)  :: u1pp(:, :), v1pp(:, :)
       real(SP), intent(in)  :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
@@ -112,23 +114,24 @@ contains
       end do
 
       ! eddy viscosity: d/dx[(ν_r+ν_l)*dHU/dx] + d/dy[(ν_u+ν_d)*dHU/dy]
-      ! Uses p=HU, q=HV.  Active when nu_vis > 0 anywhere.
+      ! Cell-centred hu/hv (legacy BreakSource PQ_scheme=.FALSE. form).
+      ! Active when nu_vis > 0 anywhere.
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             src_x(i, j) = src_x(i, j) &
                           + 0.5_SP*inv_dx(i, j)*( &
-                          (nu_vis(i + 1, j) + nu_vis(i, j))*inv_dx(i, j)*(p(i + 1, j) - p(i, j)) &
-                          - (nu_vis(i - 1, j) + nu_vis(i, j))*inv_dx(i, j)*(p(i, j) - p(i - 1, j))) &
+                          (nu_vis(i + 1, j) + nu_vis(i, j))*inv_dx(i, j)*(hu(i + 1, j) - hu(i, j)) &
+                          - (nu_vis(i - 1, j) + nu_vis(i, j))*inv_dx(i, j)*(hu(i, j) - hu(i - 1, j))) &
                           + 0.5_SP*inv_dy(i, j)*( &
-                          (nu_vis(i, j + 1) + nu_vis(i, j))*inv_dy(i, j)*(p(i, j + 1) - p(i, j)) &
-                          - (nu_vis(i, j - 1) + nu_vis(i, j))*inv_dy(i, j)*(p(i, j) - p(i, j - 1)))
+                          (nu_vis(i, j + 1) + nu_vis(i, j))*inv_dy(i, j)*(hu(i, j + 1) - hu(i, j)) &
+                          - (nu_vis(i, j - 1) + nu_vis(i, j))*inv_dy(i, j)*(hu(i, j) - hu(i, j - 1)))
             src_y(i, j) = src_y(i, j) &
                           + 0.5_SP*inv_dx(i, j)*( &
-                          (nu_vis(i + 1, j) + nu_vis(i, j))*inv_dx(i, j)*(q(i + 1, j) - q(i, j)) &
-                          - (nu_vis(i - 1, j) + nu_vis(i, j))*inv_dx(i, j)*(q(i, j) - q(i - 1, j))) &
+                          (nu_vis(i + 1, j) + nu_vis(i, j))*inv_dx(i, j)*(hv(i + 1, j) - hv(i, j)) &
+                          - (nu_vis(i - 1, j) + nu_vis(i, j))*inv_dx(i, j)*(hv(i, j) - hv(i - 1, j))) &
                           + 0.5_SP*inv_dy(i, j)*( &
-                          (nu_vis(i, j + 1) + nu_vis(i, j))*inv_dy(i, j)*(q(i, j + 1) - q(i, j)) &
-                          - (nu_vis(i, j - 1) + nu_vis(i, j))*inv_dy(i, j)*(q(i, j) - q(i, j - 1)))
+                          (nu_vis(i, j + 1) + nu_vis(i, j))*inv_dy(i, j)*(hv(i, j + 1) - hv(i, j)) &
+                          - (nu_vis(i, j - 1) + nu_vis(i, j))*inv_dy(i, j)*(hv(i, j) - hv(i, j - 1)))
          end do
       end do
 

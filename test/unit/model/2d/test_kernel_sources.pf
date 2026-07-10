@@ -31,11 +31,11 @@ contains
 
    ! Zero-fill every optional forcing input; tests switch on one term each.
    subroutine zero_inputs(inv_dx, inv_dy, depth_x, depth_y, eta, h, u, v, p, q, &
-                          u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                          hu, hv, u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, mask, mask9)
       real(SP), intent(out) :: inv_dx(:,:), inv_dy(:,:)
       real(SP), intent(out) :: depth_x(:,:), depth_y(:,:), eta(:,:), h(:,:)
-      real(SP), intent(out) :: u(:,:), v(:,:), p(:,:), q(:,:)
+      real(SP), intent(out) :: u(:,:), v(:,:), p(:,:), q(:,:), hu(:,:), hv(:,:)
       real(SP), intent(out) :: u4(:,:), v4(:,:), u1p(:,:), v1p(:,:)
       real(SP), intent(out) :: u1pp(:,:), v1pp(:,:), u2(:,:), v2(:,:), u3(:,:), v3(:,:)
       real(SP), intent(out) :: wavemaker_mass(:,:), cd(:,:), nu_vis(:,:)
@@ -44,6 +44,7 @@ contains
       depth_x = 10.0_SP;  depth_y = 10.0_SP
       eta = 0.0_SP;  h = 10.0_SP
       u = 0.0_SP;  v = 0.0_SP;  p = 0.0_SP;  q = 0.0_SP
+      hu = 0.0_SP;  hv = 0.0_SP
       u4 = 0.0_SP;  v4 = 0.0_SP;  u1p = 0.0_SP;  v1p = 0.0_SP
       u1pp = 0.0_SP;  v1pp = 0.0_SP;  u2 = 0.0_SP;  v2 = 0.0_SP
       u3 = 0.0_SP;  v3 = 0.0_SP
@@ -62,6 +63,7 @@ contains
       real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
       real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: hu(MLOC,NLOC), hv(MLOC,NLOC)
       real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
       real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
@@ -73,7 +75,7 @@ contains
 
       call make_lp(lp)
       call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
-                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, mask, mask9)
       p = 0.0_SP;  q = 0.0_SP;  depth_y = 10.0_SP
@@ -85,7 +87,7 @@ contains
       eta = ETA0
 
       call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
-                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
 
@@ -109,6 +111,7 @@ contains
       real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
       real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: hu(MLOC,NLOC), hv(MLOC,NLOC)
       real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
       real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
@@ -120,7 +123,7 @@ contains
 
       call make_lp(lp)
       call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
-                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, mask, mask9)
       p = 0.0_SP;  q = 0.0_SP;  depth_x = 10.0_SP;  depth_y = 10.0_SP
@@ -128,7 +131,7 @@ contains
       u  = U0
 
       call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
-                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
 
@@ -152,6 +155,7 @@ contains
       real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
       real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: hu(MLOC,NLOC), hv(MLOC,NLOC)
       real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
       real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
@@ -163,7 +167,7 @@ contains
 
       call make_lp(lp)
       call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
-                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, mask, mask9)
       p = 0.0_SP;  q = 0.0_SP;  depth_x = 10.0_SP;  depth_y = 10.0_SP
@@ -171,7 +175,7 @@ contains
       u = U0;  v = V0
 
       call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
-                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
 
@@ -187,16 +191,17 @@ contains
    end subroutine test_wavemaker_mass
 
    ! ----------------------------------------------------------------
-   ! Eddy viscosity term: linear p (d²P/dx² = 0) with nu_vis const
+   ! Eddy viscosity term: linear hu (d²HU/dx² = 0) with nu_vis const
    ! contributes exactly zero — the term is a Laplacian-type operator.
    ! ----------------------------------------------------------------
    @test
-   subroutine test_eddy_viscosity_linear_p()
+   subroutine test_eddy_viscosity_linear_hu()
       type(type_loop_bounds) :: lp
       real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
       real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
       real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: hu(MLOC,NLOC), hv(MLOC,NLOC)
       real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
       real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
@@ -207,20 +212,20 @@ contains
 
       call make_lp(lp)
       call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
-                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, mask, mask9)
       depth_x = 10.0_SP;  depth_y = 10.0_SP
       nu_vis = 0.2_SP
       do j = 1, NLOC
-         do i = 1, MLOC + 1
-            p(i,j) = 3.0_SP*real(i, SP)
+         do i = 1, MLOC
+            hu(i,j) = 3.0_SP*real(i, SP)
          end do
       end do
-      q = 0.0_SP
+      p = 0.0_SP;  q = 0.0_SP
 
       call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
-                       depth_x, depth_y, eta, h, u, v, p, q, &
+                       depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
 
@@ -232,6 +237,6 @@ contains
       end do
 
       call dummy_fix_lint()
-   end subroutine test_eddy_viscosity_linear_p
+   end subroutine test_eddy_viscosity_linear_hu
 
 end module test_kernel_sources

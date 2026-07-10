@@ -383,7 +383,7 @@ contains
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
                           this%depth_fx, this%depth_fy, f%eta, f%h, f%u, f%v, &
-                          this%fws%p, this%fws%q, &
+                          this%fws%p, this%fws%q, f%hu, f%hv, &
                           this%u4, this%v4, this%u1p, this%v1p, &
                           this%u1pp, this%v1pp, this%u2, this%v2, &
                           this%u3, this%v3, &
