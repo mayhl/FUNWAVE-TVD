@@ -177,7 +177,11 @@ contains
       call this%geometry%build_grid(this%env%comm, this%grid, &
                                     periodic_y=this%physics%periodic)
       call this%fields%alloc(this%grid)
-      if (this%physics%viscosity_breaking) call this%fields%alloc_breaking(this%grid)
+      ! WAVEMAKER_VIS needs nu_break too (legacy allocates the breaking
+      ! arrays for all options since fyshi 01/15/2024)
+      if (this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) then
+         call this%fields%alloc_breaking(this%grid)
+      end if
 
       call this%geometry%init_depth(this%grid, this%fields%depth, &
                                     this%fields%depth_x, this%fields%depth_y)

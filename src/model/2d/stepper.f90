@@ -61,7 +61,8 @@ module model_stepper_2d_mod
                                      cal_uv_no_dispersion, cal_etauv_update, &
                                      RK_ALPHA, RK_BETA
    use model_kernel_masks_mod, only: update_mask, update_mask9
-   use model_kernel_breaker_mod, only: wave_breaking, VIS_SCHEME_DEFAULT
+   use model_kernel_breaker_mod, only: wave_breaking, viscosity_wmaker, &
+                                       VIS_SCHEME_DEFAULT
 
    implicit none
 
@@ -138,6 +139,11 @@ module model_stepper_2d_mod
       real(SP), allocatable :: roller_flux(:, :)
       real(SP), allocatable :: undertow_u(:, :), undertow_v(:, :)
       logical, allocatable :: in_wm_zone(:, :)         ! breaker's wavemaker-zone flags
+
+      ! Combined eddy viscosity, allocated only when nu_break and
+      ! nu_sponge are BOTH active (legacy nu_vis assembly in sources.F);
+      ! single-source cases alias the source array in merge_nu_vis.
+      real(SP), allocatable :: nu_vis(:, :)
 
    contains
       procedure :: init => stepper_init
@@ -284,13 +290,25 @@ contains
       allocate (this%src_y(mloc, nloc), source=0.0_SP)
       allocate (this%zeros(mloc, nloc), source=0.0_SP)
 
+      ! legacy io.F refuses the combination (VISCOSITY_WMAKER replaces
+      ! the breaking-age scheme, it does not stack on it)
+      if (this%physics%viscosity_breaking .and. this%breaking%WAVEMAKER_VIS) then
+         error stop "stepper: viscosity_breaking and WAVEMAKER_VIS are mutually exclusive"
+      end if
+
       if (this%physics%viscosity_breaking) then
          allocate (this%etamean(mloc, nloc), source=0.0_SP)
          allocate (this%roller_flux(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_u(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_v(mloc, nloc), source=0.0_SP)
+      end if
+      if (this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) then
          allocate (this%in_wm_zone(mloc, nloc))
          call wavemaker%fill_in_zone(this%in_wm_zone)
+      end if
+      if ((this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) &
+          .and. this%sponge%diffusion_sponge) then
+         allocate (this%nu_vis(mloc, nloc), source=0.0_SP)
       end if
 
       ! -- initial cell fluxes ---------------------------------------
@@ -380,6 +398,11 @@ contains
          ! wavemaker mass source at the stage TIME (legacy SourceTerms head)
          call this%wavemaker%update_source(time)
 
+         ! combined breaking + diffusion-sponge viscosity (both active)
+         if (allocated(this%nu_vis)) then
+            this%nu_vis = f%nu_break + this%sponge%nu_sponge
+         end if
+
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
                           this%depth_fx, this%depth_fy, f%eta, f%h, f%u, f%v, &
@@ -460,6 +483,14 @@ contains
                                phy%SWE_ETA_DEP, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
                                this%undertow_u, this%undertow_v)
+         elseif (this%breaking%WAVEMAKER_VIS) then
+            ! legacy WAVE_BREAKING second branch: zone-only viscosity,
+            ! no age tracking
+            call viscosity_wmaker(lp, this%etat, f%eta, f%depth, f%h, &
+                                  this%breaking%visbrk, &
+                                  this%breaking%WAVEMAKER_visbrk, &
+                                  this%breaking%nu_bkg, num%MinDepthFrc, &
+                                  this%in_wm_zone, f%nu_break)
          end if
 
          call this%bc%exchange_state(this%grid, f)
@@ -601,14 +632,25 @@ contains
       end if
    end function wm_mass
 
-   ! Effective eddy viscosity for the momentum source: nu_break when
-   ! breaking is active (diffusion-sponge contribution: Step 6d).
+   ! Effective eddy viscosity for the momentum source (legacy nu_vis
+   ! assembly at the SourceTerms head): nu_break under viscosity
+   ! breaking or wavemaker viscosity, plus nu_sponge under the
+   ! diffusion sponge.  Legacy zero-adds make the aliased single-source
+   ! cases bitwise identical to the assembled sum.
    function merge_nu_vis(this) result(nu)
       class(type_model_stepper_2d), intent(in), target :: this
       real(SP), pointer :: nu(:, :)
 
-      if (this%physics%viscosity_breaking) then
+      logical :: has_break
+
+      has_break = this%physics%viscosity_breaking &
+                  .or. this%breaking%WAVEMAKER_VIS
+      if (allocated(this%nu_vis)) then
+         nu => this%nu_vis
+      elseif (has_break) then
          nu => this%fields%nu_break
+      elseif (this%sponge%diffusion_sponge) then
+         nu => this%sponge%nu_sponge
       else
          nu => this%zeros
       end if
@@ -632,8 +674,9 @@ contains
                                           this%u3, this%v3, this%src_x, this%src_y, &
                                           this%zeros)
       if (allocated(this%etamean)) deallocate (this%etamean, this%roller_flux, &
-                                               this%undertow_u, this%undertow_v, &
-                                               this%in_wm_zone)
+                                               this%undertow_u, this%undertow_v)
+      if (allocated(this%in_wm_zone)) deallocate (this%in_wm_zone)
+      if (allocated(this%nu_vis)) deallocate (this%nu_vis)
 
       this%env => null()
       this%grid => null()
