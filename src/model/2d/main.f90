@@ -24,7 +24,7 @@ module model_main_mod
    use core_path_mod, only: type_path
    use probe_mod, only: dump_state, reset_state
 
-   use model_geometry_mod, only: type_model_geometry
+   use model_geometry_mod, only: type_model_geometry, read_field_ascii
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
    use model_wavemaker_mod, only: type_model_wavemaker
@@ -191,24 +191,39 @@ contains
          call this%fields%alloc_breaking(this%grid)
       end if
 
+      if (trim(this%geometry%bathy_type) == "file") then
+         call read_field_ascii(this%env, this%geometry%bathy_file%root, &
+                               this%grid, this%fields%depth)
+      end if
       call this%geometry%init_depth(this%grid, this%fields%depth, &
                                     this%fields%depth_x, this%fields%depth_y)
+      ! apply_ic zeroes eta/u/v before its solitary branch, so the hot
+      ! start loads AFTER it (legacy zeroes long before INI_UVZ; bed
+      ! deformation never refreshes DepthX/DepthY).  Solitary IC plus
+      ! hot start would resolve the other way in legacy — pathological,
+      ! not supported here.
       call this%wavemaker%apply_ic(this%grid, this%fields%eta, &
                                    this%fields%u, this%fields%v)
+      if (this%hot_start%is_activated) call load_hot_start(this)
 
-      ! wet/dry mask from the initial condition (structure masks: Step 6+)
+      ! wet/dry mask from the initial condition (structure masks: Step 6+);
+      ! a hot-start mask file REPLACES this derivation (legacy NO_MASK_FILE
+      ! guard on the "get Eta and H" block)
       this%fields%mask_struc = 1
       associate (f => this%fields, lp => this%grid%lp)
-      do j = 1, lp%nloc
-         do i = 1, lp%mloc
-            if (f%eta(i, j) < -f%depth(i, j)) then
-               f%mask(i, j) = 0
-               f%eta(i, j) = -this%numerics%MinDepth - f%depth(i, j)
-            else
-               f%mask(i, j) = 1
-            end if
+      if (.not. (this%hot_start%is_activated .and. &
+                 .not. this%hot_start%no_mask_file)) then
+         do j = 1, lp%nloc
+            do i = 1, lp%mloc
+               if (f%eta(i, j) < -f%depth(i, j)) then
+                  f%mask(i, j) = 0
+                  f%eta(i, j) = -this%numerics%MinDepth - f%depth(i, j)
+               else
+                  f%mask(i, j) = 1
+               end if
+            end do
          end do
-      end do
+      end if
       f%mask = f%mask*f%mask_struc
 
       ! initial MASK9 is the pure 3x3 product on the INTERIOR only
@@ -246,6 +261,70 @@ contains
       call this%fields%register(this%registry)
 
    end subroutine model_setup
+
+   ! ----------------------------------------------------------------
+   ! Hot start (legacy INITIAL_UVZ): load eta (+u/v, mask) from the
+   ! configured files; ghosts follow legacy GetFile — MPI seams carry
+   ! neighbour data, physical walls replicate the edge value.  Bed
+   ! deformation subtracts eta from the still-water depth (cell
+   ! centres only, matching legacy).
+   ! ----------------------------------------------------------------
+   subroutine load_hot_start(this)
+      class(type_model_main), intent(inout) :: this
+
+      real(SP), allocatable :: rmask(:, :)
+
+      associate (hs => this%hot_start, f => this%fields, g => this%grid)
+
+         call read_field_ascii(this%env, hs%eta_file%root, g, f%eta)
+         call ghost_fill_replicate(this, f%eta)
+         if (.not. hs%no_uv_file) then
+            call read_field_ascii(this%env, hs%u_file%root, g, f%u)
+            call read_field_ascii(this%env, hs%v_file%root, g, f%v)
+            call ghost_fill_replicate(this, f%u)
+            call ghost_fill_replicate(this, f%v)
+         else
+            f%u = 0.0_SP
+            f%v = 0.0_SP
+         end if
+
+         if (.not. hs%no_mask_file) then
+            allocate (rmask(g%lp%mloc, g%lp%nloc), source=1.0_SP)
+            call read_field_ascii(this%env, hs%mask_file%root, g, rmask)
+            call ghost_fill_replicate(this, rmask)
+            f%mask = int(rmask)
+         end if
+
+         if (hs%bed_deformation) f%depth = f%depth - f%eta
+
+      end associate
+
+   end subroutine load_hot_start
+
+   ! Halo exchange + edge replication at physical walls (legacy
+   ! GetFile global ghost fill).
+   subroutine ghost_fill_replicate(this, arr)
+      use core_constants_mod, only: N_GHOST
+      class(type_model_main), intent(inout) :: this
+      real(SP), intent(inout) :: arr(:, :)
+
+      integer :: k
+
+      call this%grid%halo_exchange(arr)
+      ! y walls first, then x walls over the full row range — corner
+      ! ghosts land on the corner interior value like legacy
+      associate (lp => this%grid%lp, g => this%grid)
+         do k = 1, N_GHOST
+            if (g%is_right_boundary) arr(:, lp%jb - k) = arr(:, lp%jb)
+            if (g%is_left_boundary) arr(:, lp%je + k) = arr(:, lp%je)
+         end do
+         do k = 1, N_GHOST
+            if (g%is_back_boundary) arr(lp%ib - k, :) = arr(lp%ib, :)
+            if (g%is_shore_boundary) arr(lp%ie + k, :) = arr(lp%ie, :)
+         end do
+      end associate
+
+   end subroutine ghost_fill_replicate
 
    ! ----------------------------------------------------------------
    ! Full modern-path simulation — Phase 6c.  Builds the distributed
@@ -290,7 +369,9 @@ contains
       monitor%comm => this%env%comm
       monitor%stations => this%stations
 
-      call engine%init(0.0_SP, this%simulation%total_time, &
+      call engine%init(merge(this%hot_start%time, 0.0_SP, &
+                             this%hot_start%is_activated), &
+                       this%simulation%total_time, &
                        this%simulation%screen_interval)
       call engine%run(stepper, monitor, this%env%log)
 
@@ -396,7 +477,10 @@ contains
                                    coords_x=dummy_coord, coords_y=dummy_coord, &
                                    n_coords=0, grid=this%grid, &
                                    comm=this%env%comm, &
-                                   file_prefixes=prefs, icount_start=-1)
+                                   file_prefixes=prefs, &
+                                   icount_start=merge( &
+                                   this%hot_start%output_start_number - 1, &
+                                   -1, this%hot_start%is_activated))
 
          if (out%depth_out) call write_static_field(this, mgr%channels(1), &
                                                     "depth", folder//"dep.out", fmt)
