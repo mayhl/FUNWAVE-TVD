@@ -418,7 +418,9 @@ SUBROUTINE READ_INPUT
       END IF
 
       IF (WAVE_DATA_TYPE(1:4) == 'DATA') THEN
-         CALL READ_STRING(WaveCompFile, FILE_NAME, 'WaveCompFile', ierr)
+         ! missed in the io.F refactor: READ_STRING scanned the YAML
+         ! file for the legacy key=value form (same as the DATA2D fix)
+         WaveCompFile = model%wavemaker%WaveCompFile
 
          OPEN (1, FILE=TRIM(WaveCompFile))
          READ (1, *) NumFreq, NumDir
