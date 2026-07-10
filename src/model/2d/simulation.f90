@@ -50,6 +50,11 @@ module model_simulation_mod
       logical  :: fixed_dt = .false.
       real(SP) :: dt_fixed = 0.0_SP
 
+      ! Loop selector, TEMPORARY until the 6e switchover: "legacy"
+      ! runs old/legacy_runner.F, "modern" runs the stepper engine.
+      ! Deliberately not in registry.yaml — dev toggle, not schema.
+      character(:), allocatable :: engine
+
    contains
       procedure :: read_input => simulation_read_input
    end type type_model_simulation
@@ -67,6 +72,8 @@ contains
       sub_env = get_sub_env(env, "simulation")
       this%is_activated = .true.
 
+      call sub_env%yaml%read("engine", silent=no_title, val=this%engine, &
+                             default="legacy")
       call sub_env%yaml%read("title", silent=no_title, val=this%title)
       call sub_env%yaml%read_positive("total_time", val=this%total_time)
       call sub_env%yaml%read("t_start", silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)

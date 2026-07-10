@@ -15,8 +15,13 @@ module model_main_mod
 
    use core_constants_mod, only: SP
    use core_env_mod, only: type_env, new_env
+   use core_comm_mod, only: type_comm
    use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
+   use core_output_manager_mod, only: type_output_manager
+   use core_output_channel_mod, only: type_output_channel
+   use core_stepper_engine_mod, only: type_stepper_engine, type_engine_monitor
+   use core_path_mod, only: type_path
    use probe_mod, only: dump_state, reset_state
 
    use model_geometry_mod, only: type_model_geometry
@@ -34,8 +39,20 @@ module model_main_mod
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_kernel_masks_mod, only: update_mask9
+   use model_stepper_2d_mod, only: type_model_stepper_2d
 
    implicit none
+
+   ! Loop-top output call site for the stepper engine: wraps the
+   ! output manager + registry + comm (the engine itself is
+   ! output-free — libcore_output links libcore_engine).
+   type, extends(type_engine_monitor) :: type_output_monitor
+      type(type_output_manager), pointer :: mgr => null()
+      type(type_field_registry), pointer :: registry => null()
+      type(type_comm), pointer :: comm => null()
+   contains
+      procedure :: step => output_monitor_step
+   end type type_output_monitor
 
    type, public :: type_model_main
       type(type_env) :: env
@@ -61,6 +78,7 @@ module model_main_mod
       procedure :: init
       procedure :: init_from_env => model_init_from_env
       procedure :: setup => model_setup
+      procedure :: run => model_run
       procedure :: finalize => model_finalize
    end type type_model_main
 
@@ -148,9 +166,9 @@ contains
    !   $$ H = \max(\gamma_3\,\eta + d,\ d_{frc}), \qquad
    !      p = H u, \quad q = H v $$
    ! The dispersion-corrected initial state
-   ! $\bar U = Hu + \gamma_1 U_{1p} H$ needs cal_dispersion outputs and
-   ! lands with the stepper's state-derivation step (Phase 6c); p = Hu
-   ! is exact when $\gamma_1 = 0$ or $U_{1p}(t{=}0) = 0$.
+   ! $\bar U = Hu + \gamma_1 U_{1p} H$ needs cal_dispersion outputs;
+   ! stepper%init applies it (p = Hu here is exact when $\gamma_1 = 0$
+   ! or $U_{1p}(t{=}0) = 0$, and stands alone on the legacy path).
    ! ----------------------------------------------------------------
    subroutine model_setup(this)
       class(type_model_main), intent(inout) :: this
@@ -194,6 +212,135 @@ contains
       call this%fields%register(this%registry)
 
    end subroutine model_setup
+
+   ! ----------------------------------------------------------------
+   ! Full modern-path simulation — Phase 6c.  Builds the distributed
+   ! state, the 2D stepper, a field output channel bridged from the
+   ! legacy-style output flags, and hands the loop to the engine.
+   ! Hot start (TIME = HotStartTime) is not wired yet.
+   ! ----------------------------------------------------------------
+   subroutine model_run(this)
+      class(type_model_main), intent(inout), target :: this
+
+      type(type_model_stepper_2d) :: stepper
+      type(type_stepper_engine) :: engine
+      type(type_output_manager), target :: output_mgr
+      type(type_output_monitor) :: monitor
+
+      call this%setup()
+      call this%friction%init_compute(this%grid)
+
+      call stepper%init(this%env, this%grid, this%fields, this%physics, &
+                        this%numerics, this%breaking, this%friction, &
+                        this%simulation, this%output, &
+                        this%wavemaker%wavemaker_type)
+
+      call build_field_channel(this, output_mgr)
+      monitor%mgr => output_mgr
+      monitor%registry => this%registry
+      monitor%comm => this%env%comm
+
+      call engine%init(0.0_SP, this%simulation%total_time, &
+                       this%simulation%screen_interval)
+      call engine%run(stepper, monitor, this%env%log)
+
+      call output_mgr%finalize()
+      call stepper%free()
+
+   end subroutine model_run
+
+   subroutine output_monitor_step(this, t, dt)
+      class(type_output_monitor), intent(inout) :: this
+      real(SP), intent(in) :: t, dt
+      call this%mgr%step(t, dt, this%registry, this%comm)
+   end subroutine output_monitor_step
+
+   ! ----------------------------------------------------------------
+   ! Bridge the legacy-style output flags to one snapshot field
+   ! channel (full output-block YAML: Step 7).  Only registry-backed
+   ! variables map; MASK/MASK9 (integer) and the legacy P/Q interface
+   ! fluxes are skipped with a warning.  Legacy file naming: the
+   ! channel writes <registry_name>_NNNNN (h_max vs legacy hmax —
+   ! reconcile at the 6e regression switchover).
+   ! ----------------------------------------------------------------
+   subroutine build_field_channel(this, mgr)
+      class(type_model_main), intent(inout), target :: this
+      type(type_output_manager), intent(inout) :: mgr
+
+      character(len=16) :: vars(24)
+      character(len=8) :: stats(1)
+      character(:), allocatable :: folder, fmt
+      real(SP) :: dummy_coord(1)
+      type(type_path) :: outdir
+      integer :: nv
+      logical :: ok
+
+      associate (out => this%output)
+
+         nv = 0
+         if (out%OUT_ETA) call add_var(vars, nv, "eta")
+         if (out%OUT_U) call add_var(vars, nv, "u")
+         if (out%OUT_V) call add_var(vars, nv, "v")
+         if (out%OUT_Hmax) call add_var(vars, nv, "h_max")
+         if (out%OUT_Hmin) call add_var(vars, nv, "h_min")
+         if (out%OUT_Umax) call add_var(vars, nv, "u_max")
+         if (out%OUT_MFmax) call add_var(vars, nv, "mf_max")
+         if (out%OUT_VORmax) call add_var(vars, nv, "vort_max")
+         if (this%numerics%OUT_Time) call add_var(vars, nv, "arr_time")
+         if (out%OUT_NU) call add_var(vars, nv, "nu_break")
+
+         if (out%OUT_MASK .or. out%OUT_MASK9) then
+            call this%env%log%warning( &
+               "output: MASK/MASK9 not yet available on the modern path")
+         end if
+         if (out%OUT_P .or. out%OUT_Q) then
+            call this%env%log%warning( &
+               "output: legacy P/Q (interface fluxes) not yet available "// &
+               "on the modern path")
+         end if
+
+         folder = trim(out%result_folder)
+         if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
+         if (this%env%comm%is_io_node()) then
+            outdir = type_path(folder)
+            if (.not. outdir%is_dir()) ok = outdir%mkdir()
+         end if
+         call this%env%comm%barrier()
+
+         select case (out%field_io_type(1:1))
+         case ("B", "b")
+            fmt = "binary"
+         case default
+            fmt = "ascii"
+         end select
+
+         stats(1) = " "
+         dummy_coord(1) = 0.0_SP
+
+         allocate (mgr%channels(1))
+         mgr%n_channels = 1
+         call mgr%channels(1)%init(id="field", geom_type="field", &
+                                   variables=vars, n_vars=nv, &
+                                   statistics=stats, n_stats=0, &
+                                   snapshot=.true., &
+                                   t_start=this%simulation%t_start, &
+                                   interval=this%simulation%plot_intv, &
+                                   result_folder=folder, format=fmt, &
+                                   coords_x=dummy_coord, coords_y=dummy_coord, &
+                                   n_coords=0, grid=this%grid, &
+                                   comm=this%env%comm)
+
+      end associate
+
+   end subroutine build_field_channel
+
+   subroutine add_var(vars, nv, name)
+      character(len=*), intent(inout) :: vars(:)
+      integer, intent(inout) :: nv
+      character(len=*), intent(in) :: name
+      nv = nv + 1
+      vars(nv) = name
+   end subroutine add_var
 
    subroutine model_finalize(this)
       use mpi_f08, only: MPI_Finalize
