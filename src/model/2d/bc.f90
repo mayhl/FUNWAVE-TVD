@@ -47,6 +47,7 @@ module model_bc_mod
    contains
       procedure :: init => bc_init
       procedure :: exchange_state => bc_exchange_state
+      procedure :: exchange_dispersion => bc_exchange_dispersion
    end type type_model_bc
 
 contains
@@ -78,10 +79,16 @@ contains
    ! Ghost update for the advanced state, in legacy EXCHANGE order:
    ! scalars mirror on every wall, normal velocities reflect
    ! antisymmetrically ($u = 0$ at x-walls, $v = 0$ at y-walls):
-   !   $$ \eta:\ (+,+) \qquad u, p:\ (-,+) \qquad v, q:\ (+,-) $$
+   !   $$ \eta:\ (+,+) \qquad u, p, hu:\ (-,+) \qquad v, q, hv:\ (+,-) $$
    ! The mask travels as a real copy with scalar mirror semantics.
+   ! Breaking fields (nu_break, age_break) mirror as scalars when
+   ! allocated (legacy VISCOSITY_BREAKING branch).
    ! Dry-cell velocities are then zeroed (legacy U = U*MASK):
-   !   $$ u := u\,m, \quad v := v\,m, \quad p := p\,m, \quad q := q\,m $$
+   !   $$ u := u\,m, \quad v := v\,m, \quad hu := hu\,m, \quad hv := hv\,m $$
+   ! Legacy does not zero Ubar/Vbar here (their ghosts are never
+   ! read); the extra p/q masking below deviates only on cells dried
+   ! by UPDATE_MASK in the same stage — revisit at the wet/dry
+   ! (runup) regression rungs.
    ! ----------------------------------------------------------------
    subroutine bc_exchange_state(this, grid, fields)
       class(type_model_bc), intent(in) :: this
@@ -99,15 +106,50 @@ contains
 
       call exchange_one(this, grid, fields%u, SIGN_ANTI, SIGN_MIRROR)
       call exchange_one(this, grid, fields%p, SIGN_ANTI, SIGN_MIRROR)
+      call exchange_one(this, grid, fields%hu, SIGN_ANTI, SIGN_MIRROR)
       call exchange_one(this, grid, fields%v, SIGN_MIRROR, SIGN_ANTI)
       call exchange_one(this, grid, fields%q, SIGN_MIRROR, SIGN_ANTI)
+      call exchange_one(this, grid, fields%hv, SIGN_MIRROR, SIGN_ANTI)
+
+      if (allocated(fields%nu_break)) then
+         call exchange_one(this, grid, fields%nu_break, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, fields%age_break, SIGN_MIRROR, SIGN_MIRROR)
+      end if
 
       fields%u = fields%u*fields%mask
       fields%v = fields%v*fields%mask
       fields%p = fields%p*fields%mask
       fields%q = fields%q*fields%mask
+      fields%hu = fields%hu*fields%mask
+      fields%hv = fields%hv*fields%mask
 
    end subroutine bc_exchange_state
+
+   ! ----------------------------------------------------------------
+   ! Ghost update for the dispersion velocity corrections (legacy
+   ! EXCHANGE_DISPERSION): $u_4$ reflects like $u$ (anti in x), $v_4$
+   ! like $v$ (anti in y).  Their ghosts feed the 4th-order face
+   ! reconstruction and the centred $\nabla u_4$ source stencils.
+   ! Walls fill at every physical boundary — no wavemaker exemption,
+   ! since no later BC rewrites dispersion ghosts.  Legacy also
+   ! mirrors the raw derivative intermediates and, under breaking/
+   ! Gamma2 flags, etat/Ut chains — those join with their consumers.
+   ! ----------------------------------------------------------------
+   subroutine bc_exchange_dispersion(this, grid, u4, v4)
+      class(type_model_bc), intent(in) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: u4(:, :), v4(:, :)
+
+      call grid%halo_exchange(u4)
+      call fill_ghost_wall(grid%lp, grid%is_back_boundary, grid%is_shore_boundary, &
+                           grid%is_right_boundary, grid%is_left_boundary, &
+                           SIGN_ANTI, SIGN_MIRROR, u4)
+      call grid%halo_exchange(v4)
+      call fill_ghost_wall(grid%lp, grid%is_back_boundary, grid%is_shore_boundary, &
+                           grid%is_right_boundary, grid%is_left_boundary, &
+                           SIGN_MIRROR, SIGN_ANTI, v4)
+
+   end subroutine bc_exchange_dispersion
 
    subroutine exchange_one(this, grid, f, sign_x, sign_y)
       class(type_model_bc), intent(in) :: this
