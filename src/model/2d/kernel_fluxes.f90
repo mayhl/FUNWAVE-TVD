@@ -57,7 +57,7 @@ module model_kernel_fluxes_mod
    public :: construction, construction_ho
    public :: construction_ho_minmod, construction_ho_mlp
    public :: construction_weno
-   public :: fluxes, flux_wall_bc
+   public :: fluxes, flux_wall_bc, flux_dry_bc
 
 contains
 
@@ -1130,6 +1130,80 @@ contains
       end if
 
    end subroutine flux_wall_bc
+
+   ! ----------------------------------------------------------------
+   ! flux_dry_bc — dry-cell face flux enforcement (the "mask points"
+   ! section of legacy BOUNDARY_CONDITION, old/bc.F).  Every face of a
+   ! dry cell carries zero mass and cross flux; the normal momentum
+   ! flux keeps hydrostatic pressure only,
+   !   $$ F = \tfrac{1}{2} g\,(\gamma_3\,\xi^2 + 2\,\xi\,d)\,m_{nb} $$
+   ! with $\xi$ the NEIGHBOUR-side face reconstruction of $\eta$ and
+   ! $m_{nb}$ the neighbour's mask (zero when it is dry too).  Faces
+   ! on a physical domain edge are zeroed outright.  Zero mass flux
+   ! on all faces freezes dry-cell eta exactly, matching legacy.
+   ! Walls are purely topological here (MPI_PROC_NULL in legacy) — no
+   ! wavemaker exemption, unlike the flux_wall_bc fill flags.
+   ! Runs after flux_wall_bc; dry-cell overrides win at dry wall cells.
+   ! ----------------------------------------------------------------
+   subroutine flux_dry_bc(lp, west_wall, east_wall, south_wall, north_wall, &
+                          gamma3, mask, depthx, depthy, ws)
+      type(type_loop_bounds), intent(in) :: lp
+      logical, intent(in) :: west_wall, east_wall, south_wall, north_wall
+      real(SP), intent(in) :: gamma3
+      integer, intent(in) :: mask(:, :)
+      real(SP), intent(in) :: depthx(:, :), depthy(:, :)
+      type(type_flux_workspace), intent(inout) :: ws
+
+      real(SP) :: xi
+      integer :: i, j
+
+      do j = lp%jb - 1, lp%je + 1
+         do i = lp%ib - 1, lp%ie + 1
+            if (mask(i, j) >= 1) cycle
+
+            ws%p(i, j) = 0.0_SP
+            if (i == lp%ib .and. west_wall) then
+               ws%fx(i, j) = 0.0_SP
+            else
+               xi = ws%etarxl(i, j)
+               ws%fx(i, j) = 0.5_SP*GRAV*(xi*xi*gamma3 &
+                                          + 2.0_SP*xi*depthx(i, j))*mask(i - 1, j)
+            end if
+            ws%gx(i, j) = 0.0_SP
+
+            ws%p(i + 1, j) = 0.0_SP
+            if (i == lp%ie .and. east_wall) then
+               ws%fx(i + 1, j) = 0.0_SP
+            else
+               xi = ws%etarxr(i + 1, j)
+               ws%fx(i + 1, j) = 0.5_SP*GRAV*(xi*xi*gamma3 &
+                                              + 2.0_SP*xi*depthx(i + 1, j))*mask(i + 1, j)
+            end if
+            ws%gx(i + 1, j) = 0.0_SP
+
+            ws%q(i, j) = 0.0_SP
+            ws%fy(i, j) = 0.0_SP
+            if (j == lp%jb .and. south_wall) then
+               ws%gy(i, j) = 0.0_SP
+            else
+               xi = ws%etaryl(i, j)
+               ws%gy(i, j) = 0.5_SP*GRAV*(xi*xi*gamma3 &
+                                          + 2.0_SP*xi*depthy(i, j))*mask(i, j - 1)
+            end if
+
+            ws%q(i, j + 1) = 0.0_SP
+            ws%fy(i, j + 1) = 0.0_SP
+            if (j == lp%je .and. north_wall) then
+               ws%gy(i, j + 1) = 0.0_SP
+            else
+               xi = ws%etaryr(i, j + 1)
+               ws%gy(i, j + 1) = 0.5_SP*GRAV*(xi*xi*gamma3 &
+                                              + 2.0_SP*xi*depthy(i, j + 1))*mask(i, j + 1)
+            end if
+         end do
+      end do
+
+   end subroutine flux_dry_bc
 
    ! ----------------------------------------------------------------
    ! Private: minmod of three values (preserving sign of A).

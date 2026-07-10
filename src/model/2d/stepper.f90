@@ -51,7 +51,8 @@ module model_stepper_2d_mod
    use model_sponge_mod, only: type_model_sponge
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, cal_dispersion
-   use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, flux_wall_bc
+   use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, &
+                                      flux_wall_bc, flux_dry_bc
    use model_kernel_sources_mod, only: cal_sources
    use model_kernel_etauv_mod, only: type_etauv_workspace, cal_rk_update, &
                                      cal_etauv_assemble_x, cal_etauv_assemble_y, &
@@ -330,6 +331,15 @@ contains
          call flux_wall_bc(lp, this%bc%fill_west, this%bc%fill_east, &
                            this%bc%fill_south, this%bc%fill_north, &
                            phy%Gamma3, this%depth_fx, this%depth_fy, this%fws)
+
+         ! dry-cell faces after the wall fills (legacy BOUNDARY_CONDITION
+         ! order); walls here are topological, not the bc fill flags
+         call flux_dry_bc(lp, this%grid%is_back_boundary, &
+                          this%grid%is_shore_boundary, &
+                          this%grid%is_right_boundary, &
+                          this%grid%is_left_boundary, &
+                          phy%Gamma3, f%mask, this%depth_fx, this%depth_fy, &
+                          this%fws)
 
          ! Manning drag from current H (legacy evaluates inside SourceTerms)
          call this%friction%update_cd(f%h, num%MinDepthFrc)
