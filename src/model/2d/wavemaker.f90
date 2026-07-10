@@ -11,7 +11,8 @@
 !    * internal source types (WK_REG, WK_IRR, TMA_1D/JON_1D/JON_2D,
 !      WK_TIME, WK_NEW_*): continuous generation — init_compute derives
 !      the generation coefficients, update_source refreshes the mass
-!      array each stage (WK_REG live; spectral types pending).
+!      array each stage (WK_REG + WK_IRR/TMA/JON live; WK_TIME and
+!      WK_NEW_* pending).
 !    * boundary types (ABS, LEFT_BC_IRR, LEF_SOL): own the west ghost
 !      strip each step — the BC service must skip the wall mirror there
 !      (fill_west=.false. in kernel_bc).
@@ -175,7 +176,7 @@ module model_wavemaker_mod
       logical  :: WaveMakerCurrentBalance = .false.
       real(SP) :: WaveMakerCd = 0.0_SP
 
-      ! Internal-source machinery (init_compute products; WK_REG so far)
+      ! Internal-source machinery (init_compute products)
       logical  :: has_mass_source = .false.
       real(SP) :: D_gen = 0.0_SP      ! source magnitude
       real(SP) :: rlamda = 0.0_SP     ! along-crest wavenumber k sin(theta)
@@ -187,6 +188,13 @@ module model_wavemaker_mod
       real(SP), allocatable :: xmk_wk(:), ymk_wk(:)
       integer  :: ilo = 1, ihi = 0, jlo = 1, jhi = 0  ! interior cells inside the source box
       real(SP), allocatable :: mass(:, :)             ! eta-equation source (legacy WaveMaker_Mass)
+
+      ! Spectral internal source (WK_IRR / TMA_1D / JON_1D / JON_2D):
+      ! dense precomputed spatial modes, legacy (Mloc,Nloc,Nfreq) layout
+      logical  :: spectral_source = .false.
+      real(SP), allocatable :: Cm(:, :, :), Sm(:, :, :)
+      real(SP), allocatable :: omgn_ir(:)             ! component frequencies 2 pi f
+      real(SP) :: T_brk = 0.0_SP                      ! breaking-age override 1/FreqMax; 0 = none
 
    contains
       procedure :: read_input => wavemaker_read_input
@@ -289,13 +297,16 @@ contains
    ! ----------------------------------------------------------------
    ! Internal-source wavemaker setup (legacy WAVEMAKER_INITIALIZATION,
    ! old/wavemaker.F + the xmk_wk/zone block of old/init.F).  WK_REG
-   ! only so far; spectral types join at their 6d rungs.  No-op for
-   ! IC/boundary wavemaker types.
+   ! and the spectral family (WK_IRR/TMA_1D/JON_1D/JON_2D); remaining
+   ! source types join at their 6d rungs.  No-op for IC/boundary
+   ! wavemaker types.
    !
    ! Under periodic-y the wave angle must fit an integer number of
    ! along-crest wavelengths in the domain: snap $\theta$ to the
    ! nearest admissible $\sin\theta = m\,\frac{2\pi}{k\,\Delta y\,(N_{glob}-1)}$
    ! (legacy loop, kept verbatim including the $N_{glob}-1$ measure).
+   ! The spectral family snaps per component inside the coefficient
+   ! loop instead — different legacy algorithm, kept separate.
    ! ----------------------------------------------------------------
    subroutine wavemaker_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
@@ -306,19 +317,19 @@ contains
 
       integer :: i, j, mloc, nloc
 
-      if (this%wavemaker_type /= "WK_REG") return
+      select case (this%wavemaker_type)
+      case ("WK_REG")
+         this%spectral_source = .false.
+      case ("WK_IRR", "TMA_1D", "JON_1D", "JON_2D")
+         this%spectral_source = .true.
+      case default
+         return
+      end select
       this%has_mass_source = .true.
 
       ! legacy uses the scalar spacing (DXg) throughout the wavemaker
       if (grid%dx0 <= 0.0_SP .or. grid%dy0 <= 0.0_SP) &
-         error stop "wavemaker: WK_REG requires uniform grid spacing"
-
-      if (periodic .and. this%Theta_WK /= 0.0_SP) &
-         call periodic_theta_snap(this, grid, env)
-
-      call wk_regular_coefficients(this%Tperiod, this%AMP_WK, this%Theta_WK, &
-                                   this%DEP_WK, this%Delta_WK, this%D_gen, &
-                                   this%rlamda, this%Beta_gen, this%Width_WK)
+         error stop "wavemaker: internal source requires uniform grid spacing"
 
       mloc = grid%lp%mloc
       nloc = grid%lp%nloc
@@ -332,6 +343,16 @@ contains
          this%ymk_wk(j) = real(j - grid%lp%jb, SP)*grid%dy0 &
                           + real(grid%jbegin - 1, SP)*grid%dy0
       end do
+
+      if (this%spectral_source) then
+         call spectral_init_compute(this, grid, periodic, env)
+      else
+         if (periodic .and. this%Theta_WK /= 0.0_SP) &
+            call periodic_theta_snap(this, grid, env)
+         call wk_regular_coefficients(this%Tperiod, this%AMP_WK, this%Theta_WK, &
+                                      this%DEP_WK, this%Delta_WK, this%D_gen, &
+                                      this%rlamda, this%Beta_gen, this%Width_WK)
+      end if
 
       ! interior bounding box of the source region (legacy ilo/ihi/jlo/jhi)
       this%ilo = grid%lp%ie + 1
@@ -361,6 +382,12 @@ contains
    !   $$ M(x,y,t) = r(t)\,D\,e^{-\beta(x - x_c)^2}
    !                 \sin\!\big(\lambda y - \omega t\big), \qquad
    !      r(t) = \tanh\!\Big(\frac{\pi t}{\tau T}\Big) $$
+   ! Spectral family, from the precomputed modes ($C_m\cos\omega_k t
+   ! + S_m\sin\omega_k t$ collapses each component to
+   ! $\cos(\lambda y + \phi - \omega_k t)$):
+   !   $$ M(x,y,t) = r(t) \sum_k \big[C_{m,k}\cos(\omega_k t)
+   !                 + S_{m,k}\sin(\omega_k t)\big], \qquad
+   !      r(t) = \tanh\!\Big(\frac{\pi f_p\,t}{\tau}\Big) $$
    ! Cells outside the source box stay zero, which makes the
    ! unconditional adds in cal_rk_update/cal_sources identical to the
    ! legacy per-cell zone tests.  time is constant across RK stages
@@ -373,14 +400,36 @@ contains
       class(type_model_wavemaker), intent(inout) :: this
       real(SP), intent(in) :: time
 
-      real(SP) :: aa, ramp, omg
-      integer :: i, j
+      real(SP) :: bb(this%Nfreq), cc(this%Nfreq)
+      real(SP) :: aa, ramp, omg, wk_source
+      integer :: i, j, kf
 
       if (.not. this%has_mass_source) return
 
       ! legacy leans on IEEE tanh(inf) = 1 when Time_ramp = 0; guard
       ! gives the same value without the divide-by-zero
       ramp = 1.0_SP
+
+      if (this%spectral_source) then
+         if (this%Time_ramp > 0.0_SP) &
+            ramp = tanh(PI/(this%Time_ramp/this%FreqPeak)*time)
+         do kf = 1, this%Nfreq
+            bb(kf) = cos(this%omgn_ir(kf)*time)
+            cc(kf) = sin(this%omgn_ir(kf)*time)
+         end do
+         do j = this%jlo, this%jhi
+            do i = this%ilo, this%ihi
+               wk_source = 0.0_SP
+               do kf = 1, this%Nfreq
+                  wk_source = wk_source + ramp*(this%Cm(i, j, kf)*bb(kf) &
+                                                + this%Sm(i, j, kf)*cc(kf))
+               end do
+               this%mass(i, j) = wk_source
+            end do
+         end do
+         return
+      end if
+
       if (this%Time_ramp > 0.0_SP) &
          ramp = tanh(PI/(this%Time_ramp*this%Tperiod)*time)
       aa = ramp*this%D_gen
@@ -424,7 +473,9 @@ contains
 
       if (allocated(this%xmk_wk)) deallocate (this%xmk_wk, this%ymk_wk)
       if (allocated(this%mass)) deallocate (this%mass)
+      if (allocated(this%Cm)) deallocate (this%Cm, this%Sm, this%omgn_ir)
       this%has_mass_source = .false.
+      this%spectral_source = .false.
 
    end subroutine wavemaker_free
 
@@ -478,6 +529,74 @@ contains
       this%Theta_WK = theta
 
    end subroutine periodic_theta_snap
+
+   ! ----------------------------------------------------------------
+   ! Private: spectral internal-source setup (legacy WK_IRR block of
+   ! WAVEMAKER_INITIALIZATION, old/wavemaker.F).  Builds per-component
+   ! generation parameters, collapses them into the dense spatial modes
+   !   $$ C_m(x,y) = \sum_\theta D\,e^{-\beta(x - x_c)^2}
+   !                 \cos\!\big(\lambda y + \phi\big), \qquad
+   !      S_m(x,y) = \sum_\theta D\,e^{-\beta(x - x_c)^2}
+   !                 \sin\!\big(\lambda y + \phi\big) $$
+   ! (legacy CALCULATE_Cm_Sm, ghost-inclusive), and frees the
+   ! per-component temporaries.  T_brk override 1/FreqMax matches the
+   ! legacy SHOW_BREAKING assignment.
+   ! ----------------------------------------------------------------
+   subroutine spectral_init_compute(this, grid, periodic, env)
+      use core_grid_mod, only: type_grid_2d
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+
+      real(SP), allocatable :: D_gen_ir(:, :), rlamda_ir(:, :), phase_ir(:, :)
+      real(SP), allocatable :: beta_gen_ir(:)
+      logical :: is_jonswap
+      integer :: i, j, kf, ktheta, mloc, nloc
+
+      mloc = grid%lp%mloc
+      nloc = grid%lp%nloc
+      allocate (D_gen_ir(this%Nfreq, this%Ntheta), &
+                rlamda_ir(this%Nfreq, this%Ntheta), &
+                phase_ir(this%Nfreq, this%Ntheta), &
+                beta_gen_ir(this%Nfreq), this%omgn_ir(this%Nfreq), &
+                this%Cm(mloc, nloc, this%Nfreq), this%Sm(mloc, nloc, this%Nfreq))
+
+      ! legacy TMA phi factor drops for the pure JONSWAP types
+      is_jonswap = this%wavemaker_type(1:3) == "JON"
+
+      call wk_irregular_coefficients(this%EqualEnergy, is_jonswap, this%Nfreq, &
+                                     this%Ntheta, this%Delta_WK, this%DEP_WK, &
+                                     this%FreqPeak, this%FreqMax, this%FreqMin, &
+                                     this%GammaTMA, this%Hmo, this%ThetaPeak, &
+                                     this%Sigma_Theta, periodic, grid%dy0, grid%N, &
+                                     env, rlamda_ir, beta_gen_ir, D_gen_ir, &
+                                     phase_ir, this%Width_WK, this%omgn_ir)
+
+      ! per-element accumulation over ktheta matches the legacy
+      ! summation order; x/y enter via the shared wavemaker frame
+      this%Cm = 0.0_SP
+      this%Sm = 0.0_SP
+      do kf = 1, this%Nfreq
+         do j = 1, nloc
+            do i = 1, mloc
+               do ktheta = 1, this%Ntheta
+                  this%Cm(i, j, kf) = this%Cm(i, j, kf) + D_gen_ir(kf, ktheta) &
+                                      *exp(-beta_gen_ir(kf)*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                                      *cos(rlamda_ir(kf, ktheta)*this%ymk_wk(j) &
+                                           + phase_ir(kf, ktheta))
+                  this%Sm(i, j, kf) = this%Sm(i, j, kf) + D_gen_ir(kf, ktheta) &
+                                      *exp(-beta_gen_ir(kf)*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                                      *sin(rlamda_ir(kf, ktheta)*this%ymk_wk(j) &
+                                           + phase_ir(kf, ktheta))
+               end do
+            end do
+         end do
+      end do
+
+      this%T_brk = 1.0_SP/this%FreqMax
+
+   end subroutine spectral_init_compute
 
    ! ----------------------------------------------------------------
    ! Initial-condition wavemakers: fill eta/u/v at t=0.
@@ -636,5 +755,356 @@ contains
               /(omgn*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
 
    end subroutine wk_regular_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Wei & Kirby internal-source coefficients for a TMA/JONSWAP
+   ! spectrum (legacy WK_EQUAL_DFREQ_IRREGULAR_WAVE, default, and
+   ! WK_WAVEMAKER_IRREGULAR_WAVE for EqualEnergy, old/wavemaker.F).
+   ! The two variants differ only in the frequency bins and per-bin
+   ! energy; the directional spreading and the per-component
+   ! generation solve are shared, element-identical to legacy.
+   ! Component amplitude from the bin energy and spreading weight:
+   !   $$ a_{f\theta} = \frac{4}{2\sqrt 2}
+   !      \sqrt{\alpha_s\,E_f\,G_\theta}, \qquad
+   !      \alpha_s = \frac{H_{m0}^2}{16\,E} $$
+   ! then per component the same Nwogu dispersion solve and source
+   ! magnitude $D$ as the regular wave, with $\beta$ built from the
+   ! PEAK-frequency wavelength (Wei & Kirby 1999 suggestion).
+   ! Legacy quirks kept: width uses the LAST component's wave_length
+   ! (parity-ledger candidate), and the periodic snap caps at pi/2
+   ! with a snap-DOWN fallback and no error stop.
+   ! ----------------------------------------------------------------
+   subroutine wk_irregular_coefficients(equal_energy, is_jonswap, nfreq, ntheta, &
+                                        delta, h_gen, fm, fmax, fmin, gamma_spec, &
+                                        Hmo, theta_peak, sigma_theta_deg, periodic, &
+                                        dy, nglob, env, rlamda, beta_gen, D_gen, &
+                                        phi1, width, omgn)
+      use core_constants_mod, only: GRAV, PI, SMALL
+      use core_build_config_mod, only: BUILD_ZERO_PHASE
+      logical, intent(in)  :: equal_energy, is_jonswap, periodic
+      integer, intent(in)  :: nfreq, ntheta, nglob
+      real(SP), intent(in) :: delta, h_gen, fm, fmax, fmin, gamma_spec, Hmo, &
+                              theta_peak, sigma_theta_deg, dy
+      type(type_env), intent(inout) :: env
+      real(SP), intent(out) :: rlamda(nfreq, ntheta), beta_gen(nfreq)
+      real(SP), intent(out) :: D_gen(nfreq, ntheta), phi1(nfreq, ntheta)
+      real(SP), intent(out) :: width, omgn(nfreq)
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: freq(nfreq), energy_bin(nfreq), ag(ntheta)
+      real(SP) :: Ef, alpha_spec, ap, theta, alpha1, tb, tc, wkn
+      real(SP) :: c_phase, wave_length, rl_gen, ri, snap_scratch
+      integer :: kf, ktheta
+
+      if (h_gen == 0.0_SP .or. fm == 0.0_SP .or. fmax == 0.0_SP) &
+         error stop "wavemaker: re-set depth, FreqPeak, FreqMax for wavemaker"
+
+      if (equal_energy) then
+         call freq_bins_equal_energy(is_jonswap, nfreq, h_gen, fm, fmax, fmin, &
+                                     gamma_spec, freq, energy_bin, Ef)
+      else
+         call freq_bins_equal_dfreq(is_jonswap, nfreq, h_gen, fm, fmax, fmin, &
+                                    gamma_spec, freq, energy_bin, Ef)
+      end if
+
+      call directional_spreading(ntheta, theta_peak, sigma_theta_deg, ag)
+
+      alpha_spec = Hmo**2/16.0_SP/Ef
+      alpha1 = alpha + 1.0_SP/3.0_SP
+      wave_length = 0.0_SP
+
+      ! legacy PARAM scratch is static: a theta = 0 component under
+      ! periodic reuses the previous component's snapped value
+      snap_scratch = 0.0_SP
+
+      do kf = 1, nfreq
+         do ktheta = 1, ntheta
+
+            ! legacy folds the Hmo -> Hrms conversion into the half
+            ! amplitude: a = H_each / (2 sqrt 2)
+            ap = 4.0_SP*sqrt(alpha_spec*energy_bin(kf)*ag(ktheta)) &
+                 /sqrt(2.0_SP)/2.0_SP
+
+            if (ntheta == 1) then
+               theta = theta_peak*PI/180.0_SP
+            else
+               theta = -PI/3.0_SP + theta_peak*PI/180.0_SP &
+                       + 2.0_SP/3.0_SP*PI/(real(ntheta, SP) - 1.0_SP) &
+                       *(real(ktheta, SP) - 1.0_SP)
+               if (theta > 0.5_SP*PI) theta = 0.5_SP*PI
+               if (theta < -0.5_SP*PI) theta = -0.5_SP*PI
+            end if
+
+            omgn(kf) = 2.0_SP*PI*freq(kf)
+            tb = omgn(kf)*omgn(kf)*h_gen/GRAV
+            tc = 1.0_SP + tb*alpha
+            wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                       /(2.0_SP*alpha1))/h_gen
+
+            ! beta from the peak-frequency phase speed; wkn = 0 guard
+            ! kept from legacy (02/08/2012 fix)
+            if (wkn == 0.0_SP) then
+               wkn = SMALL
+               c_phase = sqrt(GRAV*h_gen)
+               wave_length = c_phase/fm
+            else
+               c_phase = 1.0_SP/wkn*fm*2.0_SP*PI
+               wave_length = c_phase/fm
+            end if
+
+            if (periodic) &
+               call spectral_periodic_snap(theta, snap_scratch, wkn, dy, &
+                                           nglob, freq(kf), env)
+
+            rlamda(kf, ktheta) = wkn*sin(theta)
+            beta_gen(kf) = 80.0_SP/delta**2/wave_length**2
+            rl_gen = wkn*cos(theta)
+            ri = sqrt(PI/beta_gen(kf))*exp(-rl_gen**2/4.0_SP/beta_gen(kf))
+
+            D_gen(kf, ktheta) = 2.0_SP*ap*cos(theta) &
+                                *(omgn(kf)**2 - alpha1*GRAV*wkn**4*h_gen**3) &
+                                /(omgn(kf)*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
+
+         end do
+      end do
+
+      ! legacy recomputes the peak wavenumber here but the width still
+      ! uses the last component's wave_length — kept bug-for-bug
+      width = delta*wave_length/2.0_SP
+
+      ! parity builds fix all phases to zero; the random path uses the
+      ! standard generator (legacy rand()/rand(0) is compiler-specific
+      ! and never reproducible anyway)
+      if (BUILD_ZERO_PHASE) then
+         phi1 = 0.0_SP
+      else
+         call random_number(phi1)
+         phi1 = phi1*2.0_SP*PI
+      end if
+
+   end subroutine wk_irregular_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: uniform frequency bins (legacy WK_EQUAL_DFREQ_IRREGULAR_
+   ! WAVE head): $f_k = f_{min} + (k-1)\,df$, $df = \frac{f_{max}-f_{min}}
+   ! {N_f - 1}$, bin energy $E_k = S(f_k)\,df$.
+   ! ----------------------------------------------------------------
+   subroutine freq_bins_equal_dfreq(is_jonswap, nfreq, h_gen, fm, fmax, fmin, &
+                                    gamma_spec, freq, energy_bin, Ef)
+      logical, intent(in)  :: is_jonswap
+      integer, intent(in)  :: nfreq
+      real(SP), intent(in) :: h_gen, fm, fmax, fmin, gamma_spec
+      real(SP), intent(out) :: freq(nfreq), energy_bin(nfreq), Ef
+
+      real(SP) :: df
+      integer :: kff
+
+      df = (fmax - fmin)/(real(nfreq, SP) - 1.0_SP)
+      Ef = 0.0_SP
+      do kff = 1, nfreq
+         freq(kff) = fmin + real(kff - 1, SP)*df
+         energy_bin(kff) = tma_density(is_jonswap, freq(kff), fm, h_gen, &
+                                       gamma_spec)*df
+         Ef = Ef + energy_bin(kff)
+      end do
+
+   end subroutine freq_bins_equal_dfreq
+
+   ! ----------------------------------------------------------------
+   ! Private: equal-energy frequency bins (legacy WK_WAVEMAKER_
+   ! IRREGULAR_WAVE head): scan the spectrum on 10000 points, split
+   ! into bins of energy $E/(N_f+1)$, put each component at the bin
+   ! midpoint.  All components carry the same bin energy.  Legacy
+   ! zero-frequency and non-monotone tail guards kept (the kff = 1
+   ! zero guard additionally bounds-checks — legacy would index 0).
+   ! ----------------------------------------------------------------
+   subroutine freq_bins_equal_energy(is_jonswap, nfreq, h_gen, fm, fmax, fmin, &
+                                     gamma_spec, freq, energy_bin, Ef)
+      integer, parameter :: NSCAN = 10000
+      logical, intent(in)  :: is_jonswap
+      integer, intent(in)  :: nfreq
+      real(SP), intent(in) :: h_gen, fm, fmax, fmin, gamma_spec
+      real(SP), intent(out) :: freq(nfreq), energy_bin(nfreq), Ef
+
+      real(SP) :: ef_scan(NSCAN)
+      real(SP) :: fre, ef_bin, ef_add
+      integer :: k, kf, kff, kb
+
+      Ef = 0.0_SP
+      do kf = 1, NSCAN
+         fre = fmin + (fmax - fmin)/real(NSCAN, SP)*(real(kf, SP) - 1.0_SP)
+         ef_scan(kf) = tma_density(is_jonswap, fre, fm, h_gen, gamma_spec)
+         Ef = Ef + ef_scan(kf)*(fmax - fmin)/real(NSCAN, SP)
+      end do
+
+      ef_bin = Ef/real(nfreq + 1, SP)
+
+      kb = 0
+      do kff = 1, nfreq
+         freq(kff) = 0.0_SP
+         ef_add = 0.0_SP
+         do k = kb + 1, NSCAN
+            ef_add = ef_add + ef_scan(k)*(fmax - fmin)/real(NSCAN, SP)
+            if (ef_add >= ef_bin .or. k == NSCAN) then
+               ! (k - kb)/2 is a truncating integer division in legacy
+               freq(kff) = fmin + (fmax - fmin)/real(NSCAN, SP) &
+                           *real(k - (k - kb)/2, SP)
+               kb = k
+               exit
+            end if
+         end do
+         if (freq(kff) == 0.0_SP .and. kff > 1) freq(kff) = freq(kff - 1)
+      end do
+      if (nfreq >= 2) then
+         if (freq(nfreq) < freq(nfreq - 1)) freq(nfreq) = freq(nfreq - 1)
+      end if
+
+      energy_bin = ef_bin
+
+   end subroutine freq_bins_equal_energy
+
+   ! ----------------------------------------------------------------
+   ! Private: TMA spectral density (legacy inline block, both spectrum
+   ! variants).  JONSWAP with the Kitaigorodskii depth factor
+   ! $\phi(\bar\omega)$, $\bar\omega = 2\pi f\sqrt{h/g}$:
+   !   $$ S(f) = \frac{g^2 \phi}{(2\pi)^4 f^5}
+   !             \exp\!\Big[-\frac54\Big(\frac{f}{f_p}\Big)^{-4}\Big]\,
+   !             \gamma^{\exp\left[-\frac{(f/f_p - 1)^2}{2\sigma^2}\right]},
+   !      \qquad \sigma = \begin{cases}0.07 & f \le f_p\\
+   !                                   0.09 & f > f_p\end{cases} $$
+   ! $\phi = 1$ for the pure JONSWAP types.
+   ! ----------------------------------------------------------------
+   function tma_density(is_jonswap, fre, fm, h_gen, gamma_spec) result(etma)
+      use core_constants_mod, only: GRAV, PI
+      logical, intent(in)  :: is_jonswap
+      real(SP), intent(in) :: fre, fm, h_gen, gamma_spec
+      real(SP) :: etma
+
+      real(SP) :: omiga_spec, phi, sigma_spec
+
+      omiga_spec = 2.0_SP*PI*fre*sqrt(h_gen/GRAV)
+      phi = 1.0_SP - 0.5_SP*(2.0_SP - omiga_spec)**2
+      if (omiga_spec <= 1.0_SP) phi = 0.5_SP*omiga_spec**2
+      if (omiga_spec >= 2.0_SP) phi = 1.0_SP
+      if (is_jonswap) phi = 1.0_SP
+
+      sigma_spec = 0.07_SP
+      if (fre > fm) sigma_spec = 0.09_SP
+
+      etma = GRAV**2*fre**(-5)*(2.0_SP*PI)**(-4)*phi &
+             *exp(-5.0_SP/4.0_SP*(fre/fm)**(-4)) &
+             *gamma_spec**(exp(-(fre/fm - 1.0_SP)**2/(2.0_SP*sigma_spec**2)))
+
+   end function tma_density
+
+   ! ----------------------------------------------------------------
+   ! Private: wrapped-normal directional spreading (Borgman 1984;
+   ! legacy ykchoi 11/07/2016 block).  Bins span $\theta_p \pm \pi/3$,
+   ! clamped to $\pm\pi/2$:
+   !   $$ G(\theta) = \frac{1}{2\pi} + \frac{1}{\pi}\sum_{n=1}^{N}
+   !      e^{-\frac{(n\sigma_\theta)^2}{2}}\cos\!\big(n(\theta-\theta_p)\big),
+   !      \qquad N = \lfloor 20/\sigma_\theta \rfloor $$
+   ! normalized by the (signed) sum then made positive (legacy ABS).
+   ! N is computed inside the ntheta > 1 branch — legacy evaluates
+   ! 20/sigma before its 1D branch, dividing by zero when sigma = 0;
+   ! the value is unused there, so the guard is unobservable.
+   ! ----------------------------------------------------------------
+   subroutine directional_spreading(ntheta, theta_peak, sigma_theta_deg, ag)
+      use core_constants_mod, only: PI
+      integer, intent(in)  :: ntheta
+      real(SP), intent(in) :: theta_peak, sigma_theta_deg
+      real(SP), intent(out) :: ag(ntheta)
+
+      real(SP) :: sigma_theta, theta, sum_ag
+      integer :: ktheta, k_n, n_spec
+
+      if (ntheta == 1) then
+         ag(1) = 1.0_SP
+         return
+      end if
+
+      sigma_theta = sigma_theta_deg*PI/180.0_SP
+      n_spec = int(20.0_SP/sigma_theta)
+
+      sum_ag = 0.0_SP
+      do ktheta = 1, ntheta
+         theta = -PI/3.0_SP + theta_peak*PI/180.0_SP &
+                 + 2.0_SP/3.0_SP*PI/(real(ntheta, SP) - 1.0_SP) &
+                 *(real(ktheta, SP) - 1.0_SP)
+         if (theta > 0.5_SP*PI) theta = 0.5_SP*PI
+         if (theta < -0.5_SP*PI) theta = -0.5_SP*PI
+
+         ag(ktheta) = 1.0_SP/(2.0_SP*PI)
+         do k_n = 1, n_spec
+            ag(ktheta) = ag(ktheta) &
+                         + (1.0_SP/PI)*exp(-0.5_SP*(real(k_n, SP)*sigma_theta)**2) &
+                         *cos(real(k_n, SP)*(theta - theta_peak*PI/180.0_SP))
+         end do
+         sum_ag = sum_ag + ag(ktheta)
+      end do
+      ! small bins can go negative; integral of G must be 1
+      ag = abs(ag/sum_ag)
+
+   end subroutine directional_spreading
+
+   ! ----------------------------------------------------------------
+   ! Private: per-component periodic wave-angle snap (legacy PERIODIC
+   ! block inside both spectrum variants).  Walks along-crest mode
+   ! numbers up past the requested angle, then snaps DOWN one mode;
+   ! caps at $\pm\pi/2$ when no mode fits (no error stop — unlike the
+   ! WK_REG snap).  scratch is caller-saved across components: a
+   ! theta = 0 component keeps the previous snapped value (legacy
+   ! PARAM static-scratch semantics).
+   ! ----------------------------------------------------------------
+   subroutine spectral_periodic_snap(theta, scratch, wkn, dy, nglob, fre, env)
+      use core_constants_mod, only: PI
+      real(SP), intent(inout) :: theta, scratch
+      real(SP), intent(in) :: wkn, dy, fre
+      integer, intent(in) :: nglob
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: rlamda_m
+      integer :: m
+      character(80) :: msg
+
+      rlamda_m = 0.0_SP
+      if (theta > 0.0_SP) then
+         scratch = 0.0_SP
+         m = 0
+         do while (scratch < theta)
+            m = m + 1
+            rlamda_m = real(m, SP)*2.0_SP*PI/dy/(real(nglob, SP) - 1.0_SP)
+            if (rlamda_m >= wkn) then
+               scratch = PI/2.0_SP
+            else
+               scratch = asin(rlamda_m/wkn)
+            end if
+         end do
+         if (rlamda_m < wkn) &
+            scratch = asin(real(m - 1, SP)*2.0_SP*PI/dy &
+                           /(real(nglob, SP) - 1.0_SP)/wkn)
+      else if (theta < 0.0_SP) then
+         scratch = 0.0_SP
+         m = 0
+         do while (scratch > theta)
+            m = m + 1
+            rlamda_m = real(m, SP)*2.0_SP*PI/dy/(real(nglob, SP) - 1.0_SP)
+            if (rlamda_m >= wkn) then
+               scratch = -PI/2.0_SP
+            else
+               scratch = -asin(rlamda_m/wkn)
+            end if
+         end do
+         if (rlamda_m < wkn) &
+            scratch = -asin(real(m - 1, SP)*2.0_SP*PI/dy &
+                            /(real(nglob, SP) - 1.0_SP)/wkn)
+      end if
+
+      write (msg, '(A,F8.3,A,F8.3,A,F8.3)') "periodic bc, freq: ", fre, &
+         ", dir: ", theta*180.0_SP/PI, " -> ", scratch*180.0_SP/PI
+      call env%log%info(trim(msg))
+      theta = scratch
+
+   end subroutine spectral_periodic_snap
 
 end module model_wavemaker_mod
