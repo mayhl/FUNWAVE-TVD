@@ -66,8 +66,9 @@ module model_stepper_2d_mod
    private
    public :: type_model_stepper_2d
 
-   ! Legacy breaking-age threshold (old/init.F: T_brk = 20 when
-   ! SHOW_BREAKING); runtime-configurable form deferred.
+   ! Legacy breaking-age threshold default (old/init.F: T_brk = 20 when
+   ! SHOW_BREAKING); spectral wavemakers override with 1/FreqMax at
+   ! init.  Runtime-configurable form deferred.
    real(SP), parameter :: T_BRK_LEGACY = 20.0_SP
 
    type, extends(type_stepper_model) :: type_model_stepper_2d
@@ -92,6 +93,9 @@ module model_stepper_2d_mod
       ! $\beta_1 = \beta_{ref} + 1$, $\beta_2 = (1/5)^2$.
       real(SP) :: b1 = 0.0_SP, b2 = 0.0_SP
       real(SP) :: beta1 = 0.0_SP, beta2 = 0.0_SP
+
+      ! Breaking-age threshold (legacy T_brk; wavemaker may override)
+      real(SP) :: t_brk = T_BRK_LEGACY
 
       ! Kernel workspaces — allocated once, reused every stage.
       type(type_flux_workspace) :: fws
@@ -181,6 +185,9 @@ contains
       this%sponge => sponge
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
+
+      this%t_brk = T_BRK_LEGACY
+      if (wavemaker%T_brk > 0.0_SP) this%t_brk = wavemaker%T_brk
 
       this%b1 = physics%Beta_ref*physics%Beta_ref
       this%b2 = physics%Beta_ref
@@ -419,7 +426,7 @@ contains
             ! ETAmean (mixing port) — untestable until the wavemaker rungs.
             call wave_breaking(lp, this%etax, this%etay, this%etat, &
                                f%eta, f%depth, f%h, f%u, f%v, this%etamean, &
-                               this%dx, this%dy, dt, T_BRK_LEGACY, &
+                               this%dx, this%dy, dt, this%t_brk, &
                                num%MinDepthFrc, this%breaking%Cbrk1, &
                                this%breaking%Cbrk2, this%breaking%WAVEMAKER_Cbrk, &
                                this%breaking%nu_bkg, VIS_SCHEME_DEFAULT, &
