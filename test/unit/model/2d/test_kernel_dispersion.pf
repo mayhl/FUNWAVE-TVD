@@ -4,7 +4,9 @@ module test_kernel_dispersion
    use pFUnit
    use core_constants_mod,         only: SP
    use core_grid_mod,               only: type_loop_bounds
-   use model_kernel_dispersion_mod, only: type_disp_workspace, cal_dispersion
+   use model_kernel_dispersion_mod, only: type_disp_workspace, &
+                                          cal_dispersion_derivs, &
+                                          cal_dispersion_assemble
 
    implicit none
 
@@ -27,6 +29,36 @@ contains
       lp%jb = NG + 1;  lp%je = NG + LNY
       lp%mloc = MLOC;  lp%nloc = NLOC
    end subroutine make_lp
+
+   ! derivs + assemble back to back (no ghost exchange in unit context;
+   ! workspace ghosts stay zeroed) — the old single-call shape
+   subroutine cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
+                             inv_dx, inv_dy, dt, mdf, beta1, beta2, gamma2, &
+                             shb, wb, eb, sb, nb, etat, ut, vt, etax, etay, &
+                             u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_disp_workspace), intent(inout) :: ws
+      real(SP), intent(in)    :: eta(:,:), depth(:,:)
+      real(SP), intent(in)    :: u(:,:), v(:,:), u0(:,:), v0(:,:)
+      real(SP), intent(in)    :: p(:,:), q(:,:)
+      integer,  intent(in)    :: mask9(:,:)
+      real(SP), intent(in)    :: inv_dx(:,:), inv_dy(:,:)
+      real(SP), intent(in)    :: dt, mdf, beta1, beta2, gamma2
+      logical,  intent(in)    :: shb, wb, eb, sb, nb
+      real(SP), intent(out)   :: etat(:,:)
+      real(SP), intent(inout) :: ut(:,:), vt(:,:), etax(:,:), etay(:,:)
+      real(SP), intent(out)   :: u4(:,:), v4(:,:), u1p(:,:), v1p(:,:)
+      real(SP), intent(inout) :: u1pp(:,:), v1pp(:,:)
+      real(SP), intent(inout) :: u2(:,:), v2(:,:), u3(:,:), v3(:,:)
+
+      call cal_dispersion_derivs(lp, ws, eta, depth, u, v, u0, v0, p, q, &
+                                 mask9, inv_dx, inv_dy, dt, mdf, gamma2, &
+                                 shb, wb, eb, sb, nb, etat, ut, vt, etax, etay)
+      call cal_dispersion_assemble(lp, ws, eta, depth, u, v, mask9, &
+                                   inv_dx, inv_dy, beta1, beta2, gamma2, &
+                                   etat, etax, etay, u4, v4, u1p, v1p, &
+                                   u1pp, v1pp, u2, v2, u3, v3)
+   end subroutine cal_dispersion
 
    ! ----------------------------------------------------------------
    ! type_disp_workspace: alloc / free round-trip

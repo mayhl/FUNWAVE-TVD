@@ -7,7 +7,7 @@ module model_kernel_dispersion_mod
    implicit none
    private
 
-   public :: type_disp_workspace, cal_dispersion
+   public :: type_disp_workspace, cal_dispersion_derivs, cal_dispersion_assemble
 
    ! ----------------------------------------------------------------
    ! Workspace for intermediate arrays in cal_dispersion.  Allocated
@@ -79,12 +79,11 @@ contains
    ! derivatives at those faces are zeroed to suppress stencil errors.
    ! Ghost-cell exchanges remain the caller's responsibility.
    ! ----------------------------------------------------------------
-   subroutine cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
-                             inv_dx, inv_dy, dt, min_depth_frc, &
-                             beta1, beta2, gamma2, show_breaking, &
-                             west_bdy, east_bdy, south_bdy, north_bdy, &
-                             etat, ut, vt, etax, etay, &
-                             u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
+   subroutine cal_dispersion_derivs(lp, ws, eta, depth, u, v, u0, v0, p, q, &
+                                    mask9, inv_dx, inv_dy, dt, min_depth_frc, &
+                                    gamma2, show_breaking, &
+                                    west_bdy, east_bdy, south_bdy, north_bdy, &
+                                    etat, ut, vt, etax, etay)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_disp_workspace), intent(inout) :: ws
       real(SP), intent(in)    :: eta(:, :), depth(:, :)
@@ -92,25 +91,15 @@ contains
       real(SP), intent(in)    :: p(:, :), q(:, :)
       integer, intent(in)    :: mask9(:, :)
       real(SP), intent(in)    :: inv_dx(:, :), inv_dy(:, :)
-      real(SP), intent(in)    :: dt, min_depth_frc, beta1, beta2, gamma2
+      real(SP), intent(in)    :: dt, min_depth_frc, gamma2
       logical, intent(in)    :: show_breaking
       logical, intent(in)    :: west_bdy, east_bdy, south_bdy, north_bdy
       real(SP), intent(out)   :: etat(:, :)
       real(SP), intent(inout) :: ut(:, :), vt(:, :)
       real(SP), intent(inout) :: etax(:, :), etay(:, :)
-      real(SP), intent(out)   :: u4(:, :), v4(:, :), u1p(:, :), v1p(:, :)
-      real(SP), intent(inout) :: u1pp(:, :), v1pp(:, :)
-      real(SP), intent(inout) :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
 
       integer  :: i, j
-      real(SP) :: rh, rhx, rhy, reta
-      real(SP) :: uxxvxy, uxyvyy, huxxhvxy, huxyhvyy
       real(SP) :: inv_dt
-      real(SP) :: uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y
-      real(SP) :: huxxhvxy_x, huxxhvxy_y, huxyhvyy_x, huxyhvyy_y
-      real(SP) :: ken1, ken2, ken3, ken4, ken5
-      real(SP) :: omega_0, omega_1
-      real(SP) :: coeff_a, coeff_b, coeff_1p
 
       ! zero workspace so ghost-cell neighbours of computed region are 0
       ws%du = 0.0_SP; ws%dv = 0.0_SP
@@ -233,13 +222,53 @@ contains
          end if
       end if
 
+   end subroutine cal_dispersion_derivs
+
+   ! ----------------------------------------------------------------
+   ! Dispersion assembly (legacy Cal_Dispersion after
+   ! EXCHANGE_DISPERSION): the caller must exchange the workspace
+   ! component arrays first (bc%exchange_dispersion) — legacy fills
+   ! their ghosts with parity mirrors and then assembles u4/v4 and
+   ! u1p/v1p over the FULL ghost-inclusive array, so the flux face
+   ! reconstruction and source stencils read assembled ghosts, never
+   ! mirrored u4/v4 (the mirror shortcut is wrong wherever
+   ! $V_{xy} \ne 0$ and flips limiter branches via the sign of zero
+   ! at zero fields).  The gamma2 stencil terms (u1pp/u2/u3) stay
+   ! interior-only, exactly as legacy.
+   ! ----------------------------------------------------------------
+   subroutine cal_dispersion_assemble(lp, ws, eta, depth, u, v, mask9, &
+                                      inv_dx, inv_dy, beta1, beta2, gamma2, &
+                                      etat, etax, etay, &
+                                      u4, v4, u1p, v1p, u1pp, v1pp, &
+                                      u2, v2, u3, v3)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_disp_workspace), intent(in) :: ws
+      real(SP), intent(in)    :: eta(:, :), depth(:, :)
+      real(SP), intent(in)    :: u(:, :), v(:, :)
+      integer, intent(in)    :: mask9(:, :)
+      real(SP), intent(in)    :: inv_dx(:, :), inv_dy(:, :)
+      real(SP), intent(in)    :: beta1, beta2, gamma2
+      real(SP), intent(in)    :: etat(:, :), etax(:, :), etay(:, :)
+      real(SP), intent(out)   :: u4(:, :), v4(:, :), u1p(:, :), v1p(:, :)
+      real(SP), intent(inout) :: u1pp(:, :), v1pp(:, :)
+      real(SP), intent(inout) :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
+
+      integer  :: i, j
+      real(SP) :: rh, rhx, rhy, reta
+      real(SP) :: uxxvxy, uxyvyy, huxxhvxy, huxyhvyy
+      real(SP) :: uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y
+      real(SP) :: huxxhvxy_x, huxxhvxy_y, huxyhvyy_x, huxyhvyy_y
+      real(SP) :: ken1, ken2, ken3, ken4, ken5
+      real(SP) :: omega_0, omega_1
+      real(SP) :: coeff_a, coeff_b, coeff_1p
+
       ! ---- linear dispersion: u4/v4, u1p/v1p -------------------------
       coeff_a = 1.0_SP/3.0_SP - beta1 + 0.5_SP*beta1*beta1
       coeff_b = beta1 - 0.5_SP
       coeff_1p = 0.5_SP*(1.0_SP - beta1)*(1.0_SP - beta1)
 
-      do j = lp%jb, lp%je
-         do i = lp%ib, lp%ie
+      do j = 1, lp%nloc
+         do i = 1, lp%mloc
             uxxvxy = ws%uxx(i, j) + ws%vxy(i, j)
             uxyvyy = ws%uxy(i, j) + ws%vyy(i, j)
             huxxhvxy = ws%duxx(i, j) + ws%dvxy(i, j)
@@ -374,6 +403,6 @@ contains
          end do
       end do
 
-   end subroutine cal_dispersion
+   end subroutine cal_dispersion_assemble
 
 end module model_kernel_dispersion_mod

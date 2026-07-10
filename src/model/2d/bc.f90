@@ -124,28 +124,72 @@ contains
    end subroutine bc_exchange_state
 
    ! ----------------------------------------------------------------
-   ! Ghost update for the dispersion velocity corrections (legacy
-   ! EXCHANGE_DISPERSION): $u_4$ reflects like $u$ (anti in x), $v_4$
-   ! like $v$ (anti in y).  Their ghosts feed the 4th-order face
-   ! reconstruction and the centred $\nabla u_4$ source stencils.
-   ! Walls fill at every physical boundary — no wavemaker exemption,
-   ! since no later BC rewrites dispersion ghosts.  Legacy also
-   ! mirrors the raw derivative intermediates and, under breaking/
-   ! Gamma2 flags, etat/Ut chains — those join with their consumers.
+   ! Ghost update for the dispersion COMPONENT arrays (legacy
+   ! EXCHANGE_DISPERSION, same array order): each raw derivative
+   ! mirrors with its own parity — u-like (anti-x), v-like (anti-y),
+   ! or scalar-like (mirror both) — and u4/v4 are then ASSEMBLED
+   ! ghost-inclusive by cal_dispersion_assemble.  Mirroring u4/v4
+   ! directly is wrong wherever $V_{xy} \ne 0$ (the components mix
+   ! parities) and flips MUSCL limiter branches through the sign of
+   ! zero even on quiescent fields (parity ledger 8c/8e/9 root).
+   ! Wavemaker-owned west face: fills skipped via fill_west (legacy
+   ! PHI_COLL exemption) — the workspace ghosts stay zeroed, which
+   ! reproduces legacy's never-written ghosts there.
+   ! Only the disp_time_left = .false. gamma2 chain is ported (the
+   ! legacy DISP_TIME_LEFT path is compile-time dead; see
+   ! design_kernel_etauv notes).
    ! ----------------------------------------------------------------
-   subroutine bc_exchange_dispersion(this, grid, u4, v4)
+   subroutine bc_exchange_dispersion(this, grid, gamma2, ws, ut, vt, etax, etay)
+      use model_kernel_dispersion_mod, only: type_disp_workspace
       class(type_model_bc), intent(in) :: this
       type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(inout) :: u4(:, :), v4(:, :)
+      real(SP), intent(in) :: gamma2
+      type(type_disp_workspace), intent(inout) :: ws
+      real(SP), intent(inout) :: ut(:, :), vt(:, :)
+      real(SP), intent(inout) :: etax(:, :), etay(:, :)
 
-      call grid%halo_exchange(u4)
-      call fill_ghost_wall(grid%lp, grid%is_back_boundary, grid%is_shore_boundary, &
-                           grid%is_right_boundary, grid%is_left_boundary, &
-                           SIGN_ANTI, SIGN_MIRROR, u4)
-      call grid%halo_exchange(v4)
-      call fill_ghost_wall(grid%lp, grid%is_back_boundary, grid%is_shore_boundary, &
-                           grid%is_right_boundary, grid%is_left_boundary, &
-                           SIGN_MIRROR, SIGN_ANTI, v4)
+      call exchange_one(this, grid, ws%uxx, SIGN_ANTI, SIGN_MIRROR)
+      call exchange_one(this, grid, ws%duxx, SIGN_ANTI, SIGN_MIRROR)
+      call exchange_one(this, grid, ws%vyy, SIGN_MIRROR, SIGN_ANTI)
+      call exchange_one(this, grid, ws%dvyy, SIGN_MIRROR, SIGN_ANTI)
+
+      call exchange_one(this, grid, ws%uxy, SIGN_MIRROR, SIGN_MIRROR)
+      call exchange_one(this, grid, ws%duxy, SIGN_MIRROR, SIGN_MIRROR)
+      call exchange_one(this, grid, ws%vxy, SIGN_MIRROR, SIGN_MIRROR)
+      call exchange_one(this, grid, ws%dvxy, SIGN_MIRROR, SIGN_MIRROR)
+
+      if (gamma2 > 0.0_SP) then
+         call exchange_one(this, grid, ut, SIGN_ANTI, SIGN_MIRROR)
+         call exchange_one(this, grid, vt, SIGN_MIRROR, SIGN_ANTI)
+
+         call exchange_one(this, grid, ws%utx, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%vty, SIGN_MIRROR, SIGN_MIRROR)
+
+         call exchange_one(this, grid, ws%utxx, SIGN_ANTI, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%vtyy, SIGN_MIRROR, SIGN_ANTI)
+
+         call exchange_one(this, grid, ws%utxy, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%vtxy, SIGN_MIRROR, SIGN_MIRROR)
+
+         call exchange_one(this, grid, ws%dutxx, SIGN_ANTI, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%dvtyy, SIGN_MIRROR, SIGN_ANTI)
+
+         call exchange_one(this, grid, ws%dutxy, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%dvtxy, SIGN_MIRROR, SIGN_MIRROR)
+
+         call exchange_one(this, grid, ws%ux, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%dux, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%vy, SIGN_MIRROR, SIGN_MIRROR)
+         call exchange_one(this, grid, ws%dvy, SIGN_MIRROR, SIGN_MIRROR)
+
+         ! legacy also exchanges DUy/DVx — no modern counterpart is
+         ! computed or consumed (u2/u3 use dux/dvy only)
+         call exchange_one(this, grid, ws%uy, SIGN_MIRROR, SIGN_ANTI)
+         call exchange_one(this, grid, ws%vx, SIGN_ANTI, SIGN_MIRROR)
+
+         call exchange_one(this, grid, etax, SIGN_ANTI, SIGN_MIRROR)
+         call exchange_one(this, grid, etay, SIGN_MIRROR, SIGN_ANTI)
+      end if
 
    end subroutine bc_exchange_dispersion
 
