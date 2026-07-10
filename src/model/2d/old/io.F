@@ -394,13 +394,7 @@ SUBROUTINE READ_INPUT
       Time_ramp = model%wavemaker%Time_ramp
       Delta_WK  = model%wavemaker%Delta_WK
 
-      CALL READ_STRING(WaveCompFile, FILE_NAME, 'WaveCompFile', ierr)
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         call MPI_FINALIZE(ier)
-# endif
-         STOP
-      END IF
+      WaveCompFile = model%wavemaker%WaveCompFile
 
 ! data reading will be in wavemaker.F
 
