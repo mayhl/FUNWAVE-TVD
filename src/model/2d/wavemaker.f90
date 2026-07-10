@@ -109,6 +109,11 @@ module model_wavemaker_mod
    ! here.  Reverse to core_constants PI post-6e (parity ledger).
    real(SP), parameter :: PI = 3.141592653
 
+   ! Legacy PARAM DEG2RAD is the coarse literal 0.0175 (old/mod_param.F:80),
+   ! not pi/180 (0.0174533) — the DATA2D direction conversions inherit
+   ! the 0.27% angle error.  Reverse post-6e (parity ledger).
+   real(SP), parameter :: DEG2RAD_LEGACY = 0.0175_SP
+
    private
    public :: type_model_wavemaker
    public :: solitary_coefficients
@@ -203,6 +208,13 @@ module model_wavemaker_mod
       real(SP), allocatable :: Cm(:, :, :), Sm(:, :, :)
       real(SP), allocatable :: omgn_ir(:)             ! component frequencies 2 pi f
       real(SP) :: T_brk = 0.0_SP                      ! breaking-age override 1/FreqMax; 0 = none
+
+      ! Multi-component time-series internal source (WK_TIME): per-
+      ! component (period, amplitude, phase) from WaveCompFile plus the
+      ! per-component generation coefficients (legacy D_genS/Beta_genS)
+      logical  :: time_series_source = .false.
+      real(SP), allocatable :: wave_comp(:, :)        ! (NumWaveComp, 3)
+      real(SP), allocatable :: D_genS(:), Beta_genS(:)
 
       ! Boundary wavemaker (ABS / LEFT_BC_IRR): dense eta/u/v series
       ! modes (legacy Cm_eta..Sm_v), component frequencies + phases,
@@ -341,9 +353,13 @@ contains
       select case (this%wavemaker_type)
       case ("WK_REG")
          this%has_mass_source = .true.
-      case ("WK_IRR", "TMA_1D", "JON_1D", "JON_2D")
+      case ("WK_IRR", "TMA_1D", "JON_1D", "JON_2D", &
+            "WK_DATA2D", "WK_NEW_DATA2D", "WK_NEW_IRR")
          this%has_mass_source = .true.
          this%spectral_source = .true.
+      case ("WK_TIME")
+         this%has_mass_source = .true.
+         this%time_series_source = .true.
       case ("ABS")
          this%abs_source = .true.
       case ("LEFT_BC_IRR")
@@ -377,7 +393,18 @@ contains
       end if
 
       if (this%spectral_source) then
-         call spectral_init_compute(this, grid, periodic, env)
+         select case (this%wavemaker_type)
+         case ("WK_DATA2D")
+            call data2d_init_compute(this, grid, periodic, env)
+         case ("WK_NEW_DATA2D")
+            call new_data2d_init_compute(this, grid, periodic, env)
+         case ("WK_NEW_IRR")
+            call new_irr_init_compute(this, grid, periodic, env)
+         case default
+            call spectral_init_compute(this, grid, periodic, env)
+         end select
+      else if (this%time_series_source) then
+         call time_series_init_compute(this)
       else
          if (periodic .and. this%Theta_WK /= 0.0_SP) &
             call periodic_theta_snap(this, grid, env)
@@ -432,6 +459,7 @@ contains
       real(SP), intent(in) :: time
 
       real(SP) :: bb(this%Nfreq), cc(this%Nfreq)
+      real(SP) :: bb1(this%NumWaveComp)
       real(SP) :: aa, ramp, omg, wk_source
       integer :: i, j, kf
 
@@ -440,6 +468,32 @@ contains
       ! legacy leans on IEEE tanh(inf) = 1 when Time_ramp = 0; guard
       ! gives the same value without the divide-by-zero
       ramp = 1.0_SP
+
+      ! WK_TIME (legacy sources.F WK_TIME branch): per-component cosine
+      ! with its own phase; no y-dependence (legacy hard-codes theta = 0)
+      !   $$ M(x,t) = r(t) \sum_k D_k\,e^{-\beta_k (x - x_c)^2}
+      !               \cos\!\big(\tfrac{2\pi}{T_k} t - \phi_k\big), \qquad
+      !      r(t) = \tanh\!\Big(\frac{\pi t}{\tau T_p}\Big) $$
+      if (this%time_series_source) then
+         if (this%Time_ramp > 0.0_SP) &
+            ramp = tanh(PI/(this%Time_ramp*this%PeakPeriod)*time)
+         do kf = 1, this%NumWaveComp
+            bb1(kf) = cos(2.0_SP*PI/this%wave_comp(kf, 1)*time &
+                          - this%wave_comp(kf, 3))
+         end do
+         do j = this%jlo, this%jhi
+            do i = this%ilo, this%ihi
+               wk_source = 0.0_SP
+               do kf = 1, this%NumWaveComp
+                  wk_source = wk_source + ramp*this%D_genS(kf) &
+                              *exp(-this%Beta_genS(kf) &
+                                   *(this%xmk_wk(i) - this%Xc_WK)**2)*bb1(kf)
+               end do
+               this%mass(i, j) = wk_source
+            end do
+         end do
+         return
+      end if
 
       if (this%spectral_source) then
          if (this%Time_ramp > 0.0_SP) &
@@ -595,8 +649,11 @@ contains
          deallocate (this%Cm_eta, this%Sm_eta, this%Cm_u, this%Sm_u, &
                      this%Cm_v, this%Sm_v, this%Segma_Ser, this%Phase_Ser)
       if (allocated(this%sponge_maker)) deallocate (this%sponge_maker)
+      if (allocated(this%wave_comp)) &
+         deallocate (this%wave_comp, this%D_genS, this%Beta_genS)
       this%has_mass_source = .false.
       this%spectral_source = .false.
+      this%time_series_source = .false.
       this%left_bc_source = .false.
       this%abs_source = .false.
 
@@ -720,6 +777,318 @@ contains
       this%T_brk = 1.0_SP/this%FreqMax
 
    end subroutine spectral_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: WK_TIME multi-component setup (legacy WK_TIME block of
+   ! WAVEMAKER_INITIALIZATION + WK_WAVEMAKER_TIME_SERIES).  Reads
+   ! NumWaveComp rows of (period, amplitude, phase) from WaveCompFile,
+   ! solves the per-component Wei & Kirby source magnitude, and takes
+   ! the shared width from PeakPeriod.  T_brk override is the LAST
+   ! component's period (legacy SHOW_BREAKING assignment).
+   ! ----------------------------------------------------------------
+   subroutine time_series_init_compute(this)
+      class(type_model_wavemaker), intent(inout) :: this
+
+      integer :: kf, i, unit, ios
+
+      allocate (this%wave_comp(this%NumWaveComp, 3), &
+                this%D_genS(this%NumWaveComp), &
+                this%Beta_genS(this%NumWaveComp))
+
+      open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
+            action="read", iostat=ios)
+      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      do kf = 1, this%NumWaveComp
+         read (unit, *, iostat=ios) (this%wave_comp(kf, i), i=1, 3)
+         if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+      end do
+      close (unit)
+
+      call wk_time_series_coefficients(this%NumWaveComp, this%wave_comp, &
+                                       this%PeakPeriod, this%DEP_WK, &
+                                       this%Delta_WK, this%D_genS, &
+                                       this%Beta_genS, this%Width_WK)
+
+      this%T_brk = this%wave_comp(this%NumWaveComp, 1)
+
+   end subroutine time_series_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: WK_DATA2D setup (legacy WK_DATA2D block of WAVEMAKER_
+   ! INITIALIZATION + WK_WAVEMAKER_2D_SPECTRAL_DATA + CALCULATE_Cm_Sm).
+   ! WaveCompFile layout:
+   !   NumFreq NumDir / PeakPeriod / freq rows / dir rows /
+   !   amp(1:NumFreq) per dir / [phase(1:NumFreq) per dir, degrees]
+   ! Directions with |dir| >= 60 deg are dropped (SWAN-conversion
+   ! guard).  Legacy quirks kept: input phase columns are NOT
+   ! remapped through the direction filter (legacy Phase2D is never
+   ! compacted — column k pairs with the k-th SURVIVING direction
+   ! only when nothing before it was dropped); the input phase unit
+   ! conversion is 0.005555555555556*pi.  Legacy SHOW_BREAKING reads
+   ! WAVE_COMP(NumWaveComp,1) with NumWaveComp belonging to WK_TIME —
+   ! never set on this path (uninitialized) — so T_brk stays at the
+   ! stepper default here.  FreqPeak (ramp scale) = 1/PeakPeriod from
+   ! the file.
+   ! ----------------------------------------------------------------
+   subroutine data2d_init_compute(this, grid, periodic, env)
+      use core_grid_mod, only: type_grid_2d
+      use core_build_config_mod, only: BUILD_ZERO_PHASE
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+
+      real(SP), allocatable :: freq(:), dire(:), amp(:, :), phase(:, :)
+      real(SP), allocatable :: dire_flt(:), amp_flt(:, :)
+      real(SP), allocatable :: d_gen2d(:, :), rlamda2d(:, :), beta_gen2d(:)
+      logical :: input_phase
+      integer :: nfreq, ndir_in, ndir, unit, ios, i, j, kf, ktheta
+      integer :: mloc, nloc
+      character(96) :: msg
+
+      open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
+            action="read", iostat=ios)
+      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      read (unit, *) nfreq, ndir_in
+      allocate (freq(nfreq), dire(ndir_in), amp(nfreq, ndir_in), &
+                phase(nfreq, ndir_in))
+      read (unit, *) this%PeakPeriod
+      do j = 1, nfreq
+         read (unit, *) freq(j)
+      end do
+      do i = 1, ndir_in
+         read (unit, *) dire(i)
+      end do
+      do i = 1, ndir_in
+         read (unit, *) (amp(j, i), j=1, nfreq)
+      end do
+      ! optional phase block (legacy READ ... END=): a missing/short
+      ! block means generated phases
+      input_phase = .true.
+      do i = 1, ndir_in
+         read (unit, *, iostat=ios) (phase(j, i), j=1, nfreq)
+         if (ios /= 0) then
+            input_phase = .false.
+            exit
+         end if
+      end do
+      close (unit)
+
+      ! drop out-of-range directions, order-preserving (|dir| < 60)
+      allocate (dire_flt(ndir_in), amp_flt(nfreq, ndir_in))
+      ndir = 0
+      do i = 1, ndir_in
+         if (abs(dire(i)) < 60.0_SP) then
+            ndir = ndir + 1
+            dire_flt(ndir) = dire(i)
+            amp_flt(:, ndir) = amp(:, i)
+         end if
+      end do
+
+      write (msg, '(A,I0,A,I0)') "WK_DATA2D: NumFreq ", nfreq, &
+         ", NumDir ", ndir
+      call env%log%info(trim(msg))
+
+      if (input_phase) then
+         call env%log%info("WK_DATA2D: using input phase info")
+         ! legacy unit conversion literal (0.00555... * pi, not /180)
+         do j = 1, nfreq
+            do i = 1, ndir
+               phase(j, i) = phase(j, i)*0.005555555555556_SP*PI
+            end do
+         end do
+      else
+         if (BUILD_ZERO_PHASE) then
+            phase(:, 1:ndir) = 0.0_SP
+         else
+            call random_number(phase(:, 1:ndir))
+            phase(:, 1:ndir) = phase(:, 1:ndir)*2.0_SP*PI
+         end if
+      end if
+
+      allocate (d_gen2d(nfreq, ndir), rlamda2d(nfreq, ndir), &
+                beta_gen2d(nfreq))
+      call wk_data2d_coefficients(grid, periodic, env, nfreq, ndir, freq, &
+                                  dire_flt(1:ndir), amp_flt(:, 1:ndir), &
+                                  this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
+                                  d_gen2d, beta_gen2d, rlamda2d, this%Width_WK)
+
+      this%Nfreq = nfreq
+      this%FreqPeak = 1.0_SP/this%PeakPeriod
+      mloc = grid%lp%mloc
+      nloc = grid%lp%nloc
+      allocate (this%omgn_ir(nfreq), this%Cm(mloc, nloc, nfreq), &
+                this%Sm(mloc, nloc, nfreq))
+      do j = 1, nfreq
+         this%omgn_ir(j) = 2.0_SP*PI*freq(j)
+      end do
+
+      ! dense modes (legacy CALCULATE_Cm_Sm; beta enters as a (mfreq)
+      ! dummy via sequence association — column 1, identical across
+      ! directions since the wavelength is frequency-only)
+      this%Cm = 0.0_SP
+      this%Sm = 0.0_SP
+      do kf = 1, nfreq
+         do j = 1, nloc
+            do i = 1, mloc
+               do ktheta = 1, ndir
+                  this%Cm(i, j, kf) = this%Cm(i, j, kf) + d_gen2d(kf, ktheta) &
+                                      *exp(-beta_gen2d(kf)*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                                      *cos(rlamda2d(kf, ktheta)*this%ymk_wk(j) &
+                                           + phase(kf, ktheta))
+                  this%Sm(i, j, kf) = this%Sm(i, j, kf) + d_gen2d(kf, ktheta) &
+                                      *exp(-beta_gen2d(kf)*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                                      *sin(rlamda2d(kf, ktheta)*this%ymk_wk(j) &
+                                           + phase(kf, ktheta))
+               end do
+            end do
+         end do
+      end do
+
+   end subroutine data2d_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: WK_NEW_DATA2D setup (legacy Salatin 2021 block of
+   ! WAVEMAKER_INITIALIZATION + WK_NEW_WAVEMAKER_2D_SPECTRAL_DATA).
+   ! Component-list WaveCompFile layout (one direction per component):
+   !   NumFreq / PeakPeriod / freqs / dirs / amps / [phases, degrees]
+   ! Components with |dir| > 90 deg are dropped; here the phase list
+   ! IS compacted with its component (unlike WK_DATA2D).  T_brk quirk
+   ! kept bug-for-bug: legacy assigns the last component's FREQUENCY
+   ! (not period).  FreqPeak = 1/PeakPeriod from the file.
+   ! ----------------------------------------------------------------
+   subroutine new_data2d_init_compute(this, grid, periodic, env)
+      use core_grid_mod, only: type_grid_2d
+      use core_build_config_mod, only: BUILD_ZERO_PHASE
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+
+      real(SP), allocatable :: freq(:), dire(:), amp(:), phase(:)
+      real(SP), allocatable :: freq_flt(:), dire_flt(:), amp_flt(:), phase_flt(:)
+      real(SP), allocatable :: d_gen(:), rlamda(:), beta_gen(:)
+      logical :: input_phase
+      integer :: nfreq_in, nfreq, unit, ios, i, j
+      character(96) :: msg
+
+      open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
+            action="read", iostat=ios)
+      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      read (unit, *) nfreq_in
+      allocate (freq(nfreq_in), dire(nfreq_in), amp(nfreq_in), phase(nfreq_in))
+      read (unit, *) this%PeakPeriod
+      do i = 1, nfreq_in
+         read (unit, *) freq(i)
+      end do
+      do i = 1, nfreq_in
+         read (unit, *) dire(i)
+      end do
+      do i = 1, nfreq_in
+         read (unit, *) amp(i)
+      end do
+      input_phase = .true.
+      do i = 1, nfreq_in
+         read (unit, *, iostat=ios) phase(i)
+         if (ios /= 0) then
+            input_phase = .false.
+            exit
+         end if
+      end do
+      close (unit)
+
+      ! drop out-of-range components, order-preserving (|dir| <= 90)
+      allocate (freq_flt(nfreq_in), dire_flt(nfreq_in), amp_flt(nfreq_in), &
+                phase_flt(nfreq_in))
+      nfreq = 0
+      do i = 1, nfreq_in
+         if (abs(dire(i)) <= 90.0_SP) then
+            nfreq = nfreq + 1
+            freq_flt(nfreq) = freq(i)
+            dire_flt(nfreq) = dire(i)
+            amp_flt(nfreq) = amp(i)
+            phase_flt(nfreq) = phase(i)
+         end if
+      end do
+
+      write (msg, '(A,I0,A)') "WK_NEW_DATA2D: using ", nfreq, &
+         " wave components"
+      call env%log%info(trim(msg))
+
+      if (input_phase) then
+         call env%log%info("WK_NEW_DATA2D: using input phase info")
+         do i = 1, nfreq
+            phase_flt(i) = phase_flt(i)*PI/180.0_SP
+         end do
+      else
+         if (BUILD_ZERO_PHASE) then
+            phase_flt(1:nfreq) = 0.0_SP
+         else
+            call random_number(phase_flt(1:nfreq))
+            phase_flt(1:nfreq) = phase_flt(1:nfreq)*2.0_SP*PI
+         end if
+      end if
+
+      allocate (d_gen(nfreq), rlamda(nfreq), beta_gen(nfreq))
+      call wk_new_data2d_coefficients(grid, periodic, env, nfreq, &
+                                      freq_flt, dire_flt, amp_flt, &
+                                      this%PeakPeriod, this%DEP_WK, &
+                                      this%Delta_WK, d_gen, beta_gen, &
+                                      rlamda, this%Width_WK)
+
+      this%Nfreq = nfreq
+      this%FreqPeak = 1.0_SP/this%PeakPeriod
+      allocate (this%omgn_ir(nfreq), &
+                this%Cm(grid%lp%mloc, grid%lp%nloc, nfreq), &
+                this%Sm(grid%lp%mloc, grid%lp%nloc, nfreq))
+      do j = 1, nfreq
+         this%omgn_ir(j) = 2.0_SP*PI*freq_flt(j)
+      end do
+
+      call calc_new_cm_sm(this, env, freq_flt(1:nfreq), d_gen, &
+                          phase_flt(1:nfreq), rlamda, beta_gen)
+
+      ! legacy: T_brk = Freq(FreqCount) — the last FREQUENCY, not a
+      ! period; kept bug-for-bug (parity ledger)
+      this%T_brk = freq_flt(nfreq)
+
+   end subroutine new_data2d_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: WK_NEW_IRR setup (legacy Salatin 2021 analytic-spectrum
+   ! block: WK_NEW_EQUAL_DFREQ_IRREGULAR_WAVE + CALCULATE_NEW_Cm_Sm).
+   ! Equal-dfreq TMA bins with ONE direction per frequency component
+   ! (interleaved across the spread), optional coherence shuffle
+   ! (alpha_c), then the same per-component source solve.
+   ! ----------------------------------------------------------------
+   subroutine new_irr_init_compute(this, grid, periodic, env)
+      use core_grid_mod, only: type_grid_2d
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+
+      real(SP), allocatable :: freq(:), d_gen(:), rlamda(:), phi1(:), beta_gen(:)
+
+      allocate (freq(this%Nfreq), d_gen(this%Nfreq), rlamda(this%Nfreq), &
+                phi1(this%Nfreq), beta_gen(this%Nfreq), &
+                this%omgn_ir(this%Nfreq), &
+                this%Cm(grid%lp%mloc, grid%lp%nloc, this%Nfreq), &
+                this%Sm(grid%lp%mloc, grid%lp%nloc, this%Nfreq))
+
+      call wk_new_irr_coefficients(this%Nfreq, this%Ntheta, this%Delta_WK, &
+                                   this%DEP_WK, this%FreqPeak, this%FreqMax, &
+                                   this%FreqMin, this%GammaTMA, this%Hmo, &
+                                   this%ThetaPeak, this%Sigma_Theta, &
+                                   this%alpha_c, periodic, grid%dy0, grid%N, &
+                                   env, freq, rlamda, beta_gen, d_gen, phi1, &
+                                   this%Width_WK, this%omgn_ir)
+
+      call calc_new_cm_sm(this, env, freq, d_gen, phi1, rlamda, beta_gen)
+
+      this%T_brk = 1.0_SP/this%FreqMax
+
+   end subroutine new_irr_init_compute
 
    ! ----------------------------------------------------------------
    ! Private: boundary wavemaker setup (legacy ABS / LEFT_BC_IRR block
@@ -1281,6 +1650,640 @@ contains
       end if
 
    end subroutine wk_irregular_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: per-component Wei & Kirby solve for WK_TIME (legacy
+   ! WK_WAVEMAKER_TIME_SERIES).  The regular-wave formulas with
+   ! theta = 0 hard-coded (legacy "assume zero because no or few cases
+   ! include directions" — the exact cos(0) = 1 factors are dropped),
+   ! one D/beta pair per component, shared width from PeakPeriod.
+   ! rI keeps the legacy truncated literal 3.14159.
+   ! ----------------------------------------------------------------
+   subroutine wk_time_series_coefficients(nc, wave_comp, peak_period, h_gen, &
+                                          delta, D_gen, beta_gen, width)
+      use core_constants_mod, only: GRAV
+      integer, intent(in) :: nc
+      real(SP), intent(in) :: wave_comp(nc, 3), peak_period, h_gen, delta
+      real(SP), intent(out) :: D_gen(nc), beta_gen(nc), width
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: alpha1, omgn, Tperiod, amp, tb, tc, wkn, c_phase
+      real(SP) :: wave_length, rl_gen, ri
+      integer :: kf
+
+      if (peak_period == 0.0_SP) &
+         error stop "wavemaker: re-set PeakPeriod for wavemaker"
+
+      alpha1 = alpha + 1.0_SP/3.0_SP
+
+      do kf = 1, nc
+         omgn = 2.0_SP*PI/wave_comp(kf, 1)
+         Tperiod = wave_comp(kf, 1)
+         amp = wave_comp(kf, 2)
+
+         if (h_gen == 0.0_SP .or. Tperiod == 0.0_SP) &
+            error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+
+         tb = omgn*omgn*h_gen/GRAV
+         tc = 1.0_SP + tb*alpha
+         wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                    /(2.0_SP*alpha1))/h_gen
+         c_phase = 1.0_SP/wkn/Tperiod*2.0_SP*PI
+         wave_length = c_phase*Tperiod
+
+         beta_gen(kf) = 80.0_SP/delta**2/wave_length**2
+         rl_gen = wkn
+         ri = sqrt(3.14159_SP/beta_gen(kf))*exp(-rl_gen**2/4.0_SP/beta_gen(kf))
+
+         D_gen(kf) = 2.0_SP*amp &
+                     *(omgn**2 - alpha1*GRAV*wkn**4*h_gen**3) &
+                     /(omgn*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
+      end do
+
+      ! shared width from the peak period (legacy tail block)
+      omgn = 2.0_SP*PI/peak_period
+      tb = omgn*omgn*h_gen/GRAV
+      tc = 1.0_SP + tb*alpha
+      wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb))/(2.0_SP*alpha1))/h_gen
+      c_phase = 1.0_SP/wkn/peak_period*2.0_SP*PI
+      wave_length = c_phase*peak_period
+      width = delta*wave_length/2.0_SP
+
+   end subroutine wk_time_series_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: per-component solve for a measured 2D spectrum (legacy
+   ! WK_WAVEMAKER_2D_SPECTRAL_DATA).  Directions convert through the
+   ! coarse legacy DEG2RAD; under periodic-y each (freq, dir) pair
+   ! snaps via the nearest-of-two-modes rule — identical arithmetic to
+   ! calc_periodic_theta, whose |theta| >= 90 error stop is
+   ! unreachable here (|dir| < 60 prefiltered).  rI keeps the
+   ! truncated 3.14159; beta is frequency-only (legacy stores it per
+   ! direction but consumes column 1 via sequence association).
+   ! ----------------------------------------------------------------
+   subroutine wk_data2d_coefficients(grid, periodic, env, nfreq, ndir, freq, &
+                                     dire_deg, amp, peak_period, h_gen, delta, &
+                                     D_gen, beta_gen, rlamda, width)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: GRAV, SMALL
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+      integer, intent(in) :: nfreq, ndir
+      real(SP), intent(in) :: freq(:), dire_deg(:), amp(:, :)
+      real(SP), intent(in) :: peak_period, h_gen, delta
+      real(SP), intent(out) :: D_gen(nfreq, ndir), beta_gen(nfreq)
+      real(SP), intent(out) :: rlamda(nfreq, ndir), width
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: dire(ndir), dir2d(nfreq, ndir)
+      real(SP) :: alpha1, omgn, Tperiod, amp_wk, tb, tc, wkn, wkn_snap
+      real(SP) :: c_phase, wave_length, rl_gen, ri, theta
+      integer :: nfre, kdir
+      character(96) :: msg
+
+      dire = dire_deg*DEG2RAD_LEGACY
+      alpha1 = alpha + 1.0_SP/3.0_SP
+
+      if (periodic) then
+         do nfre = 1, nfreq
+            ! legacy snap wavenumber chain (MAX(SMALL, h) guard)
+            omgn = 2.0_SP*PI*freq(nfre)
+            tb = omgn*omgn*h_gen/GRAV
+            tc = 1.0_SP + tb*alpha
+            wkn_snap = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                            /(2.0_SP*alpha1))/max(SMALL, h_gen)
+            do kdir = 1, ndir
+               if (dire(kdir) /= 0.0_SP) then
+                  call calc_periodic_theta(wkn_snap, dire(kdir), grid%dy0, &
+                                           grid%N, dir2d(nfre, kdir))
+                  write (msg, '(A,F8.3,A,F8.3,A,F8.3)') &
+                     "WK_DATA2D periodic, freq: ", freq(nfre), ", dir: ", &
+                     dire(kdir)*180.0_SP/PI, " -> ", &
+                     dir2d(nfre, kdir)*180.0_SP/PI
+                  call env%log%info(trim(msg))
+               else
+                  dir2d(nfre, kdir) = 0.0_SP
+               end if
+            end do
+         end do
+      else
+         do kdir = 1, ndir
+            do nfre = 1, nfreq
+               dir2d(nfre, kdir) = dire(kdir)
+            end do
+         end do
+      end if
+
+      do kdir = 1, ndir
+         do nfre = 1, nfreq
+            theta = dir2d(nfre, kdir)
+            omgn = 2.0_SP*PI*freq(nfre)
+            Tperiod = 1.0_SP/freq(nfre)
+            amp_wk = amp(nfre, kdir)
+
+            if (h_gen == 0.0_SP .or. Tperiod == 0.0_SP) &
+               error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+
+            tb = omgn*omgn*h_gen/GRAV
+            tc = 1.0_SP + tb*alpha
+            wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                       /(2.0_SP*alpha1))/h_gen
+            c_phase = 1.0_SP/wkn/Tperiod*2.0_SP*PI
+            wave_length = c_phase*Tperiod
+
+            rlamda(nfre, kdir) = wkn*sin(theta)
+            beta_gen(nfre) = 80.0_SP/delta**2/wave_length**2
+            rl_gen = wkn*cos(theta)
+            ri = sqrt(3.14159_SP/beta_gen(nfre)) &
+                 *exp(-rl_gen**2/4.0_SP/beta_gen(nfre))
+
+            D_gen(nfre, kdir) = 2.0_SP*amp_wk &
+                                *cos(theta)*(omgn**2 - alpha1*GRAV*wkn**4*h_gen**3) &
+                                /(omgn*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
+         end do
+      end do
+
+      ! width from the peak period (legacy tail block)
+      omgn = 2.0_SP*PI/peak_period
+      tb = omgn*omgn*h_gen/GRAV
+      tc = 1.0_SP + tb*alpha
+      wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb))/(2.0_SP*alpha1))/h_gen
+      c_phase = 1.0_SP/wkn/peak_period*2.0_SP*PI
+      wave_length = c_phase*peak_period
+      width = delta*wave_length/2.0_SP
+
+   end subroutine wk_data2d_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: per-component solve for a measured component list
+   ! (legacy WK_NEW_WAVEMAKER_2D_SPECTRAL_DATA, Salatin 2021).  One
+   ! direction per component; under periodic-y the angle snaps via the
+   ! decrement-retry rule (wk_new_periodic_snap).  rI keeps the
+   ! truncated 3.14159.
+   ! ----------------------------------------------------------------
+   subroutine wk_new_data2d_coefficients(grid, periodic, env, nfreq, freq, &
+                                         dire_deg, amp, peak_period, h_gen, &
+                                         delta, D_gen, beta_gen, rlamda, width)
+      use core_grid_mod, only: type_grid_2d
+      use core_constants_mod, only: GRAV, SMALL
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+      integer, intent(in) :: nfreq
+      real(SP), intent(in) :: freq(:), dire_deg(:), amp(:)
+      real(SP), intent(in) :: peak_period, h_gen, delta
+      real(SP), intent(out) :: D_gen(nfreq), beta_gen(nfreq)
+      real(SP), intent(out) :: rlamda(nfreq), width
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: dire(nfreq)
+      real(SP) :: alpha1, omgn, Tperiod, amp_wk, tb, tc, wkn, wkn_snap
+      real(SP) :: c_phase, wave_length, rl_gen, ri, snapped
+      integer :: nfre
+      character(96) :: msg
+
+      dire = dire_deg(1:nfreq)*DEG2RAD_LEGACY
+      alpha1 = alpha + 1.0_SP/3.0_SP
+
+      if (periodic) then
+         do nfre = 1, nfreq
+            omgn = 2.0_SP*PI*freq(nfre)
+            tb = omgn*omgn*h_gen/GRAV
+            tc = 1.0_SP + tb*alpha
+            wkn_snap = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                            /(2.0_SP*alpha1))/max(SMALL, h_gen)
+            call wk_new_periodic_snap(dire(nfre), wkn_snap, grid%dy0, &
+                                      grid%N, snapped)
+            write (msg, '(A,F8.3,A,F8.3,A,F8.3)') &
+               "WK_NEW_DATA2D periodic, freq: ", freq(nfre), ", dir: ", &
+               dire(nfre)*180.0_SP/PI, " -> ", snapped*180.0_SP/PI
+            call env%log%info(trim(msg))
+            dire(nfre) = snapped
+         end do
+      end if
+
+      do nfre = 1, nfreq
+         omgn = 2.0_SP*PI*freq(nfre)
+         Tperiod = 1.0_SP/freq(nfre)
+         amp_wk = amp(nfre)
+
+         if (h_gen == 0.0_SP .or. Tperiod == 0.0_SP) &
+            error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+
+         tb = omgn*omgn*h_gen/GRAV
+         tc = 1.0_SP + tb*alpha
+         wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb)) &
+                    /(2.0_SP*alpha1))/h_gen
+         c_phase = 1.0_SP/wkn/Tperiod*2.0_SP*PI
+         wave_length = c_phase*Tperiod
+
+         rlamda(nfre) = wkn*sin(dire(nfre))
+         beta_gen(nfre) = 80.0_SP/delta**2/wave_length**2
+         rl_gen = wkn*cos(dire(nfre))
+         ri = sqrt(3.14159_SP/beta_gen(nfre)) &
+              *exp(-rl_gen**2/4.0_SP/beta_gen(nfre))
+
+         D_gen(nfre) = 2.0_SP*amp_wk &
+                       *cos(dire(nfre))*(omgn**2 - alpha1*GRAV*wkn**4*h_gen**3) &
+                       /(omgn*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
+      end do
+
+      ! width from the peak period (legacy tail block)
+      omgn = 2.0_SP*PI/peak_period
+      tb = omgn*omgn*h_gen/GRAV
+      tc = 1.0_SP + tb*alpha
+      wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb))/(2.0_SP*alpha1))/h_gen
+      c_phase = 1.0_SP/wkn/peak_period*2.0_SP*PI
+      wave_length = c_phase*peak_period
+      width = delta*wave_length/2.0_SP
+
+   end subroutine wk_new_data2d_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: WK_NEW_IRR analytic-spectrum solve (legacy WK_NEW_EQUAL_
+   ! DFREQ_IRREGULAR_WAVE, Salatin 2021 — equal-dfreq only).  ONE
+   ! direction per frequency component, interleaved across the
+   ! +-pi/3 spread around ThetaPeak with the wrapped-normal weight
+   ! evaluated per component; the weights are calibrated so the
+   ! weighted bin energy reproduces the full spectral energy
+   !   $$ A_k \leftarrow A_k \frac{E}{\sum_k A_k E_k}, \qquad
+   !      H_{m0,k} = 4\sqrt{\alpha_s E_k A_k} $$
+   ! then the same Nwogu source solve per component (rI uses full pi
+   ! here — the truncated literal is the DATA2D/REG family only).
+   ! Legacy quirks kept: the phase speed uses the PEAK frequency
+   ! (wave_length = 2 pi / k evaluated through fm), the width uses the
+   ! LAST component's wave_length, and the coherence shuffle runs
+   ! before the spectral densities so moved components pick up the
+   ! host frequency's TMA density.  Legacy assigns phases only under
+   ! PERIODIC (uninitialized otherwise — UB); assigned unconditionally
+   ! here.  Legacy ntheta = 1 reads theta(2:)/AG(2:) uninitialized
+   ! (UB); here the peak angle and unit weight fill the whole array.
+   ! ----------------------------------------------------------------
+   subroutine wk_new_irr_coefficients(nfreq, ntheta, delta, h_gen, fm, fmax, &
+                                      fmin, gamma_spec, Hmo, theta_peak_deg, &
+                                      sigma_theta_deg, alpha_c_in, periodic, &
+                                      dy, nglob, env, freq, rlamda, beta_gen, &
+                                      D_gen, phi1, width, omgn)
+      use core_constants_mod, only: GRAV, SMALL
+      use core_build_config_mod, only: BUILD_ZERO_PHASE
+      integer, intent(in) :: nfreq, ntheta, nglob
+      real(SP), intent(in) :: delta, h_gen, fm, fmax, fmin, gamma_spec, Hmo
+      real(SP), intent(in) :: theta_peak_deg, sigma_theta_deg, alpha_c_in, dy
+      logical, intent(in) :: periodic
+      type(type_env), intent(inout) :: env
+      real(SP), intent(out) :: freq(nfreq), rlamda(nfreq), beta_gen(nfreq)
+      real(SP), intent(out) :: D_gen(nfreq), phi1(nfreq), width, omgn(nfreq)
+
+      real(SP), parameter :: alpha = -0.39_SP
+      real(SP) :: theta(nfreq), ag(nfreq), energy_bin(nfreq), hmo_each(nfreq)
+      real(SP) :: df, sigma_theta, ktheta_temp, sign_kf, alpha_c
+      real(SP) :: Ef, alpha_spec, correction_coeff, alpha1, ap, tb, tc, wkn
+      real(SP) :: c_phase, wave_length, rl_gen, ri, snapped
+      integer :: kf, k_n, n_spec, idx_theta, displace(1)
+      character(96) :: msg
+
+      if (h_gen == 0.0_SP .or. fm == 0.0_SP .or. fmax == 0.0_SP) &
+         error stop "wavemaker: re-set depth, FreqPeak, FreqMax for wavemaker"
+
+      df = (fmax - fmin)/(real(nfreq, SP) - 1.0_SP)
+      do kf = 1, nfreq
+         freq(kf) = fmin + real(kf - 1, SP)*df
+      end do
+
+      sigma_theta = sigma_theta_deg*PI/180.0_SP
+      idx_theta = 0
+
+      if (ntheta == 1) then
+         ! legacy fills theta(1)/AG(1) only and reads the rest
+         ! uninitialized — UB; the peak angle everywhere is the
+         ! sensible 1D limit
+         theta = theta_peak_deg*PI/180.0_SP
+         ag = 1.0_SP
+      else
+         ! N is computed here, not before the branch (legacy divides
+         ! 20/sigma ahead of its 1D branch — unobservable there)
+         n_spec = int(20.0_SP/sigma_theta)
+         displace = minloc(abs(freq - fm))
+         idx_theta = mod(displace(1), ntheta)
+         do kf = 1, nfreq
+            ktheta_temp = real(mod(kf - idx_theta, ntheta), SP)
+            if (ktheta_temp <= 0.0_SP) &
+               ktheta_temp = ktheta_temp + real(ntheta, SP)
+            if (mod(kf, 2) == 0) then
+               sign_kf = 1.0_SP
+            else
+               sign_kf = -1.0_SP
+            end if
+            theta(kf) = sign_kf*(-PI/2.0_SP &
+                                 + PI*real(floor(ktheta_temp/2.0_SP - 0.5_SP), SP) &
+                                 /(real(ntheta, SP) - 1.0_SP))
+            theta(kf) = theta(kf) + theta_peak_deg*PI/180.0_SP
+            if (theta(kf) > 0.5_SP*PI) theta(kf) = 0.5_SP*PI
+            if (theta(kf) < -0.5_SP*PI) theta(kf) = -0.5_SP*PI
+            ag(kf) = 1.0_SP/(2.0_SP*PI)
+            do k_n = 1, n_spec
+               ag(kf) = ag(kf) &
+                        + (1.0_SP/PI)*exp(-0.5_SP*(real(k_n, SP)*sigma_theta)**2) &
+                        *cos(real(k_n, SP)*(theta(kf) - theta_peak_deg*PI/180.0_SP))
+            end do
+         end do
+         ag = abs(ag)
+      end if
+
+      ! coherence shuffle: move components onto host frequencies until
+      ! alpha_c percent share a frequency (Salatin 2021)
+      alpha_c = alpha_c_in
+      if (alpha_c > 100.0_SP) alpha_c = 100.0_SP
+      if (alpha_c < 0.0_SP) alpha_c = 0.0_SP
+      if (alpha_c > 0.0_SP) &
+         call wave_coherence(alpha_c, freq, nfreq, ntheta, idx_theta, env)
+
+      ! TMA densities on the (possibly moved) frequencies
+      Ef = 0.0_SP
+      do kf = 1, nfreq
+         energy_bin(kf) = tma_density(.false., freq(kf), fm, h_gen, &
+                                      gamma_spec)*df
+         Ef = Ef + energy_bin(kf)
+      end do
+
+      alpha_spec = Hmo**2/16.0_SP/Ef
+      correction_coeff = Ef/dot_product(ag, energy_bin)
+      do kf = 1, nfreq
+         ag(kf) = ag(kf)*correction_coeff
+         hmo_each(kf) = 4.0_SP*sqrt((alpha_spec*energy_bin(kf)*ag(kf)))
+      end do
+
+      alpha1 = alpha + 1.0_SP/3.0_SP
+      wave_length = 0.0_SP
+
+      do kf = 1, nfreq
+         ap = hmo_each(kf)/sqrt(2.0_SP)/2.0_SP
+         omgn(kf) = 2.0_SP*PI*freq(kf)
+         tb = omgn(kf)*omgn(kf)*h_gen/GRAV
+         tc = 1.0_SP + tb*alpha
+         wkn = sqrt((tc - sqrt(tc*tc - 4.0_SP*alpha1*tb))/(2.0_SP*alpha1))/h_gen
+
+         if (wkn == 0.0_SP) then
+            wkn = SMALL
+            c_phase = sqrt(GRAV*h_gen)
+            wave_length = c_phase/fm
+         else
+            ! legacy evaluates the phase speed through the PEAK
+            ! frequency (fm cancels only in exact arithmetic)
+            c_phase = 1.0_SP/wkn*fm*2.0_SP*PI
+            wave_length = c_phase/fm
+         end if
+
+         if (periodic) then
+            call wk_new_periodic_snap(theta(kf), wkn, dy, nglob, snapped)
+            write (msg, '(A,F8.3,A,F8.3,A,F8.3)') &
+               "WK_NEW_IRR periodic, freq: ", freq(kf), ", dir: ", &
+               theta(kf)*180.0_SP/PI, " -> ", snapped*180.0_SP/PI
+            call env%log%info(trim(msg))
+            theta(kf) = snapped
+         end if
+
+         rlamda(kf) = wkn*sin(theta(kf))
+         beta_gen(kf) = 80.0_SP/delta**2/wave_length**2
+         rl_gen = wkn*cos(theta(kf))
+         ri = sqrt(PI/beta_gen(kf))*exp(-rl_gen**2/4.0_SP/beta_gen(kf))
+         D_gen(kf) = 2.0_SP*ap*cos(theta(kf)) &
+                     *(omgn(kf)**2 - alpha1*GRAV*wkn**4*h_gen**3) &
+                     /(omgn(kf)*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
+      end do
+
+      ! legacy width recomputes the peak wavenumber but still uses the
+      ! last component's wave_length — kept bug-for-bug
+      width = delta*wave_length/2.0_SP
+
+      if (BUILD_ZERO_PHASE) then
+         phi1 = 0.0_SP
+      else
+         call random_number(phi1)
+         phi1 = phi1*2.0_SP*PI
+      end if
+
+   end subroutine wk_new_irr_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: coherence shuffle (legacy WAVE_COHERENCE, Salatin 2021).
+   ! Host frequencies sit every ntheta-th component (anchored at the
+   ! peak-frequency index, last component always a host); randomly
+   ! drawn non-host components move UP to the nearest host frequency
+   ! until alpha_c percent of components share a frequency.  Legacy
+   ! draws with C rand() at its default seed (deterministic per libc,
+   ! rank-consistent, even under ZERO_PHASE) — reproduced with a
+   ! fixed-seed RANDOM_SEED so runs stay bitwise reproducible and
+   ! rank-consistent; the legacy draw sequence itself is
+   ! compiler-specific, so alpha_c > 0 has no legacy parity.
+   ! ----------------------------------------------------------------
+   subroutine wave_coherence(alpha_c, freq, nfreq, ntheta, idx_theta, env)
+      real(SP), intent(in) :: alpha_c
+      integer, intent(in) :: nfreq, ntheta, idx_theta
+      real(SP), intent(inout) :: freq(nfreq)
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: freq_temp(nfreq), host_freqs(nfreq)
+      real(SP) :: pool(nfreq), r, cand, host_freq
+      integer :: repetitions(nfreq), host_idx(nfreq)
+      integer, allocatable :: seed(:)
+      integer :: num_coherent, num_coherent_temp, nhost, npool
+      integer :: kf, jj, cand_idx, hi, host_whole, seed_n
+
+      call random_seed(size=seed_n)
+      allocate (seed(seed_n), source=66)
+      call random_seed(put=seed)
+
+      repetitions = 1
+      num_coherent = int(alpha_c/100.0_SP*real(nfreq, SP))
+
+      ! host indices: every ntheta-th component from the peak anchor;
+      ! the last component is always a host (legacy append)
+      nhost = 0
+      kf = idx_theta
+      if (idx_theta == 0) kf = idx_theta + ntheta
+      do while (kf <= nfreq)
+         nhost = nhost + 1
+         host_idx(nhost) = kf
+         kf = kf + ntheta
+      end do
+      if (host_idx(nhost) /= nfreq) then
+         nhost = nhost + 1
+         host_idx(nhost) = nfreq
+      end if
+      host_freqs(1:nhost) = freq(host_idx(1:nhost))
+
+      ! candidate pool = all non-host components
+      npool = 0
+      jj = 1
+      do kf = 1, nfreq
+         if (jj <= nhost .and. kf == host_idx(min(jj, nhost))) then
+            jj = jj + 1
+         else
+            npool = npool + 1
+            pool(npool) = freq(kf)
+         end if
+      end do
+
+      freq_temp = freq
+      num_coherent_temp = 0
+      do while (num_coherent_temp < num_coherent)
+         if (npool == 0) then
+            call env%log%warning("wave_coherence: candidate pool exhausted "// &
+                                 "before reaching alpha_c")
+            exit
+         end if
+         call random_number(r)
+         cand_idx = max(1, ceiling(r*real(npool, SP)))
+         cand = pool(cand_idx)
+         ! remove the drawn component from the pool
+         pool(cand_idx:npool - 1) = pool(cand_idx + 1:npool)
+         npool = npool - 1
+         ! nearest host frequency ABOVE the candidate
+         hi = 0
+         do jj = 1, nhost
+            if (host_freqs(jj) - cand > 0.0_SP) then
+               if (hi == 0) then
+                  hi = jj
+               else if (host_freqs(jj) - cand < host_freqs(hi) - cand) then
+                  hi = jj
+               end if
+            end if
+         end do
+         if (hi == 0) cycle   ! nothing above (legacy would index 0 — UB)
+         host_freq = host_freqs(hi)
+         host_whole = host_idx(hi)
+         do kf = 1, nfreq
+            if (freq_temp(kf) == cand) freq_temp(kf) = host_freq
+         end do
+         repetitions(host_whole) = repetitions(host_whole) + 1
+         do kf = 1, nfreq
+            if (freq_temp(kf) == host_freq) &
+               repetitions(kf) = repetitions(host_whole)
+         end do
+         num_coherent_temp = count(repetitions > 1)
+      end do
+      freq = freq_temp
+
+   end subroutine wave_coherence
+
+   ! ----------------------------------------------------------------
+   ! Private: periodic wave-angle snap for the WK_NEW family (legacy
+   ! goto-1000 blocks — a FOURTH snap variant).  Walks along-crest
+   ! modes up past the requested angle then snaps DOWN one mode; when
+   ! no mode fits below the wavenumber the ANGLE is decremented toward
+   ! zero by 0.001 rad and the walk restarts (no pi/2 cap, no error
+   ! stop); zero passes through.
+   ! ----------------------------------------------------------------
+   subroutine wk_new_periodic_snap(theta_in, wkn, dy, nglob, theta_out)
+      real(SP), intent(in) :: theta_in, wkn, dy
+      integer, intent(in) :: nglob
+      real(SP), intent(out) :: theta_out
+
+      real(SP) :: theta_temp, walked, rlamda_m
+      integer :: m
+
+      theta_temp = theta_in
+      retry: do
+         if (theta_temp > 0.0_SP) then
+            walked = 0.0_SP
+            m = 0
+            do while (walked < theta_temp)
+               m = m + 1
+               rlamda_m = real(m, SP)*2.0_SP*PI/dy/(real(nglob, SP) - 1.0_SP)
+               if (rlamda_m >= wkn) then
+                  theta_temp = theta_temp - 0.001_SP
+                  if (theta_temp <= 0.0_SP) then
+                     theta_out = 0.0_SP
+                     return
+                  end if
+                  cycle retry
+               end if
+               walked = asin(rlamda_m/wkn)
+            end do
+            if (rlamda_m < wkn) &
+               walked = asin(real(m - 1, SP)*2.0_SP*PI/dy &
+                             /(real(nglob, SP) - 1.0_SP)/wkn)
+            theta_out = walked
+            return
+         else if (theta_temp < 0.0_SP) then
+            walked = 0.0_SP
+            m = 0
+            do while (walked > theta_temp)
+               m = m + 1
+               rlamda_m = real(m, SP)*2.0_SP*PI/dy/(real(nglob, SP) - 1.0_SP)
+               if (rlamda_m >= wkn) then
+                  theta_temp = theta_temp + 0.001_SP
+                  if (theta_temp >= 0.0_SP) then
+                     theta_out = 0.0_SP
+                     return
+                  end if
+                  cycle retry
+               end if
+               walked = -asin(rlamda_m/wkn)
+            end do
+            if (rlamda_m < wkn) &
+               walked = -asin(real(m - 1, SP)*2.0_SP*PI/dy &
+                              /(real(nglob, SP) - 1.0_SP)/wkn)
+            theta_out = walked
+            return
+         else
+            theta_out = theta_temp
+            return
+         end if
+      end do retry
+
+   end subroutine wk_new_periodic_snap
+
+   ! ----------------------------------------------------------------
+   ! Private: dense modes for the WK_NEW family (legacy CALCULATE_NEW_
+   ! Cm_Sm).  Components sharing an (adjacent) frequency accumulate
+   ! into the FIRST slot of the run; duplicate slots stay zero and
+   ! contribute exact zeros to the stage sum, so update_source keeps
+   ! its full-kf loop (legacy iterates loop_index — numerically
+   ! identical).  Non-adjacent duplicates are NOT merged (legacy
+   ! compares neighbors only).
+   ! ----------------------------------------------------------------
+   subroutine calc_new_cm_sm(this, env, freq, D_gen, phase, rlamda, beta_gen)
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_env), intent(inout) :: env
+      real(SP), intent(in) :: freq(:), D_gen(:), phase(:), rlamda(:), beta_gen(:)
+
+      integer :: target_kf(this%Nfreq)
+      integer :: i, j, kf, kt, ndistinct
+      character(64) :: msg
+
+      target_kf(1) = 1
+      ndistinct = 1
+      do kf = 2, this%Nfreq
+         if (freq(kf) /= freq(kf - 1)) then
+            ndistinct = ndistinct + 1
+            target_kf(kf) = kf
+         else
+            target_kf(kf) = target_kf(kf - 1)
+         end if
+      end do
+      write (msg, '(A,I0)') "number of distinct freqs: ", ndistinct
+      call env%log%info(trim(msg))
+
+      this%Cm = 0.0_SP
+      this%Sm = 0.0_SP
+      do kf = 1, this%Nfreq
+         kt = target_kf(kf)
+         do j = 1, size(this%Cm, 2)
+            do i = 1, size(this%Cm, 1)
+               this%Cm(i, j, kt) = this%Cm(i, j, kt) + D_gen(kf) &
+                                   *exp(-beta_gen(kf)*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                                   *cos(rlamda(kf)*this%ymk_wk(j) + phase(kf))
+               this%Sm(i, j, kt) = this%Sm(i, j, kt) + D_gen(kf) &
+                                   *exp(-beta_gen(kf)*(this%xmk_wk(i) - this%Xc_WK)**2) &
+                                   *sin(rlamda(kf)*this%ymk_wk(j) + phase(kf))
+            end do
+         end do
+      end do
+
+   end subroutine calc_new_cm_sm
 
    ! ----------------------------------------------------------------
    ! Private: uniform frequency bins (legacy WK_EQUAL_DFREQ_IRREGULAR_
