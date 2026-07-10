@@ -38,7 +38,6 @@ module model_main_mod
    use model_coupling_mod, only: type_model_coupling
 
    use model_fields_2d_mod, only: type_fields_2d
-   use model_kernel_masks_mod, only: update_mask9
    use model_stepper_2d_mod, only: type_model_stepper_2d
 
    implicit none
@@ -200,9 +199,32 @@ contains
       end do
       f%mask = f%mask*f%mask_struc
 
-      call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
-                        this%numerics%MinDepthFrc, this%physics%SWE_ETA_DEP, &
-                        this%physics%viscosity_breaking)
+      ! initial MASK9 is the pure 3x3 product on the INTERIOR only
+      ! (legacy init.F): neither the viscosity_breaking all-1 override
+      ! nor the SWE_ETA_DEP zeroing of the in-loop update applies at
+      ! t = 0, and every ghost — including the ring the stage-1 face
+      ! reconstruction reads — is ZERO (legacy allocates zeroed and
+      ! PHI_INT_EXCH fills MPI seams only, never walls).  Anything
+      ! else kicks the stage-1 fluxes and seeds a persistent swash
+      ! divergence (parity ledger 8c).
+      f%mask9 = 0
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            f%mask9(i, j) = f%mask(i, j)*f%mask(i - 1, j)*f%mask(i + 1, j) &
+                            *f%mask(i + 1, j + 1)*f%mask(i, j + 1)*f%mask(i - 1, j + 1) &
+                            *f%mask(i + 1, j - 1)*f%mask(i, j - 1)*f%mask(i - 1, j - 1)
+         end do
+      end do
+      ! MPI-seam ghosts (real-copy ride on the halo exchange); NOTE:
+      ! under periodic-y this also wraps, where legacy PHI_INT_EXCH
+      ! leaves 1-rank y-ghosts zeroed — revisit if a periodic case
+      ! shows a step-1 ring deviation
+      block
+         real(SP), allocatable :: rmask(:, :)
+         allocate (rmask, source=real(f%mask9, SP))
+         call this%grid%halo_exchange(rmask)
+         f%mask9 = nint(rmask)
+      end block
 
       f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
       f%p = f%h*f%u
