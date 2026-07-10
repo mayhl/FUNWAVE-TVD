@@ -6,8 +6,18 @@ module model_kernel_etauv_mod
    private
 
    public :: type_etauv_workspace, update_h
+   public :: cal_rk_update
    public :: cal_etauv_assemble_x, cal_etauv_assemble_y
    public :: cal_uv_no_dispersion, cal_etauv_update
+   public :: RK_ALPHA, RK_BETA
+
+   ! SSP-RK3 stage coefficients (legacy mod_global.F alpha/beta):
+   !   $$ \phi^{(k)} = \alpha_k \phi^n + \beta_k\left(\phi^{(k-1)}
+   !      + \Delta t\, R^{(k-1)}\right) $$
+   real(SP), parameter :: RK_ALPHA(3) = &
+                          [0.0_SP, 3.0_SP/4.0_SP, 1.0_SP/3.0_SP]
+   real(SP), parameter :: RK_BETA(3) = &
+                          [1.0_SP, 1.0_SP/4.0_SP, 2.0_SP/3.0_SP]
 
    ! ----------------------------------------------------------------
    ! Dispersive U/V update — pure assemble/update kernels around the
@@ -75,6 +85,60 @@ contains
          end do
       end do
    end subroutine update_h
+
+   ! ----------------------------------------------------------------
+   ! cal_rk_update — one SSP-RK3 stage combination for the conserved
+   ! state (first half of legacy ESTIMATE_HUV, old/etauv_solver.F).
+   ! Flux divergence plus sources form the stage residual:
+   !   $$ R_1 = -\nabla\cdot(P, Q) + S_{wm}, \quad
+   !      R_2 = -\nabla\cdot(F_x, F_y) + S_x, \quad
+   !      R_3 = -\nabla\cdot(G_x, G_y) + S_y $$
+   !   $$ \eta \leftarrow \alpha\,\eta^n + \beta(\eta + \Delta t R_1),
+   !      \quad \bar U \leftarrow \alpha\,\bar U^n
+   !      + \beta(\bar U + \Delta t R_2), \quad
+   !      \bar V \leftarrow \alpha\,\bar V^n + \beta(\bar V + \Delta t R_3) $$
+   ! pflx/qflx/fx/fy/gx/gy are the interface fluxes from
+   ! type_flux_workspace, face-aligned with cell index i (face i =
+   ! low side of cell i).  wavemaker_mass is the WK_* mass source
+   ! (zero array when no wavemaker).  Legacy ETA_LIMITER (default
+   ! off) is not ported.
+   ! ----------------------------------------------------------------
+   pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
+                                 pflx, qflx, fx, fy, gx, gy, &
+                                 src_x, src_y, wavemaker_mass, &
+                                 eta0, ubar0, vbar0, eta, ubar, vbar)
+      type(type_loop_bounds), intent(in) :: lp
+      real(SP), intent(in) :: alpha, beta, dt
+      real(SP), intent(in) :: inv_dx(:, :), inv_dy(:, :)
+      real(SP), intent(in) :: pflx(:, :), qflx(:, :)
+      real(SP), intent(in) :: fx(:, :), fy(:, :), gx(:, :), gy(:, :)
+      real(SP), intent(in) :: src_x(:, :), src_y(:, :), wavemaker_mass(:, :)
+      real(SP), intent(in) :: eta0(:, :), ubar0(:, :), vbar0(:, :)
+      real(SP), intent(inout) :: eta(:, :), ubar(:, :), vbar(:, :)
+
+      real(SP) :: r1, r2, r3
+      integer :: i, j
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            r1 = -(pflx(i + 1, j) - pflx(i, j))*inv_dx(i, j) &
+                 - (qflx(i, j + 1) - qflx(i, j))*inv_dy(i, j) &
+                 + wavemaker_mass(i, j)
+            eta(i, j) = alpha*eta0(i, j) + beta*(eta(i, j) + dt*r1)
+
+            r2 = -(fx(i + 1, j) - fx(i, j))*inv_dx(i, j) &
+                 - (fy(i, j + 1) - fy(i, j))*inv_dy(i, j) &
+                 + src_x(i, j)
+            ubar(i, j) = alpha*ubar0(i, j) + beta*(ubar(i, j) + dt*r2)
+
+            r3 = -(gx(i + 1, j) - gx(i, j))*inv_dx(i, j) &
+                 - (gy(i, j + 1) - gy(i, j))*inv_dy(i, j) &
+                 + src_y(i, j)
+            vbar(i, j) = alpha*vbar0(i, j) + beta*(vbar(i, j) + dt*r3)
+         end do
+      end do
+
+   end subroutine cal_rk_update
 
    ! ----------------------------------------------------------------
    ! cal_etauv_assemble_x — x-sweep coefficients for U (Gamma1 only).
