@@ -16,9 +16,9 @@
 !
 !  Not yet ported (deferred, with their features):
 !    - MIXING_STUFF time-averaged statistics (post_step TODO)
-!    - radiation-stress diagnostics P_center/Q_center/U_davg/V_davg
+!    - radiation-stress diagnostics U_davg/V_davg (means port covers
+!      the compared P_center/Q_center sums only)
 !    - Wsurf surface vertical velocity (foam / 3D coupling)
-!    - VORmax envelope (legacy updates it inside dispersion.F)
 !    - tidal BC, sediment, foam, meteo, vessel, tracker hooks
 !
 !  Memory: all workspaces and per-step arrays are allocated once in
@@ -576,7 +576,7 @@ contains
    ! ----------------------------------------------------------------
    ! Private: legacy MAX_MIN_PROPERTY (old/misc.F) — envelope fields
    ! over the whole (ghost-inclusive) array, wet cells only.  VORmax
-   ! is not ported: legacy updates it inside dispersion.F (Cartesian).
+   ! lives in cal_dispersion_assemble (legacy dispersion.F, Cartesian).
    ! ----------------------------------------------------------------
    subroutine update_max_min(this, time)
       class(type_model_stepper_2d), intent(inout) :: this
@@ -654,7 +654,9 @@ contains
                                       this%etat, this%etax, this%etay, &
                                       this%u4, this%v4, this%u1p, this%v1p, &
                                       this%u1pp, this%v1pp, this%u2, this%v2, &
-                                      this%u3, this%v3)
+                                      this%u3, this%v3, &
+                                      out_vormax=this%output%OUT_VORmax, &
+                                      vort_max=f%vort_max)
       end associate
 
    end subroutine run_dispersion

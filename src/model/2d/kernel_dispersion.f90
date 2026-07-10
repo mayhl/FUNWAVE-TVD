@@ -240,7 +240,7 @@ contains
                                       inv_dx, inv_dy, beta1, beta2, gamma2, &
                                       etat, etax, etay, &
                                       u4, v4, u1p, v1p, u1pp, v1pp, &
-                                      u2, v2, u3, v3)
+                                      u2, v2, u3, v3, out_vormax, vort_max)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_disp_workspace), intent(in) :: ws
       real(SP), intent(in)    :: eta(:, :), depth(:, :)
@@ -252,8 +252,13 @@ contains
       real(SP), intent(out)   :: u4(:, :), v4(:, :), u1p(:, :), v1p(:, :)
       real(SP), intent(inout) :: u1pp(:, :), v1pp(:, :)
       real(SP), intent(inout) :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
+      ! VORmax envelope (legacy updates it here, per stage): signed
+      ! store under an |omega| test, exactly as dispersion.F
+      logical, intent(in), optional :: out_vormax
+      real(SP), intent(inout), optional :: vort_max(:, :)
 
       integer  :: i, j
+      logical  :: do_vormax
       real(SP) :: rh, rhx, rhy, reta
       real(SP) :: uxxvxy, uxyvyy, huxxhvxy, huxyhvyy
       real(SP) :: uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y
@@ -261,6 +266,9 @@ contains
       real(SP) :: ken1, ken2, ken3, ken4, ken5
       real(SP) :: omega_0, omega_1
       real(SP) :: coeff_a, coeff_b, coeff_1p
+
+      do_vormax = .false.
+      if (present(out_vormax)) do_vormax = out_vormax .and. present(vort_max)
 
       ! ---- linear dispersion: u4/v4, u1p/v1p -------------------------
       coeff_a = 1.0_SP/3.0_SP - beta1 + 0.5_SP*beta1*beta1
@@ -392,6 +400,11 @@ contains
                       *(huxyhvyy + ((beta1 - 1.0_SP)*rh + beta1*reta)*beta2*uxyvyy) &
                       - ((beta1 - 1.0_SP)*rhy + beta1*etay(i, j))*beta2 &
                       *(huxxhvxy + ((beta1 - 1.0_SP)*rh + beta1*reta)*beta2*uxxvxy)
+
+            if (do_vormax) then
+               if (abs(omega_0 + omega_1) > vort_max(i, j)) &
+                  vort_max(i, j) = omega_0 + omega_1
+            end if
 
             ken1 = (beta1 - 0.5_SP)*(reta + rh)*beta2
             ken2 = (1.0_SP/3.0_SP - beta1 + 0.5_SP*beta1*beta1)*rh*rh*beta2*beta2 &
