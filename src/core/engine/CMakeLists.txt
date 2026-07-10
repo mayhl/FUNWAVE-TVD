@@ -1,8 +1,7 @@
 # libcore_engine: Engine — time control, stepper
 add_library(
   libcore_engine STATIC
-  # stepper_engine.f90
-  time.f90 time_utils.f90)
+  time.f90 time_utils.f90 stepper_engine.f90)
 
 set_target_properties(
   libcore_engine PROPERTIES Fortran_MODULE_DIRECTORY
