@@ -5,7 +5,7 @@ module model_kernel_breaker_mod
    implicit none
    private
 
-   public :: wave_breaking
+   public :: wave_breaking, viscosity_wmaker
    public :: VIS_SCHEME_DEFAULT, VIS_SCHEME_KENNEDY, VIS_SCHEME_KENNEDY_ORIG
    public :: VIS_SCHEME_STATIC_TRANS, VIS_SCHEME_DEPTH_RATIO
 
@@ -198,5 +198,40 @@ contains
       end do
 
    end subroutine wave_breaking
+
+   ! ----------------------------------------------------------------
+   ! Wavemaker-zone eddy viscosity without the breaking-age scheme
+   ! (legacy VISCOSITY_WMAKER, ykchoi 2015; runs when WAVEMAKER_VIS
+   ! replaces viscosity breaking).  Interior cells only — legacy loops
+   ! Nghost+1..M-Nghost, one ring tighter than wave_breaking — and
+   ! nu_break outside the wavemaker box is never written (stays at its
+   ! initial zero, not nu_bkg).
+   ! ----------------------------------------------------------------
+   subroutine viscosity_wmaker(lp, etat, eta, depth, h, visbrk, wm_visbrk, &
+                               nu_bkg, min_depth_frc, in_wm_zone, nu_break)
+      type(type_loop_bounds), intent(in) :: lp
+      real(SP), intent(in) :: etat(:, :), eta(:, :), depth(:, :), h(:, :)
+      real(SP), intent(in) :: visbrk, wm_visbrk, nu_bkg, min_depth_frc
+      logical, intent(in) :: in_wm_zone(:, :)
+      real(SP), intent(inout) :: nu_break(:, :)
+
+      integer :: i, j
+      real(SP) :: c_shallow, cap1
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            if (.not. in_wm_zone(i, j)) cycle
+
+            c_shallow = sqrt(GRAV*max(min_depth_frc, h(i, j)))
+            if (etat(i, j) > min(visbrk*c_shallow, wm_visbrk*c_shallow)) then
+               cap1 = max(depth(i, j), min_depth_frc) + eta(i, j)
+               nu_break(i, j) = cap1*wm_visbrk*c_shallow + nu_bkg
+            else
+               nu_break(i, j) = nu_bkg
+            end if
+         end do
+      end do
+
+   end subroutine viscosity_wmaker
 
 end module model_kernel_breaker_mod
