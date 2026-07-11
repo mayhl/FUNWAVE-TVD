@@ -58,6 +58,7 @@ def suite(
     no_build: bool = typer.Option(False, "--no-build", help="Skip image build, run existing images"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Force fresh build, ignoring Docker layer cache"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Stream full build/test output"),
+    clean: bool = typer.Option(False, "--clean", help="Remove persistent build volumes first (full recompile)"),
 ):
     """Build and test across compiler environments (mirrors CI workflow).
 
@@ -71,6 +72,7 @@ def suite(
         no_build=no_build,
         no_cache=no_cache,
         verbose=verbose,
+        clean=clean,
     )
     any_failed = any(r.build_status == "failed" or r.test_status == "failed" for r in results)
     raise typer.Exit(1 if any_failed else 0)

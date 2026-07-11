@@ -120,12 +120,35 @@ def _ccache_mount(name: str) -> list[str]:
     return ["-v", f"{cache_dir}:/ccache"]
 
 
+def _build_volume_name(name: str, build_type: str) -> str:
+    return f"funwave-build-{name}-{build_type.lower()}"
+
+
+def _build_volume_mount(name: str, build_type: str) -> list[str]:
+    """Return docker run args to persist /workspace/build across runs.
+
+    Named volume (not a bind mount) — macOS bind-mount I/O would erase the
+    incremental-build win.  ccache can't cache Fortran, so make's timestamp
+    check against the previous run's objects is what skips recompiles.
+    """
+    return ["-v", f"{_build_volume_name(name, build_type)}:/workspace/build"]
+
+
+def _clean_build_volumes(names: list[str], build_types: list[str]) -> None:
+    for name, bt in product(names, build_types):
+        vol = _build_volume_name(name, bt)
+        rc = subprocess.run(["docker", "volume", "rm", vol],
+                            capture_output=True).returncode
+        if rc == 0:
+            _log("INFO", vol, "build volume removed")
+
+
 def _run_compile_and_test(tag: str, name: str, build_type: str, verbose: bool,
                           prog: Progress | None = None,
                           task_id: int | None = None) -> tuple[int, str, int, str, float, float]:
     """Single docker run — cmake build then ctest, both phases in one container."""
     cmd = ["docker", "run", "--rm", "-e", f"BUILD_TYPE={build_type}",
-           *_ccache_mount(name), tag]
+           *_ccache_mount(name), *_build_volume_mount(name, build_type), tag]
     proc = _popen(cmd)
     assert proc.stdout is not None
 
@@ -304,12 +327,15 @@ def run(
     no_build: bool = False,
     no_cache: bool = False,
     verbose: bool = False,
+    clean: bool = False,
 ) -> list[ImageResult]:
     names = discover(filter_names)
     build_types = build_types or DEFAULT_BUILD_TYPES
     if not names:
         _console.print("[yellow]No Dockerfiles found matching filter.[/yellow]")
         return []
+    if clean:
+        _clean_build_volumes(names, build_types)
 
     _console.rule("[bold cyan]Docker Testing Suite[/bold cyan]")
     results = [ImageResult(name=n, build_type=bt) for n, bt in product(names, build_types)]
