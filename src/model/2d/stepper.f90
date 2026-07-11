@@ -48,6 +48,7 @@ module model_stepper_2d_mod
    use model_output_mod, only: type_model_output
    use model_wavemaker_mod, only: type_model_wavemaker
    use model_sponge_mod, only: type_model_sponge
+   use model_obstacle_mod, only: type_model_obstacle
    use model_means_mod, only: type_model_means
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
@@ -88,6 +89,7 @@ module model_stepper_2d_mod
       type(type_model_output), pointer :: output => null()
       type(type_model_wavemaker), pointer :: wavemaker => null()
       type(type_model_sponge), pointer :: sponge => null()
+      type(type_model_obstacle), pointer :: obstacle => null()
       type(type_model_means), pointer :: means => null()
 
       type(type_model_bc) :: bc
@@ -173,7 +175,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker, sponge, means)
+                           wavemaker, sponge, obstacle, means)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -192,6 +194,8 @@ contains
       ! likewise sponge%init_compute (direct-sponge coeff)
       type(type_model_wavemaker), intent(inout), target :: wavemaker
       type(type_model_sponge), intent(inout), target :: sponge
+      ! obstacle%init_compute must have run (breakwater drag map)
+      type(type_model_obstacle), intent(inout), target :: obstacle
       ! means%init_compute must have run (the breaker reads etamean)
       type(type_model_means), intent(inout), target :: means
 
@@ -208,6 +212,7 @@ contains
       this%output => output
       this%wavemaker => wavemaker
       this%sponge => sponge
+      this%obstacle => obstacle
       this%means => means
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
@@ -423,9 +428,10 @@ contains
          end if
 
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
-                          phy%coriolis_on, &
+                          phy%coriolis_on, this%obstacle%breakwater, &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
-                          this%depth_fx, this%depth_fy, f%eta, f%h, f%u, f%v, &
+                          f%depth, this%depth_fx, this%depth_fy, &
+                          f%eta, f%h, f%u, f%v, &
                           this%fws%p, this%fws%q, f%hu, f%hv, &
                           this%u4, this%v4, this%u1p, this%v1p, &
                           this%u1pp, this%v1pp, this%u2, this%v2, &
@@ -433,7 +439,7 @@ contains
                           wm_mass(this), &
                           this%friction%Cd, &
                           merge_nu_vis(this), &
-                          cor_f(this), &
+                          cor_f(this), bw_cd(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
 
          call cal_rk_update(lp, RK_ALPHA(istage), RK_BETA(istage), dt, &
@@ -705,6 +711,19 @@ contains
       end if
    end function cor_f
 
+   ! Breakwater drag for the momentum source: the obstacle's map when
+   ! computed, zeros otherwise (the kernel also gates on breakwater_on)
+   function bw_cd(this) result(c)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: c(:, :)
+
+      if (allocated(this%obstacle%cd_breakwater)) then
+         c => this%obstacle%cd_breakwater
+      else
+         c => this%zeros
+      end if
+   end function bw_cd
+
    ! Effective eddy viscosity for the momentum source (legacy nu_vis
    ! assembly at the SourceTerms head): nu_break under viscosity
    ! breaking or wavemaker viscosity, plus nu_sponge under the
@@ -765,6 +784,7 @@ contains
       this%output => null()
       this%wavemaker => null()
       this%sponge => null()
+      this%obstacle => null()
       this%means => null()
 
    end subroutine stepper_free

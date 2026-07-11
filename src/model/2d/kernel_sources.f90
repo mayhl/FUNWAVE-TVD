@@ -41,26 +41,32 @@ contains
    !           S_y \mathrel{-}= f\,\tfrac12(p_{i,j} + p_{i+1,j}) $$
    !      exact legacy spherical-branch face-average form (sources.F);
    !      gated, not zero-added — legacy Cartesian has no such term.
+   !
+   !   7. Breakwater friction (breakwater_on):
+   !        $$ S \mathrel{-}= c_{d,bw}\,u\,|UV|\,d $$
+   !      legacy multiplies by the STILL-WATER depth d, not H ("we used
+   !      flux, so need multiply D"); added last, matching the legacy
+   !      += order after every other term.
    ! ----------------------------------------------------------------
    subroutine cal_sources(lp, gamma1, gamma2, dispersion, coriolis_on, &
-                          mask, mask9, inv_dx, inv_dy, &
-                          depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
+                          breakwater_on, mask, mask9, inv_dx, inv_dy, &
+                          depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, coriolis, &
-                          min_depth_frc, src_x, src_y)
+                          cd_breakwater, min_depth_frc, src_x, src_y)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: gamma1, gamma2
-      logical, intent(in)  :: dispersion, coriolis_on
+      logical, intent(in)  :: dispersion, coriolis_on, breakwater_on
       integer, intent(in)  :: mask(:, :), mask9(:, :)
       real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
-      real(SP), intent(in)  :: depth_x(:, :), depth_y(:, :)
+      real(SP), intent(in)  :: depth(:, :), depth_x(:, :), depth_y(:, :)
       real(SP), intent(in)  :: eta(:, :), h(:, :), u(:, :), v(:, :)
       real(SP), intent(in)  :: p(:, :), q(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :), u1p(:, :), v1p(:, :)
       real(SP), intent(in)  :: u1pp(:, :), v1pp(:, :)
       real(SP), intent(in)  :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
       real(SP), intent(in)  :: wavemaker_mass(:, :), cd(:, :), nu_vis(:, :)
-      real(SP), intent(in)  :: coriolis(:, :)
+      real(SP), intent(in)  :: coriolis(:, :), cd_breakwater(:, :)
       real(SP), intent(in)  :: min_depth_frc
       real(SP), intent(out) :: src_x(:, :), src_y(:, :)
 
@@ -123,6 +129,14 @@ contains
                              heff*(u(i, j)*v4x + v(i, j)*v4y + u4(i, j)*vx + v4(i, j)*vy &
                                    - gamma2*mask9(i, j)*(v1pp(i, j) + v2(i, j) + v3(i, j))) &
                              + div_pq*(v4(i, j) - v1p(i, j)))
+            end if
+
+            ! breakwater friction on the still-water depth
+            if (breakwater_on) then
+               src_x(i, j) = src_x(i, j) &
+                             - cd_breakwater(i, j)*u(i, j)*spd*depth(i, j)
+               src_y(i, j) = src_y(i, j) &
+                             - cd_breakwater(i, j)*v(i, j)*spd*depth(i, j)
             end if
 
          end do

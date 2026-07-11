@@ -13,7 +13,7 @@
 
 module model_main_mod
 
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, LARGE
    use core_env_mod, only: type_env, new_env
    use core_comm_mod, only: type_comm
    use core_grid_mod, only: type_grid_2d
@@ -227,6 +227,21 @@ contains
             end do
          end do
       end if
+
+      ! H and the conserved fluxes BEFORE the structure mask lands
+      ! (legacy init.F "get Eta and H" precedes the obstacle block, so
+      ! H at structure cells is built from the pre-obstacle depth and
+      ! never refreshed at init)
+      f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
+      f%p = f%h*f%u
+      f%q = f%h*f%v
+
+      ! permanent structures (legacy init.F obstacle block): mask from
+      ! file, depth -> -LARGE at structure cells; the staggered faces
+      ! are NOT rebuilt (legacy leaves DepthX/DepthY pre-obstacle)
+      if (this%obstacle%obstacle) call load_obstacle(this)
+      where (f%mask_struc == 0) f%depth = -LARGE
+
       f%mask = f%mask*f%mask_struc
 
       ! initial MASK9 is the pure 3x3 product on the INTERIOR only
@@ -255,10 +270,6 @@ contains
          call this%grid%halo_exchange(rmask)
          f%mask9 = nint(rmask)
       end block
-
-      f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
-      f%p = f%h*f%u
-      f%q = f%h*f%v
       end associate
 
       call this%fields%register(this%registry)
@@ -341,6 +352,29 @@ contains
       end associate
       if (this%env%comm%is_io_node()) call write_field_file(fname, glob, fmt)
    end subroutine gather_write
+
+   ! ----------------------------------------------------------------
+   ! Obstacle structures (legacy init.F): permanent mask from file,
+   ! INT-truncated like legacy MASK_STRUC = INT(VarGlob).  Ghosts follow
+   ! the PARALLEL legacy GetFile (seam exchange + wall replication);
+   ! NOTE: serial legacy reads the interior only and leaves wall ghosts
+   ! at 1 — a structure touching the boundary diverges between the two
+   ! legacy builds, and we reproduce the parallel one (punch-listed).
+   ! ----------------------------------------------------------------
+   subroutine load_obstacle(this)
+      class(type_model_main), intent(inout) :: this
+
+      real(SP), allocatable :: rstruc(:, :)
+
+      associate (g => this%grid)
+         allocate (rstruc(g%lp%mloc, g%lp%nloc), source=1.0_SP)
+         call read_field_ascii(this%env, this%obstacle%obstacle_file%root, &
+                               g, rstruc)
+         call ghost_fill_replicate(this, rstruc)
+         this%fields%mask_struc = int(rstruc)
+      end associate
+
+   end subroutine load_obstacle
 
    ! ----------------------------------------------------------------
    ! Hot start (legacy INITIAL_UVZ): load eta (+u/v, mask) from the
@@ -428,12 +462,14 @@ contains
       call this%sponge%merge_friction(this%friction%Cd, this%fields%depth)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
+      call this%obstacle%init_compute(this%grid, this%geometry%dx, &
+                                      this%geometry%dy, this%env)
       call this%means%init_compute(this%grid, this%env%comm, this%output)
 
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
-                        this%sponge, this%means)
+                        this%sponge, this%obstacle, this%means)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -562,8 +598,26 @@ contains
                                    this%hot_start%output_start_number - 1, &
                                    -1, this%hot_start%is_activated))
 
-         if (out%depth_out) call write_static_field(this, mgr%channels(1), &
-                                                    "depth", folder//"dep.out", fmt)
+         ! legacy PREVIEW first-frame block: OUT_DEPTH .OR. BREAKWATER
+         ! writes BOTH dep.out and cd_breakwater.out (zeros when no
+         ! breakwater)
+         if (out%depth_out .or. this%obstacle%breakwater) then
+            call write_static_field(this, mgr%channels(1), &
+                                    "depth", folder//"dep.out", fmt)
+            block
+               real(SP), allocatable :: zeros(:, :)
+               if (allocated(this%obstacle%cd_breakwater)) then
+                  call gather_write(this, mgr%channels(1)%gatherer, &
+                                    this%obstacle%cd_breakwater, &
+                                    folder//"cd_breakwater.out", fmt)
+               else
+                  allocate (zeros(this%grid%lp%mloc, this%grid%lp%nloc), &
+                            source=0.0_SP)
+                  call gather_write(this, mgr%channels(1)%gatherer, zeros, &
+                                    folder//"cd_breakwater.out", fmt)
+               end if
+            end block
+         end if
 
       end associate
 
