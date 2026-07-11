@@ -26,7 +26,7 @@ WORKDIR /workspace
 
 # pFUnit layer — rebuilds only when install_deps.sh changes
 COPY scripts/install_deps.sh scripts/install_deps.sh
-RUN bash scripts/install_deps.sh
+RUN SKIP_PFUNIT=1 bash scripts/install_deps.sh
 
 # Python deps layer — rebuilds only when lockfile changes
 COPY pyproject.toml uv.lock ./
@@ -35,4 +35,4 @@ RUN uv sync -q
 COPY . .
 
 ENV CI=true
-CMD ["./bin/fun-dev", "unit", "--mode", "ci"]
+CMD ["./bin/fun-dev", "unit", "--mode", "ci", "--compile-only"]

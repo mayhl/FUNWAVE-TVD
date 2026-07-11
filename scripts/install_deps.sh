@@ -7,6 +7,12 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJ_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # ── pFUnit ────────────────────────────────────────────────────────────────────
+# SKIP_PFUNIT=1 skips it: compile-only images (nvfortran ICEs on the pFUnit
+# generated drivers; GPU validation will use regression runs, not units)
+
+if [ -n "${SKIP_PFUNIT:-}" ]; then
+    echo "SKIP_PFUNIT set — skipping pFUnit build."
+else
 
 PFUNIT_SRC="${PROJ_ROOT}/extern/pfunit/src"
 PFUNIT_BUILD="${PROJ_ROOT}/extern/pfunit/build"
@@ -37,6 +43,8 @@ cmake --install "${PFUNIT_BUILD}"
 echo "----------------------------------------------------"
 echo "pFUnit installed to: ${PFUNIT_INSTALL}"
 echo "----------------------------------------------------"
+
+fi
 
 # ── HYPRE ─────────────────────────────────────────────────────────────────────
 

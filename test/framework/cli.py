@@ -25,11 +25,12 @@ def main():
 @app.command()
 def unit(
     mode: str = typer.Option("dev", "--mode", "-m", help="Execution mode (ci/dev)"),
-    build_dir: str = typer.Option(None, "--build-dir", "-b", help="Override FUNWAVE_BUILD_DIR")
+    build_dir: str = typer.Option(None, "--build-dir", "-b", help="Override FUNWAVE_BUILD_DIR"),
+    compile_only: bool = typer.Option(False, "--compile-only", help="Build without pFUnit and skip test execution (compile coverage only)")
 ):
     """Run Unit Tests (pFUnit) with a live dashboard."""
     reporter = ConsoleReporter()
-    runner = UnitTestRunner(reporter, mode=mode, build_dir=build_dir)
+    runner = UnitTestRunner(reporter, mode=mode, build_dir=build_dir, compile_only=compile_only)
     passed = runner.run()
     if not passed:
         raise typer.Exit(1)

@@ -11,11 +11,12 @@ from test.framework.base_runner import BaseRunner
 
 
 class UnitTestRunner(BaseRunner):
-    def __init__(self, reporter, mode="dev", build_dir=None):
+    def __init__(self, reporter, mode="dev", build_dir=None, compile_only=False):
         super().__init__(reporter)
         self.mode = mode
         self.build_dir = build_dir or os.environ.get("FUNWAVE_BUILD_DIR", "build")
         self.test_bin_dir = os.path.join(self.build_dir, "test", "core")
+        self.compile_only = compile_only
 
     def _pretty_print_error(self, log):
         repo_root = os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd())
@@ -44,9 +45,10 @@ class UnitTestRunner(BaseRunner):
             self.reporter.info("CI Mode: Performing full build...")
             build_type = os.environ.get("BUILD_TYPE", "RelWithDebInfo")
             import platform
+            testing = "OFF" if self.compile_only else "ON"
             cmake_args = [
                 "cmake", "-S", ".", "-B", self.build_dir,
-                "-DENABLE_TESTING=ON", "-DENABLE_DEV_MODE=ON",
+                f"-DENABLE_TESTING={testing}", "-DENABLE_DEV_MODE=ON",
                 f"-DCMAKE_BUILD_TYPE={build_type}",
             ]
             if platform.system() == "Darwin":
@@ -54,7 +56,12 @@ class UnitTestRunner(BaseRunner):
             subprocess.run(cmake_args, check=True)
             nproc = os.cpu_count() or 4
             subprocess.run(["cmake", "--build", self.build_dir, f"-j{nproc}"], check=True)
-            print("=== FUNWAVE TESTS ===", flush=True)
+            if not self.compile_only:
+                print("=== FUNWAVE TESTS ===", flush=True)
+
+        if self.compile_only:
+            self.reporter.success("Compile-only mode: build finished, tests skipped.")
+            return True
 
         # Load test groups from YAML configuration
         config_path = os.path.join(os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd()), "test/unit/test_config.yaml")
