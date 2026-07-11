@@ -246,6 +246,8 @@ def _status_badge(status: str) -> str:
     mapping = {
         "PASS":              '<span class="badge badge-pass">✓ PASS</span>',
         "FAIL":              '<span class="badge badge-fail">✗ FAIL</span>',
+        "XFAIL":             '<span class="badge badge-warn">⚠ XFAIL</span>',
+        "XPASS":             '<span class="badge badge-fail">✗ XPASS</span>',
         "SIM_FAILED":        '<span class="badge badge-fail">✗ SIM FAILED</span>',
         "POSTPROCESS_ERROR": '<span class="badge badge-warn">⚠ ERROR</span>',
         "COMPLETED":         '<span class="badge badge-dim">COMPLETED</span>',

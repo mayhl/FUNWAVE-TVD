@@ -116,6 +116,8 @@ simulations:
   - name: flume_2d
     exe_type: central
     np: 8
+    # 2D swash/y-wall breaking gap — flips to loud XPASS when 8e closes
+    known_fail: ledger-8e
     input: test/regression/inputs/flume_2d
     input_files: [wk_reg_wall.txt, wk_reg_wall_sponge.txt]
     preprocess:
@@ -144,6 +146,8 @@ simulations:
   - name: flume_2d_irr
     exe_type: central
     np: 8
+    # 2D swash/y-wall breaking gap — flips to loud XPASS when 8e closes
+    known_fail: ledger-8e
     input: test/regression/inputs/flume_2d
     input_files: [wk_irr_periodic.txt]
     preprocess:

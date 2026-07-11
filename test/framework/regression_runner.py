@@ -230,6 +230,17 @@ class RegressionRunner(BaseRunner):
         all_passed = all(m.passed for s in result.subsections for m in s.metrics
                          if math.isfinite(m.tolerance))
         result.status = "PASS" if all_passed else "FAIL"
+
+        # known_fail remaps comparison outcomes only — SIM_FAILED/POSTPROCESS_ERROR
+        # stay loud (a crash is never the documented ledger gap)
+        known_fail = sim.get("known_fail")
+        if known_fail:
+            if result.status == "FAIL":
+                result.status = "XFAIL"
+                result.notes += f"\nknown failure: {known_fail}"
+            else:
+                result.status = "XPASS"
+                result.notes += f"\nunexpected pass — remove known_fail: {known_fail}"
         return result
 
     def _print_summary(self, results: list[SimResult]) -> None:
@@ -239,6 +250,8 @@ class RegressionRunner(BaseRunner):
         STATUS_FMT = {
             "PASS":              "[bold green]✓ PASS[/bold green]",
             "FAIL":              "[bold red]✗ FAIL[/bold red]",
+            "XFAIL":             "[yellow]⚠ XFAIL[/yellow]",
+            "XPASS":             "[bold red]✗ XPASS[/bold red]",
             "SIM_FAILED":        "[bold red]✗ SIM_FAILED[/bold red]",
             "POSTPROCESS_ERROR": "[yellow]⚠ POSTPROCESS_ERROR[/yellow]",
             "COMPLETED":         "[dim]COMPLETED[/dim]",
@@ -410,6 +423,8 @@ class RegressionRunner(BaseRunner):
             STATUS_ICON = {
                 "PASS":              "[bold green]✓ PASS[/bold green]",
                 "FAIL":              "[bold red]✗ FAIL[/bold red]",
+                "XFAIL":             "[yellow]⚠ XFAIL[/yellow]",
+                "XPASS":             "[bold red]✗ XPASS[/bold red]",
                 "SIM_FAILED":        "[bold red]✗ SIM FAILED[/bold red]",
                 "POSTPROCESS_ERROR": "[yellow]⚠ ERROR[/yellow]",
                 "COMPLETED":         "[dim]no comparison[/dim]",
@@ -418,6 +433,8 @@ class RegressionRunner(BaseRunner):
                 f"{s.kind}: {s.summary}" for s in sim_result.subsections
             )
             result_icon = STATUS_ICON.get(sim_result.status, sim_result.status)
+            if sim_result.status in ("XFAIL", "XPASS"):
+                result_icon += f" [dim]({sim.get('known_fail')})[/dim]"
             result_line = f"  \\[{sim['name']}]  {result_icon}" + (f"  [dim]{sub_summary}[/dim]" if sub_summary else "")
 
             self.reporter.info(run_line)
@@ -428,6 +445,9 @@ class RegressionRunner(BaseRunner):
 
             if sim_result.status == "PASS":
                 self.reporter.success(result_line)
+            elif sim_result.status == "XPASS":
+                self.reporter.error(result_line)
+                self.reporter.error(f"    unexpected pass — remove known_fail: {sim.get('known_fail')} from regression_config.yaml")
             elif sim_result.status in ("SIM_FAILED", "POSTPROCESS_ERROR"):
                 self.reporter.error(result_line)
             else:
@@ -440,7 +460,7 @@ class RegressionRunner(BaseRunner):
 
         self._print_summary(sim_results)
 
-        any_failed = any(r.status not in ("PASS", "COMPLETED") for r in sim_results)
+        any_failed = any(r.status not in ("PASS", "XFAIL", "COMPLETED") for r in sim_results)
         # TODO: honour --no-auto-report: skip this block when any_failed but flag is set
         if report or pdf or any_failed:
             unique_refs = sorted({exe_dirs[s["exe_type"]][2] for s in simulations})

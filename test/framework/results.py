@@ -58,7 +58,7 @@ class SubsectionResult:
 @dataclass
 class SimResult:
     name: str
-    # PASS | FAIL | SIM_FAILED | POSTPROCESS_ERROR | COMPLETED
+    # PASS | FAIL | XFAIL | XPASS | SIM_FAILED | POSTPROCESS_ERROR | COMPLETED
     status: str
     subsections: list[SubsectionResult] = field(default_factory=list)
     notes: str = ""
