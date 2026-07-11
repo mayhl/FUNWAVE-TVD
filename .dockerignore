@@ -6,3 +6,8 @@ extern/
 __pycache__/
 *.pyc
 *.pyo
+workspaces/
+.refs/
+examples_FD/
+sol_leg/
+.claude/
