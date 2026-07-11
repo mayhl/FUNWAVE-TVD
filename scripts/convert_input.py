@@ -234,10 +234,15 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         if ftype is not None: bathy['file_type'] = ftype.lower()
         bc = pop_bool('BATHY_CORRECTION')
         if 'BATHY_CORRECTION' in params: bathy['correction'] = bc
+        sbd = pop_val('SmoothBelowDepth')
+        if sbd is not None: bathy['smooth_below_depth'] = sbd
+        scap = pop_val('SlopeCap')
+        if scap is not None: bathy['slope_cap'] = scap
         if mg is not None: bathy['nx'] = mg
         if ng is not None: bathy['ny'] = ng
     else:
         pop('DEPTH_FILE'); pop('DEPTH_FTYPE'); pop('BATHY_CORRECTION')
+        pop('SmoothBelowDepth'); pop('SlopeCap')
         df = pop_val('DEPTH_FLAT')
         if df is not None: bathy['depth'] = df
         if depth_type == 'slope':

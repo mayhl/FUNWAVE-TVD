@@ -20,6 +20,8 @@
 !      file: <path>             file only
 !      file_type: ascii         file only, default ascii
 !      correction: <bool>       file only, default false
+!      smooth_below_depth: <real>  correction only, default -LARGE (off)
+!      slope_cap: <real>        correction only, default 1.0
 !      nx: <int>                file only, headerless ASCII
 !      ny: <int>                file only, headerless ASCII
 !
@@ -30,10 +32,10 @@
 !-------------------------------------------------
 
 module model_geometry_mod
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, LARGE
    use core_comm_mod, only: type_comm
    use core_env_mod, only: type_env, get_sub_env
-   use core_grid_mod, only: type_grid_2d
+   use core_grid_mod, only: type_grid_2d, type_loop_bounds
    use core_path_mod, only: type_path
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
@@ -42,7 +44,7 @@ module model_geometry_mod
    implicit none
 
    private
-   public :: type_model_geometry, read_field_ascii
+   public :: type_model_geometry, read_field_ascii, stagger_depth
 
    character(len=8), parameter :: BATHY_TYPES(3) = &
                                   [character(len=8) :: "file", "flat", "slope"]
@@ -73,12 +75,15 @@ module model_geometry_mod
       real(SP) :: bathy_slope = 0.0_SP
       real(SP) :: bathy_slope_x0 = 0.0_SP
       logical :: bathy_correction = .false.
+      real(SP) :: smooth_below_depth = -LARGE
+      real(SP) :: slope_cap = 1.0_SP
       integer :: bathy_nx = 0, bathy_ny = 0  ! headerless ASCII only
 
    contains
       procedure :: read_input => geometry_read_input
       procedure :: build_grid => geometry_build_grid
       procedure :: init_depth => geometry_init_depth
+      procedure :: correct_depth => geometry_correct_depth
    end type type_model_geometry
 
 contains
@@ -143,6 +148,14 @@ contains
          call bathy_yaml%read_enum("file_type", FILE_TYPES, val=this%bathy_ftype, default="ascii")
          call bathy_yaml%read_input_path("file", val=this%bathy_file)
          call bathy_yaml%read("correction", val=this%bathy_correction, default="NO")
+         ! NOTE: 1. the vendored legacy still READ_FLOATs these two with the
+         !          flat-txt parser, so under the YAML bridge it always lands
+         !          on the defaults — pin defaults in any parity config
+         !       2. defaults must ride the read call — yaml val is intent(out),
+         !          a silent miss wipes the type initializer
+         call bathy_yaml%read("smooth_below_depth", val=this%smooth_below_depth, &
+                              default="-999999.0")
+         call bathy_yaml%read("slope_cap", val=this%slope_cap, default="1.0")
          call bathy_yaml%read_positive("nx", silent=no_bathy_nx, val=this%bathy_nx)
          call bathy_yaml%read_positive("ny", silent=no_bathy_ny, val=this%bathy_ny)
          ! headerless ASCII: dimensions must come from the bathymetry block
@@ -264,23 +277,170 @@ contains
                               grid%is_right_boundary, grid%is_left_boundary, &
                               SIGN_MIRROR, SIGN_MIRROR, depth)
 
-         do j = 1, lp%nloc
-            do i = 2, lp%mloc
-               depth_x(i, j) = 0.5_SP*(depth(i - 1, j) + depth(i, j))
-            end do
-            depth_x(1, j) = 0.5_SP*(3.0_SP*depth(1, j) - depth(2, j))
-         end do
-
-         do j = 2, lp%nloc
-            do i = 1, lp%mloc
-               depth_y(i, j) = 0.5_SP*(depth(i, j - 1) + depth(i, j))
-            end do
-         end do
-         depth_y(:, 1) = 0.5_SP*(3.0_SP*depth(:, 1) - depth(:, 2))
+         call stagger_depth(lp, depth, depth_x, depth_y)
 
       end associate
 
    end subroutine geometry_init_depth
+
+   ! ----------------------------------------------------------------
+   ! Face-staggered depths from cell centres (legacy init.F
+   ! "re-construct Depth"): centred faces with one-sided extrapolation
+   ! at the low array edge — split out so bathy correction can rebuild
+   ! them after rewriting depth.
+   ! ----------------------------------------------------------------
+   subroutine stagger_depth(lp, depth, depth_x, depth_y)
+      type(type_loop_bounds), intent(in)    :: lp
+      real(SP), intent(in)    :: depth(:, :)
+      real(SP), intent(inout) :: depth_x(:, :), depth_y(:, :)
+
+      integer :: i, j
+
+      do j = 1, lp%nloc
+         do i = 2, lp%mloc
+            depth_x(i, j) = 0.5_SP*(depth(i - 1, j) + depth(i, j))
+         end do
+         depth_x(1, j) = 0.5_SP*(3.0_SP*depth(1, j) - depth(2, j))
+      end do
+
+      do j = 2, lp%nloc
+         do i = 1, lp%mloc
+            depth_y(i, j) = 0.5_SP*(depth(i, j - 1) + depth(i, j))
+         end do
+      end do
+      depth_y(:, 1) = 0.5_SP*(3.0_SP*depth(:, 1) - depth(:, 2))
+
+   end subroutine stagger_depth
+
+   ! ----------------------------------------------------------------
+   ! Bathymetry correction (legacy mod_bathy_correction.F CORRECTION):
+   ! iterative smoothing of cells whose slope exceeds slope_cap,
+   ! skipping the 5-point neighbourhood of anything shallower than
+   ! smooth_below_depth.  Capped cells relax by
+   !   $$ d^{n+1}_{ij} = 0.4\,d^n_{ij} + 0.15\,(d^n_{i+1,j} + d^n_{i-1,j}
+   !                     + d^n_{i,j+1} + d^n_{i,j-1}) $$
+   ! until the max relative change
+   !   $$ \max_{ij} \frac{|d^{n+1}_{ij} - d^n_{ij}|}
+   !                     {\max(10\,d_{frc},\ d^n_{ij})} \le 0.05 $$
+   ! or 1001 sweeps.  Slopes are centred one-sided-free:
+   !   $$ |\partial_x d| \approx |d_{i+1,j} - d_{i-1,j}|/\Delta x $$
+   ! Bug-for-bug notes vs legacy:
+   !   1. NOTE: wall ghosts are NOT re-mirrored during or after the
+   !      iteration (legacy only phi_exch's MPI seams) — faces later
+   !      staggered from corrected interior + stale ghost mirrors.
+   !   2. NOTE: mid-iteration halo exchange wraps under periodic-y here;
+   !      legacy PHI_EXCH/PHI_INT_EXCH never wrap (punch-listed).  Inert
+   !      for the usual non-periodic correction configs.
+   !   3. NOTE: legacy leaves gradx/grady uninitialised where mask0=0
+   !      (allocate garbage in the diag files); zeroed here.
+   ! Diagnostic arrays are returned for the caller to gather/write
+   ! (legacy OUTPUT_CORRECTION files).
+   ! ----------------------------------------------------------------
+   subroutine geometry_correct_depth(this, env, grid, min_depth_frc, depth, &
+                                     depth_org, gradx0, grady0, gradx, grady)
+      use core_constants_mod, only: MPI_SP
+      use mpi_f08, only: MPI_Allreduce, MPI_MAX, MPI_IN_PLACE
+      class(type_model_geometry), intent(in)    :: this
+      type(type_env), intent(inout) :: env
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: min_depth_frc
+      real(SP), intent(inout) :: depth(:, :)
+      real(SP), intent(out), allocatable :: depth_org(:, :)
+      real(SP), intent(out), allocatable :: gradx0(:, :), grady0(:, :)
+      real(SP), intent(out), allocatable :: gradx(:, :), grady(:, :)
+
+      real(SP), allocatable :: depth0(:, :), depth1(:, :), rmask(:, :)
+      integer, allocatable :: mask0(:, :)
+      real(SP) :: change, tmp
+      integer :: i, j, iter, ierr
+      character(len=80) :: msg
+
+      call env%log%info("Bathymetry correction ...")
+
+      associate (lp => grid%lp)
+
+         allocate (depth_org, source=depth)
+         allocate (depth0, source=depth)
+         allocate (depth1, source=depth)
+         allocate (mask0(lp%mloc, lp%nloc), source=1)
+         allocate (gradx0(lp%mloc, lp%nloc), source=0.0_SP)
+         allocate (grady0(lp%mloc, lp%nloc), source=0.0_SP)
+         allocate (gradx(lp%mloc, lp%nloc), source=0.0_SP)
+         allocate (grady(lp%mloc, lp%nloc), source=0.0_SP)
+
+         ! mask off the smooth area + its 4-neighbours (ring-1 sweep
+         ! writes into ring 2, legacy loop bounds)
+         do j = lp%jb - 1, lp%je + 1
+            do i = lp%ib - 1, lp%ie + 1
+               if (depth0(i, j) < this%smooth_below_depth) then
+                  mask0(i, j) = 0
+                  mask0(i + 1, j) = 0
+                  mask0(i - 1, j) = 0
+                  mask0(i, j + 1) = 0
+                  mask0(i, j - 1) = 0
+               end if
+            end do
+         end do
+         ! int halo rides a real copy (legacy phi_int_exch)
+         allocate (rmask, source=real(mask0, SP))
+         call grid%halo_exchange(rmask)
+         mask0 = nint(rmask)
+
+         ! initial slope, diag only
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               if (mask0(i, j) == 1) then
+                  gradx0(i, j) = abs(depth0(i + 1, j) - depth0(i - 1, j))/this%dx
+                  grady0(i, j) = abs(depth0(i, j + 1) - depth0(i, j - 1))/this%dy
+               end if
+            end do
+         end do
+
+         change = 1.0_SP
+         iter = 0
+         do while (change > 0.05_SP .and. iter <= 1000)
+            write (msg, '(A,I4,A,F6.2)') "iteration: ", iter, &
+               "  convergence percentage: ", change
+            call env%log%info(trim(msg))
+
+            change = 0.0_SP
+            do j = lp%jb, lp%je
+               do i = lp%ib, lp%ie
+                  if (mask0(i, j) == 1) then
+                     gradx(i, j) = abs(depth0(i + 1, j) - depth0(i - 1, j))/this%dx
+                     grady(i, j) = abs(depth0(i, j + 1) - depth0(i, j - 1))/this%dy
+                     if (max(gradx(i, j), grady(i, j)) > this%slope_cap) then
+                        depth1(i, j) = 0.4_SP*depth0(i, j) &
+                                       + 0.15_SP*(depth0(i + 1, j) + depth0(i - 1, j) &
+                                                  + depth0(i, j + 1) + depth0(i, j - 1))
+                        tmp = abs(depth0(i, j) - depth1(i, j)) &
+                              /max(min_depth_frc*10.0_SP, depth0(i, j))
+                        if (tmp > change) change = tmp
+                     end if
+                  end if
+               end do
+            end do
+
+            call grid%halo_exchange(depth1)
+            depth0 = depth1
+            iter = iter + 1
+            call MPI_Allreduce(MPI_IN_PLACE, change, 1, MPI_SP, MPI_MAX, &
+                               grid%cart_comm, ierr)
+         end do
+
+         write (msg, '(A,I10)') "total iteration: ", iter
+         call env%log%info(trim(msg))
+
+         depth = depth0
+         call grid%halo_exchange(depth)
+         call grid%halo_exchange(gradx)
+         call grid%halo_exchange(grady)
+         call grid%halo_exchange(gradx0)
+         call grid%halo_exchange(grady0)
+
+      end associate
+
+   end subroutine geometry_correct_depth
 
    ! ----------------------------------------------------------------
    ! Read a global-interior ASCII field (legacy GetFile row layout:

@@ -24,7 +24,7 @@ module model_main_mod
    use core_path_mod, only: type_path
    use probe_mod, only: dump_state, reset_state
 
-   use model_geometry_mod, only: type_model_geometry, read_field_ascii
+   use model_geometry_mod, only: type_model_geometry, read_field_ascii, stagger_depth
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
    use model_wavemaker_mod, only: type_model_wavemaker
@@ -197,6 +197,9 @@ contains
       end if
       call this%geometry%init_depth(this%grid, this%fields%depth, &
                                     this%fields%depth_x, this%fields%depth_y)
+      ! legacy order: correction sits between the ghost fill and the
+      ! (re)staggering; WaterLevel (when wired) comes after correction
+      if (this%geometry%bathy_correction) call apply_bathy_correction(this)
       ! apply_ic zeroes eta/u/v before its solitary branch, so the hot
       ! start loads AFTER it (legacy zeroes long before INI_UVZ; bed
       ! deformation never refreshes DepthX/DepthY).  Solitary IC plus
@@ -261,6 +264,83 @@ contains
       call this%fields%register(this%registry)
 
    end subroutine model_setup
+
+   ! ----------------------------------------------------------------
+   ! Bathy correction wrapper: run the slope-cap smoothing, rebuild the
+   ! staggered faces from the corrected depth, and write the six legacy
+   ! OUTPUT_CORRECTION diagnostics (always ascii, legacy PutFile).
+   ! Setup-time, so the result folder may not exist yet — mkdir here
+   ! mirrors build_field_channel.
+   ! ----------------------------------------------------------------
+   subroutine apply_bathy_correction(this)
+      use core_output_gatherer_mod, only: type_output_gatherer
+      class(type_model_main), intent(inout) :: this
+
+      real(SP), allocatable :: depth_org(:, :), gradx0(:, :), grady0(:, :)
+      real(SP), allocatable :: gradx(:, :), grady(:, :)
+      type(type_output_gatherer) :: gatherer
+      type(type_path) :: outdir
+      character(:), allocatable :: folder
+      character(len=6) :: fmt
+      logical :: ok
+
+      call this%geometry%correct_depth(this%env, this%grid, &
+                                       this%numerics%MinDepthFrc, this%fields%depth, &
+                                       depth_org, gradx0, grady0, gradx, grady)
+      call stagger_depth(this%grid%lp, this%fields%depth, &
+                         this%fields%depth_x, this%fields%depth_y)
+
+      folder = trim(this%output%result_folder)
+      if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
+      if (this%env%comm%is_io_node()) then
+         outdir = type_path(folder)
+         if (.not. outdir%is_dir()) ok = outdir%mkdir()
+      end if
+      call this%env%comm%barrier()
+
+      ! legacy PutFile honours FIELD_IO_TYPE for these too
+      select case (this%output%field_io_type(1:1))
+      case ("B", "b")
+         fmt = "binary"
+      case default
+         fmt = "ascii"
+      end select
+
+      call gatherer%init_field(this%grid, this%env%comm)
+      call gather_write(this, gatherer, depth_org, folder//"depth_org.txt", fmt)
+      call gather_write(this, gatherer, depth_org - this%fields%depth, &
+                        folder//"depth_change.txt", fmt)
+      call gather_write(this, gatherer, gradx0, folder//"gradx0.txt", fmt)
+      call gather_write(this, gatherer, grady0, folder//"grady0.txt", fmt)
+      call gather_write(this, gatherer, gradx, folder//"gradx.txt", fmt)
+      call gather_write(this, gatherer, grady, folder//"grady.txt", fmt)
+      call gatherer%finalize()
+
+   end subroutine apply_bathy_correction
+
+   ! Gather a raw (mloc,nloc) array and write it — the correction
+   ! diagnostics aren't registry fields, so write_static_field can't serve
+   subroutine gather_write(this, gatherer, arr, fname, fmt)
+      use core_constants_mod, only: N_GHOST
+      use core_output_gatherer_mod, only: type_output_gatherer
+      class(type_model_main), intent(inout) :: this
+      type(type_output_gatherer), intent(in) :: gatherer
+      real(SP), intent(in) :: arr(:, :)
+      character(*), intent(in) :: fname, fmt
+
+      real(SP), allocatable :: glob(:, :)
+
+      if (this%env%comm%is_io_node()) then
+         allocate (glob(gatherer%M, gatherer%N))
+      else
+         allocate (glob(1, 1))
+      end if
+      associate (ng => N_GHOST, nx => this%grid%local_nx, ny => this%grid%local_ny)
+         call gatherer%gather_field(arr(ng + 1:ng + nx, ng + 1:ng + ny), &
+                                    glob, this%env%comm)
+      end associate
+      if (this%env%comm%is_io_node()) call write_field_file(fname, glob, fmt)
+   end subroutine gather_write
 
    ! ----------------------------------------------------------------
    ! Hot start (legacy INITIAL_UVZ): load eta (+u/v, mask) from the
