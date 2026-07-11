@@ -1,9 +1,9 @@
 var searchData=
 [
-  ['new_5fcomm_0',['new_comm',['../interfacecore__comm__mod_1_1new__comm.html',1,'core_comm_mod']]],
-  ['new_5fenv_1',['new_env',['../interfacecore__env__mod_1_1new__env.html',1,'core_env_mod']]],
-  ['new_5finteger_5frange_2',['new_integer_range',['../structcore__range__parse__mod_1_1type__integer__range.html#a1e5ab90f5f517ee2e04573fcb502423a',1,'core_range_parse_mod::type_integer_range']]],
-  ['new_5flog_5fwriter_3',['new_log_writer',['../interfacecore__log__io__mod_1_1new__log__writer.html',1,'core_log_io_mod']]],
-  ['new_5fpath_4',['new_path',['../structcore__path__mod_1_1type__path.html#a2d6c0381293de8e6645aa064bee3e164',1,'core_path_mod::type_path']]],
-  ['new_5freal_5frange_5',['new_real_range',['../structcore__range__parse__mod_1_1type__real__range.html#a083f664dacd74916b9d71c37ccc0f59d',1,'core_range_parse_mod::type_real_range']]]
+  ['finalize_0',['finalize',['../structcore__accumulators__mod_1_1type__accumulator.html#abe9bff539e083025ee816a7f2514eb17',1,'core_accumulators_mod::type_accumulator::finalize()'],['../structcore__interpolation__mod_1_1type__interpolator.html#a208ca73e266d14a46e1f109d9bd43fb6',1,'core_interpolation_mod::type_interpolator::finalize()'],['../namespacecore__accumulators__mod.html#a9a4f3ffaee2e1d64f5046fac64e18be4',1,'core_accumulators_mod::finalize()']]],
+  ['find_5fbilinear_5fcell_1',['find_bilinear_cell',['../namespacecore__interpolation__mod.html#a15a1e0f93181c2113ad7716e6e9c2a52',1,'core_interpolation_mod']]],
+  ['flat_20earth_20geographic_20projection_2',['Flat-Earth geographic projection',['../namespacecore__crs__mod.html#autotoc_md2',1,'']]],
+  ['format_5flog_5fline_3',['format_log_line',['../namespacecore__log__io__mod.html#a9e517258c507e6795e7d20a8a1486545',1,'core_log_io_mod']]],
+  ['formulas_4',['Time-weighted formulas',['../namespacecore__accumulators__mod.html#autotoc_md0',1,'']]],
+  ['free_5',['free',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#a2ae8f6e83332854271d47f95fc2cb993',1,'model_fields_2d_mod::type_fields_2d']]]
 ];

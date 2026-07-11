@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -95,24 +105,34 @@ $(document).ready(function(){initNavTree('namespaces.html',''); initResizable();
 <div class="contents">
 <div class="textblock">Here is a list of all documented modules with brief descriptions:</div><div class="directory">
 <div class="levels">[detail level <span onclick="javascript:toggleLevel(1);">1</span><span onclick="javascript:toggleLevel(2);">2</span>]</div><table class="directory">
-<tr id="row_0_" class="even"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_0_" class="arrow" onclick="toggleFolder('0_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__log__io__mod.html" target="_self">core_log_io_mod</a></td><td class="desc">Module for platform-independent logging. Replaces external flogging dependency with a native implementation </td></tr>
-<tr id="row_0_0_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="interfacecore__log__io__mod_1_1new__log__writer.html" target="_self">new_log_writer</a></td><td class="desc"></td></tr>
-<tr id="row_0_1_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__log__io__mod_1_1type__log__writer.html" target="_self">type_log_writer</a></td><td class="desc"></td></tr>
-<tr id="row_1_" class="odd"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_1_" class="arrow" onclick="toggleFolder('1_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__path__mod.html" target="_self">core_path_mod</a></td><td class="desc">Module for platform-independent path manipulation </td></tr>
-<tr id="row_1_0_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__path__mod_1_1type__path.html" target="_self">type_path</a></td><td class="desc">Utility type for path manipulation </td></tr>
-<tr id="row_2_" class="odd"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_2_" class="arrow" onclick="toggleFolder('2_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__range__parse__mod.html" target="_self">core_range_parse_mod</a></td><td class="desc">Module for parsing integer and real range strings </td></tr>
-<tr id="row_2_0_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__range__parse__mod_1_1type__base__range.html" target="_self">type_base_range</a></td><td class="desc">Base type for range logic </td></tr>
-<tr id="row_2_1_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__range__parse__mod_1_1type__integer__range.html" target="_self">type_integer_range</a></td><td class="desc">Integer range type </td></tr>
-<tr id="row_2_2_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__range__parse__mod_1_1type__real__range.html" target="_self">type_real_range</a></td><td class="desc">Real range type </td></tr>
+<tr id="row_0_" class="even"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_0_" class="arrow" onclick="toggleFolder('0_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__accumulators__mod.html" target="_self">core_accumulators_mod</a></td><td class="desc">Accumulates field statistics over a simulation time window using time-step weights \(\Delta t_n\) </td></tr>
+<tr id="row_0_0_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html" target="_self">type_accumulator</a></td><td class="desc">Accumulates time-weighted statistics for a 2-D field array </td></tr>
+<tr id="row_1_" class="even"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_1_" class="arrow" onclick="toggleFolder('1_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__constants__mod.html" target="_self">core_constants_mod</a></td><td class="desc">Project-wide compile-time constants grouped by category </td></tr>
+<tr id="row_1_0_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__constants__mod_1_1type__string.html" target="_self">type_string</a></td><td class="desc">Wrapper for a deferred-length allocatable string, used where a fixed-length <code>character</code> array would be inconvenient </td></tr>
+<tr id="row_2_" class="even"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_2_" class="arrow" onclick="toggleFolder('2_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__crs__mod.html" target="_self">core_crs_mod</a></td><td class="desc">Provides forward and inverse coordinate transforms between an external CRS (geographic or projected) and the model's local Cartesian metre grid </td></tr>
+<tr id="row_2_0_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__crs__mod_1_1type__crs.html" target="_self">type_crs</a></td><td class="desc">Coordinate Reference System descriptor for the model grid </td></tr>
+<tr id="row_3_" class="even"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_3_" class="arrow" onclick="toggleFolder('3_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__interpolation__mod.html" target="_self">core_interpolation_mod</a></td><td class="desc">Bilinear interpolation of 2-D field values at arbitrary query points distributed across an MPI-decomposed structured grid </td></tr>
+<tr id="row_3_0_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html" target="_self">type_interpolator</a></td><td class="desc">Stores pre-computed bilinear stencils for a set of query points that are local to the calling MPI rank </td></tr>
+<tr id="row_4_" class="even"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_4_" class="arrow" onclick="toggleFolder('4_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__log__io__mod.html" target="_self">core_log_io_mod</a></td><td class="desc">Module for platform-independent logging. Replaces external flogging dependency with a native implementation </td></tr>
+<tr id="row_4_0_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="interfacecore__log__io__mod_1_1new__log__writer.html" target="_self">new_log_writer</a></td><td class="desc"></td></tr>
+<tr id="row_4_1_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__log__io__mod_1_1type__log__writer.html" target="_self">type_log_writer</a></td><td class="desc"></td></tr>
+<tr id="row_5_" class="odd"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_5_" class="arrow" onclick="toggleFolder('5_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__range__parse__mod.html" target="_self">core_range_parse_mod</a></td><td class="desc">Module for parsing integer and real range strings </td></tr>
+<tr id="row_5_0_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__range__parse__mod_1_1type__base__range.html" target="_self">type_base_range</a></td><td class="desc">Base type for range logic </td></tr>
+<tr id="row_5_1_" class="odd"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__range__parse__mod_1_1type__integer__range.html" target="_self">type_integer_range</a></td><td class="desc">Integer range type </td></tr>
+<tr id="row_5_2_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__range__parse__mod_1_1type__real__range.html" target="_self">type_real_range</a></td><td class="desc">Real range type </td></tr>
+<tr id="row_6_" class="odd"><td class="entry"><span style="width:0px;display:inline-block;">&#160;</span><span id="arr_6_" class="arrow" onclick="toggleFolder('6_')">&#9660;</span><span class="icona"><span class="icon">M</span></span><a class="el" href="namespacecore__solver__tridiag__mod.html" target="_self">core_solver_tridiag_mod</a></td><td class="desc">Solver-class module: unlike <code>kernel_*</code> modules (pure compute, no MPI), <code>solver_*</code> modules may hold a <code>type_grid_2d</code> reference and communicate. Callers assemble coefficients with a kernel, invoke a solver here, then consume the solution with another kernel (see model_kernel_etauv_mod) </td></tr>
+<tr id="row_6_0_" class="even"><td class="entry"><span style="width:32px;display:inline-block;">&#160;</span><span class="icona"><span class="icon">C</span></span><a class="el" href="structcore__solver__tridiag__mod_1_1type__trid__workspace.html" target="_self">type_trid_workspace</a></td><td class="desc"></td></tr>
 </table>
 </div><!-- directory -->
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

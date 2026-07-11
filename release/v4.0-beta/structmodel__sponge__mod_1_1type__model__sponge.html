@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -113,6 +123,18 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aacfb436f1b26dd639dba76a35d131f00" id="r_aacfb436f1b26dd639dba76a35d131f00"><td class="memItemLeft" align="right" valign="top"><a id="aacfb436f1b26dd639dba76a35d131f00" name="aacfb436f1b26dd639dba76a35d131f00"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>read_input</b> (this, env)</td></tr>
 <tr class="separator:aacfb436f1b26dd639dba76a35d131f00"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adf56008ae4f092940c0077d7aba93925" id="r_adf56008ae4f092940c0077d7aba93925"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925">init_compute</a> (this, grid)</td></tr>
+<tr class="memdesc:adf56008ae4f092940c0077d7aba93925"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate and compute sponge coefficient arrays.  <br /></td></tr>
+<tr class="separator:adf56008ae4f092940c0077d7aba93925"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab6e7349f0361fc62ffd9a4ce3e74d83e" id="r_ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#ab6e7349f0361fc62ffd9a4ce3e74d83e">merge_friction</a> (this, cd_inout, depth)</td></tr>
+<tr class="memdesc:ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Max-merge friction sponge profile into an external Cd array.  <br /></td></tr>
+<tr class="separator:ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a494b68dbb81a39195f4c200be00114e6" id="r_a494b68dbb81a39195f4c200be00114e6"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#a494b68dbb81a39195f4c200be00114e6">apply</a> (this, fields, grid)</td></tr>
+<tr class="memdesc:a494b68dbb81a39195f4c200be00114e6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply Larsen-Dancy (1983) per-stage damping to the state (legacy SPONGE_DAMPING, old/sponge.F).  <br /></td></tr>
+<tr class="separator:a494b68dbb81a39195f4c200be00114e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a051b213a2f2372d13ccbfea9deb1d494" id="r_a051b213a2f2372d13ccbfea9deb1d494"><td class="memItemLeft" align="right" valign="top"><a id="a051b213a2f2372d13ccbfea9deb1d494" name="a051b213a2f2372d13ccbfea9deb1d494"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>free</b> (this)</td></tr>
+<tr class="separator:a051b213a2f2372d13ccbfea9deb1d494"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_structmodel__base__mod_1_1type__model__base"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_structmodel__base__mod_1_1type__model__base')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td></tr>
 <tr class="memitem:a6b1356cc2688b2fd2317acbeb2dd49f9 inherit pub_methods_structmodel__base__mod_1_1type__model__base" id="r_a6b1356cc2688b2fd2317acbeb2dd49f9"><td class="memItemLeft" align="right" valign="top">
 procedure(<a class="el" href="interfacemodel__base__mod_1_1model__read__input.html">model_read_input</a>), deferred&#160;</td><td class="memItemRight" valign="bottom"><b>read_input</b> (this, env)</td></tr>
@@ -153,16 +175,136 @@ real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>r_sponge</b> = 0.
 <tr class="memitem:a2f5cee69660d03823e3763bdd39192fe" id="r_a2f5cee69660d03823e3763bdd39192fe"><td class="memItemLeft" align="right" valign="top"><a id="a2f5cee69660d03823e3763bdd39192fe" name="a2f5cee69660d03823e3763bdd39192fe"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>a_sponge</b> = 5.0_SP</td></tr>
 <tr class="separator:a2f5cee69660d03823e3763bdd39192fe"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7b8b0c55f52884f834e99cfec560f823" id="r_a7b8b0c55f52884f834e99cfec560f823"><td class="memItemLeft" align="right" valign="top"><a id="a7b8b0c55f52884f834e99cfec560f823" name="a7b8b0c55f52884f834e99cfec560f823"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>coeff</b></td></tr>
+<tr class="separator:a7b8b0c55f52884f834e99cfec560f823"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2d65c3ad6b38e206550203cd5fe16c04" id="r_a2d65c3ad6b38e206550203cd5fe16c04"><td class="memItemLeft" align="right" valign="top"><a id="a2d65c3ad6b38e206550203cd5fe16c04" name="a2d65c3ad6b38e206550203cd5fe16c04"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>cd_sponge</b></td></tr>
+<tr class="separator:a2d65c3ad6b38e206550203cd5fe16c04"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a36c1ed79e0900403203e6b44d65ed654" id="r_a36c1ed79e0900403203e6b44d65ed654"><td class="memItemLeft" align="right" valign="top"><a id="a36c1ed79e0900403203e6b44d65ed654" name="a36c1ed79e0900403203e6b44d65ed654"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>nu_sponge</b></td></tr>
+<tr class="separator:a36c1ed79e0900403203e6b44d65ed654"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_structmodel__base__mod_1_1type__model__base"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_structmodel__base__mod_1_1type__model__base')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td></tr>
 <tr class="memitem:a201e9827a8f300136e2f6a1a777a4bd4 inherit pub_attribs_structmodel__base__mod_1_1type__model__base" id="r_a201e9827a8f300136e2f6a1a777a4bd4"><td class="memItemLeft" align="right" valign="top">
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_activated</b> = .false.</td></tr>
 <tr class="separator:a201e9827a8f300136e2f6a1a777a4bd4 inherit pub_attribs_structmodel__base__mod_1_1type__model__base"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<h2 class="groupheader">Member Function/Subroutine Documentation</h2>
+<a id="a494b68dbb81a39195f4c200be00114e6" name="a494b68dbb81a39195f4c200be00114e6"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a494b68dbb81a39195f4c200be00114e6">&#9670;&#160;</a></span>apply()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure model_sponge_mod::type_model_sponge::apply </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html">type_model_sponge</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">type(<a class="el" href="structmodel__fields__2d__mod_1_1type__fields__2d.html">type_fields_2d</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>fields</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">type(<a class="el" href="structcore__grid__mod_1_1type__grid__2d.html">type_grid_2d</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>grid</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Apply Larsen-Dancy (1983) per-stage damping to the state (legacy SPONGE_DAMPING, old/sponge.F). </p>
+<p>Divides eta/u/v by coeff(i,j) at every ghost-inclusive cell. eta is only damped at wet cells (mask &gt; 0); u/v always. Legacy damps the velocities, NOT the conserved Ubar/Vbar — the damped u/v feed the next stage's fluxes/sources while the tridiagonal solves rebuild u/v from the undamped Ubar/Vbar. Kept as is.</p>
+<p>Friction and diffusion sponge terms are RHS source contributions; their apply is in sources.f90 (refactor TODO). </p>
+
+</div>
+</div>
+<a id="adf56008ae4f092940c0077d7aba93925" name="adf56008ae4f092940c0077d7aba93925"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#adf56008ae4f092940c0077d7aba93925">&#9670;&#160;</a></span>init_compute()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure model_sponge_mod::type_model_sponge::init_compute </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html">type_model_sponge</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">type(<a class="el" href="structcore__grid__mod_1_1type__grid__2d.html">type_grid_2d</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>grid</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Allocate and compute sponge coefficient arrays. </p>
+<p>Direct sponge (coeff): Larsen-Dancy exponential damping ratio. Friction sponge (cd): tanh-profile drag coefficient; allocates cd_sponge. Diffusion sponge (nu): tanh-profile lateral viscosity.</p>
+<p>All arrays ghost-inclusive. Called once at init_compute time, before the first timestep and after gridsetup() + gridinit_spacing() have run. To max-merge friction sponge into an external Cd array instead, call <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#ab6e7349f0361fc62ffd9a4ce3e74d83e" title="Max-merge friction sponge profile into an external Cd array.">merge_friction()</a> after <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925" title="Allocate and compute sponge coefficient arrays.">init_compute()</a>. </p>
+
+</div>
+</div>
+<a id="ab6e7349f0361fc62ffd9a4ce3e74d83e" name="ab6e7349f0361fc62ffd9a4ce3e74d83e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab6e7349f0361fc62ffd9a4ce3e74d83e">&#9670;&#160;</a></span>merge_friction()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure model_sponge_mod::type_model_sponge::merge_friction </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html">type_model_sponge</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:, :), intent(inout)&#160;</td>
+          <td class="paramname"><em>cd_inout</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:, :), intent(in)&#160;</td>
+          <td class="paramname"><em>depth</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Max-merge friction sponge profile into an external Cd array. </p>
+<p>Must be called after <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925" title="Allocate and compute sponge coefficient arrays.">init_compute()</a>. When friction_sponge is active, max-merges cd_sponge*depth into cd_inout and then deallocates cd_sponge. No-op when friction_sponge is inactive or not allocated.</p>
+<p>The *depth factor converts the flux-based sponge drag to the same units as the velocity-based friction term in cal_sources: legacy: -CD_4_SPONGE * U * |UV| * Depth (Wei et al. flux form) merged: -(CD_4_SPONGE * Depth) * U * |UV| (same as Cd * U * |UV|)</p>
+<p>Use this instead of holding both cd_sponge and frictionCd simultaneously: call spongeinit_compute(grid) call spongemerge_friction(frictionCd, fieldsdepth) </p>
+
+</div>
+</div>
 <hr/>The documentation for this type was generated from the following file:<ul>
-<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/model/<b>sponge.f90</b></li>
+<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/model/2d/<b>sponge.f90</b></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
@@ -170,5 +312,6 @@ logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_activated</b> =
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -96,21 +106,23 @@ $(document).ready(function(){initNavTree('structcore__crs__mod_1_1type__crs.html
 
 <p>This is the complete list of members for <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>, including all inherited members.</p>
 <table class="directory">
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>epsg</b> (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>mode</b> (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>origin_x</b> (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>origin_y</b> (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>theta</b> (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>to_external</b>(this, x_loc, y_loc, x_ext, y_ext) (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>to_local</b>(this, x_ext, y_ext, x_loc, y_loc) (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>wkt</b> (defined in <a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a>)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#aa7f10b611ec72ff6db80adf3b06a5b24">epsg</a></td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#a390cbe3081eb37ac7d4425c0baf01586">mode</a></td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#ab176000b4e042896951e8a2428de1b95">origin_x</a></td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#ae029d5d779a9fdf2ce0ee505a3f2371c">origin_y</a></td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#a94f99a60731cb0994409a1e46df4ae59">theta</a></td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#a925b0cff359e2d344fec3765d42437f4">to_external</a>(this, x_loc, y_loc, x_ext, y_ext)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#ab2bb5fcdce5cb363253a1168af5b8c72">to_local</a>(this, x_ext, y_ext, x_loc, y_loc)</td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html#a00a83075e5c8b416f09ded05430d0227">wkt</a></td><td class="entry"><a class="el" href="structcore__crs__mod_1_1type__crs.html">core_crs_mod::type_crs</a></td><td class="entry"></td></tr>
 </table></div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

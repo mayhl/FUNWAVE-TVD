@@ -7,6 +7,11 @@ digraph "/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/model"
   compound=true
   subgraph clusterdir_68267d1309a1af8e8297ef4c3efbcdba {
     graph [ bgcolor="#edf0f7", pencolor="grey25", label="src", fontname=Helvetica,fontsize=10 style="filled,dashed", URL="dir_68267d1309a1af8e8297ef4c3efbcdba.html",tooltip=""]
-  dir_5dd65160827af56e6353642206b80129 [label="model", fillcolor="#edf0f7", color="grey25", style="filled,bold", URL="dir_5dd65160827af56e6353642206b80129.html",tooltip=""];
+  subgraph clusterdir_5dd65160827af56e6353642206b80129 {
+    graph [ bgcolor="#edf0f7", pencolor="grey25", label="", fontname=Helvetica,fontsize=10 style="filled,bold", URL="dir_5dd65160827af56e6353642206b80129.html",tooltip=""]
+    dir_5dd65160827af56e6353642206b80129 [shape=plaintext, label="model"];
+  dir_cbe1c5dc0066d75e8d45b6ceeccd2ff7 [label="2d", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_cbe1c5dc0066d75e8d45b6ceeccd2ff7.html",tooltip=""];
+  dir_c3df272d386c13e76b0eb01b006a56c2 [label="3d", fillcolor="#a2b4d6", color="grey25", style="filled", URL="dir_c3df272d386c13e76b0eb01b006a56c2.html",tooltip=""];
+  }
   }
 }

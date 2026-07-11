@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -105,9 +115,9 @@ Collaboration diagram for core_output_channel_mod::type_output_channel:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a8fb4d0b9cf280bf736f73f5318b14223" id="r_a8fb4d0b9cf280bf736f73f5318b14223"><td class="memItemLeft" align="right" valign="top"><a id="a8fb4d0b9cf280bf736f73f5318b14223" name="a8fb4d0b9cf280bf736f73f5318b14223"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, id, geom_type, variables, n_vars, statistics, n_stats, snapshot, t_start, interval, coords_x, coords_y, n_coords, grid, comm)</td></tr>
-<tr class="separator:a8fb4d0b9cf280bf736f73f5318b14223"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab7e0b785390431682ff56ea483bd86a6" id="r_ab7e0b785390431682ff56ea483bd86a6"><td class="memItemLeft" align="right" valign="top"><a id="ab7e0b785390431682ff56ea483bd86a6" name="ab7e0b785390431682ff56ea483bd86a6"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, id, geom_type, variables, n_vars, statistics, n_stats, snapshot, t_start, interval, result_folder, format, coords_x, coords_y, n_coords, grid, comm, file_prefixes, icount_start)</td></tr>
+<tr class="separator:ab7e0b785390431682ff56ea483bd86a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af2619edda7049fb552f844a636d8fbe4" id="r_af2619edda7049fb552f844a636d8fbe4"><td class="memItemLeft" align="right" valign="top"><a id="af2619edda7049fb552f844a636d8fbe4" name="af2619edda7049fb552f844a636d8fbe4"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>step</b> (this, t, dt, registry, comm)</td></tr>
 <tr class="separator:af2619edda7049fb552f844a636d8fbe4"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -129,6 +139,9 @@ character(8)&#160;</td><td class="memItemRight" valign="bottom"><b>format</b> = 
 <tr class="memitem:aa1a0dcd8c21b6155fc8d69adbd2dbc13" id="r_aa1a0dcd8c21b6155fc8d69adbd2dbc13"><td class="memItemLeft" align="right" valign="top"><a id="aa1a0dcd8c21b6155fc8d69adbd2dbc13" name="aa1a0dcd8c21b6155fc8d69adbd2dbc13"></a>
 character(varname_len), dimension(vars_max)&#160;</td><td class="memItemRight" valign="bottom"><b>variables</b> = ''</td></tr>
 <tr class="separator:aa1a0dcd8c21b6155fc8d69adbd2dbc13"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9a362596d141eedbc9287e79e05d064d" id="r_a9a362596d141eedbc9287e79e05d064d"><td class="memItemLeft" align="right" valign="top"><a id="a9a362596d141eedbc9287e79e05d064d" name="a9a362596d141eedbc9287e79e05d064d"></a>
+character(varname_len), dimension(vars_max)&#160;</td><td class="memItemRight" valign="bottom"><b>prefixes</b> = ''</td></tr>
+<tr class="separator:a9a362596d141eedbc9287e79e05d064d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acea77392912491ec9106fe18b94004b5" id="r_acea77392912491ec9106fe18b94004b5"><td class="memItemLeft" align="right" valign="top"><a id="acea77392912491ec9106fe18b94004b5" name="acea77392912491ec9106fe18b94004b5"></a>
 character(statname_len), dimension(stats_max)&#160;</td><td class="memItemRight" valign="bottom"><b>statistics</b> = ''</td></tr>
 <tr class="separator:acea77392912491ec9106fe18b94004b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -147,6 +160,15 @@ real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>t_start</b> = 0.0
 <tr class="memitem:a970afa3b41712f863728906bfef7b6cc" id="r_a970afa3b41712f863728906bfef7b6cc"><td class="memItemLeft" align="right" valign="top"><a id="a970afa3b41712f863728906bfef7b6cc" name="a970afa3b41712f863728906bfef7b6cc"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>interval</b> = 0.0_SP</td></tr>
 <tr class="separator:a970afa3b41712f863728906bfef7b6cc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a84dd83c3d54e72068f343715ca00f08e" id="r_a84dd83c3d54e72068f343715ca00f08e"><td class="memItemLeft" align="right" valign="top"><a id="a84dd83c3d54e72068f343715ca00f08e" name="a84dd83c3d54e72068f343715ca00f08e"></a>
+character(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>result_folder</b></td></tr>
+<tr class="separator:a84dd83c3d54e72068f343715ca00f08e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6ec288bfce0884764c7f4d7de5c72af8" id="r_a6ec288bfce0884764c7f4d7de5c72af8"><td class="memItemLeft" align="right" valign="top"><a id="a6ec288bfce0884764c7f4d7de5c72af8" name="a6ec288bfce0884764c7f4d7de5c72af8"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>icount</b> = 0</td></tr>
+<tr class="separator:a6ec288bfce0884764c7f4d7de5c72af8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a98696c6bb94f29d7f944359a3e0efdf2" id="r_a98696c6bb94f29d7f944359a3e0efdf2"><td class="memItemLeft" align="right" valign="top"><a id="a98696c6bb94f29d7f944359a3e0efdf2" name="a98696c6bb94f29d7f944359a3e0efdf2"></a>
+logical&#160;</td><td class="memItemRight" valign="bottom"><b>fired</b> = .false.</td></tr>
+<tr class="separator:a98696c6bb94f29d7f944359a3e0efdf2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aeff7a65249bfe5366c0fc5370f1814e4" id="r_aeff7a65249bfe5366c0fc5370f1814e4"><td class="memItemLeft" align="right" valign="top"><a id="aeff7a65249bfe5366c0fc5370f1814e4" name="aeff7a65249bfe5366c0fc5370f1814e4"></a>
 type(<a class="el" href="structcore__time__utils__mod_1_1type__timing__control.html">type_timing_control</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>trigger</b></td></tr>
 <tr class="separator:aeff7a65249bfe5366c0fc5370f1814e4"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -177,6 +199,7 @@ integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_global</b> = 0</
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
@@ -184,5 +207,6 @@ integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_global</b> = 0</
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

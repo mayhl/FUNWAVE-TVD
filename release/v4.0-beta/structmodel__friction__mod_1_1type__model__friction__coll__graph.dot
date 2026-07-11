@@ -8,5 +8,5 @@ digraph "model_friction_mod::type_model_friction"
   Node2 -> Node1 [id="edge1_Node000001_Node000002",dir="back",color="steelblue1",style="solid",tooltip=" "];
   Node2 [id="Node000002",label="model_base_mod::type\l_model_base",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__base__mod_1_1type__model__base.html",tooltip=" "];
   Node3 -> Node1 [id="edge2_Node000001_Node000003",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" cd_file",fontcolor="grey" ];
-  Node3 [id="Node000003",label="core_path_mod::type_path",height=0.2,width=0.4,color="gray40", fillcolor="white", style="filled",URL="$structcore__path__mod_1_1type__path.html",tooltip="Utility type for path manipulation."];
+  Node3 [id="Node000003",label="type_path",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",tooltip=" "];
 }

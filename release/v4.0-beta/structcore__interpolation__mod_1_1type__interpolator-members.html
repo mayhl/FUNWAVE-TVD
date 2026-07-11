@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -96,22 +106,24 @@ $(document).ready(function(){initNavTree('structcore__interpolation__mod_1_1type
 
 <p>This is the complete list of members for <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>, including all inherited members.</p>
 <table class="directory">
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>alpha</b> (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>beta</b> (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>finalize</b>(this) (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>gather</b>(this, field, out) (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>init</b>(this, xq, yq, grid) (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>n_points</b> (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>point_id</b> (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>src_i</b> (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>src_j</b> (defined in <a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a>)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a6b3497383f7fb81b2df72a8ed552f472">alpha</a></td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a53aaf19ddfd8d50b0204cc638426a0f2">beta</a></td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a208ca73e266d14a46e1f109d9bd43fb6">finalize</a>(this)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#aa1428ece289ff1bb479933390ad3144e">gather</a>(this, field, out)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a7ff46aa1a02f3cad9e65c031619b1c0a">init</a>(this, xq, yq, grid)</td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#ad07da9b84fa5789bf04bbd51ee42d143">n_points</a></td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a2f1df21c2b9addea969260690b955145">point_id</a></td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#acc4c3635c62e61f7be13de9141419b20">src_i</a></td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a29a867af874d598029fa834fdcd4519e">src_j</a></td><td class="entry"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">core_interpolation_mod::type_interpolator</a></td><td class="entry"></td></tr>
 </table></div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

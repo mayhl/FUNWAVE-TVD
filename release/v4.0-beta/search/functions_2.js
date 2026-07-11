@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['remove_0',['remove',['../structcore__path__mod_1_1type__path.html#ae68b06149447f13e3b0c1d1db857a720',1,'core_path_mod::type_path']]]
+  ['crs_5fscale_5fx_0',['crs_scale_x',['../namespacecore__crs__mod.html#a582a2fd186f62f647d6a9a39cd1470fa',1,'core_crs_mod']]]
 ];

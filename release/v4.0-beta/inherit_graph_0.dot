@@ -5,5 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="core_accumulators_mod\l::type_accumulator",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__accumulators__mod_1_1type__accumulator.html",tooltip=" "];
+  Node0 [id="Node000000",label="core_accumulators_mod\l::type_accumulator",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__accumulators__mod_1_1type__accumulator.html",tooltip="Accumulates time-weighted statistics for a 2-D field array."];
 }

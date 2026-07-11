@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -108,6 +118,15 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:a33608f17f3051baf6ba0ef15bba9a79b" id="r_a33608f17f3051baf6ba0ef15bba9a79b"><td class="memItemLeft" align="right" valign="top"><a id="a33608f17f3051baf6ba0ef15bba9a79b" name="a33608f17f3051baf6ba0ef15bba9a79b"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this)</td></tr>
 <tr class="separator:a33608f17f3051baf6ba0ef15bba9a79b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1f15d48d0c3b3d58a3db097f4f573066" id="r_a1f15d48d0c3b3d58a3db097f4f573066"><td class="memItemLeft" align="right" valign="top"><a id="a1f15d48d0c3b3d58a3db097f4f573066" name="a1f15d48d0c3b3d58a3db097f4f573066"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init_from_env</b> (this, env)</td></tr>
+<tr class="separator:a1f15d48d0c3b3d58a3db097f4f573066"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3eb035437b5c14f70e85f7af848c6943" id="r_a3eb035437b5c14f70e85f7af848c6943"><td class="memItemLeft" align="right" valign="top"><a id="a3eb035437b5c14f70e85f7af848c6943" name="a3eb035437b5c14f70e85f7af848c6943"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>setup</b> (this)</td></tr>
+<tr class="separator:a3eb035437b5c14f70e85f7af848c6943"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad81cfcfe774d4d59e734cf5ac951e371" id="r_ad81cfcfe774d4d59e734cf5ac951e371"><td class="memItemLeft" align="right" valign="top"><a id="ad81cfcfe774d4d59e734cf5ac951e371" name="ad81cfcfe774d4d59e734cf5ac951e371"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>run</b> (this)</td></tr>
+<tr class="separator:ad81cfcfe774d4d59e734cf5ac951e371"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aba1ff26aea13a9e26e67324abf002a37" id="r_aba1ff26aea13a9e26e67324abf002a37"><td class="memItemLeft" align="right" valign="top"><a id="aba1ff26aea13a9e26e67324abf002a37" name="aba1ff26aea13a9e26e67324abf002a37"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>finalize</b> (this)</td></tr>
 <tr class="separator:aba1ff26aea13a9e26e67324abf002a37"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -153,12 +172,28 @@ type(<a class="el" href="structmodel__physics__mod_1_1type__model__physics.html"
 <tr class="memitem:a6694b2611c3717c18fa2a8c1ac210178" id="r_a6694b2611c3717c18fa2a8c1ac210178"><td class="memItemLeft" align="right" valign="top"><a id="a6694b2611c3717c18fa2a8c1ac210178" name="a6694b2611c3717c18fa2a8c1ac210178"></a>
 type(<a class="el" href="structmodel__coupling__mod_1_1type__model__coupling.html">type_model_coupling</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>coupling</b></td></tr>
 <tr class="separator:a6694b2611c3717c18fa2a8c1ac210178"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5b54216135ce2b988e7091ab03c9badd" id="r_a5b54216135ce2b988e7091ab03c9badd"><td class="memItemLeft" align="right" valign="top"><a id="a5b54216135ce2b988e7091ab03c9badd" name="a5b54216135ce2b988e7091ab03c9badd"></a>
+type(<a class="el" href="structcore__grid__mod_1_1type__grid__2d.html">type_grid_2d</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>grid</b></td></tr>
+<tr class="separator:a5b54216135ce2b988e7091ab03c9badd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a69f71af662a7e866238c9681c173506c" id="r_a69f71af662a7e866238c9681c173506c"><td class="memItemLeft" align="right" valign="top"><a id="a69f71af662a7e866238c9681c173506c" name="a69f71af662a7e866238c9681c173506c"></a>
+type(<a class="el" href="structmodel__fields__2d__mod_1_1type__fields__2d.html">type_fields_2d</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>fields</b></td></tr>
+<tr class="separator:a69f71af662a7e866238c9681c173506c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a354ff9199832615a8535b6dfeb4eaa85" id="r_a354ff9199832615a8535b6dfeb4eaa85"><td class="memItemLeft" align="right" valign="top"><a id="a354ff9199832615a8535b6dfeb4eaa85" name="a354ff9199832615a8535b6dfeb4eaa85"></a>
+type(<a class="el" href="structcore__field__registry__mod_1_1type__field__registry.html">type_field_registry</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>registry</b></td></tr>
+<tr class="separator:a354ff9199832615a8535b6dfeb4eaa85"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab2487e11179b21c06d471ca88edec885" id="r_ab2487e11179b21c06d471ca88edec885"><td class="memItemLeft" align="right" valign="top"><a id="ab2487e11179b21c06d471ca88edec885" name="ab2487e11179b21c06d471ca88edec885"></a>
+type(<a class="el" href="structmodel__means__mod_1_1type__model__means.html">type_model_means</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>means</b></td></tr>
+<tr class="separator:ab2487e11179b21c06d471ca88edec885"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2c2fa392b02517d63b1076806d44c324" id="r_a2c2fa392b02517d63b1076806d44c324"><td class="memItemLeft" align="right" valign="top"><a id="a2c2fa392b02517d63b1076806d44c324" name="a2c2fa392b02517d63b1076806d44c324"></a>
+type(<a class="el" href="structmodel__stations__mod_1_1type__model__stations.html">type_model_stations</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>stations</b></td></tr>
+<tr class="separator:a2c2fa392b02517d63b1076806d44c324"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this type was generated from the following file:<ul>
-<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/model/<b>main.f90</b></li>
+<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/model/2d/<b>main.f90</b></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
@@ -166,5 +201,6 @@ type(<a class="el" href="structmodel__coupling__mod_1_1type__model__coupling.htm
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

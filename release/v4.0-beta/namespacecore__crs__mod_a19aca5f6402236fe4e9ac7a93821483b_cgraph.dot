@@ -1,0 +1,14 @@
+digraph "core_crs_mod::to_external"
+{
+ // LATEX_PDF_SIZE
+  bgcolor="transparent";
+  edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
+  node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
+  rankdir="LR";
+  Node1 [id="Node000001",label="core_crs_mod::to_external",height=0.2,width=0.4,color="gray40", fillcolor="grey60", style="filled", fontcolor="black",tooltip="Transform local grid metres back to external CRS coordinates."];
+  Node1 -> Node2 [id="edge1_Node000001_Node000002",color="steelblue1",style="solid",tooltip=" "];
+  Node2 [id="Node000002",label="core_crs_mod::crs_scale_x",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$namespacecore__crs__mod.html#a582a2fd186f62f647d6a9a39cd1470fa",tooltip="Precompute the x-scale factor for the flat-Earth projection."];
+  Node2 -> Node2 [id="edge2_Node000002_Node000002",color="steelblue1",style="solid",tooltip=" "];
+  Node1 -> Node3 [id="edge3_Node000001_Node000003",color="steelblue1",style="solid",tooltip=" "];
+  Node3 [id="Node000003",label="core_crs_mod::reproject",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$namespacecore__crs__mod.html#a43572174fcdc6925a03eefcd421dc8d9",tooltip="Convert a metre displacement from the origin back to external coordinates."];
+}

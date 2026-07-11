@@ -1,17 +1,17 @@
 var annotated_dup =
 [
-    [ "core_accumulators_mod", null, [
-      [ "type_accumulator", "structcore__accumulators__mod_1_1type__accumulator.html", null ]
+    [ "core_accumulators_mod", "namespacecore__accumulators__mod.html", [
+      [ "type_accumulator", "structcore__accumulators__mod_1_1type__accumulator.html", "structcore__accumulators__mod_1_1type__accumulator" ]
     ] ],
     [ "core_comm_mod", null, [
       [ "new_comm", "interfacecore__comm__mod_1_1new__comm.html", null ],
       [ "type_comm", "structcore__comm__mod_1_1type__comm.html", null ]
     ] ],
-    [ "core_constants_mod", null, [
-      [ "type_string", "structcore__constants__mod_1_1type__string.html", null ]
+    [ "core_constants_mod", "namespacecore__constants__mod.html", [
+      [ "type_string", "structcore__constants__mod_1_1type__string.html", "structcore__constants__mod_1_1type__string" ]
     ] ],
-    [ "core_crs_mod", null, [
-      [ "type_crs", "structcore__crs__mod_1_1type__crs.html", null ]
+    [ "core_crs_mod", "namespacecore__crs__mod.html", [
+      [ "type_crs", "structcore__crs__mod_1_1type__crs.html", "structcore__crs__mod_1_1type__crs" ]
     ] ],
     [ "core_env_mod", null, [
       [ "new_env", "interfacecore__env__mod_1_1new__env.html", null ],
@@ -21,10 +21,11 @@ var annotated_dup =
       [ "type_field_registry", "structcore__field__registry__mod_1_1type__field__registry.html", null ]
     ] ],
     [ "core_grid_mod", null, [
-      [ "type_grid_2d", "structcore__grid__mod_1_1type__grid__2d.html", null ]
+      [ "type_grid_2d", "structcore__grid__mod_1_1type__grid__2d.html", null ],
+      [ "type_loop_bounds", "structcore__grid__mod_1_1type__loop__bounds.html", null ]
     ] ],
-    [ "core_interpolation_mod", null, [
-      [ "type_interpolator", "structcore__interpolation__mod_1_1type__interpolator.html", null ]
+    [ "core_interpolation_mod", "namespacecore__interpolation__mod.html", [
+      [ "type_interpolator", "structcore__interpolation__mod_1_1type__interpolator.html", "structcore__interpolation__mod_1_1type__interpolator" ]
     ] ],
     [ "core_log_io_mod", "namespacecore__log__io__mod.html", [
       [ "new_log_writer", "interfacecore__log__io__mod_1_1new__log__writer.html", null ],
@@ -39,9 +40,6 @@ var annotated_dup =
     [ "core_output_manager_mod", null, [
       [ "type_output_manager", "structcore__output__manager__mod_1_1type__output__manager.html", null ]
     ] ],
-    [ "core_path_mod", "namespacecore__path__mod.html", [
-      [ "type_path", "structcore__path__mod_1_1type__path.html", "structcore__path__mod_1_1type__path" ]
-    ] ],
     [ "core_range_parse_mod", "namespacecore__range__parse__mod.html", [
       [ "type_base_range", "structcore__range__parse__mod_1_1type__base__range.html", null ],
       [ "type_integer_range", "structcore__range__parse__mod_1_1type__integer__range.html", "structcore__range__parse__mod_1_1type__integer__range" ],
@@ -49,6 +47,15 @@ var annotated_dup =
     ] ],
     [ "core_simulation_time_mod", null, [
       [ "type_simulation_control", "structcore__simulation__time__mod_1_1type__simulation__control.html", null ]
+    ] ],
+    [ "core_solver_tridiag_mod", "namespacecore__solver__tridiag__mod.html", [
+      [ "type_trid_workspace", "structcore__solver__tridiag__mod_1_1type__trid__workspace.html", null ]
+    ] ],
+    [ "core_stepper_engine_mod", null, [
+      [ "i_pre_step", "interfacecore__stepper__engine__mod_1_1i__pre__step.html", null ],
+      [ "type_engine_monitor", "structcore__stepper__engine__mod_1_1type__engine__monitor.html", null ],
+      [ "type_stepper_engine", "structcore__stepper__engine__mod_1_1type__stepper__engine.html", null ],
+      [ "type_stepper_model", "structcore__stepper__engine__mod_1_1type__stepper__model.html", null ]
     ] ],
     [ "core_time_utils_mod", null, [
       [ "callback_interface", "interfacecore__time__utils__mod_1_1callback__interface.html", null ],
@@ -63,9 +70,51 @@ var annotated_dup =
     [ "input_read", null, [
       [ "read_four_type_values", "interfaceinput__read_1_1read__four__type__values.html", null ]
     ] ],
+    [ "model_3d_baroclinic_mod", null, [
+      [ "type_model_3d_baroclinic", "structmodel__3d__baroclinic__mod_1_1type__model__3d__baroclinic.html", null ]
+    ] ],
+    [ "model_3d_bc_mod", null, [
+      [ "type_model_3d_bc", "structmodel__3d__bc__mod_1_1type__model__3d__bc.html", null ]
+    ] ],
+    [ "model_3d_config_mod", null, [
+      [ "type_model_3d_config", "structmodel__3d__config__mod_1_1type__model__3d__config.html", null ]
+    ] ],
+    [ "model_3d_geometry_mod", null, [
+      [ "type_model_3d_geometry", "structmodel__3d__geometry__mod_1_1type__model__3d__geometry.html", null ]
+    ] ],
+    [ "model_3d_hotstart_mod", null, [
+      [ "type_model_3d_hotstart", "structmodel__3d__hotstart__mod_1_1type__model__3d__hotstart.html", null ]
+    ] ],
+    [ "model_3d_mod", null, [
+      [ "type_model_3d", "structmodel__3d__mod_1_1type__model__3d.html", null ]
+    ] ],
+    [ "model_3d_output_mod", null, [
+      [ "type_model_3d_output", "structmodel__3d__output__mod_1_1type__model__3d__output.html", null ]
+    ] ],
+    [ "model_3d_physics_mod", null, [
+      [ "type_model_3d_physics", "structmodel__3d__physics__mod_1_1type__model__3d__physics.html", null ]
+    ] ],
+    [ "model_3d_simulation_mod", null, [
+      [ "type_model_3d_simulation", "structmodel__3d__simulation__mod_1_1type__model__3d__simulation.html", null ]
+    ] ],
+    [ "model_3d_solver_mod", null, [
+      [ "type_model_3d_solver", "structmodel__3d__solver__mod_1_1type__model__3d__solver.html", null ]
+    ] ],
+    [ "model_3d_sponge_mod", null, [
+      [ "type_model_3d_sponge", "structmodel__3d__sponge__mod_1_1type__model__3d__sponge.html", null ]
+    ] ],
+    [ "model_3d_turbulence_mod", null, [
+      [ "type_model_3d_turbulence", "structmodel__3d__turbulence__mod_1_1type__model__3d__turbulence.html", null ]
+    ] ],
+    [ "model_3d_wavemaker_mod", null, [
+      [ "type_model_3d_wavemaker", "structmodel__3d__wavemaker__mod_1_1type__model__3d__wavemaker.html", null ]
+    ] ],
     [ "model_base_mod", null, [
       [ "model_read_input", "interfacemodel__base__mod_1_1model__read__input.html", null ],
       [ "type_model_base", "structmodel__base__mod_1_1type__model__base.html", null ]
+    ] ],
+    [ "model_bc_mod", null, [
+      [ "type_model_bc", "structmodel__bc__mod_1_1type__model__bc.html", null ]
     ] ],
     [ "model_breaking_mod", null, [
       [ "type_model_breaking", "structmodel__breaking__mod_1_1type__model__breaking.html", null ]
@@ -73,24 +122,33 @@ var annotated_dup =
     [ "model_coupling_mod", null, [
       [ "type_model_coupling", "structmodel__coupling__mod_1_1type__model__coupling.html", null ]
     ] ],
+    [ "model_fields_2d_mod", null, [
+      [ "type_fields_2d", "structmodel__fields__2d__mod_1_1type__fields__2d.html", "structmodel__fields__2d__mod_1_1type__fields__2d" ]
+    ] ],
     [ "model_friction_mod", null, [
       [ "type_model_friction", "structmodel__friction__mod_1_1type__model__friction.html", null ]
     ] ],
     [ "model_geometry_mod", null, [
       [ "type_model_geometry", "structmodel__geometry__mod_1_1type__model__geometry.html", null ]
     ] ],
-    [ "model_grid_mod", null, [
-      [ "type_model_grid", "structmodel__grid__mod_1_1type__model__grid.html", null ]
-    ] ],
     [ "model_hot_start_mod", null, [
       [ "type_model_hot_start", "structmodel__hot__start__mod_1_1type__model__hot__start.html", null ]
     ] ],
-    [ "model_interface_mod", null, [
-      [ "model_read_input", "interfacemodel__interface__mod_1_1model__read__input.html", null ],
-      [ "type_model_interface", "structmodel__interface__mod_1_1type__model__interface.html", null ]
+    [ "model_kernel_dispersion_mod", null, [
+      [ "type_disp_workspace", "structmodel__kernel__dispersion__mod_1_1type__disp__workspace.html", null ]
+    ] ],
+    [ "model_kernel_etauv_mod", null, [
+      [ "type_etauv_workspace", "structmodel__kernel__etauv__mod_1_1type__etauv__workspace.html", null ]
+    ] ],
+    [ "model_kernel_fluxes_mod", null, [
+      [ "type_flux_workspace", "structmodel__kernel__fluxes__mod_1_1type__flux__workspace.html", null ]
     ] ],
     [ "model_main_mod", null, [
-      [ "type_model_main", "structmodel__main__mod_1_1type__model__main.html", null ]
+      [ "type_model_main", "structmodel__main__mod_1_1type__model__main.html", null ],
+      [ "type_output_monitor", "structmodel__main__mod_1_1type__output__monitor.html", null ]
+    ] ],
+    [ "model_means_mod", null, [
+      [ "type_model_means", "structmodel__means__mod_1_1type__model__means.html", null ]
     ] ],
     [ "model_numerics_mod", null, [
       [ "type_model_numerics", "structmodel__numerics__mod_1_1type__model__numerics.html", null ]
@@ -105,11 +163,21 @@ var annotated_dup =
     [ "model_physics_mod", null, [
       [ "type_model_physics", "structmodel__physics__mod_1_1type__model__physics.html", null ]
     ] ],
+    [ "model_scratch_mod", null, [
+      [ "type_model_scratch", "structmodel__scratch__mod_1_1type__model__scratch.html", null ],
+      [ "type_scratch_pool", "structmodel__scratch__mod_1_1type__scratch__pool.html", "structmodel__scratch__mod_1_1type__scratch__pool" ]
+    ] ],
     [ "model_simulation_mod", null, [
       [ "type_model_simulation", "structmodel__simulation__mod_1_1type__model__simulation.html", null ]
     ] ],
     [ "model_sponge_mod", null, [
-      [ "type_model_sponge", "structmodel__sponge__mod_1_1type__model__sponge.html", null ]
+      [ "type_model_sponge", "structmodel__sponge__mod_1_1type__model__sponge.html", "structmodel__sponge__mod_1_1type__model__sponge" ]
+    ] ],
+    [ "model_stations_mod", null, [
+      [ "type_model_stations", "structmodel__stations__mod_1_1type__model__stations.html", null ]
+    ] ],
+    [ "model_stepper_2d_mod", null, [
+      [ "type_model_stepper_2d", "structmodel__stepper__2d__mod_1_1type__model__stepper__2d.html", null ]
     ] ],
     [ "model_wavemaker_mod", null, [
       [ "type_model_wavemaker", "structmodel__wavemaker__mod_1_1type__model__wavemaker.html", null ]

@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -97,66 +107,306 @@ $(document).ready(function(){initNavTree('structcore__accumulators__mod_1_1type_
   <div class="headertitle"><div class="title">core_accumulators_mod::type_accumulator Type Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Accumulates time-weighted statistics for a 2-D field array.  
+ <a href="structcore__accumulators__mod_1_1type__accumulator.html#details">More...</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:aa4cfb553eb18a02a262a1e305da66b70" id="r_aa4cfb553eb18a02a262a1e305da66b70"><td class="memItemLeft" align="right" valign="top"><a id="aa4cfb553eb18a02a262a1e305da66b70" name="aa4cfb553eb18a02a262a1e305da66b70"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, d1, d2, quantity)</td></tr>
+<tr class="memitem:aa4cfb553eb18a02a262a1e305da66b70" id="r_aa4cfb553eb18a02a262a1e305da66b70"><td class="memItemLeft" align="right" valign="top">procedure, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#aa4cfb553eb18a02a262a1e305da66b70">init</a> (this, d1, d2, <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a4df853aea7d026b0d1363031ee08fd95">quantity</a>)</td></tr>
+<tr class="memdesc:aa4cfb553eb18a02a262a1e305da66b70"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialise the accumulator dimensions and quantity label.  <br /></td></tr>
 <tr class="separator:aa4cfb553eb18a02a262a1e305da66b70"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad6e89d75d1d6e9a44a9fb01ce334ea79" id="r_ad6e89d75d1d6e9a44a9fb01ce334ea79"><td class="memItemLeft" align="right" valign="top"><a id="ad6e89d75d1d6e9a44a9fb01ce334ea79" name="ad6e89d75d1d6e9a44a9fb01ce334ea79"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>allocate_stat</b> (this, op)</td></tr>
+<tr class="memitem:ad6e89d75d1d6e9a44a9fb01ce334ea79" id="r_ad6e89d75d1d6e9a44a9fb01ce334ea79"><td class="memItemLeft" align="right" valign="top">procedure, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#ad6e89d75d1d6e9a44a9fb01ce334ea79">allocate_stat</a> (this, op)</td></tr>
+<tr class="memdesc:ad6e89d75d1d6e9a44a9fb01ce334ea79"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate storage for one statistic.  <br /></td></tr>
 <tr class="separator:ad6e89d75d1d6e9a44a9fb01ce334ea79"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a03b2cb5d433d485cd88c30ae30eb39a9" id="r_a03b2cb5d433d485cd88c30ae30eb39a9"><td class="memItemLeft" align="right" valign="top"><a id="a03b2cb5d433d485cd88c30ae30eb39a9" name="a03b2cb5d433d485cd88c30ae30eb39a9"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>accumulate</b> (this, value, dt)</td></tr>
+<tr class="memitem:a03b2cb5d433d485cd88c30ae30eb39a9" id="r_a03b2cb5d433d485cd88c30ae30eb39a9"><td class="memItemLeft" align="right" valign="top">procedure, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a03b2cb5d433d485cd88c30ae30eb39a9">accumulate</a> (this, value, dt)</td></tr>
+<tr class="memdesc:a03b2cb5d433d485cd88c30ae30eb39a9"><td class="mdescLeft">&#160;</td><td class="mdescRight">Ingest one time step of field data.  <br /></td></tr>
 <tr class="separator:a03b2cb5d433d485cd88c30ae30eb39a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae1b2a5a34d874e5d672d2eea4844d63a" id="r_ae1b2a5a34d874e5d672d2eea4844d63a"><td class="memItemLeft" align="right" valign="top"><a id="ae1b2a5a34d874e5d672d2eea4844d63a" name="ae1b2a5a34d874e5d672d2eea4844d63a"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>reset</b> (this)</td></tr>
+<tr class="memitem:ae1b2a5a34d874e5d672d2eea4844d63a" id="r_ae1b2a5a34d874e5d672d2eea4844d63a"><td class="memItemLeft" align="right" valign="top">procedure, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#ae1b2a5a34d874e5d672d2eea4844d63a">reset</a> (this)</td></tr>
+<tr class="memdesc:ae1b2a5a34d874e5d672d2eea4844d63a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Reset all running sums to zero without freeing memory.  <br /></td></tr>
 <tr class="separator:ae1b2a5a34d874e5d672d2eea4844d63a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abe9bff539e083025ee816a7f2514eb17" id="r_abe9bff539e083025ee816a7f2514eb17"><td class="memItemLeft" align="right" valign="top"><a id="abe9bff539e083025ee816a7f2514eb17" name="abe9bff539e083025ee816a7f2514eb17"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>finalize</b> (this)</td></tr>
+<tr class="memdesc:abe9bff539e083025ee816a7f2514eb17"><td class="mdescLeft">&#160;</td><td class="mdescRight">Free all allocated arrays and reset dimensions to zero. <br /></td></tr>
 <tr class="separator:abe9bff539e083025ee816a7f2514eb17"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1c13f7c66088668b0d7cbaedc29dbdf7" id="r_a1c13f7c66088668b0d7cbaedc29dbdf7"><td class="memItemLeft" align="right" valign="top"><a id="a1c13f7c66088668b0d7cbaedc29dbdf7" name="a1c13f7c66088668b0d7cbaedc29dbdf7"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>get_stat</b> (this, op)</td></tr>
+<tr class="memitem:a1c13f7c66088668b0d7cbaedc29dbdf7" id="r_a1c13f7c66088668b0d7cbaedc29dbdf7"><td class="memItemLeft" align="right" valign="top">procedure, public&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a1c13f7c66088668b0d7cbaedc29dbdf7">get_stat</a> (this, op)</td></tr>
+<tr class="memdesc:a1c13f7c66088668b0d7cbaedc29dbdf7"><td class="mdescLeft">&#160;</td><td class="mdescRight">Retrieve the final statistic as a 2-D array.  <br /></td></tr>
 <tr class="separator:a1c13f7c66088668b0d7cbaedc29dbdf7"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:a4df853aea7d026b0d1363031ee08fd95" id="r_a4df853aea7d026b0d1363031ee08fd95"><td class="memItemLeft" align="right" valign="top"><a id="a4df853aea7d026b0d1363031ee08fd95" name="a4df853aea7d026b0d1363031ee08fd95"></a>
 character(32)&#160;</td><td class="memItemRight" valign="bottom"><b>quantity</b></td></tr>
+<tr class="memdesc:a4df853aea7d026b0d1363031ee08fd95"><td class="mdescLeft">&#160;</td><td class="mdescRight">Human-readable label for the accumulated quantity (e.g. <code>"eta"</code>). <br /></td></tr>
 <tr class="separator:a4df853aea7d026b0d1363031ee08fd95"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae6232b2084164cafa63d48dacad0432a" id="r_ae6232b2084164cafa63d48dacad0432a"><td class="memItemLeft" align="right" valign="top"><a id="ae6232b2084164cafa63d48dacad0432a" name="ae6232b2084164cafa63d48dacad0432a"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>dim1</b> = 0</td></tr>
+<tr class="memdesc:ae6232b2084164cafa63d48dacad0432a"><td class="mdescLeft">&#160;</td><td class="mdescRight">First spatial dimension of the field arrays. <br /></td></tr>
 <tr class="separator:ae6232b2084164cafa63d48dacad0432a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a4b621277e421e6df2b942ff3c734dfc2" id="r_a4b621277e421e6df2b942ff3c734dfc2"><td class="memItemLeft" align="right" valign="top"><a id="a4b621277e421e6df2b942ff3c734dfc2" name="a4b621277e421e6df2b942ff3c734dfc2"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>dim2</b> = 0</td></tr>
+<tr class="memdesc:a4b621277e421e6df2b942ff3c734dfc2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Second spatial dimension of the field arrays. <br /></td></tr>
 <tr class="separator:a4b621277e421e6df2b942ff3c734dfc2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c108db859159bbcbe78deb5fb185252" id="r_a8c108db859159bbcbe78deb5fb185252"><td class="memItemLeft" align="right" valign="top"><a id="a8c108db859159bbcbe78deb5fb185252" name="a8c108db859159bbcbe78deb5fb185252"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>total_dt</b> = 0.0_SP</td></tr>
+<tr class="memdesc:a8c108db859159bbcbe78deb5fb185252"><td class="mdescLeft">&#160;</td><td class="mdescRight">Total accumulated time \(T = \sum_n \Delta t_n\), used as the normalisation denominator for mean and RMS. <br /></td></tr>
 <tr class="separator:a8c108db859159bbcbe78deb5fb185252"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6119c3a2bb8af601c6d51f7cc48c99e2" id="r_a6119c3a2bb8af601c6d51f7cc48c99e2"><td class="memItemLeft" align="right" valign="top"><a id="a6119c3a2bb8af601c6d51f7cc48c99e2" name="a6119c3a2bb8af601c6d51f7cc48c99e2"></a>
-real(sp), dimension(:,:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_sum</b></td></tr>
-<tr class="separator:a6119c3a2bb8af601c6d51f7cc48c99e2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a98b3a33c936351ee7dc4139a2ae55c65" id="r_a98b3a33c936351ee7dc4139a2ae55c65"><td class="memItemLeft" align="right" valign="top"><a id="a98b3a33c936351ee7dc4139a2ae55c65" name="a98b3a33c936351ee7dc4139a2ae55c65"></a>
-real(sp), dimension(:,:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_sum_sq</b></td></tr>
-<tr class="separator:a98b3a33c936351ee7dc4139a2ae55c65"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acd2ee363df1268ff0227dcfd9bcba8c3" id="r_acd2ee363df1268ff0227dcfd9bcba8c3"><td class="memItemLeft" align="right" valign="top"><a id="acd2ee363df1268ff0227dcfd9bcba8c3" name="acd2ee363df1268ff0227dcfd9bcba8c3"></a>
-real(sp), dimension(:,:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_max</b></td></tr>
-<tr class="separator:acd2ee363df1268ff0227dcfd9bcba8c3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:abc3b25c7b2ebae410c01de10d2237413" id="r_abc3b25c7b2ebae410c01de10d2237413"><td class="memItemLeft" align="right" valign="top"><a id="abc3b25c7b2ebae410c01de10d2237413" name="abc3b25c7b2ebae410c01de10d2237413"></a>
-real(sp), dimension(:,:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_min</b></td></tr>
-<tr class="separator:abc3b25c7b2ebae410c01de10d2237413"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af14f5a3ec00eedebd10fca3777cae281" id="r_af14f5a3ec00eedebd10fca3777cae281"><td class="memItemLeft" align="right" valign="top"><a id="af14f5a3ec00eedebd10fca3777cae281" name="af14f5a3ec00eedebd10fca3777cae281"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_sum</b></td></tr>
+<tr class="memdesc:af14f5a3ec00eedebd10fca3777cae281"><td class="mdescLeft">&#160;</td><td class="mdescRight">Running sum \(\sum_n f^{(n)} \Delta t_n\) (allocated for "mean" and "rms"). <br /></td></tr>
+<tr class="separator:af14f5a3ec00eedebd10fca3777cae281"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5d9678b4b2f5c9c224606be32c62421b" id="r_a5d9678b4b2f5c9c224606be32c62421b"><td class="memItemLeft" align="right" valign="top"><a id="a5d9678b4b2f5c9c224606be32c62421b" name="a5d9678b4b2f5c9c224606be32c62421b"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_sum_sq</b></td></tr>
+<tr class="memdesc:a5d9678b4b2f5c9c224606be32c62421b"><td class="mdescLeft">&#160;</td><td class="mdescRight">Running sum of squares \(\sum_n (f^{(n)})^2 \Delta t_n\) (allocated for "rms"). <br /></td></tr>
+<tr class="separator:a5d9678b4b2f5c9c224606be32c62421b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad3a46c42b0c9b31d137cbaff09b7facd" id="r_ad3a46c42b0c9b31d137cbaff09b7facd"><td class="memItemLeft" align="right" valign="top"><a id="ad3a46c42b0c9b31d137cbaff09b7facd" name="ad3a46c42b0c9b31d137cbaff09b7facd"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_max</b></td></tr>
+<tr class="memdesc:ad3a46c42b0c9b31d137cbaff09b7facd"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point-wise maximum over all accumulated steps (allocated for "max"). <br /></td></tr>
+<tr class="separator:ad3a46c42b0c9b31d137cbaff09b7facd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a44244f8daa31767b2afb6afa7f25e248" id="r_a44244f8daa31767b2afb6afa7f25e248"><td class="memItemLeft" align="right" valign="top"><a id="a44244f8daa31767b2afb6afa7f25e248" name="a44244f8daa31767b2afb6afa7f25e248"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>val_min</b></td></tr>
+<tr class="memdesc:a44244f8daa31767b2afb6afa7f25e248"><td class="mdescLeft">&#160;</td><td class="mdescRight">Point-wise minimum over all accumulated steps (allocated for "min"). <br /></td></tr>
+<tr class="separator:a44244f8daa31767b2afb6afa7f25e248"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Accumulates time-weighted statistics for a 2-D field array. </p>
+<p>Call <code>init</code> to set dimensions and the quantity label, then <code>allocate_stat</code> for each required statistic, then <code>accumulate</code> inside the time-stepping loop, and finally <code>get_stat</code> to retrieve results. Call <code>reset</code> to restart without reallocation; <code>finalize</code> to free all memory. </p>
+</div><h2 class="groupheader">Member Function/Subroutine Documentation</h2>
+<a id="a03b2cb5d433d485cd88c30ae30eb39a9" name="a03b2cb5d433d485cd88c30ae30eb39a9"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a03b2cb5d433d485cd88c30ae30eb39a9">&#9670;&#160;</a></span>accumulate()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure, public core_accumulators_mod::type_accumulator::accumulate </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:, :), intent(in)&#160;</td>
+          <td class="paramname"><em>value</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), intent(in)&#160;</td>
+          <td class="paramname"><em>dt</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Ingest one time step of field data. </p>
+<p>Updates all allocated running sums:</p><ul>
+<li><code>val_sum</code> \(\mathrel{+}= f \cdot \Delta t\)</li>
+<li><code>val_sum_sq</code> \(\mathrel{+}= f^2 \cdot \Delta t\)</li>
+<li><code>val_min</code> \(= \min(\texttt{val\_min},\, f)\)</li>
+<li><code>val_max</code> \(= \max(\texttt{val\_max},\, f)\)</li>
+<li><code>total_dt</code> \(\mathrel{+}= \Delta t\)</li>
+</ul>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">value</td><td>Field snapshot at the current time step, shape <code>(dim1, dim2)</code>. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">dt</td><td>Time-step size \(\Delta t &gt; 0\). </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="ad6e89d75d1d6e9a44a9fb01ce334ea79" name="ad6e89d75d1d6e9a44a9fb01ce334ea79"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ad6e89d75d1d6e9a44a9fb01ce334ea79">&#9670;&#160;</a></span>allocate_stat()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure, public core_accumulators_mod::type_accumulator::allocate_stat </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">character(*), intent(in)&#160;</td>
+          <td class="paramname"><em>op</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Allocate storage for one statistic. </p>
+<p>Must be called after <code>init</code> and before the first <code>accumulate</code>. Safe to call multiple times for the same <code>op</code>; subsequent calls are no-ops if storage is already allocated.</p>
+<p>Valid values of <code>op</code>: </p><table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone"><code>op</code>   </th><th class="markdownTableHeadNone">Storage allocated    </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone"><code>"min"</code>   </td><td class="markdownTableBodyNone"><code>val_min</code>    </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone"><code>"max"</code>   </td><td class="markdownTableBodyNone"><code>val_max</code>    </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone"><code>"mean"</code>   </td><td class="markdownTableBodyNone"><code>val_sum</code>    </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone"><code>"rms"</code>   </td><td class="markdownTableBodyNone"><code>val_sum</code>, <code>val_sum_sq</code>   </td></tr>
+</table>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">op</td><td>Statistic name: <code>"min"</code>, <code>"max"</code>, <code>"mean"</code>, or <code>"rms"</code>. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a1c13f7c66088668b0d7cbaedc29dbdf7" name="a1c13f7c66088668b0d7cbaedc29dbdf7"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a1c13f7c66088668b0d7cbaedc29dbdf7">&#9670;&#160;</a></span>get_stat()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure, public core_accumulators_mod::type_accumulator::get_stat </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">character(*), intent(in)&#160;</td>
+          <td class="paramname"><em>op</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Retrieve the final statistic as a 2-D array. </p>
+<p>Applies the normalisation formula for the requested <code>op</code>:</p>
+<table class="markdownTable">
+<tr class="markdownTableHead">
+<th class="markdownTableHeadNone"><code>op</code>   </th><th class="markdownTableHeadNone">Formula    </th></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone"><code>"min"</code>   </td><td class="markdownTableBodyNone">\(\min\) (already stored)    </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone"><code>"max"</code>   </td><td class="markdownTableBodyNone">\(\max\) (already stored)    </td></tr>
+<tr class="markdownTableRowOdd">
+<td class="markdownTableBodyNone"><code>"mean"</code>   </td><td class="markdownTableBodyNone">\(\bar{f} = \sum f\,\Delta t \;/\; T\)    </td></tr>
+<tr class="markdownTableRowEven">
+<td class="markdownTableBodyNone"><code>"rms"</code>   </td><td class="markdownTableBodyNone">\(\sqrt{\sum f^2\,\Delta t \;/\; T}\)   </td></tr>
+</table>
+<p>Returns a zero-filled array if the required storage is not allocated or if <code>total_dt &lt;= 0</code>.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">op</td><td>Statistic name (same values as <code>allocate_stat</code>). </td></tr>
+  </table>
+  </dd>
+</dl>
+<dl class="section return"><dt>Returns</dt><dd>Array of shape <code>(dim1, dim2)</code> with the statistic value. </dd></dl>
+
+</div>
+</div>
+<a id="aa4cfb553eb18a02a262a1e305da66b70" name="aa4cfb553eb18a02a262a1e305da66b70"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa4cfb553eb18a02a262a1e305da66b70">&#9670;&#160;</a></span>init()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure, public core_accumulators_mod::type_accumulator::init </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">integer, intent(in)&#160;</td>
+          <td class="paramname"><em>d1</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">integer, intent(in)&#160;</td>
+          <td class="paramname"><em>d2</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">character(*), intent(in)&#160;</td>
+          <td class="paramname"><em>quantity</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Initialise the accumulator dimensions and quantity label. </p>
+<p>Calls <code>finalize</code> first so it is safe to re-initialise an existing accumulator.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">d1</td><td>First spatial dimension. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">d2</td><td>Second spatial dimension. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">quantity</td><td>Label for the accumulated field (max 32 chars). </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="ae1b2a5a34d874e5d672d2eea4844d63a" name="ae1b2a5a34d874e5d672d2eea4844d63a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ae1b2a5a34d874e5d672d2eea4844d63a">&#9670;&#160;</a></span>reset()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure, public core_accumulators_mod::type_accumulator::reset </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em></td><td>)</td>
+          <td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Reset all running sums to zero without freeing memory. </p>
+<p>Use this to start a new accumulation window after calling <code>get_stat</code>, avoiding the overhead of reallocation. </p>
+
+</div>
+</div>
 <hr/>The documentation for this type was generated from the following file:<ul>
-<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<b>accumulators.f90</b></li>
+<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<a class="el" href="accumulators_8f90.html">accumulators.f90</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><b>core_accumulators_mod</b></li><li class="navelem"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a></li>
+    <li class="navelem"><a class="el" href="namespacecore__accumulators__mod.html">core_accumulators_mod</a></li><li class="navelem"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">type_accumulator</a></li>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

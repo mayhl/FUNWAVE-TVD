@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -97,48 +107,179 @@ $(document).ready(function(){initNavTree('structcore__crs__mod_1_1type__crs.html
   <div class="headertitle"><div class="title">core_crs_mod::type_crs Type Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Coordinate Reference System descriptor for the model grid.  
+ <a href="structcore__crs__mod_1_1type__crs.html#details">More...</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:ab2bb5fcdce5cb363253a1168af5b8c72" id="r_ab2bb5fcdce5cb363253a1168af5b8c72"><td class="memItemLeft" align="right" valign="top"><a id="ab2bb5fcdce5cb363253a1168af5b8c72" name="ab2bb5fcdce5cb363253a1168af5b8c72"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>to_local</b> (this, x_ext, y_ext, x_loc, y_loc)</td></tr>
+<tr class="memitem:ab2bb5fcdce5cb363253a1168af5b8c72" id="r_ab2bb5fcdce5cb363253a1168af5b8c72"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__crs__mod_1_1type__crs.html#ab2bb5fcdce5cb363253a1168af5b8c72">to_local</a> (this, x_ext, y_ext, x_loc, y_loc)</td></tr>
+<tr class="memdesc:ab2bb5fcdce5cb363253a1168af5b8c72"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transform external CRS coordinates to local grid metres.  <br /></td></tr>
 <tr class="separator:ab2bb5fcdce5cb363253a1168af5b8c72"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a925b0cff359e2d344fec3765d42437f4" id="r_a925b0cff359e2d344fec3765d42437f4"><td class="memItemLeft" align="right" valign="top"><a id="a925b0cff359e2d344fec3765d42437f4" name="a925b0cff359e2d344fec3765d42437f4"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>to_external</b> (this, x_loc, y_loc, x_ext, y_ext)</td></tr>
+<tr class="memitem:a925b0cff359e2d344fec3765d42437f4" id="r_a925b0cff359e2d344fec3765d42437f4"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__crs__mod_1_1type__crs.html#a925b0cff359e2d344fec3765d42437f4">to_external</a> (this, x_loc, y_loc, x_ext, y_ext)</td></tr>
+<tr class="memdesc:a925b0cff359e2d344fec3765d42437f4"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transform local grid metres back to external CRS coordinates.  <br /></td></tr>
 <tr class="separator:a925b0cff359e2d344fec3765d42437f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:a390cbe3081eb37ac7d4425c0baf01586" id="r_a390cbe3081eb37ac7d4425c0baf01586"><td class="memItemLeft" align="right" valign="top"><a id="a390cbe3081eb37ac7d4425c0baf01586" name="a390cbe3081eb37ac7d4425c0baf01586"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>mode</b> = CRS_LOCAL</td></tr>
+<tr class="memdesc:a390cbe3081eb37ac7d4425c0baf01586"><td class="mdescLeft">&#160;</td><td class="mdescRight">Transform mode: one of <code>CRS_LOCAL</code>, <code>CRS_PROJECTED</code>, <code>CRS_GEOGRAPHIC</code>. <br /></td></tr>
 <tr class="separator:a390cbe3081eb37ac7d4425c0baf01586"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa7f10b611ec72ff6db80adf3b06a5b24" id="r_aa7f10b611ec72ff6db80adf3b06a5b24"><td class="memItemLeft" align="right" valign="top"><a id="aa7f10b611ec72ff6db80adf3b06a5b24" name="aa7f10b611ec72ff6db80adf3b06a5b24"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>epsg</b> = 0</td></tr>
+<tr class="memdesc:aa7f10b611ec72ff6db80adf3b06a5b24"><td class="mdescLeft">&#160;</td><td class="mdescRight">EPSG code of the external CRS (0 = unset). <br /></td></tr>
 <tr class="separator:aa7f10b611ec72ff6db80adf3b06a5b24"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab176000b4e042896951e8a2428de1b95" id="r_ab176000b4e042896951e8a2428de1b95"><td class="memItemLeft" align="right" valign="top"><a id="ab176000b4e042896951e8a2428de1b95" name="ab176000b4e042896951e8a2428de1b95"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>origin_x</b> = 0.0_SP</td></tr>
+<tr class="memdesc:ab176000b4e042896951e8a2428de1b95"><td class="mdescLeft">&#160;</td><td class="mdescRight">x-coordinate of the grid origin in the external CRS (metres or degrees). <br /></td></tr>
 <tr class="separator:ab176000b4e042896951e8a2428de1b95"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ae029d5d779a9fdf2ce0ee505a3f2371c" id="r_ae029d5d779a9fdf2ce0ee505a3f2371c"><td class="memItemLeft" align="right" valign="top"><a id="ae029d5d779a9fdf2ce0ee505a3f2371c" name="ae029d5d779a9fdf2ce0ee505a3f2371c"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>origin_y</b> = 0.0_SP</td></tr>
+<tr class="memdesc:ae029d5d779a9fdf2ce0ee505a3f2371c"><td class="mdescLeft">&#160;</td><td class="mdescRight">y-coordinate of the grid origin in the external CRS (metres or degrees). <br /></td></tr>
 <tr class="separator:ae029d5d779a9fdf2ce0ee505a3f2371c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a94f99a60731cb0994409a1e46df4ae59" id="r_a94f99a60731cb0994409a1e46df4ae59"><td class="memItemLeft" align="right" valign="top"><a id="a94f99a60731cb0994409a1e46df4ae59" name="a94f99a60731cb0994409a1e46df4ae59"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>theta</b> = 0.0_SP</td></tr>
+<tr class="memdesc:a94f99a60731cb0994409a1e46df4ae59"><td class="mdescLeft">&#160;</td><td class="mdescRight">Grid rotation angle \(\theta\) in radians, counter-clockwise from east. <br /></td></tr>
 <tr class="separator:a94f99a60731cb0994409a1e46df4ae59"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a00a83075e5c8b416f09ded05430d0227" id="r_a00a83075e5c8b416f09ded05430d0227"><td class="memItemLeft" align="right" valign="top"><a id="a00a83075e5c8b416f09ded05430d0227" name="a00a83075e5c8b416f09ded05430d0227"></a>
 character(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>wkt</b></td></tr>
+<tr class="memdesc:a00a83075e5c8b416f09ded05430d0227"><td class="mdescLeft">&#160;</td><td class="mdescRight">Well-Known Text (WKT) representation of the external CRS (optional). <br /></td></tr>
 <tr class="separator:a00a83075e5c8b416f09ded05430d0227"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Coordinate Reference System descriptor for the model grid. </p>
+<p>Encapsulates the mode, origin, and rotation angle required to transform between the external CRS and the local metre grid. </p>
+</div><h2 class="groupheader">Member Function/Subroutine Documentation</h2>
+<a id="a925b0cff359e2d344fec3765d42437f4" name="a925b0cff359e2d344fec3765d42437f4"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a925b0cff359e2d344fec3765d42437f4">&#9670;&#160;</a></span>to_external()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure core_crs_mod::type_crs::to_external </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__crs__mod_1_1type__crs.html">type_crs</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(in)&#160;</td>
+          <td class="paramname"><em>x_loc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(in)&#160;</td>
+          <td class="paramname"><em>y_loc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(out)&#160;</td>
+          <td class="paramname"><em>x_ext</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(out)&#160;</td>
+          <td class="paramname"><em>y_ext</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Transform local grid metres back to external CRS coordinates. </p>
+<p>Applies the inverse rotation \(R^T\) followed by re-projection.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">x_loc</td><td>Local grid x-coordinates in metres, size N. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">y_loc</td><td>Local grid y-coordinates in metres, size N. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">x_ext</td><td>External x-coordinates (longitude or easting), size N. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">y_ext</td><td>External y-coordinates (latitude or northing), size N. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="ab2bb5fcdce5cb363253a1168af5b8c72" name="ab2bb5fcdce5cb363253a1168af5b8c72"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#ab2bb5fcdce5cb363253a1168af5b8c72">&#9670;&#160;</a></span>to_local()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure core_crs_mod::type_crs::to_local </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__crs__mod_1_1type__crs.html">type_crs</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(in)&#160;</td>
+          <td class="paramname"><em>x_ext</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(in)&#160;</td>
+          <td class="paramname"><em>y_ext</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(out)&#160;</td>
+          <td class="paramname"><em>x_loc</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(out)&#160;</td>
+          <td class="paramname"><em>y_loc</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Transform external CRS coordinates to local grid metres. </p>
+<p>Applies the displacement + rotation formula described in the module documentation. For <code>CRS_GEOGRAPHIC</code>, the flat-Earth approximation is used.</p>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">x_ext</td><td>External x-coordinates (longitude or easting), size N. </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">y_ext</td><td>External y-coordinates (latitude or northing), size N. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">x_loc</td><td>Local grid x-coordinates in metres, size N. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">y_loc</td><td>Local grid y-coordinates in metres, size N. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
 <hr/>The documentation for this type was generated from the following file:<ul>
-<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<b>crs.f90</b></li>
+<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<a class="el" href="crs_8f90.html">crs.f90</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><b>core_crs_mod</b></li><li class="navelem"><a class="el" href="structcore__crs__mod_1_1type__crs.html">type_crs</a></li>
+    <li class="navelem"><a class="el" href="namespacecore__crs__mod.html">core_crs_mod</a></li><li class="navelem"><a class="el" href="structcore__crs__mod_1_1type__crs.html">type_crs</a></li>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

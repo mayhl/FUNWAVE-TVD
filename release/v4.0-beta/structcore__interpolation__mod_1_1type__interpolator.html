@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -97,51 +107,181 @@ $(document).ready(function(){initNavTree('structcore__interpolation__mod_1_1type
   <div class="headertitle"><div class="title">core_interpolation_mod::type_interpolator Type Reference</div></div>
 </div><!--header-->
 <div class="contents">
+
+<p>Stores pre-computed bilinear stencils for a set of query points that are local to the calling MPI rank.  
+ <a href="structcore__interpolation__mod_1_1type__interpolator.html#details">More...</a></p>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a7ff46aa1a02f3cad9e65c031619b1c0a" id="r_a7ff46aa1a02f3cad9e65c031619b1c0a"><td class="memItemLeft" align="right" valign="top"><a id="a7ff46aa1a02f3cad9e65c031619b1c0a" name="a7ff46aa1a02f3cad9e65c031619b1c0a"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, xq, yq, grid)</td></tr>
+<tr class="memitem:a7ff46aa1a02f3cad9e65c031619b1c0a" id="r_a7ff46aa1a02f3cad9e65c031619b1c0a"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#a7ff46aa1a02f3cad9e65c031619b1c0a">init</a> (this, xq, yq, grid)</td></tr>
+<tr class="memdesc:a7ff46aa1a02f3cad9e65c031619b1c0a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Initialise from a set of global query coordinates.  <br /></td></tr>
 <tr class="separator:a7ff46aa1a02f3cad9e65c031619b1c0a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aa1428ece289ff1bb479933390ad3144e" id="r_aa1428ece289ff1bb479933390ad3144e"><td class="memItemLeft" align="right" valign="top"><a id="aa1428ece289ff1bb479933390ad3144e" name="aa1428ece289ff1bb479933390ad3144e"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>gather</b> (this, field, out)</td></tr>
+<tr class="memitem:aa1428ece289ff1bb479933390ad3144e" id="r_aa1428ece289ff1bb479933390ad3144e"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html#aa1428ece289ff1bb479933390ad3144e">gather</a> (this, field, out)</td></tr>
+<tr class="memdesc:aa1428ece289ff1bb479933390ad3144e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Evaluate bilinear field values at the pre-computed query points.  <br /></td></tr>
 <tr class="separator:aa1428ece289ff1bb479933390ad3144e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a208ca73e266d14a46e1f109d9bd43fb6" id="r_a208ca73e266d14a46e1f109d9bd43fb6"><td class="memItemLeft" align="right" valign="top"><a id="a208ca73e266d14a46e1f109d9bd43fb6" name="a208ca73e266d14a46e1f109d9bd43fb6"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>finalize</b> (this)</td></tr>
+<tr class="memdesc:a208ca73e266d14a46e1f109d9bd43fb6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Release all allocated arrays and reset the point count. <br /></td></tr>
 <tr class="separator:a208ca73e266d14a46e1f109d9bd43fb6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
 <tr class="memitem:ad07da9b84fa5789bf04bbd51ee42d143" id="r_ad07da9b84fa5789bf04bbd51ee42d143"><td class="memItemLeft" align="right" valign="top"><a id="ad07da9b84fa5789bf04bbd51ee42d143" name="ad07da9b84fa5789bf04bbd51ee42d143"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_points</b> = 0</td></tr>
+<tr class="memdesc:ad07da9b84fa5789bf04bbd51ee42d143"><td class="mdescLeft">&#160;</td><td class="mdescRight">Number of query points owned by this rank. <br /></td></tr>
 <tr class="separator:ad07da9b84fa5789bf04bbd51ee42d143"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:acc4c3635c62e61f7be13de9141419b20" id="r_acc4c3635c62e61f7be13de9141419b20"><td class="memItemLeft" align="right" valign="top"><a id="acc4c3635c62e61f7be13de9141419b20" name="acc4c3635c62e61f7be13de9141419b20"></a>
 integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>src_i</b></td></tr>
+<tr class="memdesc:acc4c3635c62e61f7be13de9141419b20"><td class="mdescLeft">&#160;</td><td class="mdescRight">Ghost-inclusive local i-index of the lower-left bilinear cell, i.e. interior index + N_GHOST. <br /></td></tr>
 <tr class="separator:acc4c3635c62e61f7be13de9141419b20"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a29a867af874d598029fa834fdcd4519e" id="r_a29a867af874d598029fa834fdcd4519e"><td class="memItemLeft" align="right" valign="top"><a id="a29a867af874d598029fa834fdcd4519e" name="a29a867af874d598029fa834fdcd4519e"></a>
 integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>src_j</b></td></tr>
+<tr class="memdesc:a29a867af874d598029fa834fdcd4519e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Ghost-inclusive local j-index of the lower-left bilinear cell. <br /></td></tr>
 <tr class="separator:a29a867af874d598029fa834fdcd4519e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a6b3497383f7fb81b2df72a8ed552f472" id="r_a6b3497383f7fb81b2df72a8ed552f472"><td class="memItemLeft" align="right" valign="top"><a id="a6b3497383f7fb81b2df72a8ed552f472" name="a6b3497383f7fb81b2df72a8ed552f472"></a>
 real(sp), dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>alpha</b></td></tr>
+<tr class="memdesc:a6b3497383f7fb81b2df72a8ed552f472"><td class="mdescLeft">&#160;</td><td class="mdescRight">Normalised x-weight \(\alpha \in [0,1]\). <br /></td></tr>
 <tr class="separator:a6b3497383f7fb81b2df72a8ed552f472"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a53aaf19ddfd8d50b0204cc638426a0f2" id="r_a53aaf19ddfd8d50b0204cc638426a0f2"><td class="memItemLeft" align="right" valign="top"><a id="a53aaf19ddfd8d50b0204cc638426a0f2" name="a53aaf19ddfd8d50b0204cc638426a0f2"></a>
 real(sp), dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>beta</b></td></tr>
+<tr class="memdesc:a53aaf19ddfd8d50b0204cc638426a0f2"><td class="mdescLeft">&#160;</td><td class="mdescRight">Normalised y-weight \(\beta \in [0,1]\). <br /></td></tr>
 <tr class="separator:a53aaf19ddfd8d50b0204cc638426a0f2"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2f1df21c2b9addea969260690b955145" id="r_a2f1df21c2b9addea969260690b955145"><td class="memItemLeft" align="right" valign="top"><a id="a2f1df21c2b9addea969260690b955145" name="a2f1df21c2b9addea969260690b955145"></a>
 integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>point_id</b></td></tr>
+<tr class="memdesc:a2f1df21c2b9addea969260690b955145"><td class="mdescLeft">&#160;</td><td class="mdescRight">Global (1-based) index of each point, for output assembly across ranks. <br /></td></tr>
 <tr class="separator:a2f1df21c2b9addea969260690b955145"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
+<a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
+<div class="textblock"><p>Stores pre-computed bilinear stencils for a set of query points that are local to the calling MPI rank. </p>
+<p>Members are allocated by <code>init</code> and freed by <code>finalize</code>. All index arrays are in <em>ghost-inclusive</em> local coordinates so that <code>gather</code> can index directly into ghost-padded field arrays. </p>
+</div><h2 class="groupheader">Member Function/Subroutine Documentation</h2>
+<a id="aa1428ece289ff1bb479933390ad3144e" name="aa1428ece289ff1bb479933390ad3144e"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#aa1428ece289ff1bb479933390ad3144e">&#9670;&#160;</a></span>gather()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure core_interpolation_mod::type_interpolator::gather </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">type_interpolator</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:, :), intent(in)&#160;</td>
+          <td class="paramname"><em>field</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(out)&#160;</td>
+          <td class="paramname"><em>out</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Evaluate bilinear field values at the pre-computed query points. </p>
+<p>For each locally owned point \(k\) with lower-left cell index \((i,j)\) and normalised weights \(\alpha, \beta \in [0,1]\), the interpolated value is</p>
+<p class="formulaDsp">
+\[
+   f_k = (1-\alpha)(1-\beta)\,f_{i,\,j}
+       + \alpha(1-\beta)\,f_{i+1,\,j}
+       + (1-\alpha)\beta\,f_{i,\,j+1}
+       + \alpha\,\beta\,f_{i+1,\,j+1}
+ \]
+</p>
+<p>where the weights are defined as  </p><p class="formulaDsp">
+\[
+   \alpha = \frac{x_k - x_i}{\Delta x_i}, \qquad
+   \beta  = \frac{y_k - y_j}{\Delta y_j}.
+ \]
+</p>
+<p>See <b>[press2007numerical]</b>, §3.6, for the bilinear form on a non-uniform rectilinear grid.</p>
+<dl class="section note"><dt>Note</dt><dd>The loop is parallelised with OpenMP (<code>!$omp parallel do</code>). Call a halo exchange before gather so ghost cells contain valid neighbour data.</dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">field</td><td>Ghost-inclusive 2-D field array; first dimension size must equal <code>local_nx + 2*N_GHOST</code>. </td></tr>
+    <tr><td class="paramdir">[out]</td><td class="paramname">out</td><td>Interpolated values at the <code>n_points</code> locally owned query points. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
+<a id="a7ff46aa1a02f3cad9e65c031619b1c0a" name="a7ff46aa1a02f3cad9e65c031619b1c0a"></a>
+<h2 class="memtitle"><span class="permalink"><a href="#a7ff46aa1a02f3cad9e65c031619b1c0a">&#9670;&#160;</a></span>init()</h2>
+
+<div class="memitem">
+<div class="memproto">
+      <table class="memname">
+        <tr>
+          <td class="memname">procedure core_interpolation_mod::type_interpolator::init </td>
+          <td>(</td>
+          <td class="paramtype">class(<a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">type_interpolator</a>), intent(inout)&#160;</td>
+          <td class="paramname"><em>this</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(in)&#160;</td>
+          <td class="paramname"><em>xq</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">real(sp), dimension(:), intent(in)&#160;</td>
+          <td class="paramname"><em>yq</em>, </td>
+        </tr>
+        <tr>
+          <td class="paramkey"></td>
+          <td></td>
+          <td class="paramtype">type(<a class="el" href="structcore__grid__mod_1_1type__grid__2d.html">type_grid_2d</a>), intent(in)&#160;</td>
+          <td class="paramname"><em>grid</em>&#160;</td>
+        </tr>
+        <tr>
+          <td></td>
+          <td>)</td>
+          <td></td><td></td>
+        </tr>
+      </table>
+</div><div class="memdoc">
+
+<p>Initialise from a set of global query coordinates. </p>
+<p>Iterates over all global query points and retains only those that fall within the local subdomain owned by the calling MPI rank. For each retained point the bilinear cell and weights are computed by <code>find_bilinear_cell</code>.</p>
+<dl class="section pre"><dt>Precondition</dt><dd><code>gridx</code>, <code>gridy</code>, <code>griddx</code>, <code>griddy</code> must be allocated (call <code>gridinit_spacing</code> first). </dd>
+<dd>
+Field arrays passed to <code>gather</code> must be ghost-inclusive: first dimension size = <code>local_nx + 2*N_GHOST</code>.</dd></dl>
+<dl class="params"><dt>Parameters</dt><dd>
+  <table class="params">
+    <tr><td class="paramdir">[in]</td><td class="paramname">xq</td><td>Global x-coordinates of query points (size N_global). </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">yq</td><td>Global y-coordinates of query points (size N_global). </td></tr>
+    <tr><td class="paramdir">[in]</td><td class="paramname">grid</td><td>Local subdomain grid descriptor. </td></tr>
+  </table>
+  </dd>
+</dl>
+
+</div>
+</div>
 <hr/>The documentation for this type was generated from the following file:<ul>
-<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<b>interpolation.f90</b></li>
+<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<a class="el" href="interpolation_8f90.html">interpolation.f90</a></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
-    <li class="navelem"><b>core_interpolation_mod</b></li><li class="navelem"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">type_interpolator</a></li>
+    <li class="navelem"><a class="el" href="namespacecore__interpolation__mod.html">core_interpolation_mod</a></li><li class="navelem"><a class="el" href="structcore__interpolation__mod_1_1type__interpolator.html">type_interpolator</a></li>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

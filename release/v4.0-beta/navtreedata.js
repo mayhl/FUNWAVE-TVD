@@ -25,6 +25,7 @@
 var NAVTREE =
 [
   [ "funwave", "index.html", [
+    [ "Bibliography", "citelist.html", null ],
     [ "Modules", "namespaces.html", [
       [ "Modules List", "namespaces.html", "namespaces_dup" ],
       [ "Module Members", "namespacemembers.html", [
@@ -39,15 +40,20 @@ var NAVTREE =
       [ "Class Hierarchy", "hierarchy.html", "hierarchy" ],
       [ "Data Fields", "functions.html", [
         [ "All", "functions.html", null ],
-        [ "Functions/Subroutines", "functions_func.html", null ]
+        [ "Functions/Subroutines", "functions_func.html", null ],
+        [ "Variables", "functions_vars.html", null ]
       ] ]
+    ] ],
+    [ "Files", "files.html", [
+      [ "File List", "files.html", "files_dup" ]
     ] ]
   ] ]
 ];
 
 var NAVTREEINDEX =
 [
-"annotated.html"
+"accumulators_8f90.html",
+"structmodel__fields__2d__mod_1_1type__fields__2d.html#a22a4aa045909fea7b02c0843e5dc1b30"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

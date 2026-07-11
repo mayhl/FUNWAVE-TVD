@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -97,24 +107,27 @@ $(document).ready(function(){initNavTree('structmodel__simulation__mod_1_1type__
 <p>This is the complete list of members for <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>, including all inherited members.</p>
 <table class="directory">
   <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>dt_fixed</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>fixed_dt</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>is_activated</b> (defined in <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a>)</td><td class="entry"><a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>plot_intv</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>plot_intv_station</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>read_input</b>(this, env) (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>read_input</b>(this, env) (defined in <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a>)</td><td class="entry"><a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td><td class="entry"><span class="mlabel">pure virtual</span></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>screen_interval</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>station_output_buffer</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>t_start</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>title</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>total_time</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>engine</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>fixed_dt</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>is_activated</b> (defined in <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a>)</td><td class="entry"><a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>plot_intv</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>plot_intv_station</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>read_input</b>(this, env) (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>read_input</b>(this, env) (defined in <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a>)</td><td class="entry"><a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td><td class="entry"><span class="mlabel">pure virtual</span></td></tr>
+  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>screen_interval</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>station_output_buffer</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>t_start</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>title</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
+  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>total_time</b> (defined in <a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a>)</td><td class="entry"><a class="el" href="structmodel__simulation__mod_1_1type__model__simulation.html">model_simulation_mod::type_model_simulation</a></td><td class="entry"></td></tr>
 </table></div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

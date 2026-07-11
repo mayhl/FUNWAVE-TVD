@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -100,12 +110,18 @@ $(document).ready(function(){initNavTree('structcore__output__gatherer__mod_1_1t
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a2550981684cf4fe50a1b5fd2efb81875" id="r_a2550981684cf4fe50a1b5fd2efb81875"><td class="memItemLeft" align="right" valign="top"><a id="a2550981684cf4fe50a1b5fd2efb81875" name="a2550981684cf4fe50a1b5fd2efb81875"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init_points</b> (this, n_global, n_local, comm)</td></tr>
-<tr class="separator:a2550981684cf4fe50a1b5fd2efb81875"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a73611afbacc716785ab4290ccb25f955" id="r_a73611afbacc716785ab4290ccb25f955"><td class="memItemLeft" align="right" valign="top"><a id="a73611afbacc716785ab4290ccb25f955" name="a73611afbacc716785ab4290ccb25f955"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init_points</b> (this, n_global, n_local, comm, local_ids)</td></tr>
+<tr class="separator:a73611afbacc716785ab4290ccb25f955"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8986103bb20a091d8ce65d3790fce6df" id="r_a8986103bb20a091d8ce65d3790fce6df"><td class="memItemLeft" align="right" valign="top"><a id="a8986103bb20a091d8ce65d3790fce6df" name="a8986103bb20a091d8ce65d3790fce6df"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init_field</b> (this, grid, comm)</td></tr>
+<tr class="separator:a8986103bb20a091d8ce65d3790fce6df"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aeba38b229afe01f17e73d7a483687dd9" id="r_aeba38b229afe01f17e73d7a483687dd9"><td class="memItemLeft" align="right" valign="top"><a id="aeba38b229afe01f17e73d7a483687dd9" name="aeba38b229afe01f17e73d7a483687dd9"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>gather_vals</b> (this, local_vals, global_out, comm)</td></tr>
 <tr class="separator:aeba38b229afe01f17e73d7a483687dd9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abcccbe2643233733df393d30c916817e" id="r_abcccbe2643233733df393d30c916817e"><td class="memItemLeft" align="right" valign="top"><a id="abcccbe2643233733df393d30c916817e" name="abcccbe2643233733df393d30c916817e"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>gather_field</b> (this, local_vals, global_out, comm)</td></tr>
+<tr class="separator:abcccbe2643233733df393d30c916817e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:abc754c68b824830bffa69262596382bb" id="r_abc754c68b824830bffa69262596382bb"><td class="memItemLeft" align="right" valign="top"><a id="abc754c68b824830bffa69262596382bb" name="abc754c68b824830bffa69262596382bb"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>finalize</b> (this)</td></tr>
 <tr class="separator:abc754c68b824830bffa69262596382bb"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -121,6 +137,27 @@ integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_local</b> = 0</t
 <tr class="memitem:a49844b53135ebfe889f5d32666f53a88" id="r_a49844b53135ebfe889f5d32666f53a88"><td class="memItemLeft" align="right" valign="top"><a id="a49844b53135ebfe889f5d32666f53a88" name="a49844b53135ebfe889f5d32666f53a88"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>io_rank</b> = 0</td></tr>
 <tr class="separator:a49844b53135ebfe889f5d32666f53a88"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8e2a2420c21ccb7837748a551e8b6f47" id="r_a8e2a2420c21ccb7837748a551e8b6f47"><td class="memItemLeft" align="right" valign="top"><a id="a8e2a2420c21ccb7837748a551e8b6f47" name="a8e2a2420c21ccb7837748a551e8b6f47"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>m</b> = 0</td></tr>
+<tr class="separator:a8e2a2420c21ccb7837748a551e8b6f47"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2a1932e757b0e6af13222d052f7fa273" id="r_a2a1932e757b0e6af13222d052f7fa273"><td class="memItemLeft" align="right" valign="top"><a id="a2a1932e757b0e6af13222d052f7fa273" name="a2a1932e757b0e6af13222d052f7fa273"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>n</b> = 0</td></tr>
+<tr class="separator:a2a1932e757b0e6af13222d052f7fa273"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a01f786c80dde2bf9eb1dab8a3c255561" id="r_a01f786c80dde2bf9eb1dab8a3c255561"><td class="memItemLeft" align="right" valign="top"><a id="a01f786c80dde2bf9eb1dab8a3c255561" name="a01f786c80dde2bf9eb1dab8a3c255561"></a>
+integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>ib_all</b></td></tr>
+<tr class="separator:a01f786c80dde2bf9eb1dab8a3c255561"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0f4ade842f607341d86f56633bb3dce4" id="r_a0f4ade842f607341d86f56633bb3dce4"><td class="memItemLeft" align="right" valign="top"><a id="a0f4ade842f607341d86f56633bb3dce4" name="a0f4ade842f607341d86f56633bb3dce4"></a>
+integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>ie_all</b></td></tr>
+<tr class="separator:a0f4ade842f607341d86f56633bb3dce4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a56f5b42a6aede011f2694841ffb62552" id="r_a56f5b42a6aede011f2694841ffb62552"><td class="memItemLeft" align="right" valign="top"><a id="a56f5b42a6aede011f2694841ffb62552" name="a56f5b42a6aede011f2694841ffb62552"></a>
+integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>jb_all</b></td></tr>
+<tr class="separator:a56f5b42a6aede011f2694841ffb62552"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:abc4a219a1daccd860fcc4d22b7adc678" id="r_abc4a219a1daccd860fcc4d22b7adc678"><td class="memItemLeft" align="right" valign="top"><a id="abc4a219a1daccd860fcc4d22b7adc678" name="abc4a219a1daccd860fcc4d22b7adc678"></a>
+integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>je_all</b></td></tr>
+<tr class="separator:abc4a219a1daccd860fcc4d22b7adc678"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a24131698a502e536b98d3cc2e6d30bb4" id="r_a24131698a502e536b98d3cc2e6d30bb4"><td class="memItemLeft" align="right" valign="top"><a id="a24131698a502e536b98d3cc2e6d30bb4" name="a24131698a502e536b98d3cc2e6d30bb4"></a>
+integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>point_ids</b></td></tr>
+<tr class="separator:a24131698a502e536b98d3cc2e6d30bb4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af3ea1d046ff8a5ea251107d8caabb827" id="r_af3ea1d046ff8a5ea251107d8caabb827"><td class="memItemLeft" align="right" valign="top"><a id="af3ea1d046ff8a5ea251107d8caabb827" name="af3ea1d046ff8a5ea251107d8caabb827"></a>
 integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>recv_counts</b></td></tr>
 <tr class="separator:af3ea1d046ff8a5ea251107d8caabb827"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -133,6 +170,7 @@ integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bo
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
@@ -140,5 +178,6 @@ integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bo
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

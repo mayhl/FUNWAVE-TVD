@@ -16,8 +16,18 @@
 <link href="search/search.css" rel="stylesheet" type="text/css"/>
 <script type="text/javascript" src="search/searchdata.js"></script>
 <script type="text/javascript" src="search/search.js"></script>
+<script type="text/javascript">
+window.MathJax = {
+  options: {
+    ignoreHtmlClass: 'tex2jax_ignore',
+    processHtmlClass: 'tex2jax_process'
+  }
+};
+</script>
+<script type="text/javascript" id="MathJax-script" async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
 <link href="doxygen.css" rel="stylesheet" type="text/css" />
 <link href="doxygen-awesome.css" rel="stylesheet" type="text/css"/>
+<link href="doxygen-custom.css" rel="stylesheet" type="text/css"/>
 </head>
 <body>
 <div id="top"><!-- do not remove this div, it is closed by doxygen! -->
@@ -96,27 +106,29 @@ $(document).ready(function(){initNavTree('structcore__accumulators__mod_1_1type_
 
 <p>This is the complete list of members for <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>, including all inherited members.</p>
 <table class="directory">
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>accumulate</b>(this, value, dt) (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>allocate_stat</b>(this, op) (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>dim1</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>dim2</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>finalize</b>(this) (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>get_stat</b>(this, op) (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>init</b>(this, d1, d2, quantity) (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>quantity</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>reset</b>(this) (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>total_dt</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>val_max</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>val_min</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="even"><td class="entry"><b>val_sum</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
-  <tr bgcolor="#f0f0f0" class="odd"><td class="entry"><b>val_sum_sq</b> (defined in <a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a>)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a03b2cb5d433d485cd88c30ae30eb39a9">accumulate</a>(this, value, dt)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#ad6e89d75d1d6e9a44a9fb01ce334ea79">allocate_stat</a>(this, op)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#ae6232b2084164cafa63d48dacad0432a">dim1</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a4b621277e421e6df2b942ff3c734dfc2">dim2</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#abe9bff539e083025ee816a7f2514eb17">finalize</a>(this)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a1c13f7c66088668b0d7cbaedc29dbdf7">get_stat</a>(this, op)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#aa4cfb553eb18a02a262a1e305da66b70">init</a>(this, d1, d2, quantity)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a4df853aea7d026b0d1363031ee08fd95">quantity</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#ae1b2a5a34d874e5d672d2eea4844d63a">reset</a>(this)</td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a8c108db859159bbcbe78deb5fb185252">total_dt</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#ad3a46c42b0c9b31d137cbaff09b7facd">val_max</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a44244f8daa31767b2afb6afa7f25e248">val_min</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="even"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#af14f5a3ec00eedebd10fca3777cae281">val_sum</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
+  <tr class="odd"><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html#a5d9678b4b2f5c9c224606be32c62421b">val_sum_sq</a></td><td class="entry"><a class="el" href="structcore__accumulators__mod_1_1type__accumulator.html">core_accumulators_mod::type_accumulator</a></td><td class="entry"></td></tr>
 </table></div><!-- contents -->
 </div><!-- doc-content -->
+<!-- HTML footer for doxygen 1.17.0-->
 <!-- start footer part -->
 <div id="nav-path" class="navpath"><!-- id is needed for treeview function! -->
   <ul>
     <li class="footer">Generated by <a href="https://www.doxygen.org/index.html"><img class="footer" src="doxygen.svg" width="104" height="31" alt="doxygen"/></a> 1.9.8 </li>
   </ul>
 </div>
+<script src="doxygen-nav.js"></script>
 </body>
 </html>

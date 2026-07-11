@@ -6,5 +6,5 @@ digraph "core_time_utils_mod::type_timing_control"
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   Node1 [id="Node000001",label="core_time_utils_mod\l::type_timing_control",height=0.2,width=0.4,color="gray40", fillcolor="grey60", style="filled", fontcolor="black",tooltip=" "];
   Node2 -> Node1 [id="edge1_Node000001_Node000002",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" ops",fontcolor="grey" ];
-  Node2 [id="Node000002",label="core_constants_mod\l::type_string",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__constants__mod_1_1type__string.html",tooltip=" "];
+  Node2 [id="Node000002",label="core_constants_mod\l::type_string",height=0.2,width=0.4,color="gray40", fillcolor="white", style="filled",URL="$structcore__constants__mod_1_1type__string.html",tooltip="Wrapper for a deferred-length allocatable string, used where a fixed-length character array would be ..."];
 }
