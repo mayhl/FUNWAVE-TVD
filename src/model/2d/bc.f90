@@ -44,6 +44,11 @@ module model_bc_mod
       logical :: fill_east = .false.
       logical :: fill_south = .false.
       logical :: fill_north = .false.
+      ! Legacy EXCHANGE feature gates (old/bc.F:441-449): AGE_BREAKING
+      ! under VISCOSITY_BREAKING, nu_break also under WAVEMAKER_VIS.
+      ! The show-only display mode exchanges neither (stepper sets).
+      logical :: exch_age = .false.
+      logical :: exch_nu = .false.
    contains
       procedure :: init => bc_init
       procedure :: exchange_state => bc_exchange_state
@@ -81,8 +86,8 @@ contains
    ! antisymmetrically ($u = 0$ at x-walls, $v = 0$ at y-walls):
    !   $$ \eta:\ (+,+) \qquad u, p, hu:\ (-,+) \qquad v, q, hv:\ (+,-) $$
    ! The mask travels as a real copy with scalar mirror semantics.
-   ! Breaking fields (nu_break, age_break) mirror as scalars when
-   ! allocated (legacy VISCOSITY_BREAKING branch).
+   ! Breaking fields (age_break, nu_break) mirror as scalars under
+   ! their legacy gates (exch_age/exch_nu, legacy order age first).
    ! Dry-cell velocities are then zeroed (legacy U = U*MASK):
    !   $$ u := u\,m, \quad v := v\,m, \quad hu := hu\,m, \quad hv := hv\,m $$
    ! Ubar/Vbar are exchanged (their ghosts are unread in legacy —
@@ -111,9 +116,11 @@ contains
       call exchange_one(this, grid, fields%q, SIGN_MIRROR, SIGN_ANTI)
       call exchange_one(this, grid, fields%hv, SIGN_MIRROR, SIGN_ANTI)
 
-      if (allocated(fields%nu_break)) then
-         call exchange_one(this, grid, fields%nu_break, SIGN_MIRROR, SIGN_MIRROR)
+      if (this%exch_age) then
          call exchange_one(this, grid, fields%age_break, SIGN_MIRROR, SIGN_MIRROR)
+      end if
+      if (this%exch_nu) then
+         call exchange_one(this, grid, fields%nu_break, SIGN_MIRROR, SIGN_MIRROR)
       end if
 
       fields%u = fields%u*fields%mask

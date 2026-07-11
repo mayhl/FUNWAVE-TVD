@@ -70,9 +70,11 @@ module model_stepper_2d_mod
    private
    public :: type_model_stepper_2d
 
-   ! Legacy breaking-age threshold default (old/init.F: T_brk = 20 when
-   ! SHOW_BREAKING); spectral wavemakers override with 1/FreqMax at
-   ! init.  Runtime-configurable form deferred.
+   ! Legacy breaking-age threshold (old/init.F:1235: T_brk = 20 when
+   ! SHOW_BREAKING).  The spectral-wavemaker T_brk assignments are DEAD
+   ! in legacy: WAVEMAKER_INITIALIZATION (init.F:955) runs first and
+   ! init.F:1235 overwrites unconditionally under the same
+   ! SHOW_BREAKING gate, so 20 always wins (parity ledger 17d/e).
    real(SP), parameter :: T_BRK_LEGACY = 20.0_SP
 
    type, extends(type_stepper_model) :: type_model_stepper_2d
@@ -100,7 +102,7 @@ module model_stepper_2d_mod
       real(SP) :: b1 = 0.0_SP, b2 = 0.0_SP
       real(SP) :: beta1 = 0.0_SP, beta2 = 0.0_SP
 
-      ! Breaking-age threshold (legacy T_brk; wavemaker may override)
+      ! Breaking-age threshold (legacy T_brk, always 20 — see above)
       real(SP) :: t_brk = T_BRK_LEGACY
 
       ! dt of the step in flight (estimate_dt -> post_step means/stats)
@@ -141,10 +143,17 @@ module model_stepper_2d_mod
       real(SP), allocatable :: zeros(:, :)             ! inactive-source stand-in
       real(SP), allocatable :: coriolis(:, :)          ! per-cell f (f-plane; CRS later)
 
-      ! Breaking extras (allocated when viscosity_breaking).
+      ! Breaking extras (allocated whenever the breaker runs — the
+      ! show-only display mode included — or their OUT_ flags ask for
+      ! the legacy zero-filled files).
       real(SP), allocatable :: roller_flux(:, :)
       real(SP), allocatable :: undertow_u(:, :), undertow_v(:, :)
       logical, allocatable :: in_wm_zone(:, :)         ! breaker's wavemaker-zone flags
+
+      ! Breaker dispatch (legacy WAVE_BREAKING head): viscosity mode or
+      ! the show-only display mode; WAVEMAKER_VIS keeps priority over
+      ! show in modern (deliberate 19c deviation from the ykchoi trap)
+      logical :: run_breaker = .false.
 
       ! Combined eddy viscosity, allocated only when nu_break and
       ! nu_sponge are BOTH active (legacy nu_vis assembly in sources.F);
@@ -217,8 +226,16 @@ contains
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
+      ! legacy EXCHANGE ghost gates (old/bc.F:441-449): AGE_BREAKING
+      ! travels only under VISCOSITY_BREAKING, nu_break also under
+      ! WAVEMAKER_VIS — the show-only display mode exchanges NEITHER
+      ! (its age ghosts stay locally-written/zero, seams included)
+      this%bc%exch_age = physics%viscosity_breaking
+      this%bc%exch_nu = physics%viscosity_breaking .or. breaking%WAVEMAKER_VIS
+
+      ! wavemaker%T_brk is deliberately NOT consumed (dead in legacy;
+      ! see the T_BRK_LEGACY note)
       this%t_brk = T_BRK_LEGACY
-      if (wavemaker%T_brk > 0.0_SP) this%t_brk = wavemaker%T_brk
 
       this%west_dirichlet = grid%is_back_boundary &
                             .and. wavemaker%wavemaker_type == "LEFT_BC_IRR"
@@ -320,12 +337,23 @@ contains
          error stop "stepper: viscosity_breaking and WAVEMAKER_VIS are mutually exclusive"
       end if
 
-      if (this%physics%viscosity_breaking) then
+      ! legacy WAVE_BREAKING dispatch: SHOW_BREAKING runs BREAKING
+      ! (show_breaking is forced by viscosity_breaking in model_setup);
+      ! in modern WAVEMAKER_VIS wins over show (19c deviation)
+      this%run_breaker = this%physics%viscosity_breaking &
+                         .or. (this%breaking%show_breaking &
+                               .and. .not. this%breaking%WAVEMAKER_VIS)
+
+      ! legacy allocates + zeroes ROLLER_FLUX/UNDERTOW unconditionally,
+      ! so OUT_ROLLER/OUT_UNDERTOW without a running breaker still
+      ! write zero-filled files
+      if (this%run_breaker .or. this%output%OUT_ROLLER &
+          .or. this%output%OUT_UNDERTOW) then
          allocate (this%roller_flux(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_u(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_v(mloc, nloc), source=0.0_SP)
       end if
-      if (this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) then
+      if (this%run_breaker .or. this%breaking%WAVEMAKER_VIS) then
          allocate (this%in_wm_zone(mloc, nloc))
          call wavemaker%fill_in_zone(this%in_wm_zone)
       end if
@@ -498,7 +526,11 @@ contains
                            num%MinDepthFrc, phy%SWE_ETA_DEP, &
                            phy%viscosity_breaking)
 
-         if (phy%viscosity_breaking) then
+         if (this%run_breaker) then
+            ! viscosity mode AND the legacy show-only display mode: the
+            ! breaker always fills nu_break/age/roller here, but only
+            ! viscosity_breaking feeds nu_break into the momentum
+            ! sources (merge_nu_vis) — show-only leaves dynamics alone
             ! TODO(6e+): vis_scheme selection beyond DEFAULT
             call wave_breaking(lp, this%etax, this%etay, this%etat, &
                                f%eta, f%depth, f%h, f%u, f%v, this%means%etamean, &
@@ -547,6 +579,12 @@ contains
       this%fws%q = 0.0_SP
       call registry%register("p_flux", this%fws%p)
       call registry%register("q_flux", this%fws%q)
+
+      if (allocated(this%roller_flux)) then
+         call registry%register("roller_flux", this%roller_flux)
+         call registry%register("undertow_u", this%undertow_u)
+         call registry%register("undertow_v", this%undertow_v)
+      end if
 
       associate (f => this%fields, lp => this%grid%lp)
          if (this%output%OUT_MASK) then

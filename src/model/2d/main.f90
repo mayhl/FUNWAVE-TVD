@@ -182,12 +182,21 @@ contains
 
       integer :: i, j
 
+      ! legacy io.F flag forcing (io.F:622-623): roller implies the
+      ! breaking viscosity scheme, and breaking viscosity implies the
+      ! show/display scheme — every downstream consumer (allocations,
+      ! stepper dispatch, output gates) reads the forced values
+      if (this%breaking%roller) this%physics%viscosity_breaking = .true.
+      if (this%physics%viscosity_breaking) this%breaking%show_breaking = .true.
+
       call this%geometry%build_grid(this%env%comm, this%grid, &
                                     periodic_y=this%physics%periodic)
       call this%fields%alloc(this%grid)
-      ! WAVEMAKER_VIS needs nu_break too (legacy allocates the breaking
-      ! arrays for all options since fyshi 01/15/2024)
-      if (this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) then
+      ! WAVEMAKER_VIS and the show-only display mode need nu_break/age
+      ! too (legacy allocates the breaking arrays for all options since
+      ! fyshi 01/15/2024)
+      if (this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS &
+          .or. this%breaking%show_breaking) then
          call this%fields%alloc_breaking(this%grid)
       end if
 
@@ -554,6 +563,16 @@ contains
          ! Legacy gates the nubrk write on VISCOSITY_BREAKING, not OUT_NU alone
          if (out%OUT_NU .and. this%physics%viscosity_breaking) &
             call add_var(vars, prefs, nv, "nu_break", "nubrk")
+         ! Legacy gates the age write on SHOW_BREAKING (io.F:1442-1447);
+         ! roller/undertow write whenever flagged (zero-filled files
+         ! when no breaker runs, like legacy's unconditional arrays)
+         if (out%OUT_AGE .and. this%breaking%show_breaking) &
+            call add_var(vars, prefs, nv, "age_break", "age")
+         if (out%OUT_ROLLER) call add_var(vars, prefs, nv, "roller_flux", "roller")
+         if (out%OUT_UNDERTOW) then
+            call add_var(vars, prefs, nv, "undertow_u", "U_undertow")
+            call add_var(vars, prefs, nv, "undertow_v", "V_undertow")
+         end if
          if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")
          if (out%OUT_MASK9) call add_var(vars, prefs, nv, "mask9", "mask9")
          ! Legacy P/Q are the interface fluxes, not the registry p/q (Ubar)

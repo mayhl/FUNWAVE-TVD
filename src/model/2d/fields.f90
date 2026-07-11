@@ -122,7 +122,8 @@ contains
       allocate (this%arr_time(mloc, nloc), source=0.0_SP)
    end subroutine fields_alloc
 
-   !> Allocate breaking-physics arrays.  Call after alloc() when VISCOSITY_BREAKING is active.
+   !> Allocate breaking-physics arrays.  Call after alloc() when any breaker
+   !> mode is active (viscosity, WAVEMAKER_VIS, or the show-only display mode).
    subroutine fields_alloc_breaking(this, grid)
       class(type_fields_2d), intent(inout) :: this
       type(type_grid_2d), intent(in)    :: grid
@@ -175,6 +176,7 @@ contains
 
       ! Optional breaking-physics fields: present only after alloc_breaking().
       if (allocated(this%nu_break)) call registry%register("nu_break", this%nu_break)
+      if (allocated(this%age_break)) call registry%register("age_break", this%age_break)
       if (allocated(this%d_break)) call registry%register("d_break", this%d_break)
    end subroutine fields_register
 
