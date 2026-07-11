@@ -50,7 +50,8 @@ Sponge_north_width =   0.0
 Cd = 0.0
 
 CFL = 0.5
-DT_fixed = 0.08
+! safe min from adaptive ref time_dt.out (dipped to 0.0705, below the old 0.08)
+DT_fixed = 0.06
 FroudeCap = 1.0
 
 MinDepth = 0.01

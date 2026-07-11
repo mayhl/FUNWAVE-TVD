@@ -33,6 +33,9 @@ CFL = 0.5
 FroudeCap = 3.0
 MinDepth = 0.01
 
+! strict mode only - stripped in default (adaptive) regression runs
+DT_fixed = 0.04
+
 DEPTH_OUT = T
 ETA = T
 U = T
