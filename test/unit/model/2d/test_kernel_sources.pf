@@ -69,6 +69,7 @@ contains
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
       real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      real(SP) :: coriolis(MLOC,NLOC)
       integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: DS = 0.1_SP, ETA0 = 0.5_SP
@@ -86,10 +87,11 @@ contains
       end do
       eta = ETA0
 
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+      coriolis = 0.0_SP
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
-                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+                       wavemaker_mass, cd, nu_vis, coriolis, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -117,6 +119,7 @@ contains
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
       real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      real(SP) :: coriolis(MLOC,NLOC)
       integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: CD0 = 0.01_SP, U0 = 2.0_SP
@@ -130,10 +133,11 @@ contains
       cd = CD0
       u  = U0
 
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+      coriolis = 0.0_SP
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
-                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+                       wavemaker_mass, cd, nu_vis, coriolis, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -161,6 +165,7 @@ contains
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
       real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      real(SP) :: coriolis(MLOC,NLOC)
       integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: WM0 = 0.3_SP, U0 = 1.5_SP, V0 = -0.5_SP
@@ -174,10 +179,11 @@ contains
       wavemaker_mass = WM0
       u = U0;  v = V0
 
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+      coriolis = 0.0_SP
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
-                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+                       wavemaker_mass, cd, nu_vis, coriolis, MIN_DEPTH_FRC, src_x, src_y)
 
       ! friction off (cd=0), bathy flat: src = wavemaker mass term - drag on |UV|
       do j = lp%jb, lp%je
@@ -207,6 +213,7 @@ contains
       real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
       real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      real(SP) :: coriolis(MLOC,NLOC)
       integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
       integer  :: i, j
 
@@ -224,10 +231,11 @@ contains
       end do
       p = 0.0_SP;  q = 0.0_SP
 
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., mask, mask9, inv_dx, inv_dy, &
+      coriolis = 0.0_SP
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
-                       wavemaker_mass, cd, nu_vis, MIN_DEPTH_FRC, src_x, src_y)
+                       wavemaker_mass, cd, nu_vis, coriolis, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -238,5 +246,65 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_eddy_viscosity_linear_hu
+
+   ! ----------------------------------------------------------------
+   ! Coriolis: constant f and constant face fluxes →
+   !   src_x = f*Q0 (face average of a constant), src_y = -f*P0.
+   ! All other terms off; same inputs with coriolis_on=.false. → 0.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_coriolis_constant_flux()
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: depth_x(MLOC+1,NLOC), depth_y(MLOC,NLOC+1)
+      real(SP) :: eta(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), p(MLOC+1,NLOC), q(MLOC,NLOC+1)
+      real(SP) :: hu(MLOC,NLOC), hv(MLOC,NLOC)
+      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
+      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC), u2(MLOC,NLOC), v2(MLOC,NLOC)
+      real(SP) :: u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: wavemaker_mass(MLOC,NLOC), cd(MLOC,NLOC), nu_vis(MLOC,NLOC)
+      real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
+      real(SP) :: coriolis(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: i, j
+      real(SP), parameter :: F0 = 1.0e-2_SP, P0 = 2.0_SP, Q0 = 3.0_SP
+
+      call make_lp(lp)
+      call zero_inputs(inv_dx, inv_dy, depth_x(1:MLOC,:), depth_y(:,1:NLOC), &
+                       eta, h, u, v, p(1:MLOC,:), q(:,1:NLOC), hu, hv, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, mask, mask9)
+      depth_x = 10.0_SP;  depth_y = 10.0_SP
+      p = P0;  q = Q0
+      coriolis = F0
+
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .true., mask, mask9, inv_dx, inv_dy, &
+                       depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, coriolis, MIN_DEPTH_FRC, src_x, src_y)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual( F0*Q0, src_x(i,j), TOL)
+            @assertEqual(-F0*P0, src_y(i,j), TOL)
+         end do
+      end do
+
+      ! gated off: identical inputs contribute nothing
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., mask, mask9, inv_dx, inv_dy, &
+                       depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
+                       u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
+                       wavemaker_mass, cd, nu_vis, coriolis, MIN_DEPTH_FRC, src_x, src_y)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(0.0_SP, src_x(i,j), TOL)
+            @assertEqual(0.0_SP, src_y(i,j), TOL)
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_coriolis_constant_flux
 
 end module test_kernel_sources

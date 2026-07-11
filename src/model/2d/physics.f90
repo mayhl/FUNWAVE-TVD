@@ -18,6 +18,9 @@
 !    breaking: <bool>
 !    wavemaker: <bool>
 !    sediment: <bool>
+!    coriolis:               optional dictionary — f-plane rotation
+!      f: <real>             Coriolis parameter (1/s); wins over latitude
+!      latitude: <real>      centre latitude (deg), f = pi*sin(lat)/21600
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -25,8 +28,9 @@
 !-------------------------------------------------
 
 module model_physics_mod
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, PI
    use core_env_mod, only: type_env, get_sub_env
+   use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_PHYSICS_BETA_REF, DEF_PHYSICS_BREAKING, &
@@ -60,6 +64,12 @@ module model_physics_mod
       logical  :: wavemaker = .false.
       logical  :: sediment = .false.
 
+      ! f-plane Coriolis (legacy has the source term in the spherical
+      ! branch only; [[design-grid-crs]] decouples f from the metric —
+      ! the future CRS provider fills the per-cell array from this)
+      logical  :: coriolis_on = .false.
+      real(SP) :: coriolis_f = 0.0_SP
+
    contains
       procedure :: read_input => physics_read_input
    end type type_model_physics
@@ -71,7 +81,9 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: is_empty, no_key
+      type(type_yaml_reader) :: cor_yaml
+      logical :: is_empty, no_key, no_cor, no_f, no_lat
+      real(SP) :: lat
 
       sub_env = get_sub_env(env, "physics", is_empty)
       this%is_activated = .not. is_empty
@@ -100,6 +112,24 @@ contains
       call sub_env%yaml%read("breaking", val=this%breaking, default=DEF_PHYSICS_BREAKING)
       call sub_env%yaml%read("wavemaker", val=this%wavemaker, default=DEF_PHYSICS_WAVEMAKER)
       call sub_env%yaml%read("sediment", val=this%sediment, default=DEF_PHYSICS_SEDIMENT)
+
+      ! f-plane Coriolis:
+      !   $$ f = \frac{\pi \sin\varphi}{21600} = 2\Omega\sin\varphi,
+      !      \quad \Omega = \frac{2\pi}{86400} $$
+      ! same discrete constant as the legacy spherical fill (init.F)
+      cor_yaml = sub_env%yaml%cast_dictionary("coriolis", no_cor)
+      if (.not. no_cor) then
+         this%coriolis_on = .true.
+         call cor_yaml%read("f", silent=no_f, val=this%coriolis_f, default="0.0")
+         if (no_f) then
+            call cor_yaml%read("latitude", silent=no_lat, val=lat, default="0.0")
+            if (no_lat) then
+               call sub_env%log%exit_on_error( &
+                  "physics/coriolis: f or latitude required")
+            end if
+            this%coriolis_f = PI*sin(lat*PI/180.0_SP)/21600.0_SP
+         end if
+      end if
 
    end subroutine physics_read_input
 

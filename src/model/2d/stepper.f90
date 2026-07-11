@@ -137,6 +137,7 @@ module model_stepper_2d_mod
       real(SP), allocatable :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
       real(SP), allocatable :: src_x(:, :), src_y(:, :)
       real(SP), allocatable :: zeros(:, :)             ! inactive-source stand-in
+      real(SP), allocatable :: coriolis(:, :)          ! per-cell f (f-plane; CRS later)
 
       ! Breaking extras (allocated when viscosity_breaking).
       real(SP), allocatable :: roller_flux(:, :)
@@ -302,6 +303,12 @@ contains
       allocate (this%src_y(mloc, nloc), source=0.0_SP)
       allocate (this%zeros(mloc, nloc), source=0.0_SP)
 
+      ! per-cell f slot — the future CRS metric provider takes ownership
+      ! of filling this ([[design-grid-crs]]); constant f-plane today
+      if (this%physics%coriolis_on) then
+         allocate (this%coriolis(mloc, nloc), source=this%physics%coriolis_f)
+      end if
+
       ! legacy io.F refuses the combination (VISCOSITY_WMAKER replaces
       ! the breaking-age scheme, it does not stack on it)
       if (this%physics%viscosity_breaking .and. this%breaking%WAVEMAKER_VIS) then
@@ -416,6 +423,7 @@ contains
          end if
 
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
+                          phy%coriolis_on, &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
                           this%depth_fx, this%depth_fy, f%eta, f%h, f%u, f%v, &
                           this%fws%p, this%fws%q, f%hu, f%hv, &
@@ -425,6 +433,7 @@ contains
                           wm_mass(this), &
                           this%friction%Cd, &
                           merge_nu_vis(this), &
+                          cor_f(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
 
          call cal_rk_update(lp, RK_ALPHA(istage), RK_BETA(istage), dt, &
@@ -683,6 +692,19 @@ contains
       end if
    end function wm_mass
 
+   ! Per-cell Coriolis f for the momentum source: the stepper's array
+   ! when active, zeros otherwise (the kernel also gates on coriolis_on)
+   function cor_f(this) result(c)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: c(:, :)
+
+      if (allocated(this%coriolis)) then
+         c => this%coriolis
+      else
+         c => this%zeros
+      end if
+   end function cor_f
+
    ! Effective eddy viscosity for the momentum source (legacy nu_vis
    ! assembly at the SourceTerms head): nu_break under viscosity
    ! breaking or wavemaker viscosity, plus nu_sponge under the
@@ -728,6 +750,7 @@ contains
                                                    this%undertow_u, this%undertow_v)
       if (allocated(this%in_wm_zone)) deallocate (this%in_wm_zone)
       if (allocated(this%nu_vis)) deallocate (this%nu_vis)
+      if (allocated(this%coriolis)) deallocate (this%coriolis)
       if (allocated(this%mask_out)) deallocate (this%mask_out)
       if (allocated(this%mask9_out)) deallocate (this%mask9_out)
 

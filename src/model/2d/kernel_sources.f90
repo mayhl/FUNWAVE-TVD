@@ -35,16 +35,22 @@ contains
    !      Pass zero array when eddy viscosity is inactive.
    !      hu/hv are the CELL-CENTRED fluxes (legacy HU/HV) — the
    !      interface p/q feed div(p,q) only.
+   !
+   !   6. Coriolis (coriolis_on; f-plane today, CRS per-cell f later):
+   !        $$ S_x \mathrel{+}= f\,\tfrac12(q_{i,j} + q_{i,j+1}), \qquad
+   !           S_y \mathrel{-}= f\,\tfrac12(p_{i,j} + p_{i+1,j}) $$
+   !      exact legacy spherical-branch face-average form (sources.F);
+   !      gated, not zero-added — legacy Cartesian has no such term.
    ! ----------------------------------------------------------------
-   subroutine cal_sources(lp, gamma1, gamma2, dispersion, &
+   subroutine cal_sources(lp, gamma1, gamma2, dispersion, coriolis_on, &
                           mask, mask9, inv_dx, inv_dy, &
                           depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
-                          wavemaker_mass, cd, nu_vis, &
+                          wavemaker_mass, cd, nu_vis, coriolis, &
                           min_depth_frc, src_x, src_y)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: gamma1, gamma2
-      logical, intent(in)  :: dispersion
+      logical, intent(in)  :: dispersion, coriolis_on
       integer, intent(in)  :: mask(:, :), mask9(:, :)
       real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)  :: depth_x(:, :), depth_y(:, :)
@@ -54,6 +60,7 @@ contains
       real(SP), intent(in)  :: u1pp(:, :), v1pp(:, :)
       real(SP), intent(in)  :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
       real(SP), intent(in)  :: wavemaker_mass(:, :), cd(:, :), nu_vis(:, :)
+      real(SP), intent(in)  :: coriolis(:, :)
       real(SP), intent(in)  :: min_depth_frc
       real(SP), intent(out) :: src_x(:, :), src_y(:, :)
 
@@ -80,6 +87,14 @@ contains
             ! wavemaker mass injection
             src_x(i, j) = src_x(i, j) + wavemaker_mass(i, j)*u(i, j)
             src_y(i, j) = src_y(i, j) + wavemaker_mass(i, j)*v(i, j)
+
+            ! Coriolis on the face-averaged fluxes
+            if (coriolis_on) then
+               src_x(i, j) = src_x(i, j) &
+                             + coriolis(i, j)*0.5_SP*(q(i, j) + q(i, j + 1))
+               src_y(i, j) = src_y(i, j) &
+                             - coriolis(i, j)*0.5_SP*(p(i, j) + p(i + 1, j))
+            end if
 
             if (dispersion) then
                heff = max(h(i, j), min_depth_frc)
