@@ -44,7 +44,7 @@ target_include_directories(${main_lib}_old PRIVATE
     $<TARGET_PROPERTY:${main_lib}_model,Fortran_MODULE_DIRECTORY>
     $<TARGET_PROPERTY:${main_lib}_core,Fortran_MODULE_DIRECTORY>)
 if(USE_VESSEL)
-  target_sources(${main_lib}_old PRIVATE vessel.F)
+  target_sources(${main_lib}_old PRIVATE mod_vessel.F)
 endif()
 
 if(USE_METEO)
@@ -68,5 +68,5 @@ if(USE_SUBGRID)
 endif()
 
 if(USE_PERCIPITATION)
-  target_sources(${main_lib}_old PRIVATE mod_percipitation.F)
+  target_sources(${main_lib}_old PRIVATE mod_precipitation.F)
 endif()
