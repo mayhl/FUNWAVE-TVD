@@ -80,7 +80,8 @@ simulations:
       field: test.regression.postproc.field_compare
     tolerances:
       # v, q omitted — near-zero in 1D periodic flume (Y-direction noise)
-      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 5.0e-4, p: 1.0e-4 }
+      # mask9/p calibrated to measured floors (means 5.3e-4/1.6e-4, ledger-16 noise class)
+      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-3, p: 5.0e-4 }
 
   # ── flume_1d_spectral: spectral wavemakers — code-path coverage only ─────
   # T_INTV_mean removed from inputs; spectral stats belong in validation.
@@ -104,7 +105,8 @@ simulations:
     postprocess:
       field: test.regression.postproc.field_compare
     tolerances:
-      field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 2.0e-3, mask9: 5.0e-4, p: 5.0e-4 }
+      # mask9/hmin calibrated to measured floors (ledger-16 noise class; tma_1d hmin mean 1.05e-4)
+      field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 2.0e-4, umax: 1.0e-3, mask: 2.0e-3, mask9: 1.0e-3, p: 5.0e-4 }
 
   # flume_2d_wk_reg: wall BC (PERIODIC=F), oblique regular wave (Theta=20°).
   # Two variants: bare walls and walls + south/north sponge.
@@ -192,7 +194,8 @@ simulations:
   # WK_IRR with VISCOSITY_BREAKING=F; DT_fixed=0.04 (finer DX=1m grid).
   # Short TOTAL_TIME=200s — code-path coverage only, not full rip development.
   # Stats removed: mean circulation belongs in validation framework.
-  # Tolerances conservative pending first calibration run.
+  # eta calibrated to measured floor: legacy realization distance 7.5e-3 vs
+  # fresh refs (legacy nondeterministic even at fixed dt, ledger 15).
   - name: rip_2d
     exe_type: central
     np: 4
@@ -213,7 +216,7 @@ simulations:
     postprocess:
       field: test.regression.postproc.field_compare
     tolerances:
-      field: { eta: 5.0e-3, u: 3.0e-2, v: 3.0e-2, hmax: 3.0e-3, hmin: 3.0e-3, umax: 1.0e-2, mask: 2.0e-3 }
+      field: { eta: 2.0e-2, u: 3.0e-2, v: 3.0e-2, hmax: 3.0e-3, hmin: 3.0e-3, umax: 1.0e-2, mask: 2.0e-3 }
 
   - name: standing_wave_3d_10m
     exe_type: central-3d
