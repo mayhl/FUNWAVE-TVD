@@ -280,8 +280,8 @@ contains
                                    R_sp, A_sp, &
                                    ibegin, iproc, nx_proc, local_nx, &
                                    jbegin, jproc, ny_proc, local_ny)
-      real(SP), intent(inout) :: coeff(dim1, dim2)
       integer, intent(in)    :: dim1, dim2, ng
+      real(SP), intent(inout) :: coeff(dim1, dim2)
       real(SP), intent(in)    :: ref_dx, ref_dy
       real(SP), intent(in)    :: w_width, e_width, s_width, n_width
       real(SP), intent(in)    :: R_sp, A_sp
@@ -377,8 +377,8 @@ contains
                                      CDsp, &
                                      ibegin, iproc, nx_proc, local_nx, &
                                      jbegin, jproc, ny_proc, local_ny)
-      real(SP), intent(inout) :: cd(dim1, dim2)
       integer, intent(in)    :: dim1, dim2, ng
+      real(SP), intent(inout) :: cd(dim1, dim2)
       real(SP), intent(in)    :: ref_dx, ref_dy
       real(SP), intent(in)    :: w_width, e_width, s_width, n_width
       real(SP), intent(in)    :: CDsp
@@ -467,8 +467,8 @@ contains
                                       Csp_val, &
                                       ibegin, iproc, nx_proc, local_nx, &
                                       jbegin, jproc, ny_proc, local_ny)
-      real(SP), intent(inout) :: nu(dim1, dim2)
       integer, intent(in)    :: dim1, dim2, ng
+      real(SP), intent(inout) :: nu(dim1, dim2)
       real(SP), intent(in)    :: ref_dx, ref_dy
       real(SP), intent(in)    :: w_width, e_width, s_width, n_width
       real(SP), intent(in)    :: Csp_val

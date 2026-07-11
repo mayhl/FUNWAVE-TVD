@@ -5,7 +5,7 @@ module model_kernel_etauv_mod
    implicit none
    private
 
-   public :: type_etauv_workspace, update_h
+   public :: update_h
    public :: cal_rk_update
    public :: cal_etauv_assemble_x, cal_etauv_assemble_y
    public :: cal_uv_no_dispersion, cal_etauv_update

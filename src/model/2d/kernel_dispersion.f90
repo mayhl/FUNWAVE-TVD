@@ -7,7 +7,7 @@ module model_kernel_dispersion_mod
    implicit none
    private
 
-   public :: type_disp_workspace, cal_dispersion_derivs, cal_dispersion_assemble
+   public :: cal_dispersion_derivs, cal_dispersion_assemble
 
    ! ----------------------------------------------------------------
    ! Workspace for intermediate arrays in cal_dispersion.  Allocated
