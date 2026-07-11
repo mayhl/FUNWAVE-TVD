@@ -42,14 +42,14 @@ def regression(
     pdf: bool = typer.Option(False, "--pdf", help="Generate PDF report after run (implies --report)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detail tables for all tests (default: only on failure)"),
     stop_on_pass: bool = typer.Option(False, "--stop-on-pass", "-1", help="Stop after the first passing test"),
-    strict: bool = typer.Option(False, "--strict", "-s", help="Use fixed timestep (DT_fixed from input files) for deterministic comparison"),
+    fixed_dt: bool = typer.Option(False, "--fixed-dt", "--strict", "-s", help="Keep DT_fixed from input files for deterministic frame times (default strips it; --strict is a deprecated alias)"),
 ):
     """Run Regression Tests."""
     reporter = ConsoleReporter()
     provider = LocalProvider()
     runner = RegressionRunner(reporter, provider)
     runner.run(filter_tags=tags or None, force=force, report=report, pdf=pdf, verbose=verbose,
-               stop_on_pass=stop_on_pass, strict=strict)
+               stop_on_pass=stop_on_pass, fixed_dt=fixed_dt)
 
 @app.command()
 def suite(

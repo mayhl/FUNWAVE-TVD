@@ -157,7 +157,7 @@ class RegressionRunner(BaseRunner):
                 expanded.append(sim)
         return expanded
 
-    def _setup_run_dir(self, sim, run_dir, strict=False):
+    def _setup_run_dir(self, sim, run_dir, fixed_dt=False):
         os.makedirs(run_dir, exist_ok=True)
         if "output_dir" in sim:
             os.makedirs(os.path.join(run_dir, sim["output_dir"]), exist_ok=True)
@@ -166,7 +166,7 @@ class RegressionRunner(BaseRunner):
             src = os.path.join(input_dir, item)
             if os.path.isfile(src) and item.endswith('.txt'):
                 dst = os.path.join(run_dir, item)
-                if strict:
+                if fixed_dt:
                     shutil.copy2(src, dst)
                 else:
                     with open(src) as f:
@@ -269,7 +269,7 @@ class RegressionRunner(BaseRunner):
         self.reporter.console.print()
 
     def run(self, filter_tags=None, force=False, report: bool = False, pdf: bool = False,
-            verbose: bool = False, stop_on_pass: bool = False, strict: bool = False):
+            verbose: bool = False, stop_on_pass: bool = False, fixed_dt: bool = False):
         try:
             current_branch = subprocess.check_output(
                 ["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
@@ -338,7 +338,7 @@ class RegressionRunner(BaseRunner):
             ref_out      = os.path.join(ref_run_dir, sim["output_dir"])
             sim_stamp    = os.path.join(ref_out, ".sim_complete")
 
-            if force or strict:
+            if force:
                 if os.path.exists(sim_stamp):
                     os.remove(sim_stamp)
                 for d in (ref_run_dir, curr_run_dir):
@@ -346,12 +346,25 @@ class RegressionRunner(BaseRunner):
                         shutil.rmtree(d, ignore_errors=True)
 
             # --- ref ---
+            # Stamp records the dt mode that generated the cached ref; a
+            # mismatch (or a legacy empty stamp) invalidates it — adaptive
+            # refs are not comparable against fixed-dt dev runs or vice versa
+            dt_mode = "fixed_dt" if fixed_dt else "adaptive"
+            stamp_mode = None
+            if os.path.exists(sim_stamp):
+                try:
+                    stamp_mode = open(sim_stamp).read().strip() or None
+                except OSError:
+                    pass
             ref_stderr = ""
             ref_elapsed = 0.0
-            if os.path.exists(sim_stamp):
+            if stamp_mode == dt_mode:
                 ref_status = "cached"
             else:
-                self._setup_run_dir(sim, ref_run_dir, strict=strict)
+                for d in (ref_run_dir, curr_run_dir):
+                    if os.path.exists(d):
+                        shutil.rmtree(d, ignore_errors=True)
+                self._setup_run_dir(sim, ref_run_dir, fixed_dt=fixed_dt)
                 ref_input = sim["input_file"]
                 if "preprocess" in sim and sim.get("preprocess_ref", False):
                     self._preprocess(sim, ref_run_dir)
@@ -363,7 +376,8 @@ class RegressionRunner(BaseRunner):
                 if ref_status == "COMPLETED":
                     try:
                         os.makedirs(ref_out, exist_ok=True)
-                        open(os.path.join(ref_out, ".sim_complete"), "w").close()
+                        with open(os.path.join(ref_out, ".sim_complete"), "w") as f:
+                            f.write(dt_mode + "\n")
                     except Exception:
                         pass
                 else:
@@ -371,7 +385,7 @@ class RegressionRunner(BaseRunner):
                     _, ref_stderr = self.provider.get_output(ref_id)
 
             # --- dev ---
-            self._setup_run_dir(sim, curr_run_dir, strict=strict)
+            self._setup_run_dir(sim, curr_run_dir, fixed_dt=fixed_dt)
             if "preprocess" in sim:
                 self._preprocess(sim, curr_run_dir)
             curr_id = self.provider.submit(
