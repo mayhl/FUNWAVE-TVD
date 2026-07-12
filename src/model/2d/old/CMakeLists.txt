@@ -67,6 +67,6 @@ if(USE_SUBGRID)
   target_sources(${main_lib}_old PRIVATE mod_subgrid.F)
 endif()
 
-if(USE_PERCIPITATION)
+if(USE_PRECIPITATION)
   target_sources(${main_lib}_old PRIVATE mod_precipitation.F)
 endif()
