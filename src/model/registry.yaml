@@ -960,6 +960,28 @@ parameters:
     default:      ~
     latex:        ~
 
+  # ── precipitation (legacy mod_precipitation.F) ─────────────────────────────
+  - name:         rainfall_file
+    legacy_name:  RAINFALL_FILE
+    yaml_path:    "precipitation.RAINFALL_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         rainwaveinteraction
+    legacy_name:  RainWaveInteraction
+    yaml_path:    "precipitation.RainWaveInteraction"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         out_precipitation
+    legacy_name:  OUT_PRECIPITATION
+    yaml_path:    "precipitation.OUT_PRECIPITATION"
+    units:        ~
+    default:      true
+    latex:        ~
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

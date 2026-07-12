@@ -94,74 +94,22 @@ CONTAINS
       CHARACTER(LEN=80):: PrecName
       CHARACTER(LEN=80) :: WHAT
 
-! read precipitation from input.txt
-      FILE_NAME = INPUT_FILE_NAME
+! NOTE: config bridged from READ_INPUT (io.F) — the READ_LOGICAL /
+! READ_STRING calls here parsed 'KEY = VALUE' lines and fail against
+! the YAML input, clobbering the bridged values with defaults, so
+! RainWaveInteraction / OUT_PRECIPITATION / RAINFALL_FILE arrive
+! pre-set (the modern reader stops when RAINFALL_FILE is missing,
+! matching the STOP that lived here)
 
 # if defined (PARALLEL)
       if (myid .eq. 0) WRITE (3, *) '                                         '
       if (myid .eq. 0) WRITE (3, *) '-------------- Precipitation INFO ----------'
+      if (myid .eq. 0) WRITE (3, '(A15,A50)') 'RAINFALL_FILE:', RAINFALL_FILE
 # else
       WRITE (3, *) '                                         '
       WRITE (3, *) '-------------- Precipitation INFO ----------'
+      WRITE (3, '(A15,A50)') 'RAINFALL_FILE:', RAINFALL_FILE
 # endif
-
-! -------------------rainfall and wave interaction ---------------
-
-      CALL READ_LOGICAL(RainWaveInteraction, &
-                        FILE_NAME, 'RainWaveInteraction', ierr)
-      IF (ierr == 1) THEN
-         RainWaveInteraction = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'no RainWaveInteraction'
-            WRITE (3, '(A40)') 'no RainWaveInteraction'
-         end if
-# else
-         WRITE (*, '(A40)') 'no RainWaveInteraction'
-         WRITE (3, '(A40)') 'no RainWaveInteraction'
-# endif
-      END IF
-
-! ------------------- output -----------------
-      CALL READ_LOGICAL(OUT_PRECIPITATION, FILE_NAME, 'OUT_PRECIPITATION', ierr)
-      IF (ierr == 1) THEN
-         OUT_PRECIPITATION = .TRUE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'default, make PRECIPITATION OUTPUT'
-            WRITE (3, '(A40)') 'default, make PRECIPITATION OUTPUT'
-         end if
-# else
-         WRITE (*, '(A40)') 'default, make PRECIPITATION OUTPUT'
-         WRITE (3, '(A40)') 'default, make PRECIPITATION OUTPUT'
-# endif
-      END IF
-
-! -------------------------
-
-! rainfall file
-      CALL READ_STRING(RAINFALL_FILE, FILE_NAME, 'RAINFALL_FILE', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         IF (MYID == 0) &
-            WRITE (*, *) 'RAINFALL_FILE CANNOT BE FOUND. STOP'
-         CALL MPI_FINALIZE(ier)
-         STOP
-# else
-         WRITE (*, *) 'RAINFALL_FILE CANNOT BE FOUND. STOP'
-         STOP
-# endif
-
-      ELSE
-
-# if defined (PARALLEL)
-         if (myid .eq. 0) WRITE (3, '(A15,A50)') 'RAINFALL_FILE:', RAINFALL_FILE
-# else
-         WRITE (3, '(A15,A50)') 'RAINFALL_FILE:', RAINFALL_FILE
-# endif
-
-      END IF
 
 ! open file
       Ifile = 400

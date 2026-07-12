@@ -100,12 +100,14 @@ contains
    ! pflx/qflx/fx/fy/gx/gy are the interface fluxes from
    ! type_flux_workspace, face-aligned with cell index i (face i =
    ! low side of cell i).  wavemaker_mass is the WK_* mass source
-   ! (zero array when no wavemaker).  Legacy ETA_LIMITER (default
-   ! off) is not ported.
+   ! (zero array when no wavemaker); prec_rate is the rainfall mass
+   ! source appended AFTER it like legacy R1 += PrecRateModel (zero
+   ! array when inactive).  Legacy ETA_LIMITER (default off) is not
+   ! ported.
    ! ----------------------------------------------------------------
    pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
                                  pflx, qflx, fx, fy, gx, gy, &
-                                 src_x, src_y, wavemaker_mass, &
+                                 src_x, src_y, wavemaker_mass, prec_rate, &
                                  eta0, ubar0, vbar0, eta, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in) :: alpha, beta, dt
@@ -113,6 +115,7 @@ contains
       real(SP), intent(in) :: pflx(:, :), qflx(:, :)
       real(SP), intent(in) :: fx(:, :), fy(:, :), gx(:, :), gy(:, :)
       real(SP), intent(in) :: src_x(:, :), src_y(:, :), wavemaker_mass(:, :)
+      real(SP), intent(in) :: prec_rate(:, :)
       real(SP), intent(in) :: eta0(:, :), ubar0(:, :), vbar0(:, :)
       real(SP), intent(inout) :: eta(:, :), ubar(:, :), vbar(:, :)
 
@@ -123,7 +126,7 @@ contains
          do i = lp%ib, lp%ie
             r1 = -(pflx(i + 1, j) - pflx(i, j))*inv_dx(i, j) &
                  - (qflx(i, j + 1) - qflx(i, j))*inv_dy(i, j) &
-                 + wavemaker_mass(i, j)
+                 + wavemaker_mass(i, j) + prec_rate(i, j)
             eta(i, j) = alpha*eta0(i, j) + beta*(eta(i, j) + dt*r1)
 
             r2 = -(fx(i + 1, j) - fx(i, j))*inv_dx(i, j) &

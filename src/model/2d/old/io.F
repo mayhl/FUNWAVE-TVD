@@ -147,6 +147,11 @@ SUBROUTINE READ_INPUT
    USE GLOBAL
    USE INPUT_READ
    USE TIDE_MODULE
+# if defined (PRECIPITATION)
+   ! ONLY guard: the module's FILE_NAME collides with the local one
+   USE PRECIPITATION_MODULE, ONLY: RainWaveInteraction, &
+                                   OUT_Precipitation, RAINFALL_FILE
+# endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
 # if defined(INTEL)
@@ -798,6 +803,17 @@ SUBROUTINE READ_INPUT
       TideSouthFileName = model%tide%file_south%root
    IF (ALLOCATED(model%tide%file_north%root)) &
       TideNorthFileName = model%tide%file_north%root
+
+# if defined (PRECIPITATION)
+   ! precipitation bridge: same pattern as the tide bridge above —
+   ! PRECIPITATION_MODULE variables seeded from the modern reader, the
+   ! READ calls in mod_precipitation.F stubbed out.  The modern reader
+   ! already stops when RAINFALL_FILE is missing (legacy STOP)
+   RainWaveInteraction = model%precipitation%rain_wave_interaction
+   OUT_Precipitation   = model%precipitation%out_precipitation
+   IF (ALLOCATED(model%precipitation%rainfall_file%root)) &
+      RAINFALL_FILE = model%precipitation%rainfall_file%root
+# endif
 
 END SUBROUTINE READ_INPUT
 

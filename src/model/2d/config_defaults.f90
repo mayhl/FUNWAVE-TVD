@@ -75,6 +75,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_PHYSICS_VISCOSITY_BREAKING = "YES"
    character(*), parameter :: DEF_PHYSICS_WATER_LEVEL = "0.0"
    character(*), parameter :: DEF_PHYSICS_WAVEMAKER = "NO"
+   ! ── precipitation ──
+   character(*), parameter :: DEF_PRECIPITATION_OUT_PRECIPITATION = "YES"
+   character(*), parameter :: DEF_PRECIPITATION_RAINWAVEINTERACTION = "NO"
    ! ── simulation ──
    character(*), parameter :: DEF_SIMULATION_PLOT_INTV_STATION = "1.0"
    character(*), parameter :: DEF_SIMULATION_SCREEN_INTERVAL = "1.0"

@@ -37,6 +37,7 @@ module model_main_mod
    use model_physics_mod, only: type_model_physics
    use model_coupling_mod, only: type_model_coupling
    use model_tide_mod, only: type_model_tide
+   use model_precipitation_mod, only: type_model_precipitation
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -73,6 +74,7 @@ module model_main_mod
       type(type_model_physics)    :: physics
       type(type_model_coupling)   :: coupling
       type(type_model_tide)       :: tide
+      type(type_model_precipitation) :: precipitation
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -119,6 +121,7 @@ contains
       call this%physics%read_input(this%env)
       call this%coupling%read_input(this%env)
       call this%tide%read_input(this%env)
+      call this%precipitation%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -159,6 +162,7 @@ contains
       call this%physics%read_input(this%env)
       call this%coupling%read_input(this%env)
       call this%tide%read_input(this%env)
+      call this%precipitation%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -479,6 +483,9 @@ contains
       ! GEN_ABS rides the ABS wavemaker relaxation (legacy sponge.F
       ! reads TIDE_MODULE state)
       this%wavemaker%tide => this%tide
+      ! legacy PRECIPITATION_INITIAL runs after INITIALIZATION — index
+      ! file open, first frame into the high bracket
+      call this%precipitation%init_compute(this%grid)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
@@ -488,7 +495,8 @@ contains
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
-                        this%sponge, this%obstacle, this%means, this%tide)
+                        this%sponge, this%obstacle, this%means, this%tide, &
+                        this%precipitation)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -517,6 +525,7 @@ contains
       call this%means%free()
       call this%stations%free()
       call this%tide%free()
+      call this%precipitation%free()
 
    end subroutine model_run
 

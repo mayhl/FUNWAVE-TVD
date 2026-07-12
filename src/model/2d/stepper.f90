@@ -18,7 +18,7 @@
 !    - radiation-stress diagnostics U_davg/V_davg (means.f90 covers
 !      the compared P_center/Q_center sums only)
 !    - Wsurf surface vertical velocity (foam / 3D coupling)
-!    - tidal BC, sediment, foam, meteo, vessel, tracker hooks
+!    - sediment, foam, meteo, vessel, tracker hooks
 !
 !  Memory: all workspaces and per-step arrays are allocated once in
 !  init() and reused every stage/step; migration onto the typed
@@ -51,6 +51,7 @@ module model_stepper_2d_mod
    use model_obstacle_mod, only: type_model_obstacle
    use model_means_mod, only: type_model_means
    use model_tide_mod, only: type_model_tide
+   use model_precipitation_mod, only: type_model_precipitation
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -95,6 +96,7 @@ module model_stepper_2d_mod
       type(type_model_obstacle), pointer :: obstacle => null()
       type(type_model_means), pointer :: means => null()
       type(type_model_tide), pointer :: tide => null()
+      type(type_model_precipitation), pointer :: precipitation => null()
 
       type(type_model_bc) :: bc
 
@@ -186,7 +188,8 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker, sponge, obstacle, means, tide)
+                           wavemaker, sponge, obstacle, means, tide, &
+                           precipitation)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -212,6 +215,9 @@ contains
       ! tide%init_compute must have run (relaxation profiles, DATA
       ! series, and the REMOVE_SPONGE disable)
       type(type_model_tide), intent(inout), target :: tide
+      ! precipitation%init_compute must have run (index file open,
+      ! first frame loaded)
+      type(type_model_precipitation), intent(inout), target :: precipitation
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -229,6 +235,7 @@ contains
       this%obstacle => obstacle
       this%means => means
       this%tide => tide
+      this%precipitation => precipitation
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -438,6 +445,12 @@ contains
             call this%tide%update_data(time, dt)
          end if
 
+         ! per-step rainfall refresh (legacy PRECIPITATION_DISTRIBUTION
+         ! before the RK loop, same already-advanced TIME)
+         if (istage == 1 .and. this%precipitation%is_activated) then
+            call this%precipitation%update(time)
+         end if
+
          if (phy%dispersion) call run_dispersion(this, dt)
 
          call fluxes(lp, num%high_order, num%construction, &
@@ -490,7 +503,7 @@ contains
                             this%fws%p, this%fws%q, this%fws%fx, this%fws%fy, &
                             this%fws%gx, this%fws%gy, &
                             this%src_x, this%src_y, &
-                            wm_mass(this), &
+                            wm_mass(this), prec_rate(this), &
                             f%eta0, f%p0, f%q0, f%eta, f%p, f%q)
 
          ! legacy GET_Eta_U_V_HU_HV: whole-array H (unclamped; ghost eta
@@ -757,6 +770,19 @@ contains
       end if
    end function wm_mass
 
+   ! Rainfall mass source for the eta RHS: the precipitation rate array
+   ! when active, zeros otherwise (appended after wm_mass like legacy)
+   function prec_rate(this) result(p)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: p(:, :)
+
+      if (this%precipitation%is_activated) then
+         p => this%precipitation%rate_model
+      else
+         p => this%zeros
+      end if
+   end function prec_rate
+
    ! Per-cell Coriolis f for the momentum source: the stepper's array
    ! when active, zeros otherwise (the kernel also gates on coriolis_on)
    function cor_f(this) result(c)
@@ -845,6 +871,8 @@ contains
       this%sponge => null()
       this%obstacle => null()
       this%means => null()
+      this%tide => null()
+      this%precipitation => null()
 
    end subroutine stepper_free
 
