@@ -74,6 +74,7 @@ module model_wavemaker_mod
    use core_constants_mod, only: SP
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
+   use model_tide_mod, only: type_model_tide
 
    use model_config_defaults_mod, only: DEF_WAVEMAKER_A0_NWAVE, DEF_WAVEMAKER_ALPHA_C, &
                                         DEF_WAVEMAKER_AMP, DEF_WAVEMAKER_AMP_WK, &
@@ -226,6 +227,10 @@ module model_wavemaker_mod
       real(SP), allocatable :: Cm_v(:, :, :), Sm_v(:, :, :)
       real(SP), allocatable :: Segma_Ser(:), Phase_Ser(:)
       real(SP), allocatable :: sponge_maker(:, :)
+
+      ! Tidal GEN_ABS hook (legacy ABSORBING_GENERATING_BC reads
+      ! TIDE_MODULE state); set by main before init_compute
+      type(type_model_tide), pointer :: tide => null()
 
    contains
       procedure :: read_input => wavemaker_read_input
@@ -548,11 +553,14 @@ contains
    !      \eta_{in} = \sum_k C_{m,k}\cos(\tfrac{\pi}{2} + \sigma_k t + \phi_k)
    !                  + S_{m,k}\sin(\cdot) $$
    ! at the step time (no stage offset), u/v untouched (legacy comments
-   ! them out), hu/hv rebuilt everywhere.  NOTE: this is the original
-   ! SpongeMaker form — the vendored legacy's Salatin-2021 rewrite
-   ! reads the TIDE module's SPONGE_TIDE_WEST, which is UNALLOCATED
-   ! without tidal BC flags (upstream bug; no legacy parity possible),
-   ! and drops the phases from the time factors.
+   ! them out), hu/hv rebuilt everywhere.  NOTE: without tidal flags
+   ! this is the original SpongeMaker form — the vendored legacy's
+   ! Salatin-2021 rewrite reads the TIDE module's SPONGE_TIDE_WEST,
+   ! which is UNALLOCATED then (upstream bug; no legacy parity
+   ! possible), and drops the phases from the time factors.  Under
+   ! TIDAL_BC_GEN_ABS the tide module allocates it and the Salatin
+   ! form becomes the well-defined legacy path, ported bug-for-bug
+   ! (no phases, + TideWest_ETA, tide-sponge relaxation).
    ! ----------------------------------------------------------------
    subroutine wavemaker_apply_boundary(this, grid, istage, dt, time, &
                                        eta, u, v, hu, hv, depth)
@@ -569,6 +577,7 @@ contains
       real(SP) :: bb(this%Nfreq), cc(this%Nfreq)
       real(SP) :: rtime, ein, uin, vin
       integer :: i, j, kf
+      logical :: gen_abs
 
       if (this%left_bc_source) then
          if (.not. grid%is_back_boundary) return
@@ -596,6 +605,35 @@ contains
       end if
 
       if (this%abs_source) then
+         if (associated(this%tide)) then
+            gen_abs = this%tide%tidal_bc_gen_abs
+         else
+            gen_abs = .false.
+         end if
+         if (gen_abs) then
+            ! vendored Salatin-2021 form, well-defined once the tide
+            ! module allocates SPONGE_TIDE_WEST: phases DROPPED from
+            ! the time factors, the west tide added to the target, and
+            ! the relaxation through the tide sponge (multiplication —
+            ! the profile is stored inverted)
+            do kf = 1, this%Nfreq
+               bb(kf) = cos(PI/2.0_SP + this%Segma_Ser(kf)*time)
+               cc(kf) = sin(PI/2.0_SP + this%Segma_Ser(kf)*time)
+            end do
+            do j = 1, grid%lp%nloc
+               do i = 1, grid%lp%mloc
+                  ein = 0.0_SP
+                  do kf = 1, this%Nfreq
+                     ein = ein + this%Cm_eta(i, j, kf)*bb(kf) + this%Sm_eta(i, j, kf)*cc(kf)
+                  end do
+                  ein = ein + this%tide%eta_west
+                  eta(i, j) = ein + (eta(i, j) - ein)*this%tide%sponge_west(i, j)
+                  hu(i, j) = (depth(i, j) + eta(i, j))*u(i, j)
+                  hv(i, j) = (depth(i, j) + eta(i, j))*v(i, j)
+               end do
+            end do
+            return
+         end if
          do kf = 1, this%Nfreq
             bb(kf) = cos(PI/2.0_SP + this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
             cc(kf) = sin(PI/2.0_SP + this%Segma_Ser(kf)*time + this%Phase_Ser(kf))

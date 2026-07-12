@@ -146,6 +146,7 @@ END SUBROUTINE OUTPUT
 SUBROUTINE READ_INPUT
    USE GLOBAL
    USE INPUT_READ
+   USE TIDE_MODULE
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
 # if defined(INTEL)
@@ -762,6 +763,41 @@ SUBROUTINE READ_INPUT
 
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!END!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+   ! tide bridge: TIDE_MODULE reads its keys itself in the original
+   ! (TIDE_INITIAL READ_* against input.txt); against the YAML those
+   ! fall through to defaults, so the module variables are seeded here
+   ! from the modern reader and the READ calls in mod_tide.F are
+   ! stubbed out
+   TIDAL_BC_ABS     = model%tide%tidal_bc_abs
+   TIDAL_BC_GEN_ABS = model%tide%tidal_bc_gen_abs
+   TideBcType       = model%tide%tide_bc_type
+   Iwidth_tide      = model%tide%iwidth
+   TideWest  = model%tide%tide_west
+   TideEast  = model%tide%tide_east
+   TideSouth = model%tide%tide_south
+   TideNorth = model%tide%tide_north
+   TideWest_ETA  = model%tide%eta_west
+   TideWest_U    = model%tide%u_west
+   TideWest_V    = model%tide%v_west
+   TideEast_ETA  = model%tide%eta_east
+   TideEast_U    = model%tide%u_east
+   TideEast_V    = model%tide%v_east
+   TideSouth_ETA = model%tide%eta_south
+   TideSouth_U   = model%tide%u_south
+   TideSouth_V   = model%tide%v_south
+   TideNorth_ETA = model%tide%eta_north
+   TideNorth_U   = model%tide%u_north
+   TideNorth_V   = model%tide%v_north
+   ! type_path roots are allocatable — set only when configured
+   IF (ALLOCATED(model%tide%file_west%root)) &
+      TideWestFileName = model%tide%file_west%root
+   IF (ALLOCATED(model%tide%file_east%root)) &
+      TideEastFileName = model%tide%file_east%root
+   IF (ALLOCATED(model%tide%file_south%root)) &
+      TideSouthFileName = model%tide%file_south%root
+   IF (ALLOCATED(model%tide%file_north%root)) &
+      TideNorthFileName = model%tide%file_north%root
 
 END SUBROUTINE READ_INPUT
 

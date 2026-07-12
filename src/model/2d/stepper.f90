@@ -50,6 +50,7 @@ module model_stepper_2d_mod
    use model_sponge_mod, only: type_model_sponge
    use model_obstacle_mod, only: type_model_obstacle
    use model_means_mod, only: type_model_means
+   use model_tide_mod, only: type_model_tide
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -93,6 +94,7 @@ module model_stepper_2d_mod
       type(type_model_sponge), pointer :: sponge => null()
       type(type_model_obstacle), pointer :: obstacle => null()
       type(type_model_means), pointer :: means => null()
+      type(type_model_tide), pointer :: tide => null()
 
       type(type_model_bc) :: bc
 
@@ -184,7 +186,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker, sponge, obstacle, means)
+                           wavemaker, sponge, obstacle, means, tide)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -207,6 +209,9 @@ contains
       type(type_model_obstacle), intent(inout), target :: obstacle
       ! means%init_compute must have run (the breaker reads etamean)
       type(type_model_means), intent(inout), target :: means
+      ! tide%init_compute must have run (relaxation profiles, DATA
+      ! series, and the REMOVE_SPONGE disable)
+      type(type_model_tide), intent(inout), target :: tide
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -223,6 +228,7 @@ contains
       this%sponge => sponge
       this%obstacle => obstacle
       this%means => means
+      this%tide => tide
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -423,6 +429,15 @@ contains
       associate (f => this%fields, lp => this%grid%lp, &
                  phy => this%physics, num => this%numerics)
 
+         ! per-step tidal DATA refresh (legacy TIDE_DATA before the RK
+         ! loop, at the already-advanced TIME); gated on read-time
+         ! enablement, NOT tidal_bc_abs — the REMOVE_SPONGE disable
+         ! stops TIDE_BC but legacy keeps streaming the files
+         if (istage == 1 .and. this%tide%is_activated &
+             .and. this%tide%data_mode()) then
+            call this%tide%update_data(time, dt)
+         end if
+
          if (phy%dispersion) call run_dispersion(this, dt)
 
          call fluxes(lp, num%high_order, num%construction, &
@@ -525,6 +540,12 @@ contains
          call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
                            num%MinDepthFrc, phy%SWE_ETA_DEP, &
                            phy%viscosity_breaking)
+
+         ! tidal strip relaxation (legacy TIDE_BC between UPDATE_MASK
+         ! and WAVE_BREAKING); hu/hv stay stale like legacy
+         if (this%tide%tidal_bc_abs) then
+            call this%tide%apply_bc(f%mask, f%eta, f%u, f%v)
+         end if
 
          if (this%run_breaker) then
             ! viscosity mode AND the legacy show-only display mode: the

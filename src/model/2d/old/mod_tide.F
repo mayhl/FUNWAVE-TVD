@@ -106,78 +106,14 @@ CONTAINS
       CHARACTER(LEN=80)::TMP_NAME = ' '
       INTEGER :: Ifile, ierr
 
-! read  from input.txt
-      FILE_NAME = INPUT_FILE_NAME
-
-! width of sponge
-
-      CALL READ_INTEGER(Iwidth_tide, FILE_NAME, 'WaveMakerPointNum', ierr)
-
-      IF (ierr == 1) THEN
-         Iwidth_tide = 30
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'WaveMakerPointNum Default:  30 points'
-            WRITE (3, '(A40)') 'WaveMakerPointNum Default:  30 points'
-         end if
-# else
-         WRITE (*, '(A40)') 'WaveMakerPointNum Default:  30 points'
-         WRITE (3, '(A40)') 'WaveMakerPointNum Default:  30 points'
-# endif
-      END IF
-
-      ! absorb only
-
-      CALL READ_LOGICAL(TIDAL_BC_ABS, FILE_NAME, 'TIDAL_BC_ABS', ierr)
-      IF (ierr == 1) THEN
-         TIDAL_BC_ABS = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) then
-            WRITE (3, '(A80)') 'TIDAL_BC_ABS not defined, Default: False'
-            WRITE (*, '(A80)') 'TIDAL_BC_ABS not defined, Default: False'
-         end if
-# else
-         WRITE (3, '(A80)') 'TIDAL_BC_ABS not defined, Default: False'
-         WRITE (*, '(A80)') 'TIDAL_BC_ABS not defined, Default: False'
-# endif
-      END IF
-
-      ! generating and absorbing
-
-      CALL READ_LOGICAL(TIDAL_BC_GEN_ABS, FILE_NAME, 'TIDAL_BC_GEN_ABS', ierr)
-      IF (ierr == 1) THEN
-         TIDAL_BC_GEN_ABS = .FALSE.
-      ELSE
-         IF (TIDAL_BC_GEN_ABS) THEN
-# if defined (PARALLEL)
-            if (myid .eq. 0) then
-               WRITE (3, '(A80)') 'TIDAL_BC_GEN_ABS is TRUE'
-               WRITE (*, '(A80)') 'TIDAL_BC_GEN_ABS is TRUE'
-            end if
-# else
-            WRITE (3, '(A80)') 'TIDAL_BC_GEN_ABS is TRUE'
-            WRITE (*, '(A80)') 'TIDAL_BC_GEN_ABS is TRUE'
-# endif
-         END IF ! true
-      END IF
+! NOTE: config comes from the YAML bridge in io.F READ_INPUT (the
+! original READ_* calls parse input.txt '=' lines and would clobber the
+! bridged values with defaults) — Iwidth_tide, TIDAL_BC_ABS,
+! TIDAL_BC_GEN_ABS, TideBcType and the per-boundary values/filenames
+! are all module variables seeded before TIDE_INITIAL runs
 
 !   tidal bc ---------
       IF (TIDAL_BC_GEN_ABS .OR. TIDAL_BC_ABS) THEN
-
-! input tide details
-         CALL READ_STRING(TideBcType, FILE_NAME, 'TideBcType', ierr)
-         IF (ierr == 1) THEN
-            TideBcType = 'CONSTANT'
-# if defined (PARALLEL)
-            if (myid .eq. 0) THEN
-               WRITE (*, '(A50)') 'You dont specify TideBcType, use CONSTANT.'
-               WRITE (3, '(A50)') 'You dont specify TideBcType, use CONSTANT.'
-            end if
-# else
-            WRITE (*, '(A50)') 'You dont specify TideBcType, use CONSTANT.'
-            WRITE (3, '(A50)') 'You dont specify TideBcType, use CONSTANT.'
-# endif
-         END IF
 
          IF (TideBcType(1:4) == 'CONS') THEN
 
@@ -364,207 +300,11 @@ CONTAINS
    END SUBROUTINE TIDE_BC
 
    SUBROUTINE Tide_READ_CONSTANT
-      USE GLOBAL, ONLY: itmp1, itmp2, itmp3, itmp4, itmp5, SMALL, INPUT_FILE_NAME, WaveMaker
-# if defined (PARALLEL)
-      USE GLOBAL, ONLY: iista, jjsta
-# endif
-
-      USE INPUT_READ
       IMPLICIT NONE
 
-      CHARACTER(LEN=80)::FILE_NAME = ' '
-      CHARACTER(LEN=80)::TMP_NAME = ' '
-      INTEGER :: Ifile, ierr
-! read  from input.txt
-      FILE_NAME = INPUT_FILE_NAME
-
-!  west ---
-
-      CALL READ_Float(TideWest_ETA, FILE_NAME, 'TideWest_ETA', ierr)
-
-      IF (ierr == 1) THEN
-         TideWest = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideWest_ETA, use default: FALSE'
-            WRITE (3, '(A80)') 'You dont specify TideWest_ETA, use default: FALSE'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideWest_ETA, use default: FALSE'
-         WRITE (3, '(A80)') 'You dont specify TideWest_ETA, use default: FALSE'
-# endif
-      END IF
-
-      CALL READ_Float(TideWest_U, FILE_NAME, 'TideWest_U', ierr)
-
-      IF (ierr == 1) THEN
-         TideWest_U = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideWest_U, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideWest_U, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideWest_U, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideWest_U, use default: 0'
-# endif
-      END IF
-
-      CALL READ_Float(TideWest_V, FILE_NAME, 'TideWest_V', ierr)
-
-      IF (ierr == 1) THEN
-         TideWest_V = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideWest_V, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideWest_V, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideWest_V, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideWest_V, use default: 0'
-# endif
-      END IF
-
-!  east ---
-
-      CALL READ_Float(TideEast_ETA, FILE_NAME, 'TideEast_ETA', ierr)
-
-      IF (ierr == 1) THEN
-         TideEast = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideEast_ETA, use default: FALSE'
-            WRITE (3, '(A80)') 'You dont specify TideEast_ETA, use default: FALSE'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideEast_ETA, use default: FALSE'
-         WRITE (3, '(A80)') 'You dont specify TideEast_ETA, use default: FALSE'
-# endif
-      END IF
-
-      CALL READ_Float(TideEast_U, FILE_NAME, 'TideEast_U', ierr)
-
-      IF (ierr == 1) THEN
-         TideEast_U = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideEast_U, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideEast_U, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideEast_U, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideEast_U, use default: 0'
-# endif
-      END IF
-
-      CALL READ_Float(TideEast_V, FILE_NAME, 'TideEast_V', ierr)
-
-      IF (ierr == 1) THEN
-         TideEast_V = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideEast_V, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideEast_V, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideEast_V, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideEast_V, use default: 0'
-# endif
-      END IF
-
-!  south ---
-
-      CALL READ_Float(TideSouth_ETA, FILE_NAME, 'TideSouth_ETA', ierr)
-
-      IF (ierr == 1) THEN
-         TideSouth = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideSouth_ETA, use default: FALSE'
-            WRITE (3, '(A80)') 'You dont specify TideSouth_ETA, use default: FALSE'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideSouth_ETA, use default: FALSE'
-         WRITE (3, '(A80)') 'You dont specify TideSouth_ETA, use default: FALSE'
-# endif
-      END IF
-
-      CALL READ_Float(TideSouth_U, FILE_NAME, 'TideSouth_U', ierr)
-
-      IF (ierr == 1) THEN
-         TideSouth_U = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideSouth_U, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideSouth_U, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideSouth_U, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideSouth_U, use default: 0'
-# endif
-      END IF
-
-      CALL READ_Float(TideSouth_V, FILE_NAME, 'TideSouth_V', ierr)
-
-      IF (ierr == 1) THEN
-         TideSouth_V = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideSouth_V, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideSouth_V, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideSouth_V, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideSouth_V, use default: 0'
-# endif
-      END IF
-
-!  north ---
-
-      CALL READ_Float(TideNorth_ETA, FILE_NAME, 'TideNorth_ETA', ierr)
-
-      IF (ierr == 1) THEN
-         TideNorth = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideNorth_ETA, use default: FALSE'
-            WRITE (3, '(A80)') 'You dont specify TideNorth_ETA, use default: FALSE'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideNorth_ETA, use default: FALSE'
-         WRITE (3, '(A80)') 'You dont specify TideNorth_ETA, use default: FALSE'
-# endif
-      END IF
-
-      CALL READ_Float(TideNorth_U, FILE_NAME, 'TideNorth_U', ierr)
-
-      IF (ierr == 1) THEN
-         TideNorth_U = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideNorth_U, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideNorth_U, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideNorth_U, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideNorth_U, use default: 0'
-# endif
-      END IF
-
-      CALL READ_Float(TideNorth_V, FILE_NAME, 'TideNorth_V', ierr)
-
-      IF (ierr == 1) THEN
-         TideNorth_V = ZERO
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'You dont specify TideNorth_V, use default: 0'
-            WRITE (3, '(A80)') 'You dont specify TideNorth_V, use default: 0'
-         end if
-# else
-         WRITE (*, '(A80)') 'You dont specify TideNorth_V, use default: 0'
-         WRITE (3, '(A80)') 'You dont specify TideNorth_V, use default: 0'
-# endif
-      END IF
+! NOTE: bridged from the YAML config in io.F READ_INPUT — TideWest/
+! East/South/North and the 12 constants are already set (ETA presence
+! enabled the boundary, U/V defaulted to zero)
 
    END SUBROUTINE Tide_READ_CONSTANT
 
@@ -666,18 +406,8 @@ CONTAINS
       FILE_NAME = INPUT_FILE_NAME
 
 ! west -----------
-      CALL READ_STRING(TideWestFileName, FILE_NAME, 'TideWestFileName', ierr)
-
-! intel compiler does not work well with inquire, so change to ierr==1
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         IF (MYID == 0) &
-            WRITE (*, *) TRIM(TMP_NAME), ' No west tidal bc'
-# else
-         WRITE (*, *) TRIM(TMP_NAME), ' No west tidal bc'
-# endif
-         TideWest = .False.
-      ELSE
+      ! TideWest + TideWestFileName bridged from the YAML config
+      IF (TideWest) THEN
          TMP_NAME = TRIM(TideWestFileName)
       END IF
 
@@ -709,16 +439,8 @@ CONTAINS
       END IF ! tidewest
 
 ! east -----------
-      CALL READ_STRING(TideEastFileName, FILE_NAME, 'TideEastFileName', ierr)
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         IF (MYID == 0) &
-            WRITE (*, *) TRIM(TMP_NAME), ' No east tidal bc'
-# else
-         WRITE (*, *) TRIM(TMP_NAME), ' No east tidal bc'
-# endif
-         TideEast = .False.
-      ELSE
+      ! TideEast + TideEastFileName bridged from the YAML config
+      IF (TideEast) THEN
          TMP_NAME = TRIM(TideEastFileName)
       END IF
 
@@ -750,16 +472,8 @@ CONTAINS
       END IF ! tideeast
 
 ! south -----------
-      CALL READ_STRING(TideSouthFileName, FILE_NAME, 'TideSouthFileName', ierr)
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         IF (MYID == 0) &
-            WRITE (*, *) TRIM(TMP_NAME), ' No south tidal bc'
-# else
-         WRITE (*, *) TRIM(TMP_NAME), ' No south tidal bc'
-# endif
-         TideSouth = .False.
-      ELSE
+      ! TideSouth + TideSouthFileName bridged from the YAML config
+      IF (TideSouth) THEN
          TMP_NAME = TRIM(TideSouthFileName)
       END IF
 
@@ -791,16 +505,8 @@ CONTAINS
       END IF ! tidesouth
 
 ! north -----------
-      CALL READ_STRING(TideNorthFileName, FILE_NAME, 'TideNorthFileName', ierr)
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         IF (MYID == 0) &
-            WRITE (*, *) TRIM(TMP_NAME), ' No north tidal bc'
-# else
-         WRITE (*, *) TRIM(TMP_NAME), ' No north tidal bc'
-# endif
-         TideNorth = .False.
-      ELSE
+      ! TideNorth + TideNorthFileName bridged from the YAML config
+      IF (TideNorth) THEN
          TMP_NAME = TRIM(TideNorthFileName)
       END IF
 

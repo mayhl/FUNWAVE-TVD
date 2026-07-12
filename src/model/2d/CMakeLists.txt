@@ -14,6 +14,7 @@ target_sources(${main_lib}_model PRIVATE
    bc.f90
    simulation.f90
    hotstart.f90
+   tide.f90
    wavemaker.f90
    sponge.f90
    obstacle.f90

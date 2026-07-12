@@ -819,6 +819,147 @@ parameters:
     default:      5.0
     latex:        ~
 
+  # ── tide (legacy mod_tide.F) ───────────────────────────────────────────────
+  - name:         tidal_bc_abs
+    legacy_name:  TIDAL_BC_ABS
+    yaml_path:    "tide.TIDAL_BC_ABS"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         tidal_bc_gen_abs
+    legacy_name:  TIDAL_BC_GEN_ABS
+    yaml_path:    "tide.TIDAL_BC_GEN_ABS"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         tide_bc_type
+    legacy_name:  TideBcType
+    yaml_path:    "tide.TideBcType"
+    units:        ~
+    default:      "CONSTANT"
+    latex:        ~
+
+  - name:         wavemakerpointnum
+    legacy_name:  WaveMakerPointNum
+    yaml_path:    "tide.WaveMakerPointNum"
+    units:        ~
+    default:      30
+    latex:        ~
+
+  - name:         tidewest_eta
+    legacy_name:  TideWest_ETA
+    yaml_path:    "tide.TideWest_ETA"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         tidewest_u
+    legacy_name:  TideWest_U
+    yaml_path:    "tide.TideWest_U"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tidewest_v
+    legacy_name:  TideWest_V
+    yaml_path:    "tide.TideWest_V"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tideeast_eta
+    legacy_name:  TideEast_ETA
+    yaml_path:    "tide.TideEast_ETA"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         tideeast_u
+    legacy_name:  TideEast_U
+    yaml_path:    "tide.TideEast_U"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tideeast_v
+    legacy_name:  TideEast_V
+    yaml_path:    "tide.TideEast_V"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tidesouth_eta
+    legacy_name:  TideSouth_ETA
+    yaml_path:    "tide.TideSouth_ETA"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         tidesouth_u
+    legacy_name:  TideSouth_U
+    yaml_path:    "tide.TideSouth_U"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tidesouth_v
+    legacy_name:  TideSouth_V
+    yaml_path:    "tide.TideSouth_V"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tidenorth_eta
+    legacy_name:  TideNorth_ETA
+    yaml_path:    "tide.TideNorth_ETA"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         tidenorth_u
+    legacy_name:  TideNorth_U
+    yaml_path:    "tide.TideNorth_U"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tidenorth_v
+    legacy_name:  TideNorth_V
+    yaml_path:    "tide.TideNorth_V"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         tidewestfilename
+    legacy_name:  TideWestFileName
+    yaml_path:    "tide.TideWestFileName"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         tideeastfilename
+    legacy_name:  TideEastFileName
+    yaml_path:    "tide.TideEastFileName"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         tidesouthfilename
+    legacy_name:  TideSouthFileName
+    yaml_path:    "tide.TideSouthFileName"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         tidenorthfilename
+    legacy_name:  TideNorthFileName
+    yaml_path:    "tide.TideNorthFileName"
+    units:        ~
+    default:      ~
+    latex:        ~
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

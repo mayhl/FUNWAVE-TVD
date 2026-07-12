@@ -94,6 +94,11 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SPONGE_SPONGE_NORTH_WIDTH = "0.0"
    character(*), parameter :: DEF_SPONGE_SPONGE_SOUTH_WIDTH = "0.0"
    character(*), parameter :: DEF_SPONGE_SPONGE_WEST_WIDTH = "0.0"
+   ! ── tide ──
+   character(*), parameter :: DEF_TIDE_TIDAL_BC_ABS = "NO"
+   character(*), parameter :: DEF_TIDE_TIDAL_BC_GEN_ABS = "NO"
+   character(*), parameter :: DEF_TIDE_TIDEBCTYPE = "CONSTANT"
+   character(*), parameter :: DEF_TIDE_WAVEMAKERPOINTNUM = "30"
    ! ── wavemaker ──
    character(*), parameter :: DEF_WAVEMAKER_AMP = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_AMP_WK = "0.0"
