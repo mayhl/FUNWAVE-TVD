@@ -100,7 +100,7 @@ def generate(reg: dict) -> str:
             lines.append(f'   ! ── {sec} ──\n')
             section = sec
         name = const_name(p['yaml_path'])
-        lines.append(f"   character(*), parameter :: {name} = '{default}'\n")
+        lines.append(f'   character(*), parameter :: {name} = "{default}"\n')
     lines.append(FOOTER)
     return ''.join(lines)
 
