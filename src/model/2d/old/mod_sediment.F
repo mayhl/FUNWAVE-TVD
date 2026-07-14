@@ -150,14 +150,15 @@ CONTAINS
 
 ! The suspended-load set (Sed_Scheme, D50, Sdensity, n_porosity, WS/WS_formula,
 ! Shields_cr, MinDepthPickup, PickupReduction/ReductionParameter,
-! C_limiter/USE_CLIMITER, Morph_interval) and the morphology set (Bed_Change,
-! BedLoad, Shields_cr_bedload, Morph_factor, IN_Mask_s/Mask_s_File) are seeded
-! by the io.F bridge from the modern sediment reader; the READ_* calls that used
-! to pull them out of input.txt are gone.  Note the bridge already resolved the
-! Shields_cr_bedload -> Shields_cr fallback, so there is nothing to fall back to
-! here.  Everything the bridge does not carry yet (avalanching, cohesive, the
-! source-term switches) keeps its declaration default, which is the same value
-! the stripped READs fell back to.
+! C_limiter/USE_CLIMITER, Morph_interval), the morphology set (Bed_Change,
+! BedLoad, Shields_cr_bedload, Morph_factor, IN_Mask_s/Mask_s_File), the
+! avalanching set (Avalanche, Tan_phi, Aval_interval), the cohesive set
+! (CohesiveSediment, SoftBed, the *_coh parameters) and the feedback switches
+! (SedimentMassSource, SedimentMomentDC, SedimentMomentEXG) are all seeded by the
+! io.F bridge from the modern sediment reader; the READ_* calls that used to pull
+! them out of input.txt are gone.  Note the bridge already resolved the two
+! conditional fallbacks -- Shields_cr_bedload -> Shields_cr, and D50 -> mud or
+! sand on CohesiveSediment -- so there is nothing to fall back to here.
 
       PLOT_COUNT_SEDIMENT = ZERO
 

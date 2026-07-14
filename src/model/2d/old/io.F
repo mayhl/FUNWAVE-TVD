@@ -177,7 +177,12 @@ SUBROUTINE READ_INPUT
                               ReductionParameter, Morph_interval, &
                               WS, WS_formula, C_limiter, USE_CLIMITER, &
                               BED_CHANGE, BedLoad, Shields_cr_bedload, &
-                              Morph_factor, IN_Mask_s, Mask_s_File
+                              Morph_factor, IN_Mask_s, Mask_s_File, &
+                              Avalanche, Tan_phi, Aval_interval, &
+                              CohesiveSediment, SoftBed, Tau_cr_coh, &
+                              Tau_crd_coh, E_coh, alpha_coh, a_coh, b_coh, &
+                              n_coh, m_coh, k_coh, SedimentMassSource, &
+                              SedimentMomentDC, SedimentMomentEXG
 # endif
 # if defined (FOAM)
    ! ONLY guard: the module declares its own SMALL, colliding with GLOBAL's
@@ -916,9 +921,8 @@ SUBROUTINE READ_INPUT
 
 # if defined (SEDIMENT)
    ! SEDIMENT_MODULE variables seeded from the modern reader, the READ calls in
-   ! mod_sediment.F stubbed out.  The suspended-load and morphology sets are
-   ! bridged; avalanching, cohesive and the source-term switches sit at their
-   ! module defaults until those rungs land.
+   ! mod_sediment.F stubbed out.  Every set is bridged: suspended load,
+   ! morphology, avalanching, cohesive, and the feedback switches.
    Sed_Scheme         = model%sediment%sed_scheme
    D50                = model%sediment%d50
    Sdensity           = model%sediment%sdensity
@@ -946,6 +950,31 @@ SUBROUTINE READ_INPUT
    Morph_factor       = model%sediment%morph_factor
    IN_Mask_s          = model%sediment%hard_bottom
    IF (IN_Mask_s) Mask_s_File = model%sediment%hard_bottom_file%root
+
+   ! avalanching.  Aval_interval is presence-tested and has already fallen back
+   ! to SMALL on the modern side, so seed the resolved value.
+   Avalanche          = model%sediment%avalanche
+   Tan_phi            = model%sediment%tan_phi
+   Aval_interval      = model%sediment%aval_interval
+
+   ! cohesive.  D50 above is likewise already resolved, so the mud-vs-sand
+   ! fallback does not have to be re-derived here.
+   CohesiveSediment   = model%sediment%cohesive
+   SoftBed            = model%sediment%soft_bed
+   Tau_cr_coh         = model%sediment%tau_cr_coh
+   Tau_crd_coh        = model%sediment%tau_crd_coh
+   E_coh              = model%sediment%e_coh
+   alpha_coh          = model%sediment%alpha_coh
+   a_coh              = model%sediment%a_coh
+   b_coh              = model%sediment%b_coh
+   n_coh              = model%sediment%n_coh
+   m_coh              = model%sediment%m_coh
+   k_coh              = model%sediment%k_coh
+
+   ! feedback into the flow's mass and momentum residuals
+   SedimentMassSource = model%sediment%mass_source
+   SedimentMomentDC   = model%sediment%moment_dc
+   SedimentMomentEXG  = model%sediment%moment_exg
 # endif
 
 END SUBROUTINE READ_INPUT
