@@ -1159,6 +1159,134 @@ parameters:
     default:      0.1
     latex:        ~
 
+  # ── sediment (legacy mod_sediment.F) ───────────────────────────────────────
+  # Suspended-load transport of a single grain size.  Kappa1/Kappa2 are read and
+  # echoed by legacy but never enter a formula, so they are not ported.
+  #
+  # WS and C_limiter are PRESENCE-tested, not value-tested: an absent WS switches
+  # to the settling-velocity formula, an absent C_limiter disables the limiter.
+  # Both therefore carry no default (a default would make them always "present").
+  - name:         sed_scheme
+    legacy_name:  Sed_Scheme
+    yaml_path:    "sediment.Sed_Scheme"
+    units:        ~
+    default:      Upwinding
+    latex:        ~
+
+  - name:         d50
+    legacy_name:  D50
+    yaml_path:    "sediment.D50"
+    units:        "m"
+    default:      0.0005
+    latex:        "$D_{50}$"
+
+  - name:         sdensity
+    legacy_name:  Sdensity
+    yaml_path:    "sediment.Sdensity"
+    units:        ~
+    default:      2.68
+    latex:        "$s$"
+
+  - name:         n_porosity
+    legacy_name:  n_porosity
+    yaml_path:    "sediment.n_porosity"
+    units:        ~
+    default:      0.47
+    latex:        "$n$"
+
+  - name:         ws
+    legacy_name:  WS
+    yaml_path:    "sediment.WS"
+    units:        "m/s"
+    default:      ~
+    latex:        "$w_s$"
+
+  - name:         shields_cr
+    legacy_name:  Shields_cr
+    yaml_path:    "sediment.Shields_cr"
+    units:        ~
+    default:      0.055
+    latex:        "$\\theta_{cr}$"
+
+  - name:         mindepthpickup
+    legacy_name:  MinDepthPickup
+    yaml_path:    "sediment.MinDepthPickup"
+    units:        "m"
+    default:      0.1
+    latex:        ~
+
+  - name:         pickupreduction
+    legacy_name:  PickupReduction
+    yaml_path:    "sediment.PickupReduction"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         reductionparameter
+    legacy_name:  ReductionParameter
+    yaml_path:    "sediment.ReductionParameter"
+    units:        ~
+    default:      0.65
+    latex:        ~
+
+  - name:         c_limiter
+    legacy_name:  C_limiter
+    yaml_path:    "sediment.C_limiter"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         morph_interval
+    legacy_name:  Morph_interval
+    yaml_path:    "sediment.Morph_interval"
+    units:        "s"
+    default:      ~
+    latex:        ~
+
+  # Morphology.  Shields_cr_bedload is presence-tested like WS above: absent, it
+  # falls back to Shields_cr, so it carries no default of its own.
+  - name:         bed_change
+    legacy_name:  Bed_Change
+    yaml_path:    "sediment.Bed_Change"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         bedload
+    legacy_name:  BedLoad
+    yaml_path:    "sediment.BedLoad"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         shields_cr_bedload
+    legacy_name:  Shields_cr_bedload
+    yaml_path:    "sediment.Shields_cr_bedload"
+    units:        ~
+    default:      ~
+    latex:        "$\\theta_{cr,b}$"
+
+  - name:         morph_factor
+    legacy_name:  Morph_factor
+    yaml_path:    "sediment.Morph_factor"
+    units:        ~
+    default:      1
+    latex:        ~
+
+  - name:         hard_bottom
+    legacy_name:  IN_Mask_s
+    yaml_path:    "sediment.Hard_bottom"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         hard_bottom_file
+    legacy_name:  Mask_s_File
+    yaml_path:    "sediment.Hard_bottom_file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

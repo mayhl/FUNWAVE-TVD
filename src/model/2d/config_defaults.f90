@@ -83,6 +83,19 @@ module model_config_defaults_mod
    ! ── precipitation ──
    character(*), parameter :: DEF_PRECIPITATION_OUT_PRECIPITATION = "YES"
    character(*), parameter :: DEF_PRECIPITATION_RAINWAVEINTERACTION = "NO"
+   ! ── sediment ──
+   character(*), parameter :: DEF_SEDIMENT_BEDLOAD = "NO"
+   character(*), parameter :: DEF_SEDIMENT_BED_CHANGE = "NO"
+   character(*), parameter :: DEF_SEDIMENT_D50 = "0.0005"
+   character(*), parameter :: DEF_SEDIMENT_HARD_BOTTOM = "NO"
+   character(*), parameter :: DEF_SEDIMENT_MINDEPTHPICKUP = "0.1"
+   character(*), parameter :: DEF_SEDIMENT_MORPH_FACTOR = "1"
+   character(*), parameter :: DEF_SEDIMENT_PICKUPREDUCTION = "YES"
+   character(*), parameter :: DEF_SEDIMENT_REDUCTIONPARAMETER = "0.65"
+   character(*), parameter :: DEF_SEDIMENT_SDENSITY = "2.68"
+   character(*), parameter :: DEF_SEDIMENT_SED_SCHEME = "Upwinding"
+   character(*), parameter :: DEF_SEDIMENT_SHIELDS_CR = "0.055"
+   character(*), parameter :: DEF_SEDIMENT_N_POROSITY = "0.47"
    ! ── simulation ──
    character(*), parameter :: DEF_SIMULATION_PLOT_INTV_STATION = "1.0"
    character(*), parameter :: DEF_SIMULATION_SCREEN_INTERVAL = "1.0"
