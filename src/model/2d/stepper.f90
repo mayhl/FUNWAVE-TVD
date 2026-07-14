@@ -572,6 +572,10 @@ contains
                             this%src_x, this%src_y, &
                             wm_mass(this), prec_rate(this), ves_flux(this), &
                             this%subgrid%is_activated, porosity(this), &
+                            this%sediment%mass_source, this%sediment%moment_dc, &
+                            this%sediment%moment_exg, &
+                            sed_mass(this), sed_dc_x(this), sed_dc_y(this), &
+                            sed_exg_x(this), sed_exg_y(this), &
                             f%eta0, f%p0, f%q0, f%eta, f%p, f%q)
 
          ! legacy GET_Eta_U_V_HU_HV: whole-array H (unclamped; ghost eta
@@ -754,6 +758,8 @@ contains
          call registry%register("sediment_depo", this%sediment%depo)
          call registry%register("sediment_bedfx", this%sediment%bed_flux_x)
          call registry%register("sediment_bedfy", this%sediment%bed_flux_y)
+         call registry%register("sediment_aval", this%sediment%zb_aval)
+         call registry%register("sediment_avalac", this%sediment%aval_accum)
       end if
 
       associate (f => this%fields, lp => this%grid%lp)
@@ -790,7 +796,7 @@ contains
       ! depth_x/depth_y), which every kernel of the next step then reads
       if (this%sediment%is_activated) then
          call this%sediment%morphology(this%bc, this%grid, this%dt_step, &
-                                       this%inv_dx, this%inv_dy, &
+                                       this%dx, this%dy, this%inv_dx, this%inv_dy, &
                                        this%fields%depth, this%fields%depth_x, &
                                        this%fields%depth_y)
       end if
@@ -1091,6 +1097,65 @@ contains
          f => this%zeros
       end if
    end function ves_flux
+
+   ! Sediment feedback into the flow's residual: the module's arrays when it
+   ! is on, zeros otherwise.  The switches are separate dummies — when one is
+   ! off its array holds live numbers the flow must not read (sediment.f90
+   ! NOTE 21), so pointing them at the real fields is not enough.
+   function sed_mass(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%sediment%is_activated) then
+         s => this%sediment%mass_sed
+      else
+         s => this%zeros
+      end if
+   end function sed_mass
+
+   function sed_dc_x(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%sediment%is_activated) then
+         s => this%sediment%dc_x
+      else
+         s => this%zeros
+      end if
+   end function sed_dc_x
+
+   function sed_dc_y(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%sediment%is_activated) then
+         s => this%sediment%dc_y
+      else
+         s => this%zeros
+      end if
+   end function sed_dc_y
+
+   function sed_exg_x(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%sediment%is_activated) then
+         s => this%sediment%exg_x
+      else
+         s => this%zeros
+      end if
+   end function sed_exg_x
+
+   function sed_exg_y(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%sediment%is_activated) then
+         s => this%sediment%exg_y
+      else
+         s => this%zeros
+      end if
+   end function sed_exg_y
 
    subroutine stepper_free(this)
       class(type_model_stepper_2d), intent(inout) :: this

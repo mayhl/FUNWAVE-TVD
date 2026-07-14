@@ -716,6 +716,8 @@ contains
             call add_var(vars, prefs, nv, "sediment_depo", "Depo")
             call add_var(vars, prefs, nv, "sediment_bedfx", "BedFx")
             call add_var(vars, prefs, nv, "sediment_bedfy", "BedFy")
+            call add_var(vars, prefs, nv, "sediment_aval", "Aval")
+            call add_var(vars, prefs, nv, "sediment_avalac", "AvalAc")
             call add_var(vars, prefs, nv, "depth", "dep")
          end if
          if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")

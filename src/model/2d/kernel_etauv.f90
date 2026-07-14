@@ -107,11 +107,21 @@ contains
    ! (porosity is never zero — the dry clamp lifts it to 1 — so legacy's
    ! guard branch there is dead).  Legacy ETA_LIMITER (default off) is
    ! not ported.
+   !
+   ! The sediment feedback enters as three separately switched terms: the
+   ! bed-exchange mass source between the porosity divide and the rainfall
+   ! (legacy's slot), and the concentration-gradient and momentum-exchange
+   ! terms appended to the momentum residuals.  Each array is zeros when its
+   ! switch is off, but the switch still gates the add — legacy fills all
+   ! three whenever any one of them is on (sediment.f90 NOTE 21).
    ! ----------------------------------------------------------------
    pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
                                  pflx, qflx, fx, fy, gx, gy, &
                                  src_x, src_y, wavemaker_mass, prec_rate, &
                                  ves_flux, subgrid_on, porosity, &
+                                 sed_mass_on, sed_dc_on, sed_exg_on, &
+                                 sed_mass, sed_dc_x, sed_dc_y, &
+                                 sed_exg_x, sed_exg_y, &
                                  eta0, ubar0, vbar0, eta, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in) :: alpha, beta, dt
@@ -123,6 +133,9 @@ contains
       real(SP), intent(in) :: ves_flux(:, :)
       logical, intent(in) :: subgrid_on
       real(SP), intent(in) :: porosity(:, :)
+      logical, intent(in) :: sed_mass_on, sed_dc_on, sed_exg_on
+      real(SP), intent(in) :: sed_mass(:, :), sed_dc_x(:, :), sed_dc_y(:, :)
+      real(SP), intent(in) :: sed_exg_x(:, :), sed_exg_y(:, :)
       real(SP), intent(in) :: eta0(:, :), ubar0(:, :), vbar0(:, :)
       real(SP), intent(inout) :: eta(:, :), ubar(:, :), vbar(:, :)
 
@@ -138,17 +151,22 @@ contains
             ! added straight after the divergence); zeros when no vessel
             r1 = r1 + ves_flux(i, j)
             if (subgrid_on) r1 = r1/porosity(i, j)
+            if (sed_mass_on) r1 = r1 + sed_mass(i, j)
             r1 = r1 + prec_rate(i, j)
             eta(i, j) = alpha*eta0(i, j) + beta*(eta(i, j) + dt*r1)
 
             r2 = -(fx(i + 1, j) - fx(i, j))*inv_dx(i, j) &
                  - (fy(i, j + 1) - fy(i, j))*inv_dy(i, j) &
                  + src_x(i, j)
+            if (sed_dc_on) r2 = r2 + sed_dc_x(i, j)
+            if (sed_exg_on) r2 = r2 + sed_exg_x(i, j)
             ubar(i, j) = alpha*ubar0(i, j) + beta*(ubar(i, j) + dt*r2)
 
             r3 = -(gx(i + 1, j) - gx(i, j))*inv_dx(i, j) &
                  - (gy(i, j + 1) - gy(i, j))*inv_dy(i, j) &
                  + src_y(i, j)
+            if (sed_dc_on) r3 = r3 + sed_dc_y(i, j)
+            if (sed_exg_on) r3 = r3 + sed_exg_y(i, j)
             vbar(i, j) = alpha*vbar0(i, j) + beta*(vbar(i, j) + dt*r3)
          end do
       end do
