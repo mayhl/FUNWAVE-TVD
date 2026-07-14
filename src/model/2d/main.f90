@@ -41,6 +41,7 @@ module model_main_mod
    use model_subgrid_mod, only: type_model_subgrid
    use model_foam_mod, only: type_model_foam
    use model_tracer_mod, only: type_model_tracer
+   use model_vessel_mod, only: type_model_vessel
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -58,6 +59,7 @@ module model_main_mod
       type(type_comm), pointer :: comm => null()
       type(type_model_stations), pointer :: stations => null()
       type(type_model_tracer), pointer :: tracer => null()
+      type(type_model_vessel), pointer :: vessel => null()
    contains
       procedure :: step => output_monitor_step
    end type type_output_monitor
@@ -82,6 +84,7 @@ module model_main_mod
       type(type_model_subgrid) :: subgrid
       type(type_model_foam) :: foam
       type(type_model_tracer) :: tracer
+      type(type_model_vessel) :: vessel
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -133,6 +136,7 @@ contains
       call this%foam%read_input(this%env)
       call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       call this%tracer%read_input(this%env)
+      call this%vessel%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -178,6 +182,7 @@ contains
       call this%foam%read_input(this%env)
       call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       call this%tracer%read_input(this%env)
+      call this%vessel%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -550,6 +555,12 @@ contains
       call this%tracer%init_compute(this%grid, this%env, &
                                     this%output%result_folder, &
                                     this%simulation%t_start)
+      ! legacy VESSEL_INITIAL: opens every vessel_NNNNN, reads its geometry and
+      ! first track point, and builds the ghost-inclusive lattice the hull frame
+      ! is evaluated on -- so the grid must already be spaced
+      call this%vessel%init_compute(this%grid, this%env, &
+                                    this%output%result_folder, &
+                                    this%simulation%t_start)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
@@ -561,7 +572,7 @@ contains
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
                         this%precipitation, this%subgrid, this%foam, &
-                        this%tracer)
+                        this%tracer, this%vessel)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -577,6 +588,7 @@ contains
       monitor%comm => this%env%comm
       monitor%stations => this%stations
       monitor%tracer => this%tracer
+      monitor%vessel => this%vessel
 
       call engine%init(merge(this%hot_start%time, 0.0_SP, &
                              this%hot_start%is_activated), &
@@ -595,6 +607,7 @@ contains
       call this%subgrid%free()
       call this%foam%free()
       call this%tracer%free()
+      call this%vessel%free()
 
    end subroutine model_run
 
@@ -608,6 +621,8 @@ contains
       if (associated(this%stations)) call this%stations%update(t, dt)
       ! legacy OUTPUT_TRACKING: loop-top, on the PLOT_COUNT_TRACKING cadence
       if (associated(this%tracer)) call this%tracer%write_output(t, dt)
+      ! legacy OUTPUT_VESSEL: resistance time series on the PLOT_COUNT_VESSEL cadence
+      if (associated(this%vessel)) call this%vessel%write_output(t, dt)
 
       ! Legacy PREVIEW appends "time dt" to time_dt.out (run dir, not
       ! result_folder) at every field-frame flush; io rank only here.
@@ -668,6 +683,17 @@ contains
          ! build always dumps it
          if (this%foam%is_activated) &
             call add_var(vars, prefs, nv, "eta_foam", "FoamEta")
+         ! legacy PREVIEW writes Pves_ (and VesUp_/VesVp_ under -DPROPELLER)
+         ! gated on OUT_VESSEL alone.  The jet pair is the ONLY observable the
+         ! propeller has -- it feeds nothing back into the flow -- so without
+         ! these a dead jet and a live one are indistinguishable.
+         if (this%vessel%is_activated .and. this%vessel%out_vessel) then
+            call add_var(vars, prefs, nv, "vessel_pressure", "Pves")
+            if (this%vessel%propeller) then
+               call add_var(vars, prefs, nv, "vessel_up", "VesUp")
+               call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
+            end if
+         end if
          if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")
          if (out%OUT_MASK9) call add_var(vars, prefs, nv, "mask9", "mask9")
          ! Legacy P/Q are the interface fluxes, not the registry p/q (Ubar)

@@ -49,14 +49,16 @@ contains
    !      += order after every other term.
    ! ----------------------------------------------------------------
    subroutine cal_sources(lp, gamma1, gamma2, dispersion, coriolis_on, &
-                          breakwater_on, mask, mask9, inv_dx, inv_dy, &
+                          breakwater_on, vessel_drag_on, mask, mask9, inv_dx, inv_dy, &
                           depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, coriolis, &
-                          cd_breakwater, min_depth_frc, src_x, src_y)
+                          cd_breakwater, cd_vessel, ves_px, ves_py, &
+                          min_depth_frc, src_x, src_y)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: gamma1, gamma2
       logical, intent(in)  :: dispersion, coriolis_on, breakwater_on
+      logical, intent(in)  :: vessel_drag_on
       integer, intent(in)  :: mask(:, :), mask9(:, :)
       real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)  :: depth(:, :), depth_x(:, :), depth_y(:, :)
@@ -67,6 +69,7 @@ contains
       real(SP), intent(in)  :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
       real(SP), intent(in)  :: wavemaker_mass(:, :), cd(:, :), nu_vis(:, :)
       real(SP), intent(in)  :: coriolis(:, :), cd_breakwater(:, :)
+      real(SP), intent(in)  :: cd_vessel(:, :), ves_px(:, :), ves_py(:, :)
       real(SP), intent(in)  :: min_depth_frc
       real(SP), intent(out) :: src_x(:, :), src_y(:, :)
 
@@ -89,6 +92,13 @@ contains
             ! friction (Cd already effective: linear drag or Manning pre-applied)
             src_x(i, j) = src_x(i, j) - cd(i, j)*u(i, j)*spd
             src_y(i, j) = src_y(i, j) - cd(i, j)*v(i, j)*spd
+
+            ! deep-draft hull drag (legacy DEEP_DRAFT_VESSEL): note there is
+            ! no depth factor here, unlike the breakwater term below
+            if (vessel_drag_on) then
+               src_x(i, j) = src_x(i, j) - cd_vessel(i, j)*u(i, j)*spd
+               src_y(i, j) = src_y(i, j) - cd_vessel(i, j)*v(i, j)*spd
+            end if
 
             ! wavemaker mass injection
             src_x(i, j) = src_x(i, j) + wavemaker_mass(i, j)*u(i, j)
@@ -163,6 +173,12 @@ contains
                           - (nu_vis(i, j - 1) + nu_vis(i, j))*inv_dy(i, j)*(hv(i, j) - hv(i, j - 1)))
          end do
       end do
+
+      ! moving-vessel pressure gradient -g H grad(P).  Legacy adds this as a
+      ! whole-array term after the loops (SourceX = SourceX + VesselPressureX),
+      ! so it lands last; zeros when no vessel is active.
+      src_x = src_x + ves_px
+      src_y = src_y + ves_py
 
    end subroutine cal_sources
 

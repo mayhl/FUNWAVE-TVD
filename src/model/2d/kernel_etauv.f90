@@ -111,7 +111,7 @@ contains
    pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
                                  pflx, qflx, fx, fy, gx, gy, &
                                  src_x, src_y, wavemaker_mass, prec_rate, &
-                                 subgrid_on, porosity, &
+                                 ves_flux, subgrid_on, porosity, &
                                  eta0, ubar0, vbar0, eta, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in) :: alpha, beta, dt
@@ -120,6 +120,7 @@ contains
       real(SP), intent(in) :: fx(:, :), fy(:, :), gx(:, :), gy(:, :)
       real(SP), intent(in) :: src_x(:, :), src_y(:, :), wavemaker_mass(:, :)
       real(SP), intent(in) :: prec_rate(:, :)
+      real(SP), intent(in) :: ves_flux(:, :)
       logical, intent(in) :: subgrid_on
       real(SP), intent(in) :: porosity(:, :)
       real(SP), intent(in) :: eta0(:, :), ubar0(:, :), vbar0(:, :)
@@ -133,6 +134,9 @@ contains
             r1 = -(pflx(i + 1, j) - pflx(i, j))*inv_dx(i, j) &
                  - (qflx(i, j + 1) - qflx(i, j))*inv_dy(i, j) &
                  + wavemaker_mass(i, j)
+            ! slender-body mass flux (legacy R1 = R1 + VesselFluxGradient,
+            ! added straight after the divergence); zeros when no vessel
+            r1 = r1 + ves_flux(i, j)
             if (subgrid_on) r1 = r1/porosity(i, j)
             r1 = r1 + prec_rate(i, j)
             eta(i, j) = alpha*eta0(i, j) + beta*(eta(i, j) + dt*r1)

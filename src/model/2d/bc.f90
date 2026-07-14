@@ -53,6 +53,7 @@ module model_bc_mod
       procedure :: init => bc_init
       procedure :: exchange_state => bc_exchange_state
       procedure :: exchange_dispersion => bc_exchange_dispersion
+      procedure :: exchange_scalar => bc_exchange_scalar
    end type type_model_bc
 
 contains
@@ -199,6 +200,17 @@ contains
       end if
 
    end subroutine bc_exchange_dispersion
+
+   ! Halo + scalar mirror for a field an optional module owns (legacy PHI_COLL
+   ! with VTYPE=1); the vessel propeller jet is the first caller.
+   subroutine bc_exchange_scalar(this, grid, f)
+      class(type_model_bc), intent(in) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: f(:, :)
+
+      call exchange_one(this, grid, f, SIGN_MIRROR, SIGN_MIRROR)
+
+   end subroutine bc_exchange_scalar
 
    subroutine exchange_one(this, grid, f, sign_x, sign_y)
       class(type_model_bc), intent(in) :: this

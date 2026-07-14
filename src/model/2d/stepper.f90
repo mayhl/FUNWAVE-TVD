@@ -55,6 +55,7 @@ module model_stepper_2d_mod
    use model_subgrid_mod, only: type_model_subgrid
    use model_foam_mod, only: type_model_foam
    use model_tracer_mod, only: type_model_tracer
+   use model_vessel_mod, only: type_model_vessel
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -103,6 +104,7 @@ module model_stepper_2d_mod
       type(type_model_subgrid), pointer :: subgrid => null()
       type(type_model_foam), pointer :: foam => null()
       type(type_model_tracer), pointer :: tracer => null()
+      type(type_model_vessel), pointer :: vessel => null()
 
       type(type_model_bc) :: bc
 
@@ -165,9 +167,10 @@ module model_stepper_2d_mod
       ! show in modern (deliberate 19c deviation from the ykchoi trap)
       logical :: run_breaker = .false.
 
-      ! Combined eddy viscosity, allocated only when nu_break and
-      ! nu_sponge are BOTH active (legacy nu_vis assembly in sources.F);
-      ! single-source cases alias the source array in merge_nu_vis.
+      ! Combined eddy viscosity, allocated only when more than one of
+      ! nu_break / vessel deep-draft / nu_sponge is active (legacy nu_vis
+      ! assembly in sources.F); single-source cases alias the source
+      ! array in merge_nu_vis.
       real(SP), allocatable :: nu_vis(:, :)
 
       ! Output mirrors (registry is real(SP)-only): legacy Int2Flo
@@ -195,7 +198,7 @@ contains
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
-                           precipitation, subgrid, foam, tracer)
+                           precipitation, subgrid, foam, tracer, vessel)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -233,6 +236,10 @@ contains
       ! tracer%init_compute must have run (trackers located); like foam it
       ! is one-way — it only reads u/v/mask
       type(type_model_tracer), intent(inout), target :: tracer
+      ! vessel%init_compute must have run (tracks open, first point read).
+      ! Unlike foam/tracer this one is TWO-WAY: the pressure gradient and the
+      ! slender-body flux feed the momentum and continuity RHS.
+      type(type_model_vessel), intent(inout), target :: vessel
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -254,6 +261,7 @@ contains
       this%subgrid => subgrid
       this%foam => foam
       this%tracer => tracer
+      this%vessel => vessel
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -388,8 +396,15 @@ contains
          allocate (this%in_wm_zone(mloc, nloc))
          call wavemaker%fill_in_zone(this%in_wm_zone)
       end if
-      if ((this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) &
-          .and. this%sponge%diffusion_sponge) then
+      ! Legacy assembles nu_vis as
+      !     nu_vis = nu_break [+ VisVessel_2D]   under VISCOSITY_BREAKING/WAVEMAKER_VIS
+      !     nu_vis = nu_vis + nu_sponge          under DIFFUSION_SPONGE
+      ! so the vessel term rides INSIDE the breaking branch and is silently
+      ! dropped when breaking viscosity is off (ledger 6g-5).  Allocate the
+      ! combined array whenever more than one contributor is live; the
+      ! single-source cases still alias in merge_nu_vis.
+      if (((this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) &
+           .and. this%sponge%diffusion_sponge) .or. ves_vis_on(this)) then
          allocate (this%nu_vis(mloc, nloc), source=0.0_SP)
       end if
 
@@ -469,6 +484,15 @@ contains
             call this%precipitation%update(time)
          end if
 
+         ! vessel tracks + pressure/flux fields (legacy VESSEL_FORCING,
+         ! after ESTIMATE_DT and BEFORE the RK loop, so once per step at the
+         ! already-advanced TIME).  It writes eta/eta0 on the first step only
+         ! (MakeVesselDraft), so it must land ahead of the fluxes.
+         if (istage == 1 .and. this%vessel%is_activated) then
+            call this%vessel%update(this%bc, this%grid, time, dt, &
+                                    f%eta, f%eta0, f%depth, f%h)
+         end if
+
          if (phy%dispersion) call run_dispersion(this, dt)
 
          call fluxes(lp, num%high_order, num%construction, &
@@ -496,13 +520,24 @@ contains
          ! wavemaker mass source at the stage TIME (legacy SourceTerms head)
          call this%wavemaker%update_source(time)
 
-         ! combined breaking + diffusion-sponge viscosity (both active)
+         ! combined eddy viscosity, assembled in legacy's order (sources.F
+         ! head): nu_break, then the deep-draft hull, then the sponge
          if (allocated(this%nu_vis)) then
-            this%nu_vis = f%nu_break + this%sponge%nu_sponge
+            this%nu_vis = 0.0_SP
+            if (phy%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) then
+               this%nu_vis = f%nu_break
+               if (ves_vis_on(this)) then
+                  this%nu_vis = this%nu_vis + this%vessel%vis_2d
+               end if
+            end if
+            if (this%sponge%diffusion_sponge) then
+               this%nu_vis = this%nu_vis + this%sponge%nu_sponge
+            end if
          end if
 
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
                           phy%coriolis_on, this%obstacle%breakwater, &
+                          ves_drag_on(this), &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
                           f%depth, this%depth_fx, this%depth_fy, &
                           f%eta, f%h, f%u, f%v, &
@@ -514,6 +549,7 @@ contains
                           this%friction%Cd, &
                           merge_nu_vis(this), &
                           cor_f(this), bw_cd(this), &
+                          ves_cd(this), ves_px(this), ves_py(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
 
          call cal_rk_update(lp, RK_ALPHA(istage), RK_BETA(istage), dt, &
@@ -521,7 +557,7 @@ contains
                             this%fws%p, this%fws%q, this%fws%fx, this%fws%fy, &
                             this%fws%gx, this%fws%gy, &
                             this%src_x, this%src_y, &
-                            wm_mass(this), prec_rate(this), &
+                            wm_mass(this), prec_rate(this), ves_flux(this), &
                             this%subgrid%is_activated, porosity(this), &
                             f%eta0, f%p0, f%q0, f%eta, f%p, f%q)
 
@@ -580,6 +616,12 @@ contains
          call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
                            num%MinDepthFrc, phy%SWE_ETA_DEP, &
                            phy%viscosity_breaking)
+
+         ! deep-draft hull blanks mask9 (legacy UPDATE_MASK:
+         ! MASK9 = MASK9tmp*MaskVessel, before the ghost exchange)
+         if (ves_mask_on(this)) then
+            f%mask9 = f%mask9*this%vessel%mask_vessel
+         end if
 
          ! tidal strip relaxation (legacy TIDE_BC between UPDATE_MASK
          ! and WAVE_BREAKING); hu/hv stay stale like legacy
@@ -660,6 +702,19 @@ contains
       if (this%foam%is_activated) then
          call registry%register("eta_foam", this%foam%eta_foam)
          call registry%register("eta_foam_max", this%foam%eta_foam_max)
+      end if
+
+      if (this%vessel%is_activated) then
+         ! legacy PREVIEW writes Pves_ under OUT_VESSEL
+         call registry%register("vessel_pressure", this%vessel%p_total)
+         ! legacy VesUp_/VesVp_.  These matter more than they look: the
+         ! propeller is ONE-WAY, so a dead jet is bitwise identical to a live
+         ! one on eta/u/v and no hydrodynamic check can tell them apart.  The
+         ! jet field is the only liveness evidence there is.
+         if (this%vessel%propeller) then
+            call registry%register("vessel_up", this%vessel%up_total)
+            call registry%register("vessel_vp", this%vessel%vp_total)
+         end if
       end if
 
       associate (f => this%fields, lp => this%grid%lp)
@@ -897,6 +952,83 @@ contains
       end if
    end function merge_nu_vis
 
+   ! ── vessel accessors ───────────────────────────────────────────────
+   ! Same zeros-stand-in contract as the other optional modules: an
+   ! inactive vessel adds an exact zero, so a vessel-free run stays
+   ! bitwise identical to one built with the module compiled in.
+
+   ! Deep-draft hull drag is live only when the module, the deep-draft
+   ! sub-feature, AND the friction method are all on.
+   function ves_drag_on(this) result(on)
+      class(type_model_stepper_2d), intent(in) :: this
+      logical :: on
+
+      on = this%vessel%is_activated .and. this%vessel%deep_draft &
+           .and. this%vessel%friction_method
+   end function ves_drag_on
+
+   function ves_mask_on(this) result(on)
+      class(type_model_stepper_2d), intent(in) :: this
+      logical :: on
+
+      on = this%vessel%is_activated .and. this%vessel%deep_draft &
+           .and. this%vessel%mask_method
+   end function ves_mask_on
+
+   function ves_vis_on(this) result(on)
+      class(type_model_stepper_2d), intent(in) :: this
+      logical :: on
+
+      on = this%vessel%is_activated .and. this%vessel%deep_draft &
+           .and. this%vessel%viscosity_method
+   end function ves_vis_on
+
+   function ves_cd(this) result(c)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: c(:, :)
+
+      if (ves_drag_on(this)) then
+         c => this%vessel%cd_2d
+      else
+         c => this%zeros
+      end if
+   end function ves_cd
+
+   ! Momentum source: -g H grad(P) from the moving pressure patch.
+   function ves_px(this) result(p)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: p(:, :)
+
+      if (this%vessel%is_activated) then
+         p => this%vessel%p_x
+      else
+         p => this%zeros
+      end if
+   end function ves_px
+
+   function ves_py(this) result(p)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: p(:, :)
+
+      if (this%vessel%is_activated) then
+         p => this%vessel%p_y
+      else
+         p => this%zeros
+      end if
+   end function ves_py
+
+   ! Continuity source: the slender-body mass-flux dipole.
+   function ves_flux(this) result(f)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: f(:, :)
+
+      if (this%vessel%is_activated) then
+         f => this%vessel%flux_grad
+      else
+         f => this%zeros
+      end if
+   end function ves_flux
+
    subroutine stepper_free(this)
       class(type_model_stepper_2d), intent(inout) :: this
 
@@ -940,6 +1072,7 @@ contains
       this%subgrid => null()
       this%foam => null()
       this%tracer => null()
+      this%vessel => null()
 
    end subroutine stepper_free
 
