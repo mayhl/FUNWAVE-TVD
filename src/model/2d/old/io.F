@@ -170,6 +170,15 @@ SUBROUTINE READ_INPUT
                             CLEARANCE, CdDeepDraft, VisDeepDraft
 # endif
 # endif
+# if defined (SEDIMENT)
+   ! ONLY guard: the module re-exports I/J and its GLOBAL imports
+   USE SEDIMENT_MODULE, ONLY: Sed_Scheme, D50, Sdensity, n_porosity, &
+                              Shields_cr, MinDepthPickup, PickupReduction, &
+                              ReductionParameter, Morph_interval, &
+                              WS, WS_formula, C_limiter, USE_CLIMITER, &
+                              BED_CHANGE, BedLoad, Shields_cr_bedload, &
+                              Morph_factor, IN_Mask_s, Mask_s_File
+# endif
 # if defined (FOAM)
    ! ONLY guard: the module declares its own SMALL, colliding with GLOBAL's
    USE MOD_FOAM, ONLY: PLOT_INTV_FOAM, f_source, FoamTimeScale, &
@@ -903,6 +912,40 @@ SUBROUTINE READ_INPUT
    IF (model%vessel%deep_draft) CALL VESSEL_FLAG_MISMATCH( &
       'vessel.DEEP_DRAFT is true but the binary was built WITHOUT -DDEEP_DRAFT_VESSEL')
 # endif
+# endif
+
+# if defined (SEDIMENT)
+   ! SEDIMENT_MODULE variables seeded from the modern reader, the READ calls in
+   ! mod_sediment.F stubbed out.  The suspended-load and morphology sets are
+   ! bridged; avalanching, cohesive and the source-term switches sit at their
+   ! module defaults until those rungs land.
+   Sed_Scheme         = model%sediment%sed_scheme
+   D50                = model%sediment%d50
+   Sdensity           = model%sediment%sdensity
+   n_porosity         = model%sediment%n_porosity
+   Shields_cr         = model%sediment%shields_cr
+   MinDepthPickup     = model%sediment%min_depth_pickup
+   PickupReduction    = model%sediment%pickup_reduction
+   ReductionParameter = model%sediment%reduction_parameter
+   Morph_interval     = model%sediment%morph_interval
+
+   ! WS and C_limiter are presence-tested in the modern reader: an absent WS
+   ! selects the settling formula (which SEDIMENT_INITIAL evaluates itself, off
+   ! the same D50/Sdensity), an absent C_limiter disables the limiter
+   WS           = model%sediment%ws
+   WS_formula   = model%sediment%ws_formula
+   C_limiter    = model%sediment%c_limiter
+   USE_CLIMITER = model%sediment%use_climiter
+
+   ! morphology.  Shields_cr_bedload is presence-tested too and has already
+   ! fallen back to Shields_cr on the modern side, so seed the resolved value
+   ! (SEDIMENT_INITIAL's own fallback then re-assigns the same number).
+   BED_CHANGE         = model%sediment%bed_change
+   BedLoad            = model%sediment%bedload
+   Shields_cr_bedload = model%sediment%shields_cr_bedload
+   Morph_factor       = model%sediment%morph_factor
+   IN_Mask_s          = model%sediment%hard_bottom
+   IF (IN_Mask_s) Mask_s_File = model%sediment%hard_bottom_file%root
 # endif
 
 END SUBROUTINE READ_INPUT
