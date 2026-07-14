@@ -1173,11 +1173,14 @@ parameters:
     default:      Upwinding
     latex:        ~
 
+  # D50 is presence-tested because its fallback depends on CohesiveSediment:
+  # 0.5 mm sand, or 5 nm mud.  A flat default cannot express that, so the two
+  # sit as parameters in sediment.f90.
   - name:         d50
     legacy_name:  D50
     yaml_path:    "sediment.D50"
     units:        "m"
-    default:      0.0005
+    default:      ~
     latex:        "$D_{50}$"
 
   - name:         sdensity
@@ -1285,6 +1288,131 @@ parameters:
     yaml_path:    "sediment.Hard_bottom_file"
     units:        ~
     default:      ~
+    latex:        ~
+
+  # Avalanching.  Aval_interval is presence-tested: absent, it falls back to
+  # SMALL, i.e. the slope is relaxed every step.
+  - name:         avalanche
+    legacy_name:  Avalanche
+    yaml_path:    "sediment.Avalanche"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         tan_phi
+    legacy_name:  tan_phi
+    yaml_path:    "sediment.Tan_phi"
+    units:        ~
+    default:      0.7
+    latex:        "$\\tan\\phi$"
+
+  - name:         aval_interval
+    legacy_name:  Aval_interval
+    yaml_path:    "sediment.Aval_interval"
+    units:        "s"
+    default:      ~
+    latex:        ~
+
+  # Cohesive sediment.  Switching it on replaces the pickup law and the settling
+  # velocity wholesale, and silently retires the bedload.
+  - name:         cohesive_sediment
+    legacy_name:  CohesiveSediment
+    yaml_path:    "sediment.CohesiveSediment"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         soft_bed
+    legacy_name:  SoftBed
+    yaml_path:    "sediment.SoftBed"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         tau_cr_coh
+    legacy_name:  Tau_cr_coh
+    yaml_path:    "sediment.Tau_cr_coh"
+    units:        "m2/s2"
+    default:      0.001
+    latex:        "$\\tau_{cr}$"
+
+  - name:         tau_crd_coh
+    legacy_name:  Tau_crd_coh
+    yaml_path:    "sediment.Tau_crd_coh"
+    units:        "m2/s2"
+    default:      0.001
+    latex:        "$\\tau_{cr,d}$"
+
+  - name:         e_coh
+    legacy_name:  E_coh
+    yaml_path:    "sediment.E_coh"
+    units:        "m/s"
+    default:      0.0001
+    latex:        "$E$"
+
+  - name:         alpha_coh
+    legacy_name:  alpha_coh
+    yaml_path:    "sediment.alpha_coh"
+    units:        ~
+    default:      1.0
+    latex:        "$\\alpha$"
+
+  - name:         a_coh
+    legacy_name:  a_coh
+    yaml_path:    "sediment.a_coh"
+    units:        ~
+    default:      0.1
+    latex:        "$a$"
+
+  - name:         b_coh
+    legacy_name:  b_coh
+    yaml_path:    "sediment.b_coh"
+    units:        ~
+    default:      2.0
+    latex:        "$b$"
+
+  - name:         n_coh
+    legacy_name:  n_coh
+    yaml_path:    "sediment.n_coh"
+    units:        ~
+    default:      0.5
+    latex:        "$n$"
+
+  - name:         m_coh
+    legacy_name:  m_coh
+    yaml_path:    "sediment.m_coh"
+    units:        ~
+    default:      1.5
+    latex:        "$m$"
+
+  # inert: legacy assigns it to the molecular viscosity, whose only two consumers
+  # (Dstar, the WS formula) are non-cohesive-only.  Ported for fidelity.
+  - name:         k_coh
+    legacy_name:  k_coh
+    yaml_path:    "sediment.k_coh"
+    units:        "m2/s"
+    default:      0.000001
+    latex:        "$k$"
+
+  - name:         sediment_mass_source
+    legacy_name:  SedimentMassSource
+    yaml_path:    "sediment.SedimentMassSource"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         sediment_moment_dc
+    legacy_name:  SedimentMomentDC
+    yaml_path:    "sediment.SedimentMomentDC"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         sediment_moment_exg
+    legacy_name:  SedimentMomentEXG
+    yaml_path:    "sediment.SedimentMomentEXG"
+    units:        ~
+    default:      false
     latex:        ~
 
   - name:         amp
