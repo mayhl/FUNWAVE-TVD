@@ -1060,6 +1060,101 @@ parameters:
     default:      ~
     latex:        ~
 
+  # ── vessel (legacy mod_vessel.F) ───────────────────────────────────────────
+  # One vessel_NNNNN file per hull (geometry, propeller specs, and the time/x/y
+  # track) lives in VESSEL_FOLDER, not here: registry v1 is flat and cannot
+  # express a list.  Both engines read those files, so they are the parity-shared
+  # input.
+  #
+  # PROPELLER and DEEP_DRAFT_VESSEL are cpp flags in legacy; the modern engine is
+  # not preprocessed, so they become runtime switches.  The io.F bridge checks
+  # them against the legacy build flags and stops on a mismatch, so a modern
+  # `propeller: true` against a binary built without -DPROPELLER cannot silently
+  # score as parity.
+  - name:         vessel_folder
+    legacy_name:  VESSEL_FOLDER
+    yaml_path:    "vessel.VESSEL_FOLDER"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         numvessel
+    legacy_name:  NumVessel
+    yaml_path:    "vessel.NumVessel"
+    units:        ~
+    default:      1
+    latex:        ~
+
+  - name:         out_vessel
+    legacy_name:  OUT_VESSEL
+    yaml_path:    "vessel.OUT_VESSEL"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         plot_intv_vessel
+    legacy_name:  PLOT_INTV_VESSEL
+    yaml_path:    "vessel.PLOT_INTV_VESSEL"
+    units:        "s"
+    default:      ~
+    latex:        ~
+
+  - name:         propeller
+    legacy_name:  PROPELLER
+    yaml_path:    "vessel.PROPELLER"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         deep_draft
+    legacy_name:  DEEP_DRAFT_VESSEL
+    yaml_path:    "vessel.DEEP_DRAFT"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         maskmethod
+    legacy_name:  MaskMethod
+    yaml_path:    "vessel.MaskMethod"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         frictionmethod
+    legacy_name:  FrictionMethod
+    yaml_path:    "vessel.FrictionMethod"
+    units:        ~
+    default:      true
+    latex:        ~
+
+  - name:         viscositymethod
+    legacy_name:  ViscosityMethod
+    yaml_path:    "vessel.ViscosityMethod"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         clearance
+    legacy_name:  CLEARANCE
+    yaml_path:    "vessel.CLEARANCE"
+    units:        "m"
+    default:      1.0
+    latex:        ~
+
+  - name:         cddeepdraft
+    legacy_name:  CdDeepDraft
+    yaml_path:    "vessel.CdDeepDraft"
+    units:        ~
+    default:      0.1
+    latex:        "$C_{d,v}$"
+
+  - name:         visdeepdraft
+    legacy_name:  VisDeepDraft
+    yaml_path:    "vessel.VisDeepDraft"
+    units:        "m^2/s"
+    default:      0.1
+    latex:        ~
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

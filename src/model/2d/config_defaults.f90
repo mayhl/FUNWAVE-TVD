@@ -111,6 +111,17 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_TIDE_TIDAL_BC_GEN_ABS = "NO"
    character(*), parameter :: DEF_TIDE_TIDEBCTYPE = "CONSTANT"
    character(*), parameter :: DEF_TIDE_WAVEMAKERPOINTNUM = "30"
+   ! ── vessel ──
+   character(*), parameter :: DEF_VESSEL_CLEARANCE = "1.0"
+   character(*), parameter :: DEF_VESSEL_CDDEEPDRAFT = "0.1"
+   character(*), parameter :: DEF_VESSEL_DEEP_DRAFT = "NO"
+   character(*), parameter :: DEF_VESSEL_FRICTIONMETHOD = "YES"
+   character(*), parameter :: DEF_VESSEL_MASKMETHOD = "YES"
+   character(*), parameter :: DEF_VESSEL_NUMVESSEL = "1"
+   character(*), parameter :: DEF_VESSEL_OUT_VESSEL = "YES"
+   character(*), parameter :: DEF_VESSEL_PROPELLER = "NO"
+   character(*), parameter :: DEF_VESSEL_VISDEEPDRAFT = "0.1"
+   character(*), parameter :: DEF_VESSEL_VISCOSITYMETHOD = "NO"
    ! ── wavemaker ──
    character(*), parameter :: DEF_WAVEMAKER_AMP = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_AMP_WK = "0.0"
