@@ -162,6 +162,14 @@ SUBROUTINE READ_INPUT
    ! ONLY guard: the module re-exports II/JJ and its GLOBAL imports
    USE TRACER, ONLY: TRACER_FILE
 # endif
+# if defined (VESSEL)
+   ! ONLY guard: the module re-exports II/JJ/Kves and its GLOBAL imports
+   USE VESSEL_MODULE, ONLY: VESSEL_FOLDER, NumVessel, OUT_VESSEL, PLOT_INTV_VESSEL
+# if defined (DEEP_DRAFT_VESSEL)
+   USE VESSEL_MODULE, ONLY: MaskMethod, FrictionMethod, ViscosityMethod, &
+                            CLEARANCE, CdDeepDraft, VisDeepDraft
+# endif
+# endif
 # if defined (FOAM)
    ! ONLY guard: the module declares its own SMALL, colliding with GLOBAL's
    USE MOD_FOAM, ONLY: PLOT_INTV_FOAM, f_source, FoamTimeScale, &
@@ -859,6 +867,42 @@ SUBROUTINE READ_INPUT
    ! the tracker table itself still comes from TRACER_FILE, which both
    ! engines read, so only the path needs bridging
    TRACER_FILE = model%tracer%tracer_file
+# endif
+
+# if defined (VESSEL)
+   ! VESSEL_MODULE variables seeded from the modern reader, the READ calls in
+   ! mod_vessel.F stubbed out.  The vessel_NNNNN files stay the parity-shared
+   ! input -- both engines read them from VESSEL_FOLDER.
+   IF (ALLOCATED(model%vessel%vessel_folder)) &
+      VESSEL_FOLDER = model%vessel%vessel_folder
+   NumVessel        = model%vessel%n_vessel
+   OUT_VESSEL       = model%vessel%out_vessel
+   PLOT_INTV_VESSEL = model%vessel%plot_intv
+
+   ! PROPELLER and DEEP_DRAFT_VESSEL are cpp flags here but runtime switches in
+   ! the modern engine.  A mismatch would silently compare two different models,
+   ! so stop instead.
+# if defined (PROPELLER)
+   IF (.NOT. model%vessel%propeller) CALL VESSEL_FLAG_MISMATCH( &
+      'binary built WITH -DPROPELLER but vessel.PROPELLER is false')
+# else
+   IF (model%vessel%propeller) CALL VESSEL_FLAG_MISMATCH( &
+      'vessel.PROPELLER is true but the binary was built WITHOUT -DPROPELLER')
+# endif
+
+# if defined (DEEP_DRAFT_VESSEL)
+   IF (.NOT. model%vessel%deep_draft) CALL VESSEL_FLAG_MISMATCH( &
+      'binary built WITH -DDEEP_DRAFT_VESSEL but vessel.DEEP_DRAFT is false')
+   MaskMethod      = model%vessel%mask_method
+   FrictionMethod  = model%vessel%friction_method
+   ViscosityMethod = model%vessel%viscosity_method
+   CLEARANCE       = model%vessel%clearance
+   CdDeepDraft     = model%vessel%cd_deep_draft
+   VisDeepDraft    = model%vessel%vis_deep_draft
+# else
+   IF (model%vessel%deep_draft) CALL VESSEL_FLAG_MISMATCH( &
+      'vessel.DEEP_DRAFT is true but the binary was built WITHOUT -DDEEP_DRAFT_VESSEL')
+# endif
 # endif
 
 END SUBROUTINE READ_INPUT
@@ -2053,6 +2097,35 @@ END SUBROUTINE OUTPUT_VESSEL
 
 # endif
 ! end vessel
+
+# if defined (VESSEL)
+!-------------------------------------------------------------------------------------
+!
+!    VESSEL_FLAG_MISMATCH stops the run when the modern engine's runtime vessel
+!    switches disagree with the cpp flags this binary was built with.  Without
+!    it the two engines would quietly integrate different physics and the
+!    parity numbers would look clean.
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE VESSEL_FLAG_MISMATCH(MSG)
+   USE PARAM
+   USE GLOBAL
+   IMPLICIT NONE
+   CHARACTER(LEN=*), INTENT(IN) :: MSG
+
+# if defined (PARALLEL)
+   IF (myid == 0) WRITE (*, *) 'VESSEL BUILD-FLAG MISMATCH: ', TRIM(MSG)
+   CALL MPI_FINALIZE(ier)
+   STOP
+# else
+   WRITE (*, *) 'VESSEL BUILD-FLAG MISMATCH: ', TRIM(MSG)
+   STOP
+# endif
+
+END SUBROUTINE VESSEL_FLAG_MISMATCH
+
+# endif
+! end vessel flag guard
 
 # if defined (SEDIMENT)
 !-------------------------------------------------------------------------------------

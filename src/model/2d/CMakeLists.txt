@@ -19,6 +19,7 @@ target_sources(${main_lib}_model PRIVATE
    subgrid.f90
    foam.f90
    tracer.f90
+   vessel.f90
    wavemaker.f90
    sponge.f90
    obstacle.f90

@@ -109,6 +109,10 @@ MODULE VESSEL_MODULE
 
    LOGICAL :: MakeVesselDraft = .TRUE.
 
+! seeded by the io.F bridge from the modern vessel reader; the READ_STRING
+! that used to pull this out of input.txt is gone
+   CHARACTER(LEN=80), SAVE :: VESSEL_FOLDER = ' '
+
 !INTERFACE READ_FOUR_TYPE_VALUES
 !  Module Procedure VESSEL_INITIAL
 !  Module Procedure VESSEL_FORCING
@@ -119,7 +123,7 @@ CONTAINS
 ! READ VESSEL
 
    SUBROUTINE VESSEL_INITIAL
-      USE GLOBAL, ONLY: itmp1, itmp2, itmp3, itmp4, itmp5, SMALL, INPUT_FILE_NAME
+      USE GLOBAL, ONLY: itmp1, itmp2, itmp3, itmp4, itmp5, SMALL
 # if defined (PARALLEL)
       USE GLOBAL, ONLY: iista, jjsta   !ykchoi Jan/23/2018
 # endif
@@ -128,133 +132,27 @@ CONTAINS
       IMPLICIT NONE
       CHARACTER(LEN=80)::FILE_NAME = ' '
       CHARACTER(LEN=80)::FILE_VESSEL = ' '
-      CHARACTER(LEN=80) :: VESSEL_FOLDER = ' '
       CHARACTER(LEN=80)::TMP_NAME = ' '
       CHARACTER(LEN=80)::VesselName = ' '
       INTEGER :: Ifile, ierr
 
-! read vessel number and folder from input.txt
-      FILE_NAME = INPUT_FILE_NAME
-
-! vessel folder
-      CALL READ_STRING(VESSEL_FOLDER, FILE_NAME, 'VESSEL_FOLDER', ierr)
+! VESSEL_FOLDER, NumVessel, OUT_VESSEL, PLOT_INTV_VESSEL and the deep-draft
+! knobs are all seeded by the io.F bridge from the modern reader; the
+! READ_STRING/READ_INTEGER/READ_LOGICAL/READ_FLOAT calls that used to pull them
+! out of input.txt are gone.  The vessel_NNNNN files below are still read by
+! both engines -- they are the parity-shared input.
 # if defined (PARALLEL)
       if (myid .eq. 0) WRITE (3, '(A15,A50)') 'VESSEL_FOLDER:', VESSEL_FOLDER
-# else
-      WRITE (3, '(A15,A50)') 'VESSEL_FOLDER:', VESSEL_FOLDER
-# endif
-
-      CALL READ_INTEGER(NumVessel, FILE_NAME, 'NumVessel', ierr)
-# if defined (PARALLEL)
       if (myid .eq. 0) WRITE (3, '(A12,I3)') 'NumVessel = ', NumVessel
 # else
+      WRITE (3, '(A15,A50)') 'VESSEL_FOLDER:', VESSEL_FOLDER
       WRITE (3, '(A12,I3)') 'NumVessel = ', NumVessel
 # endif
 
-      CALL READ_LOGICAL(OUT_VESSEL, FILE_NAME, 'OUT_VESSEL', ierr)
-
 ! deep draft vessel
 
-# if defined (DEEP_DRAFT_VESSEL)
-      ! ---------
-      CALL READ_LOGICAL(MaskMethod, FILE_NAME, 'MaskMethod', ierr)
-      IF (ierr == 1) THEN
-         MaskMethod = .TRUE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'Deep draft, Mask method is used.'
-            WRITE (3, '(A80)') 'Deep draft, Mask method is used.'
-         end if
-# else
-         WRITE (*, '(A80)') 'Deep draft, Mask method is used.'
-         WRITE (3, '(A80)') 'Deep draft, Mask method is used.'
-# endif
-      END IF
-
-! clearance
-      CALL READ_FLOAT(CLEARANCE, FILE_NAME, 'CLEARANCE', ierr)
-
-      IF (ierr == 1) THEN
-         CLEARANCE = 1.0_SP
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'You dont specify CLEARANCE, use 1.0 m'
-            WRITE (3, '(A40)') 'You dont specify CLEARANCE, use 1.0 m'
-         end if
-# else
-         WRITE (*, '(A40)') 'You dont specify CLEARANCE, use 1.0 m'
-         WRITE (3, '(A40)') 'You dont specify CLEARANCE, use 1.0 m'
-# endif
-      END IF
-
-      ! frction ---
-      CALL READ_LOGICAL(FrictionMethod, FILE_NAME, 'FrictionMethod', ierr)
-      IF (ierr == 1) THEN
-         FrictionMethod = .TRUE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'Deep draft, Friction method used.'
-            WRITE (3, '(A80)') 'Deep draft, Friction method used.'
-         end if
-# else
-         WRITE (*, '(A80)') 'Deep draft, Friction method used.'
-         WRITE (3, '(A80)') 'Deep draft, Friction method used.'
-# endif
-      END IF
-
-      IF (FrictionMethod) THEN
-         CALL READ_FLOAT(CdDeepDraft, FILE_NAME, 'CdDeepDraft', ierr)
-
-         IF (ierr == 1) THEN
-            CdDeepDraft = 0.1_SP
-# if defined (PARALLEL)
-            if (myid .eq. 0) THEN
-               WRITE (*, '(A40)') 'You dont specify CdDeepDraft, use 0.1'
-               WRITE (3, '(A40)') 'You dont specify CdDeepDraft, use 0.1'
-            end if
-# else
-            WRITE (*, '(A40)') 'You dont specify CdDeepDraft, use 0.1'
-            WRITE (3, '(A40)') 'You dont specify CdDeepDraft, use 0.1'
-# endif
-         END IF
-
-      END IF  ! end friction method
-
-      ! viscosity ---
-      CALL READ_LOGICAL(ViscosityMethod, FILE_NAME, 'ViscosityMethod', ierr)
-      IF (ierr == 1) THEN
-         ViscosityMethod = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'Deep draft, Viscosity method NOT used.'
-            WRITE (3, '(A80)') 'Deep draft, Viscosity method NOT used.'
-         end if
-# else
-         WRITE (*, '(A80)') 'Deep draft, Viscosity method NOT used.'
-         WRITE (3, '(A80)') 'Deep draft, Viscosity method NOT used.'
-# endif
-      END IF
-
-      IF (ViscosityMethod) THEN
-         CALL READ_FLOAT(VisDeepDraft, FILE_NAME, 'VisDeepDraft', ierr)
-
-         IF (ierr == 1) THEN
-            VisDeepDraft = 0.1_SP
-# if defined (PARALLEL)
-            if (myid .eq. 0) THEN
-               WRITE (*, '(A40)') 'You dont specify VisDeepDraft, use 0.1'
-               WRITE (3, '(A40)') 'You dont specify VisDeepDraft, use 0.1'
-            end if
-# else
-            WRITE (*, '(A40)') 'You dont specify VisDeepDraft, use 0.1'
-            WRITE (3, '(A40)') 'You dont specify VisDeepDraft, use 0.1'
-# endif
-         END IF
-
-      END IF  ! end viscosity method
-
-      ! -----------
-# endif
+! deep-draft knobs (MaskMethod, CLEARANCE, FrictionMethod, CdDeepDraft,
+! ViscosityMethod, VisDeepDraft) are bridged from the modern reader
 ! end deep draft vessel
 
       ALLOCATE (Xvessel1(NumVessel), Yvessel1(NumVessel), &
@@ -293,17 +191,9 @@ CONTAINS
       ALLOCATE (CdVessel_2D(Mloc, Nloc), VisVessel_2D(Mloc, Nloc), MaskVessel(Mloc, Nloc))
 # endif
 
-! plot vessel intitial
+! plot vessel intitial (PLOT_INTV_VESSEL bridged from the modern reader,
+! which also applies the legacy "not specified, use SMALL" fallback)
       PLOT_COUNT_VESSEL = 0
-      CALL READ_FLOAT(PLOT_INTV_VESSEL, FILE_NAME, 'PLOT_INTV_VESSEL', ierr)
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) WRITE (3, '(A50)') 'PLOT_INTV_VESSEL not specified, use SMALL'
-# else
-         WRITE (3, '(A50)') 'PLOT_INTV_VESSEL not specified, use SMALL'
-# endif
-         PLOT_INTV_VESSEL = SMALL
-      END IF
 
       DO Kves = 1, NumVessel
 
