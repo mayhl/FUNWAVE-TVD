@@ -1049,6 +1049,17 @@ parameters:
     default:      0.5
     latex:        "$C_{d,f}$"
 
+  # ── tracer (legacy mod_tracer.F) ───────────────────────────────────────────
+  # The tracker table (count, output interval, and one row per tracker) lives in
+  # TRACER_FILE, not here: registry v1 is flat and cannot express a list.  Both
+  # engines read that file, so it is the parity-shared input.
+  - name:         tracer_file
+    legacy_name:  TRACER_FILE
+    yaml_path:    "tracer.TRACER_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

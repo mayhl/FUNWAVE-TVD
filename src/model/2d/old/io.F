@@ -60,7 +60,8 @@ SUBROUTINE OUTPUT
    USE SEDIMENT_MODULE
 # endif
 # if defined (TRACKING)
-   USE TRACER
+   ! ONLY guard: the module re-exports II/JJ and its GLOBAL imports
+   USE TRACER, ONLY: PLOT_INTV_TRACKING, PLOT_COUNT_TRACKING, OUTPUT_TRACKING
 # endif
 # if defined(FOAM)
    USE MOD_FOAM
@@ -156,6 +157,10 @@ SUBROUTINE READ_INPUT
    ! ONLY guard: the module's LINE/FDIR collide with the local ones
    USE SUBGRID_MODULE, ONLY: SubMainGridRatio, OUT_POROSITY, &
                              DEPTH_SUBGRID_FILE
+# endif
+# if defined (TRACKING)
+   ! ONLY guard: the module re-exports II/JJ and its GLOBAL imports
+   USE TRACER, ONLY: TRACER_FILE
 # endif
 # if defined (FOAM)
    ! ONLY guard: the module declares its own SMALL, colliding with GLOBAL's
@@ -848,6 +853,12 @@ SUBROUTINE READ_INPUT
    BurstTimeNonBreaking = model%foam%burst_time_nb
    MinThick             = model%foam%min_thick
    CdFoam               = model%foam%cd_foam
+# endif
+
+# if defined (TRACKING)
+   ! the tracker table itself still comes from TRACER_FILE, which both
+   ! engines read, so only the path needs bridging
+   TRACER_FILE = model%tracer%tracer_file
 # endif
 
 END SUBROUTINE READ_INPUT

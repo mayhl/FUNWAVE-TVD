@@ -1,0 +1,247 @@
+! allow(E001)
+module test_tracer
+
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_grid_mod, only: type_grid_2d
+   use model_tracer_mod, only: type_model_tracer, tracer_locate, tracer_move, tri_area
+
+   implicit none
+
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 6
+   integer, parameter :: LNY = 6
+   integer, parameter :: MLOC = LNX + 2*NG   ! 12
+   integer, parameter :: NLOC = LNY + 2*NG   ! 12
+
+   real(SP), parameter :: DXY = 2.0_SP
+   real(SP), parameter :: TOL = 1.0e-12_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! Single-rank grid: nx_proc*ny_proc = 1 short-circuits the collectives, so
+   ! the geometry and advection can be exercised without MPI.
+   subroutine make_tracer(tr, grid, n, xs, ys)
+      type(type_model_tracer), intent(out) :: tr
+      type(type_grid_2d), intent(out) :: grid
+      integer, intent(in) :: n
+      real(SP), intent(in) :: xs(:), ys(:)
+
+      integer :: i
+
+      grid%lp%ib = NG + 1; grid%lp%ie = NG + LNX
+      grid%lp%jb = NG + 1; grid%lp%je = NG + LNY
+      grid%lp%mloc = MLOC; grid%lp%nloc = NLOC
+      grid%nx_proc = 1; grid%ny_proc = 1
+      grid%is_shore_boundary = .true.    ! east  — the far vertex has no owner
+      grid%is_left_boundary = .true.     ! north
+
+      tr%is_activated = .true.
+      tr%n_tracker = n
+
+      allocate (tr%x_track(n), source=xs(1:n))
+      allocate (tr%y_track(n), source=ys(1:n))
+      allocate (tr%t_start(n), source=0.0_SP)
+      allocate (tr%layer(n), source=0)
+      allocate (tr%nx1(n), tr%ny1(n), tr%nx2(n), tr%ny2(n), tr%nx3(n), tr%ny3(n))
+      allocate (tr%sc(n), tr%s1(n), tr%s2(n), tr%s3(n))
+      allocate (tr%x_pre(n), tr%y_pre(n))
+      allocate (tr%nx1_pre(n), tr%ny1_pre(n), tr%nx2_pre(n), tr%ny2_pre(n), &
+                tr%nx3_pre(n), tr%ny3_pre(n))
+      allocate (tr%sc_pre(n), tr%s1_pre(n), tr%s2_pre(n), tr%s3_pre(n))
+      allocate (tr%in_cell(n), tr%stop_search(n), tr%found(n))
+
+      tr%in_cell = .false.
+      tr%stop_search = .false.
+      tr%found = 0
+      tr%sc = 0.0_SP
+
+      ! grid-point lattice: xco(ib) = 0, spacing DXY, extended into the ghosts
+      allocate (tr%xco(MLOC), tr%yco(NLOC))
+      do i = 1, MLOC
+         tr%xco(i) = real(i - (NG + 1), SP)*DXY
+      end do
+      do i = 1, NLOC
+         tr%yco(i) = real(i - (NG + 1), SP)*DXY
+      end do
+   end subroutine make_tracer
+
+   ! The signed area is negative when the vertices run clockwise — that sign
+   ! is what makes the three-non-negative-areas test an inside test.
+   @test
+   subroutine test_tri_area_sign()
+      real(SP) :: ccw, cw
+
+      ccw = tri_area(0.0_SP, 0.0_SP, 2.0_SP, 0.0_SP, 0.0_SP, 2.0_SP)
+      cw = tri_area(0.0_SP, 0.0_SP, 0.0_SP, 2.0_SP, 2.0_SP, 0.0_SP)
+
+      @assertEqual(2.0_SP, ccw, TOL)
+      @assertEqual(-2.0_SP, cw, TOL)
+   end subroutine test_tri_area_sign
+
+   ! A located tracker's three sub-areas must partition its triangle:
+   ! S1 + S2 + S3 = Sc.  This is the invariant the interpolation rests on.
+   @test
+   subroutine test_locate_partitions_triangle()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+
+      call make_tracer(tr, grid, 1, [3.0_SP], [1.0_SP])
+      call tracer_locate(tr, grid)
+
+      @assertTrue(tr%in_cell(1))
+      @assertEqual(tr%sc(1), tr%s1(1) + tr%s2(1) + tr%s3(1), TOL)
+      @assertTrue(tr%sc(1) > 0.0_SP)
+   end subroutine test_locate_partitions_triangle
+
+   ! Barycentric weights reproduce a linear field exactly, so a tracker in a
+   ! uniform current advects at precisely u*dt no matter where in the cell it
+   ! sits.  Catches a mis-paired weight/vertex (S_k must oppose vertex k).
+   @test
+   subroutine test_uniform_velocity_advects_exactly()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP), parameter :: U0 = 0.7_SP, V0 = -0.3_SP, DT = 0.25_SP
+
+      call make_tracer(tr, grid, 1, [3.0_SP], [1.0_SP])
+      call tracer_locate(tr, grid)
+
+      u = U0
+      v = V0
+      call tracer_move(tr, 1.0_SP, DT, u, v)
+
+      @assertEqual(3.0_SP + U0*DT, tr%x_track(1), TOL)
+      @assertEqual(1.0_SP + V0*DT, tr%y_track(1), TOL)
+   end subroutine test_uniform_velocity_advects_exactly
+
+   ! Stronger: a velocity field linear in x and y must be interpolated
+   ! exactly at the tracker position (barycentric interpolation is linear).
+   @test
+   subroutine test_linear_velocity_is_exact()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: xt, yt, u_exact
+      real(SP), parameter :: A = 0.1_SP, B = 0.05_SP, C = -0.02_SP
+      real(SP), parameter :: DT = 0.5_SP
+      integer :: i, j
+
+      xt = 3.4_SP
+      yt = 1.7_SP
+      call make_tracer(tr, grid, 1, [xt], [yt])
+      call tracer_locate(tr, grid)
+
+      do j = 1, NLOC
+         do i = 1, MLOC
+            u(i, j) = A + B*tr%xco(i) + C*tr%yco(j)
+            v(i, j) = 0.0_SP
+         end do
+      end do
+
+      call tracer_move(tr, 1.0_SP, DT, u, v)
+
+      u_exact = A + B*xt + C*yt
+      @assertEqual(xt + u_exact*DT, tr%x_track(1), 1.0e-10_SP)
+   end subroutine test_linear_velocity_is_exact
+
+   ! Legacy gates motion on TIME > TRACKER_START, so a tracker is frozen at
+   ! its seed position until its start time has strictly passed.
+   @test
+   subroutine test_t_start_gates_motion()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+
+      call make_tracer(tr, grid, 1, [3.0_SP], [1.0_SP])
+      call tracer_locate(tr, grid)
+      tr%t_start(1) = 5.0_SP
+
+      u = 1.0_SP
+      v = 1.0_SP
+
+      ! t == t_start: still frozen (legacy gates on TIME > TRACKER_START)
+      call tracer_move(tr, 5.0_SP, 0.25_SP, u, v)
+      @assertEqual(3.0_SP, tr%x_track(1), TOL)
+
+      ! t > t_start: moves
+      call tracer_move(tr, 5.1_SP, 0.25_SP, u, v)
+      @assertEqual(3.25_SP, tr%x_track(1), TOL)
+   end subroutine test_t_start_gates_motion
+
+   ! The wet-cell revert counts vertex 2 TWICE and vertex 3 never (tracer.f90
+   ! NOTE 1).  Vertex 3 wet but 1 and 2 dry therefore sums to 0 and the
+   ! tracker is dragged back — where a correct mask sum would let it through.
+   ! This pins the legacy typo; if the sum is ever "fixed", this test fails.
+   @test
+   subroutine test_dry_revert_ignores_vertex3()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+
+      ! (3.0,0.5) sits in the lower-left triangle of the quad [2,4]x[0,2],
+      ! whose vertices are (5,4) (6,4) (5,5); u=0.4,dt=1 keeps it there
+      call make_tracer(tr, grid, 1, [3.0_SP], [0.5_SP])
+      call tracer_locate(tr, grid)
+      @assertEqual(5, tr%nx1(1))
+      @assertEqual(4, tr%ny1(1))
+
+      u = 0.4_SP
+      v = 0.0_SP
+      mask = 1
+      mask(5, 4) = 0     ! vertex 1 dry
+      mask(6, 4) = 0     ! vertex 2 dry
+      mask(5, 5) = 1     ! vertex 3 WET — but the typo never reads it
+
+      call tr%update(grid, 1.0_SP, 1.0_SP, u, v, mask)
+
+      ! dragged back to its pre-move position
+      @assertEqual(3.0_SP, tr%x_track(1), TOL)
+   end subroutine test_dry_revert_ignores_vertex3
+
+   ! Control for the above: with vertex 1 wet the sum clears 1, so the same
+   ! move is kept.  Together the pair shows the revert reads vertices 1 and 2
+   ! only.
+   @test
+   subroutine test_wet_cell_keeps_move()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+
+      call make_tracer(tr, grid, 1, [3.0_SP], [0.5_SP])
+      call tracer_locate(tr, grid)
+
+      u = 0.4_SP
+      v = 0.0_SP
+      mask = 1
+      mask(5, 4) = 1     ! vertex 1 wet
+      mask(6, 4) = 0     ! vertex 2 dry
+
+      call tr%update(grid, 1.0_SP, 1.0_SP, u, v, mask)
+
+      ! move kept
+      @assertEqual(3.4_SP, tr%x_track(1), TOL)
+   end subroutine test_wet_cell_keeps_move
+
+   ! A tracker seeded outside the local domain is never found; legacy retries
+   ! the identical search once, then sets stop_search and freezes it forever
+   ! (tracer.f90 NOTE 2).
+   @test
+   subroutine test_lost_tracker_freezes()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+
+      call make_tracer(tr, grid, 1, [999.0_SP], [999.0_SP])
+      call tracer_locate(tr, grid)
+
+      @assertFalse(tr%in_cell(1))
+      @assertTrue(tr%stop_search(1))
+      @assertEqual(999.0_SP, tr%x_track(1), TOL)
+   end subroutine test_lost_tracker_freezes
+
+end module test_tracer

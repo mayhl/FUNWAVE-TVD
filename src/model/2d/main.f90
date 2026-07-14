@@ -40,6 +40,7 @@ module model_main_mod
    use model_precipitation_mod, only: type_model_precipitation
    use model_subgrid_mod, only: type_model_subgrid
    use model_foam_mod, only: type_model_foam
+   use model_tracer_mod, only: type_model_tracer
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -56,6 +57,7 @@ module model_main_mod
       type(type_field_registry), pointer :: registry => null()
       type(type_comm), pointer :: comm => null()
       type(type_model_stations), pointer :: stations => null()
+      type(type_model_tracer), pointer :: tracer => null()
    contains
       procedure :: step => output_monitor_step
    end type type_output_monitor
@@ -79,6 +81,7 @@ module model_main_mod
       type(type_model_precipitation) :: precipitation
       type(type_model_subgrid) :: subgrid
       type(type_model_foam) :: foam
+      type(type_model_tracer) :: tracer
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -129,6 +132,7 @@ contains
       call this%subgrid%read_input(this%env)
       call this%foam%read_input(this%env)
       call this%foam%resolve_plot_intv(this%simulation%plot_intv)
+      call this%tracer%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -173,6 +177,7 @@ contains
       call this%subgrid%read_input(this%env)
       call this%foam%read_input(this%env)
       call this%foam%resolve_plot_intv(this%simulation%plot_intv)
+      call this%tracer%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -540,6 +545,11 @@ contains
       ! legacy ALLOCATE_FOAM/INITIALIZATION_FOAM: zeroed state, no
       ! dependence on the bathymetry or any other component
       call this%foam%init_compute(this%grid)
+      ! legacy TRACER_INITIAL: reads the tracker table and locates every
+      ! tracker on the grid-point lattice, so the grid must be spaced
+      call this%tracer%init_compute(this%grid, this%env, &
+                                    this%output%result_folder, &
+                                    this%simulation%t_start)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
@@ -550,7 +560,8 @@ contains
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
-                        this%precipitation, this%subgrid, this%foam)
+                        this%precipitation, this%subgrid, this%foam, &
+                        this%tracer)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -565,6 +576,7 @@ contains
       monitor%registry => this%registry
       monitor%comm => this%env%comm
       monitor%stations => this%stations
+      monitor%tracer => this%tracer
 
       call engine%init(merge(this%hot_start%time, 0.0_SP, &
                              this%hot_start%is_activated), &
@@ -582,6 +594,7 @@ contains
       call this%precipitation%free()
       call this%subgrid%free()
       call this%foam%free()
+      call this%tracer%free()
 
    end subroutine model_run
 
@@ -593,6 +606,8 @@ contains
 
       call this%mgr%step(t, dt, this%registry, this%comm)
       if (associated(this%stations)) call this%stations%update(t, dt)
+      ! legacy OUTPUT_TRACKING: loop-top, on the PLOT_COUNT_TRACKING cadence
+      if (associated(this%tracer)) call this%tracer%write_output(t, dt)
 
       ! Legacy PREVIEW appends "time dt" to time_dt.out (run dir, not
       ! result_folder) at every field-frame flush; io rank only here.

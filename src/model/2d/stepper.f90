@@ -54,6 +54,7 @@ module model_stepper_2d_mod
    use model_precipitation_mod, only: type_model_precipitation
    use model_subgrid_mod, only: type_model_subgrid
    use model_foam_mod, only: type_model_foam
+   use model_tracer_mod, only: type_model_tracer
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -101,6 +102,7 @@ module model_stepper_2d_mod
       type(type_model_precipitation), pointer :: precipitation => null()
       type(type_model_subgrid), pointer :: subgrid => null()
       type(type_model_foam), pointer :: foam => null()
+      type(type_model_tracer), pointer :: tracer => null()
 
       type(type_model_bc) :: bc
 
@@ -193,7 +195,7 @@ contains
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
-                           precipitation, subgrid, foam)
+                           precipitation, subgrid, foam, tracer)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -228,6 +230,9 @@ contains
       ! foam%init_compute must have run (state arrays allocated); foam is
       ! one-way, so nothing here depends on its values
       type(type_model_foam), intent(inout), target :: foam
+      ! tracer%init_compute must have run (trackers located); like foam it
+      ! is one-way — it only reads u/v/mask
+      type(type_model_tracer), intent(inout), target :: tracer
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -248,6 +253,7 @@ contains
       this%precipitation => precipitation
       this%subgrid => subgrid
       this%foam => foam
+      this%tracer => tracer
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -689,6 +695,14 @@ contains
       call this%means%update(this%fields, this%fws%p, this%fws%q, &
                              this%numerics%MinDepthFrc, this%dt_step, time)
 
+      ! legacy TRACK_XY: outside the RK loop, between MIXING_STUFF and
+      ! MAX_MIN_PROPERTY, so the trackers advect on the completed step's
+      ! u/v with the full dt (unlike foam, which sits inside the stages)
+      if (this%tracer%is_activated) then
+         call this%tracer%update(this%grid, time, this%dt_step, &
+                                 this%fields%u, this%fields%v, this%fields%mask)
+      end if
+
       call update_max_min(this, time)
 
       ! Refresh integer-mask output mirrors for the loop-top flush
@@ -925,6 +939,7 @@ contains
       this%precipitation => null()
       this%subgrid => null()
       this%foam => null()
+      this%tracer => null()
 
    end subroutine stepper_free
 

@@ -87,33 +87,16 @@ MODULE TRACER
 
    INTEGER, SAVE :: NumTracker = 1
 
+! seeded by the io.F bridge from the modern tracer reader; the READ_STRING
+! that used to pull this out of input.txt is gone
+   CHARACTER(LEN=80), SAVE :: TRACER_FILE = ' '
+
 CONTAINS
 
    SUBROUTINE TRACER_INITIAL
 
-      USE GLOBAL, ONLY: INPUT_FILE_NAME
-      INTEGER :: I_tmp, ierr
+      INTEGER :: I_tmp
       CHARACTER(LEN=80) :: WHAT
-      CHARACTER(LEN=80) :: TRACER_FILE, FILE_NAME
-
-! read  from input.txt
-      FILE_NAME = INPUT_FILE_NAME
-
-      CALL READ_STRING(TRACER_FILE, FILE_NAME, 'TRACER_FILE', ierr)
-
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40,A40)') 'You use tracking ', 'but no TRACER_FILE found, STOP'
-            WRITE (3, '(A40,A40)') 'You use tracking ', 'but no TRACER_FILE found, STOP'
-         end if
-         call MPI_FINALIZE(ier)
-# else
-         WRITE (*, '(A40,A40)') 'You use tracking ', 'but no TRACER_FILE found, STOP'
-         WRITE (3, '(A40,A40)') 'You use tracking ', 'but no TRACER_FILE found, STOP'
-# endif
-         STOP
-      END IF
 
       OPEN (1, FILE=TRIM(TRACER_FILE))
       READ (1, *) WHAT

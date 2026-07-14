@@ -18,6 +18,7 @@ target_sources(${main_lib}_model PRIVATE
    precipitation.f90
    subgrid.f90
    foam.f90
+   tracer.f90
    wavemaker.f90
    sponge.f90
    obstacle.f90

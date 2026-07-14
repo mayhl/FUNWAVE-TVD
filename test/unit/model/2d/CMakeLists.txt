@@ -53,3 +53,6 @@ target_link_libraries(test_subgrid libfunwave_model)
 
 qadd_pfunit_ctest(test_foam)
 target_link_libraries(test_foam libfunwave_model)
+
+qadd_pfunit_ctest(test_tracer)
+target_link_libraries(test_tracer libfunwave_model)
