@@ -1990,6 +1990,32 @@ SUBROUTINE PutFile(FILE, PHI)
       write (FORMAT_LEN(16:16), '(A1)') ')'
    END IF
 
+! NOTE: upstream lost this routine's write loop and its END statement, which
+! spliced OUTPUT_VESSEL into the tail of the serial PutFile and left VESSEL
+! unlinkable.  Loop reconstructed from PutFileASCII; unverifiable, because the
+! serial build is unsupported (the modern layer requires mpi_f08)
+   OPEN (1, FILE=TRIM(FILE))
+   DO J = Jbeg, Jend, OUTPUT_RES
+      WRITE (1, FORMAT_LEN) (real(PHI(I, J)), I=Ibeg, Iend, OUTPUT_RES)
+   END DO
+   CLOSE (1)
+
+END SUBROUTINE PutFile
+
+# endif
+! end serial PutFile
+
+# if defined (VESSEL)
+!-------------------------------------------------------------------------------------
+!
+!    OUTPUT_VESSEL is a subroutine to write the vessel resistance time series
+!
+!-------------------------------------------------------------------------------------
+SUBROUTINE OUTPUT_VESSEL
+   USE PARAM
+   USE GLOBAL
+   USE VESSEL_MODULE
+   IMPLICIT NONE
    CHARACTER(LEN=80)::FDIR = ' '
    LOGICAL :: FirstCallVessel = .TRUE.
    SAVE FirstCallVessel
