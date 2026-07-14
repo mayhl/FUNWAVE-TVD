@@ -80,7 +80,6 @@ module model_wavemaker_mod
                                         DEF_WAVEMAKER_AMP, DEF_WAVEMAKER_AMP_WK, &
                                         DEF_WAVEMAKER_A_SPONGE_WAVEMAKER, &
                                         DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP, &
-                                        DEF_WAVEMAKER_DEPTHWAVEMAKER, &
                                         DEF_WAVEMAKER_DEP_NWAVE, DEF_WAVEMAKER_DEP_WK, &
                                         DEF_WAVEMAKER_EQUALENERGY, &
                                         DEF_WAVEMAKER_ETA_LIMITER, DEF_WAVEMAKER_FREQMAX, &
@@ -94,7 +93,7 @@ module model_wavemaker_mod
                                         DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION, &
                                         DEF_WAVEMAKER_THETAPEAK, DEF_WAVEMAKER_THETA_WK, &
                                         DEF_WAVEMAKER_TIME_RAMP, DEF_WAVEMAKER_TPERIOD, &
-                                        DEF_WAVEMAKER_TYPE, DEF_WAVEMAKER_WAVEMAKERCD, &
+                                        DEF_WAVEMAKER_TYPE, &
                                         DEF_WAVEMAKER_WAVE_DATA_TYPE, DEF_WAVEMAKER_WID, &
                                         DEF_WAVEMAKER_WIDTHWAVEMAKER, &
                                         DEF_WAVEMAKER_X1_NWAVE, DEF_WAVEMAKER_X2_NWAVE, &
@@ -317,16 +316,19 @@ contains
 
       ! Absorbing-generating
       call sub_env%yaml%read("WAVE_DATA_TYPE", val=this%WAVE_DATA_TYPE, default=DEF_WAVEMAKER_WAVE_DATA_TYPE)
-      call sub_env%yaml%read("DepthWaveMaker", silent=no_key, val=this%DepthWaveMaker, default=DEF_WAVEMAKER_DEPTHWAVEMAKER)
-      if (no_key) &
-         call sub_env%yaml%read("DEP_WK", silent=no_key, val=this%DepthWaveMaker, default=DEF_WAVEMAKER_DEP_WK)
+      ! no `default=` on either presence-tested read below: yaml%read only
+      ! assigns `silent` when `default` is ABSENT, so asking for both hands
+      ! back an unwritten flag.  Absent key -> the component initialiser
+      ! stands and the fallback resolves it.
+      call sub_env%yaml%read("DepthWaveMaker", silent=no_key, val=this%DepthWaveMaker)
+      if (no_key) this%DepthWaveMaker = this%DEP_WK
       call sub_env%yaml%read("WidthWaveMaker", silent=no_key, val=this%WidthWaveMaker, default=DEF_WAVEMAKER_WIDTHWAVEMAKER)
   call sub_env%yaml%read("R_sponge_wavemaker", silent=no_key, val=this%R_sponge_wavemaker, default=DEF_WAVEMAKER_R_SPONGE_WAVEMAKER)
   call sub_env%yaml%read("A_sponge_wavemaker", silent=no_key, val=this%A_sponge_wavemaker, default=DEF_WAVEMAKER_A_SPONGE_WAVEMAKER)
       call sub_env%yaml%read("EqualEnergy", val=this%EqualEnergy, default=DEF_WAVEMAKER_EQUALENERGY)
 
       ! WaveMakerCd presence enables WaveMakerCurrentBalance
-      call sub_env%yaml%read("WaveMakerCd", silent=no_key, val=this%WaveMakerCd, default=DEF_WAVEMAKER_WAVEMAKERCD)
+      call sub_env%yaml%read("WaveMakerCd", silent=no_key, val=this%WaveMakerCd)
       this%WaveMakerCurrentBalance = .not. no_key
 
    end subroutine wavemaker_read_input

@@ -1208,11 +1208,12 @@ parameters:
     default:      0.5
     latex:        ~
 
+  # absent -> falls back to DEP_WK, so no literal default
   - name:         depthwavemaker
     legacy_name:  DepthWaveMaker
     yaml_path:    "wavemaker.DepthWaveMaker"
     units:        ~
-    default:      0.0
+    default:      ~
     latex:        ~
 
   - name:         eta_limiter
@@ -1376,11 +1377,13 @@ parameters:
     default:      ~
     latex:        ~
 
+  # presence-tested: the key existing is what turns the current balance on,
+  # so it must have no default (a default would make it always "present")
   - name:         wavemakercd
     legacy_name:  WaveMakerCd
     yaml_path:    "wavemaker.WaveMakerCd"
     units:        ~
-    default:      0.0
+    default:      ~
     latex:        ~
 
   - name:         widthwavemaker
