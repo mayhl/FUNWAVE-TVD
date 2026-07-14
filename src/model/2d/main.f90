@@ -547,6 +547,10 @@ contains
       ! legacy PRECIPITATION_INITIAL runs after INITIALIZATION — index
       ! file open, first frame into the high bracket
       call this%precipitation%init_compute(this%grid)
+      ! legacy init.F:850 derives the blow-up threshold from the bathymetry
+      ! (100 * max|Depth|), so it must land after the depth is built
+      call this%output%resolve_blowup(this%grid, this%fields%depth)
+
       ! legacy ALLOCATE_FOAM/INITIALIZATION_FOAM: zeroed state, no
       ! dependence on the bathymetry or any other component
       call this%foam%init_compute(this%grid)

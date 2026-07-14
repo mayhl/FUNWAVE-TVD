@@ -57,7 +57,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_OBSTACLE_BREAKWATERABSORBCOEF = "10.0"
    character(*), parameter :: DEF_OBSTACLE_BREAKWATER_ABSORB_COEF = "0.0"
    ! ── output ──
-   character(*), parameter :: DEF_OUTPUT_ETABLOWVAL = "10.0"
    character(*), parameter :: DEF_OUTPUT_DEPTH_OUT = "NO"
    character(*), parameter :: DEF_OUTPUT_ETA_BLOW_VAL = "1.0e8"
    character(*), parameter :: DEF_OUTPUT_FIELD_IO_TYPE = "ASCII"

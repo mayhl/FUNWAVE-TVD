@@ -34,11 +34,13 @@
 !-------------------------------------------------
 
 module model_output_mod
-   use core_constants_mod, only: SP, type_string
+   use core_constants_mod, only: SP, type_string, MPI_SP
    use core_env_mod, only: type_env, get_sub_env
+   use core_grid_mod, only: type_grid_2d
    use model_base_mod, only: type_model_base
+   use mpi_f08
 
-   use model_config_defaults_mod, only: DEF_OUTPUT_DEPTH_OUT, DEF_OUTPUT_ETABLOWVAL, &
+   use model_config_defaults_mod, only: DEF_OUTPUT_DEPTH_OUT, &
                                         DEF_OUTPUT_FIELD_IO_TYPE, &
                                         DEF_OUTPUT_NUMBER_STATIONS, DEF_OUTPUT_OUTPUT_RES, &
                                         DEF_OUTPUT_RESULT_FOLDER, DEF_OUTPUT_STEADY_TIME, &
@@ -82,7 +84,15 @@ module model_output_mod
       character(:), allocatable :: stations_file
       integer  :: number_stations = 0
       integer  :: output_res = 1
+      ! Blow-up threshold.  Legacy DERIVES this as 100*max|Depth| in
+      ! INITIALIZATION (init.F:850) and overwrites whatever the input file said,
+      ! so legacy's own EtaBlowVal key is dead.  resolve_blowup() reproduces the
+      ! derived value whenever the YAML key is absent; an explicit key overrides
+      ! it (a deliberate improvement -- legacy cannot be overridden at all).
+      ! A fixed threshold cannot work: a deep-draft hull legitimately imprints
+      ! eta = -draft, which a flat 10 m limit reads as a blow-up on step 1.
       real(SP) :: EtaBlowVal = 10.0_SP
+      logical  :: has_blow_val = .false.
 
       ! Depth output — static (no time component) unless sediment is active
       logical :: depth_out = .false.
@@ -132,6 +142,7 @@ module model_output_mod
       real(SP) :: STEADY_TIME = 999999.0_SP
    contains
       procedure :: read_input => output_read_input
+      procedure :: resolve_blowup => output_resolve_blowup
    end type type_model_output
 
 contains
@@ -163,7 +174,12 @@ contains
          call sub_env%yaml%read("stations_file", val=this%stations_file, default="")
       end if
       call sub_env%yaml%read("output_res", val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
-      call sub_env%yaml%read("EtaBlowVal", silent=no_key, val=this%EtaBlowVal, default=DEF_OUTPUT_ETABLOWVAL)
+      ! NOTE: no `default=` here on purpose -- yaml%read only assigns `silent`
+      ! when `default` is ABSENT, so asking for both hands back an unwritten
+      ! flag.  Absent key -> EtaBlowVal keeps its component value and
+      ! resolve_blowup() replaces it with the legacy-derived 100*max|Depth|
+      call sub_env%yaml%read("EtaBlowVal", silent=no_key, val=this%EtaBlowVal)
+      this%has_blow_val = .not. no_key
       call sub_env%yaml%read("depth_out", val=this%depth_out, default=DEF_OUTPUT_DEPTH_OUT)
       call sub_env%yaml%read("T_INTV_mean", silent=no_key, val=this%T_INTV_mean, default=DEF_OUTPUT_T_INTV_MEAN)
       call sub_env%yaml%read("STEADY_TIME", silent=no_key, val=this%STEADY_TIME, default=DEF_OUTPUT_STEADY_TIME)
@@ -214,5 +230,35 @@ contains
       end if
 
    end subroutine output_read_input
+
+   ! Legacy INITIALIZATION (init.F:850):
+   !     EtaBlowVal = 100 * MAXVAL(abs(Depth(Ibeg:Iend, Jbeg:Jend)))
+   ! reduced with MPI_MAX across ranks.  Scaling the threshold to the water
+   ! depth is what makes it work for a deep-draft hull, whose draft legitimately
+   ! drives |eta| far past any fixed limit.  Called once the bathymetry is up.
+   subroutine output_resolve_blowup(this, grid, depth)
+      class(type_model_output), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: depth(:, :)
+
+      real(SP) :: local_max, global_max
+      integer :: ierr
+
+      ! an explicit key wins; legacy has no such escape hatch
+      if (this%has_blow_val) return
+
+      associate (lp => grid%lp)
+         local_max = maxval(abs(depth(lp%ib:lp%ie, lp%jb:lp%je)))
+      end associate
+
+      if (grid%nx_proc*grid%ny_proc > 1) then
+         call MPI_Allreduce(local_max, global_max, 1, MPI_SP, MPI_MAX, &
+                            grid%cart_comm, ierr)
+         local_max = global_max
+      end if
+
+      this%EtaBlowVal = 100.0_SP*local_max
+
+   end subroutine output_resolve_blowup
 
 end module model_output_mod

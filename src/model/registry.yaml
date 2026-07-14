@@ -763,11 +763,15 @@ parameters:
     default:      10.0
     latex:        ~
 
+  # No static default: absent -> DERIVED as 100 * max|Depth| at init, exactly as
+  # legacy (init.F:850, which overwrites its own input key).  An explicit value
+  # overrides; legacy has no such escape hatch.  A fixed threshold cannot work --
+  # a deep-draft hull legitimately imprints eta = -draft.
   - name:         eta_blow_val
     legacy_name:  EtaBlowVal
     yaml_path:    "output.EtaBlowVal"
-    units:        ~
-    default:      10.0
+    units:        "m"
+    default:      ~
     latex:        ~
 
   - name:         breaking_flag
