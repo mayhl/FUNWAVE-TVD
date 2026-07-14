@@ -1,0 +1,221 @@
+! allow(E001)
+module test_foam
+
+   use pFUnit
+   use core_constants_mod, only: SP, LARGE
+   use core_grid_mod, only: type_loop_bounds
+   use model_foam_mod, only: type_model_foam, foam_flux, foam_advance
+
+   implicit none
+
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 4
+   integer, parameter :: LNY = 4
+   integer, parameter :: MLOC = LNX + 2*NG   ! 10
+   integer, parameter :: NLOC = LNY + 2*NG   ! 10
+
+   real(SP), parameter :: DXY = 2.0_SP
+   real(SP), parameter :: TOL = 1.0e-12_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine make_foam(fm, lp)
+      type(type_model_foam), intent(out) :: fm
+      type(type_loop_bounds), intent(out) :: lp
+
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
+
+      fm%is_activated = .true.
+      fm%f_source = 0.05_SP
+      fm%time_scale = 3.8_SP
+      fm%burst_time_nb = 1.0_SP
+      fm%min_thick = 0.01_SP
+      fm%cd_foam = 0.5_SP
+
+      allocate (fm%eta_foam(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%eta_foam_max(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%u_foam(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%v_foam(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%mx(MLOC + 1, NLOC), source=0.0_SP)
+      allocate (fm%my(MLOC, NLOC + 1), source=0.0_SP)
+      allocate (fm%sink(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%source(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%del(MLOC, NLOC), source=0.0_SP)
+      allocate (fm%vxl(MLOC + 1, NLOC), source=0.0_SP)
+      allocate (fm%vxr(MLOC + 1, NLOC), source=0.0_SP)
+      allocate (fm%vyl(MLOC, NLOC + 1), source=0.0_SP)
+      allocate (fm%vyr(MLOC, NLOC + 1), source=0.0_SP)
+   end subroutine make_foam
+
+   ! Breaking injects foam at f_source*nu_break*dt.  With no foam present
+   ! there is nothing to burst and nothing to advect, so the first stage of
+   ! a breaking cell is the pure source term.
+   @test
+   subroutine test_source_injects_foam()
+      type(type_model_foam) :: fm
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv(MLOC, NLOC), u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: nu(MLOC, NLOC), age(MLOC, NLOC)
+      real(SP) :: dt, expect
+
+      call make_foam(fm, lp)
+      inv = 1.0_SP/DXY; u = 0.0_SP; v = 0.0_SP
+      nu = 0.0_SP; age = 5.0_SP
+      dt = 0.1_SP
+
+      nu(5, 5) = 0.2_SP        ! one breaking cell
+
+      call foam_advance(fm, lp, dt, inv, inv, u, v, nu, age)
+
+      expect = fm%f_source*0.2_SP*dt
+      @assertEqual(expect, fm%eta_foam(5, 5), TOL)
+      ! a non-breaking neighbour stays clean
+      @assertEqual(0.0_SP, fm%eta_foam(6, 5), TOL)
+   end subroutine test_source_injects_foam
+
+   ! Existing foam in a cell that has stopped breaking is aged to
+   ! BurstTimeNonBreaking and decays: sink = eta/tau * exp(-age/tau).
+   @test
+   subroutine test_nonbreaking_foam_bursts()
+      type(type_model_foam) :: fm
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv(MLOC, NLOC), u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: nu(MLOC, NLOC), age(MLOC, NLOC)
+      real(SP) :: dt, e0, sink, expect
+
+      call make_foam(fm, lp)
+      inv = 1.0_SP/DXY; u = 0.0_SP; v = 0.0_SP
+      nu = 0.0_SP                     ! nothing is breaking
+      age = 99.0_SP                   ! overwritten by burst_time_nb
+      dt = 0.1_SP
+      e0 = 0.4_SP
+      fm%eta_foam(5, 5) = e0
+
+      call foam_advance(fm, lp, dt, inv, inv, u, v, nu, age)
+
+      sink = e0/fm%time_scale*exp(-fm%burst_time_nb/fm%time_scale)
+      expect = e0 - sink*dt
+      @assertEqual(expect, fm%eta_foam(5, 5), TOL)
+      @assertTrue(fm%eta_foam(5, 5) < e0)
+   end subroutine test_nonbreaking_foam_bursts
+
+   ! A fresh breaking event (age < 2 dt) resets the envelope and suppresses
+   ! decay by setting the age to LARGE, so exp(-age/tau) underflows to zero
+   ! and the cell keeps every drop of the source.
+   @test
+   subroutine test_fresh_break_suppresses_decay()
+      type(type_model_foam) :: fm
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv(MLOC, NLOC), u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: nu(MLOC, NLOC), age(MLOC, NLOC)
+      real(SP) :: dt, e0
+
+      call make_foam(fm, lp)
+      inv = 1.0_SP/DXY; u = 0.0_SP; v = 0.0_SP
+      nu = 0.0_SP; age = 5.0_SP
+      dt = 0.1_SP
+      e0 = 0.4_SP
+
+      nu(5, 5) = 0.2_SP
+      age(5, 5) = 0.5_SP*dt           ! younger than 2 dt
+      fm%eta_foam(5, 5) = e0
+      fm%eta_foam_max(5, 5) = 9.9_SP  ! stale envelope, must be reset
+
+      call foam_advance(fm, lp, dt, inv, inv, u, v, nu, age)
+
+      ! envelope reset to 0 then re-raised to the pre-update eta_foam
+      @assertEqual(e0, fm%eta_foam_max(5, 5), TOL)
+      ! no sink: eta grows by the full source
+      @assertEqual(e0 + fm%f_source*0.2_SP*dt, fm%eta_foam(5, 5), TOL)
+   end subroutine test_fresh_break_suppresses_decay
+
+   ! eta_foam is clipped at zero -- a burst can never drive it negative.
+   @test
+   subroutine test_eta_foam_clipped_at_zero()
+      type(type_model_foam) :: fm
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv(MLOC, NLOC), u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: nu(MLOC, NLOC), age(MLOC, NLOC)
+
+      call make_foam(fm, lp)
+      inv = 1.0_SP/DXY; u = 0.0_SP; v = 0.0_SP
+      nu = 0.0_SP; age = 0.0_SP
+      fm%eta_foam(5, 5) = 1.0e-8_SP
+
+      ! a huge dt drives the sink far past the available foam
+      call foam_advance(fm, lp, 1.0e6_SP, inv, inv, u, v, nu, age)
+
+      @assertEqual(0.0_SP, fm%eta_foam(5, 5), TOL)
+   end subroutine test_eta_foam_clipped_at_zero
+
+   ! Foam velocity is dragged towards the water velocity, and a dry (no
+   ! foam) cell holds zero foam velocity.
+   @test
+   subroutine test_foam_velocity_drag()
+      type(type_model_foam) :: fm
+      type(type_loop_bounds) :: lp
+      real(SP) :: inv(MLOC, NLOC), u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: nu(MLOC, NLOC), age(MLOC, NLOC)
+      real(SP) :: dt
+
+      call make_foam(fm, lp)
+      inv = 1.0_SP/DXY; nu = 0.0_SP; age = 99.0_SP
+      u = 1.0_SP; v = 0.0_SP
+      dt = 0.01_SP
+
+      fm%eta_foam(5, 5) = 0.5_SP      ! foam here: drags towards u
+      fm%eta_foam(6, 5) = 0.0_SP      ! no foam here: velocity pinned to 0
+      fm%u_foam(6, 5) = 0.7_SP        ! stale value, must be cleared
+
+      call foam_advance(fm, lp, dt, inv, inv, u, v, nu, age)
+
+      @assertTrue(fm%u_foam(5, 5) > 0.0_SP)
+      @assertTrue(fm%u_foam(5, 5) <= u(5, 5))
+      @assertEqual(0.0_SP, fm%u_foam(6, 5), TOL)
+      @assertEqual(0.0_SP, fm%v_foam(5, 5), TOL)
+   end subroutine test_foam_velocity_drag
+
+   ! Pure advection: a uniform foam sheet moving at a uniform foam velocity
+   ! has zero flux divergence, so a constant field must stay constant.
+   @test
+   subroutine test_uniform_sheet_is_steady()
+      type(type_model_foam) :: fm
+      type(type_loop_bounds) :: lp
+      real(SP) :: dx(MLOC, NLOC), inv(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+      real(SP) :: nu(MLOC, NLOC), age(MLOC, NLOC)
+      real(SP) :: dt
+      integer :: i, j
+
+      call make_foam(fm, lp)
+      dx = DXY; inv = 1.0_SP/DXY
+      ! To isolate advection, both source and sink must vanish.  nu_break
+      ! must be NONZERO or the non-breaking branch overwrites age with
+      ! burst_time_nb and the sheet decays; f_source = 0 then kills the
+      ! source, and age = LARGE underflows exp(-age/tau) to kill the sink.
+      fm%f_source = 0.0_SP
+      nu = 1.0_SP
+      age = LARGE
+      u = 0.0_SP; v = 0.0_SP
+      dt = 0.01_SP
+
+      fm%eta_foam = 0.3_SP
+      fm%u_foam = 0.5_SP
+      fm%v_foam = 0.0_SP
+
+      call foam_flux(fm, lp, dx, dx, inv, inv)
+      call foam_advance(fm, lp, dt, inv, inv, u, v, nu, age)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @assertEqual(0.3_SP, fm%eta_foam(i, j), 1.0e-10_SP)
+         end do
+      end do
+   end subroutine test_uniform_sheet_is_steady
+
+end module test_foam

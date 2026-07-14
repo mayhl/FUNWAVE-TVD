@@ -50,3 +50,6 @@ target_link_libraries(test_kernel_sources libfunwave_model)
 
 qadd_pfunit_ctest(test_subgrid)
 target_link_libraries(test_subgrid libfunwave_model)
+
+qadd_pfunit_ctest(test_foam)
+target_link_libraries(test_foam libfunwave_model)

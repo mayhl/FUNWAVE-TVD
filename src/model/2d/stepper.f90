@@ -53,6 +53,7 @@ module model_stepper_2d_mod
    use model_tide_mod, only: type_model_tide
    use model_precipitation_mod, only: type_model_precipitation
    use model_subgrid_mod, only: type_model_subgrid
+   use model_foam_mod, only: type_model_foam
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -99,6 +100,7 @@ module model_stepper_2d_mod
       type(type_model_tide), pointer :: tide => null()
       type(type_model_precipitation), pointer :: precipitation => null()
       type(type_model_subgrid), pointer :: subgrid => null()
+      type(type_model_foam), pointer :: foam => null()
 
       type(type_model_bc) :: bc
 
@@ -191,7 +193,7 @@ contains
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
-                           precipitation, subgrid)
+                           precipitation, subgrid, foam)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -223,6 +225,9 @@ contains
       ! subgrid%init_compute must have run (panels loaded, still-water
       ! porosity seeded — stage 1 divides by it before the first update)
       type(type_model_subgrid), intent(inout), target :: subgrid
+      ! foam%init_compute must have run (state arrays allocated); foam is
+      ! one-way, so nothing here depends on its values
+      type(type_model_foam), intent(inout), target :: foam
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -242,6 +247,7 @@ contains
       this%tide => tide
       this%precipitation => precipitation
       this%subgrid => subgrid
+      this%foam => foam
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -600,6 +606,16 @@ contains
                                   this%in_wm_zone, f%nu_break)
          end if
 
+         ! foam rides the breaker output (legacy FOAM_* between
+         ! WAVE_BREAKING and EXCHANGE, so it reads the pre-exchange
+         ! nu_break/age ghosts).  One-way: nothing below reads it back,
+         ! and it steps the FULL dt every stage (foam.f90 NOTE 1)
+         if (this%foam%is_activated) then
+            call this%foam%update(this%grid, dt, this%dx, this%dy, &
+                                  this%inv_dx, this%inv_dy, &
+                                  f%u, f%v, f%nu_break, f%age_break)
+         end if
+
          call this%bc%exchange_state(this%grid, f)
 
          call this%wavemaker%apply_boundary(this%grid, istage, dt, time, &
@@ -633,6 +649,11 @@ contains
          call registry%register("roller_flux", this%roller_flux)
          call registry%register("undertow_u", this%undertow_u)
          call registry%register("undertow_v", this%undertow_v)
+      end if
+
+      if (this%foam%is_activated) then
+         call registry%register("eta_foam", this%foam%eta_foam)
+         call registry%register("eta_foam_max", this%foam%eta_foam_max)
       end if
 
       associate (f => this%fields, lp => this%grid%lp)
@@ -903,6 +924,7 @@ contains
       this%tide => null()
       this%precipitation => null()
       this%subgrid => null()
+      this%foam => null()
 
    end subroutine stepper_free
 

@@ -22,6 +22,12 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_WAVEMAKER_CBRK = "1.0"
    character(*), parameter :: DEF_BREAKING_WAVEMAKER_VIS = "NO"
    character(*), parameter :: DEF_BREAKING_WAVEMAKER_VISBRK = "0.0"
+   ! ── foam ──
+   character(*), parameter :: DEF_FOAM_BURSTTIMENONBREAKING = "1.0"
+   character(*), parameter :: DEF_FOAM_CDFOAM = "0.5"
+   character(*), parameter :: DEF_FOAM_FOAMTIMESCALE = "3.8"
+   character(*), parameter :: DEF_FOAM_MINTHICK = "0.01"
+   character(*), parameter :: DEF_FOAM_F_SOURCE = "0.05"
    ! ── friction ──
    character(*), parameter :: DEF_FRICTION_CD = "0.0"
    character(*), parameter :: DEF_FRICTION_FRICTION_MATRIX = "NO"

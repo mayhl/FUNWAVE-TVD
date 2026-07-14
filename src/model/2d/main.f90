@@ -39,6 +39,7 @@ module model_main_mod
    use model_tide_mod, only: type_model_tide
    use model_precipitation_mod, only: type_model_precipitation
    use model_subgrid_mod, only: type_model_subgrid
+   use model_foam_mod, only: type_model_foam
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -77,6 +78,7 @@ module model_main_mod
       type(type_model_tide)       :: tide
       type(type_model_precipitation) :: precipitation
       type(type_model_subgrid) :: subgrid
+      type(type_model_foam) :: foam
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -125,6 +127,8 @@ contains
       call this%tide%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
+      call this%foam%read_input(this%env)
+      call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -167,6 +171,8 @@ contains
       call this%tide%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
+      call this%foam%read_input(this%env)
+      call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -531,6 +537,9 @@ contains
       ! legacy PRECIPITATION_INITIAL runs after INITIALIZATION — index
       ! file open, first frame into the high bracket
       call this%precipitation%init_compute(this%grid)
+      ! legacy ALLOCATE_FOAM/INITIALIZATION_FOAM: zeroed state, no
+      ! dependence on the bathymetry or any other component
+      call this%foam%init_compute(this%grid)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
@@ -541,7 +550,7 @@ contains
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
-                        this%precipitation, this%subgrid)
+                        this%precipitation, this%subgrid, this%foam)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -572,6 +581,7 @@ contains
       call this%tide%free()
       call this%precipitation%free()
       call this%subgrid%free()
+      call this%foam%free()
 
    end subroutine model_run
 
@@ -639,6 +649,10 @@ contains
             call add_var(vars, prefs, nv, "undertow_u", "U_undertow")
             call add_var(vars, prefs, nv, "undertow_v", "V_undertow")
          end if
+         ! legacy PREVIEW writes FoamEta_ with no OUT_ gate — a -DFOAM
+         ! build always dumps it
+         if (this%foam%is_activated) &
+            call add_var(vars, prefs, nv, "eta_foam", "FoamEta")
          if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")
          if (out%OUT_MASK9) call add_var(vars, prefs, nv, "mask9", "mask9")
          ! Legacy P/Q are the interface fluxes, not the registry p/q (Ubar)

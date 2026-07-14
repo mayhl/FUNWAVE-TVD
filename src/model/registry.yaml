@@ -1004,6 +1004,51 @@ parameters:
     default:      1
     latex:        ~
 
+  # ── foam (legacy mod_foam.F) ───────────────────────────────────────────────
+  # BurstRate/TransferRate are omitted: their readers sit behind USE_BURSTRATE,
+  # which no build system defines, so the knobs are unreachable.
+  - name:         plot_intv_foam
+    legacy_name:  PLOT_INTV_FOAM
+    yaml_path:    "foam.PLOT_INTV_FOAM"
+    units:        "s"
+    default:      ~
+    latex:        ~
+
+  - name:         f_source
+    legacy_name:  f_source
+    yaml_path:    "foam.f_source"
+    units:        ~
+    default:      0.05
+    latex:        "$f_{\\mathrm{source}}$"
+
+  - name:         foamtimescale
+    legacy_name:  FoamTimeScale
+    yaml_path:    "foam.FoamTimeScale"
+    units:        "s"
+    default:      3.8
+    latex:        "$\\tau_f$"
+
+  - name:         bursttimenonbreaking
+    legacy_name:  BurstTimeNonBreaking
+    yaml_path:    "foam.BurstTimeNonBreaking"
+    units:        "s"
+    default:      1.0
+    latex:        ~
+
+  - name:         minthick
+    legacy_name:  MinThick
+    yaml_path:    "foam.MinThick"
+    units:        "m"
+    default:      0.01
+    latex:        ~
+
+  - name:         cdfoam
+    legacy_name:  CdFoam
+    yaml_path:    "foam.CdFoam"
+    units:        ~
+    default:      0.5
+    latex:        "$C_{d,f}$"
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

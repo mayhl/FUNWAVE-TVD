@@ -157,6 +157,11 @@ SUBROUTINE READ_INPUT
    USE SUBGRID_MODULE, ONLY: SubMainGridRatio, OUT_POROSITY, &
                              DEPTH_SUBGRID_FILE
 # endif
+# if defined (FOAM)
+   ! ONLY guard: the module declares its own SMALL, colliding with GLOBAL's
+   USE MOD_FOAM, ONLY: PLOT_INTV_FOAM, f_source, FoamTimeScale, &
+                       BurstTimeNonBreaking, MinThick, CdFoam
+# endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
 # if defined(INTEL)
@@ -830,6 +835,19 @@ SUBROUTINE READ_INPUT
    OUT_POROSITY     = model%subgrid%out_porosity
    IF (ALLOCATED(model%subgrid%depth_subgrid_file%root)) &
       DEPTH_SUBGRID_FILE = model%subgrid%depth_subgrid_file%root
+# endif
+
+# if defined (FOAM)
+   ! foam bridge: MOD_FOAM variables seeded from the modern reader, the
+   ! READ calls in mod_foam.F stubbed out.  PLOT_INTV_FOAM only drives
+   ! OUTPUT_FOAM, whose body is an empty stub — bridged so the legacy
+   ! engine sees the same value, but it steers nothing
+   PLOT_INTV_FOAM       = model%foam%plot_intv
+   f_source             = model%foam%f_source
+   FoamTimeScale        = model%foam%time_scale
+   BurstTimeNonBreaking = model%foam%burst_time_nb
+   MinThick             = model%foam%min_thick
+   CdFoam               = model%foam%cd_foam
 # endif
 
 END SUBROUTINE READ_INPUT
