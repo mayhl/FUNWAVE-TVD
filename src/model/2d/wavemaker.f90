@@ -188,6 +188,7 @@ module model_wavemaker_mod
       ! Wavemaker current balance — presence of WaveMakerCd enables balance
       logical  :: WaveMakerCurrentBalance = .false.
       real(SP) :: WaveMakerCd = 0.0_SP
+      real(SP), allocatable :: cd_current(:, :)   ! WaveMakerCd over the source box
 
       ! Internal-source machinery (init_compute products)
       logical  :: has_mass_source = .false.
@@ -440,6 +441,23 @@ contains
 
       allocate (this%mass(mloc, nloc), source=0.0_SP)
 
+      ! Current balance: extra bottom drag over the source box, to stop the
+      ! wavemaker's momentum flux driving a longshore current (legacy
+      ! sources.F, per-cell box test).  Baked into a map because the box is
+      ! static; zero outside it, so the kernel's add is unconditional.
+      ! Legacy tests the box for any wavemaker type, but Width_WK = 0 without
+      ! a mass source makes it inert there — hence the gate above.
+      if (this%WaveMakerCurrentBalance) then
+         allocate (this%cd_current(mloc, nloc), source=0.0_SP)
+         do j = 1, nloc
+            do i = 1, mloc
+               if (abs(this%xmk_wk(i) - this%Xc_WK) < this%Width_WK .and. &
+                   abs(this%ymk_wk(j) - this%Yc_WK) < this%Ywidth_WK/2.0_SP) &
+                  this%cd_current(i, j) = this%WaveMakerCd
+            end do
+         end do
+      end if
+
    end subroutine wavemaker_init_compute
 
    ! ----------------------------------------------------------------
@@ -684,6 +702,7 @@ contains
 
       if (allocated(this%xmk_wk)) deallocate (this%xmk_wk, this%ymk_wk)
       if (allocated(this%mass)) deallocate (this%mass)
+      if (allocated(this%cd_current)) deallocate (this%cd_current)
       if (allocated(this%Cm)) deallocate (this%Cm, this%Sm, this%omgn_ir)
       if (allocated(this%Cm_eta)) &
          deallocate (this%Cm_eta, this%Sm_eta, this%Cm_u, this%Sm_u, &

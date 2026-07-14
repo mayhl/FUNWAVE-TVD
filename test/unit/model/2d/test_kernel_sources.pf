@@ -17,9 +17,9 @@ module test_kernel_sources
    real(SP), parameter :: TOL = 1.0e-10_SP
    real(SP), parameter :: MIN_DEPTH_FRC = 0.5_SP
 
-   ! inactive-vessel stand-in: cd_vessel / ves_px / ves_py all zero, so the
-   ! vessel terms add an exact zero and these tests keep their old answers
-   real(SP), parameter :: ves_zero(MLOC, NLOC) = 0.0_SP
+   ! inactive-module stand-in: cd_wavemaker / cd_vessel / ves_px / ves_py all
+   ! zero, so those terms add an exact zero and these tests keep their answers
+   real(SP), parameter :: zero2d(MLOC, NLOC) = 0.0_SP
 
 contains
 
@@ -97,7 +97,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -145,7 +145,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -193,7 +193,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       ! friction off (cd=0), bathy flat: src = wavemaker mass term - drag on |UV|
       do j = lp%jb, lp%je
@@ -247,7 +247,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -296,7 +296,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -310,7 +310,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -359,7 +359,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -373,7 +373,7 @@ contains
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       ves_zero, ves_zero, ves_zero, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie

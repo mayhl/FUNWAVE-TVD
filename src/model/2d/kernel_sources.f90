@@ -29,6 +29,12 @@ contains
    !   4. Wavemaker mass injection:  wavemaker_mass * u / v
    !      Pass zero array when no wavemaker.
    !
+   !   4b. Wavemaker current balance:  -Cd_wmk * u * |UV|
+   !      extra bottom drag over the source box, so the source's momentum
+   !      flux does not drive a longshore current.  Like the deep-draft
+   !      hull drag and unlike the breakwater, no depth factor.  cd_wavemaker
+   !      is zero outside the box; pass a zero array when the balance is off.
+   !
    !   5. Eddy viscosity (BreakSourceX/Y, Shi 2012 §3):
    !        d/dx[(νa+νb)*dHU/dx] + d/dy[(νa+νb)*dHU/dy]
    !      nu_vis = nu_break + nu_sponge assembled by caller.
@@ -53,7 +59,7 @@ contains
                           depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, coriolis, &
-                          cd_breakwater, cd_vessel, ves_px, ves_py, &
+                          cd_breakwater, cd_wavemaker, cd_vessel, ves_px, ves_py, &
                           min_depth_frc, src_x, src_y)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: gamma1, gamma2
@@ -69,6 +75,7 @@ contains
       real(SP), intent(in)  :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
       real(SP), intent(in)  :: wavemaker_mass(:, :), cd(:, :), nu_vis(:, :)
       real(SP), intent(in)  :: coriolis(:, :), cd_breakwater(:, :)
+      real(SP), intent(in)  :: cd_wavemaker(:, :)
       real(SP), intent(in)  :: cd_vessel(:, :), ves_px(:, :), ves_py(:, :)
       real(SP), intent(in)  :: min_depth_frc
       real(SP), intent(out) :: src_x(:, :), src_y(:, :)
@@ -99,6 +106,11 @@ contains
                src_x(i, j) = src_x(i, j) - cd_vessel(i, j)*u(i, j)*spd
                src_y(i, j) = src_y(i, j) - cd_vessel(i, j)*v(i, j)*spd
             end if
+
+            ! wavemaker current balance (zero outside the source box, so the
+            ! add is unconditional — same contract as wavemaker_mass)
+            src_x(i, j) = src_x(i, j) - cd_wavemaker(i, j)*u(i, j)*spd
+            src_y(i, j) = src_y(i, j) - cd_wavemaker(i, j)*v(i, j)*spd
 
             ! wavemaker mass injection
             src_x(i, j) = src_x(i, j) + wavemaker_mass(i, j)*u(i, j)

@@ -548,7 +548,7 @@ contains
                           wm_mass(this), &
                           this%friction%Cd, &
                           merge_nu_vis(this), &
-                          cor_f(this), bw_cd(this), &
+                          cor_f(this), bw_cd(this), wm_cd(this), &
                           ves_cd(this), ves_px(this), ves_py(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
 
@@ -927,6 +927,19 @@ contains
          c => this%zeros
       end if
    end function bw_cd
+
+   ! Wavemaker current-balance drag for the momentum source: the
+   ! wavemaker's source-box map when the balance is on, zeros otherwise
+   function wm_cd(this) result(c)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: c(:, :)
+
+      if (allocated(this%wavemaker%cd_current)) then
+         c => this%wavemaker%cd_current
+      else
+         c => this%zeros
+      end if
+   end function wm_cd
 
    ! Effective eddy viscosity for the momentum source (legacy nu_vis
    ! assembly at the SourceTerms head): nu_break under viscosity
