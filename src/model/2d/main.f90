@@ -42,6 +42,7 @@ module model_main_mod
    use model_foam_mod, only: type_model_foam
    use model_tracer_mod, only: type_model_tracer
    use model_vessel_mod, only: type_model_vessel
+   use model_sediment_mod, only: type_model_sediment
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -85,6 +86,7 @@ module model_main_mod
       type(type_model_foam) :: foam
       type(type_model_tracer) :: tracer
       type(type_model_vessel) :: vessel
+      type(type_model_sediment) :: sediment
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -137,6 +139,7 @@ contains
       call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       call this%tracer%read_input(this%env)
       call this%vessel%read_input(this%env)
+      call this%sediment%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -183,6 +186,7 @@ contains
       call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       call this%tracer%read_input(this%env)
       call this%vessel%read_input(this%env)
+      call this%sediment%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -565,6 +569,9 @@ contains
       call this%vessel%init_compute(this%grid, this%env, &
                                     this%output%result_folder, &
                                     this%simulation%t_start)
+      ! legacy SEDIMENT_INITIAL: zeroed transport state plus the grain
+      ! parameters, which depend on config alone
+      call this%sediment%init_compute(this%grid, this%env, this%fields%depth)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
@@ -576,7 +583,7 @@ contains
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
                         this%precipitation, this%subgrid, this%foam, &
-                        this%tracer, this%vessel)
+                        this%tracer, this%vessel, this%sediment)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -612,6 +619,7 @@ contains
       call this%foam%free()
       call this%tracer%free()
       call this%vessel%free()
+      call this%sediment%free()
 
    end subroutine model_run
 
@@ -697,6 +705,18 @@ contains
                call add_var(vars, prefs, nv, "vessel_up", "VesUp")
                call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
             end if
+         end if
+         ! legacy writes its sediment fields straight out of PREVIEW, ungated
+         ! (OUTPUT_SEDIMENT, which PLOT_INTV_SEDIMENT gates, is an empty stub),
+         ! so every one of these rides the ordinary plot cadence.  dep_ is the
+         ! evolving bed — the only observable of the morphology.
+         if (this%sediment%is_activated) then
+            call add_var(vars, prefs, nv, "sediment_c", "C")
+            call add_var(vars, prefs, nv, "sediment_pickup", "Pick")
+            call add_var(vars, prefs, nv, "sediment_depo", "Depo")
+            call add_var(vars, prefs, nv, "sediment_bedfx", "BedFx")
+            call add_var(vars, prefs, nv, "sediment_bedfy", "BedFy")
+            call add_var(vars, prefs, nv, "depth", "dep")
          end if
          if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")
          if (out%OUT_MASK9) call add_var(vars, prefs, nv, "mask9", "mask9")

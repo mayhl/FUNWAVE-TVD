@@ -56,6 +56,7 @@ module model_stepper_2d_mod
    use model_foam_mod, only: type_model_foam
    use model_tracer_mod, only: type_model_tracer
    use model_vessel_mod, only: type_model_vessel
+   use model_sediment_mod, only: type_model_sediment
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -105,6 +106,7 @@ module model_stepper_2d_mod
       type(type_model_foam), pointer :: foam => null()
       type(type_model_tracer), pointer :: tracer => null()
       type(type_model_vessel), pointer :: vessel => null()
+      type(type_model_sediment), pointer :: sediment => null()
 
       type(type_model_bc) :: bc
 
@@ -198,7 +200,8 @@ contains
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
-                           precipitation, subgrid, foam, tracer, vessel)
+                           precipitation, subgrid, foam, tracer, vessel, &
+                           sediment)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -240,6 +243,11 @@ contains
       ! Unlike foam/tracer this one is TWO-WAY: the pressure gradient and the
       ! slender-body flux feed the momentum and continuity RHS.
       type(type_model_vessel), intent(inout), target :: vessel
+      ! sediment%init_compute must have run (transport state allocated, grain
+      ! parameters folded).  One-way for now — it reads the flow and rebuilds
+      ! H, but nothing feeds back into the momentum or continuity RHS until
+      ! the morphology and source-term rungs land.
+      type(type_model_sediment), intent(inout), target :: sediment
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -262,6 +270,7 @@ contains
       this%foam => foam
       this%tracer => tracer
       this%vessel => vessel
+      this%sediment => sediment
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -435,6 +444,10 @@ contains
          f%eta0 = f%eta
          f%p0 = f%p
          f%q0 = f%q
+
+         ! the suspended load rides the same RK weights, so its step-start
+         ! copy is taken here too (legacy CHH0 = CHH, alongside Eta0)
+         call this%sediment%save_step0()
 
          call this%bc%exchange_state(this%grid, f)
 
@@ -629,6 +642,21 @@ contains
             call this%tide%apply_bc(f%mask, f%eta, f%u, f%v)
          end if
 
+         ! suspended load (legacy SEDIMENT_ADVECTION_DIFFUSION, between
+         ! TIDE_BC and WAVE_BREAKING).  It REBUILDS f%h off the current eta,
+         ! so the breaker and foam below see the sediment module's H, not the
+         ! one the RK update left (sediment.f90 NOTE 3).  The undertow it
+         ! advects on is the PREVIOUS stage's, since the breaker runs after.
+         if (this%sediment%is_activated) then
+            call this%sediment%update(this%bc, this%grid, RK_ALPHA(istage), &
+                                      RK_BETA(istage), dt, phy%Gamma3, &
+                                      num%MinDepth, this%inv_dx, this%inv_dy, &
+                                      f%mask, f%eta, f%depth, f%u, f%v, &
+                                      this%fws%p, this%fws%q, f%h, &
+                                      this%breaking%roller, &
+                                      this%undertow_u, this%undertow_v)
+         end if
+
          if (this%run_breaker) then
             ! viscosity mode AND the legacy show-only display mode: the
             ! breaker always fills nu_break/age/roller here, but only
@@ -717,6 +745,17 @@ contains
          end if
       end if
 
+      ! legacy OUTPUT_SEDIMENT writes C_/Pick_/Depo_ with no OUT_ gate.  Like
+      ! the propeller jet these are the only observable the transport has until
+      ! bed change lands, so without them a dead solver scores as parity.
+      if (this%sediment%is_activated) then
+         call registry%register("sediment_c", this%sediment%ch)
+         call registry%register("sediment_pickup", this%sediment%pickup)
+         call registry%register("sediment_depo", this%sediment%depo)
+         call registry%register("sediment_bedfx", this%sediment%bed_flux_x)
+         call registry%register("sediment_bedfy", this%sediment%bed_flux_y)
+      end if
+
       associate (f => this%fields, lp => this%grid%lp)
          if (this%output%OUT_MASK) then
             allocate (this%mask_out(lp%mloc, lp%nloc))
@@ -744,6 +783,17 @@ contains
 
       real(SP) :: max_abs_eta
       integer :: ierr
+
+      ! legacy MORPHOLOGICAL_CHANGE: outside the RK loop and ahead of
+      ! MIXING_STUFF, so it evolves the bed on the last stage's bedload flux
+      ! and the completed step's dt.  It REWRITES fields%depth (and restaggers
+      ! depth_x/depth_y), which every kernel of the next step then reads
+      if (this%sediment%is_activated) then
+         call this%sediment%morphology(this%bc, this%grid, this%dt_step, &
+                                       this%inv_dx, this%inv_dy, &
+                                       this%fields%depth, this%fields%depth_x, &
+                                       this%fields%depth_y)
+      end if
 
       ! Legacy MIXING_STUFF: means accumulate on the completed step
       ! (last-stage interface fluxes feed the P_center/Q_center sums)
