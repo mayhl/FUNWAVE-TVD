@@ -162,7 +162,7 @@ contains
       eta = 0.0_SP
       call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
                          pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
-                         wm, prec, .false., zeros, &
+                         wm, prec, zeros, .false., zeros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
       eta_off = eta(i, j)
       ! -(4)*0.5 + 1 + 3
@@ -171,7 +171,7 @@ contains
       eta = 0.0_SP
       call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
                          pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
-                         wm, prec, .true., poros, &
+                         wm, prec, zeros, .true., poros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
       ! (-2 + 1)/0.5 + 3 — the rain is NOT scaled by the porosity
       expect = -2.0_SP + 3.0_SP
@@ -182,7 +182,7 @@ contains
       poros = 1.0_SP
       call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
                          pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
-                         wm, prec, .true., poros, &
+                         wm, prec, zeros, .true., poros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
       @assertEqual(eta_off, eta(i, j), 0.0_SP)
 

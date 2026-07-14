@@ -1,0 +1,203 @@
+! allow(E001)
+module test_vessel
+
+   use pFUnit
+   use core_constants_mod, only: SP, PI, ZERO
+   use core_grid_mod, only: type_grid_2d
+   use model_vessel_mod, only: type_model_vessel, vessel_pressure_source, &
+                               vessel_slender_source
+
+   implicit none
+
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 40
+   integer, parameter :: LNY = 40
+   integer, parameter :: MLOC = LNX + 2*NG
+   integer, parameter :: NLOC = LNY + 2*NG
+
+   real(SP), parameter :: DXY = 1.0_SP
+   real(SP), parameter :: TOL = 1.0e-10_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! Single-rank grid (nx_proc*ny_proc = 1 short-circuits the collectives) with
+   ! one PRESSURE hull, heading +x, centred wherever the caller puts it.
+   subroutine make_vessel(v, grid, vtype, theta)
+      type(type_model_vessel), intent(out) :: v
+      type(type_grid_2d), intent(out) :: grid
+      integer, intent(in) :: vtype
+      real(SP), intent(in) :: theta
+
+      integer :: i, j
+
+      grid%lp%ib = NG + 1; grid%lp%ie = NG + LNX
+      grid%lp%jb = NG + 1; grid%lp%je = NG + LNY
+      grid%lp%mloc = MLOC; grid%lp%nloc = NLOC
+      grid%nx_proc = 1; grid%ny_proc = 1
+
+      v%is_activated = .true.
+      v%n_vessel = 1
+      v%dx0 = DXY
+      v%dy0 = DXY
+
+      allocate (v%source_type(1), v%vessel_type(1))
+      allocate (v%length(1), v%width(1))
+      allocate (v%alpha1(1), v%alpha2(1), v%beta(1), v%p_ves(1))
+      allocate (v%theta(1))
+      allocate (v%res_x(1), v%res_y(1))
+      allocate (v%res_pos_x(1), v%res_neg_x(1), v%res_pos_y(1), v%res_neg_y(1))
+      allocate (v%p_total(MLOC, NLOC), v%p_each(MLOC, NLOC))
+      allocate (v%flux_grad(MLOC, NLOC), v%flux_grad_each(MLOC, NLOC))
+
+      v%source_type(1) = "PRESSURE"
+      v%vessel_type(1) = vtype
+      v%length(1) = 20.0_SP
+      v%width(1) = 10.0_SP
+      v%alpha1(1) = 0.5_SP
+      v%alpha2(1) = 0.5_SP
+      v%beta(1) = 0.5_SP
+      v%p_ves(1) = 3.0_SP
+      v%theta(1) = theta
+
+      ! ghost-inclusive lattice, xco(ib) = 0
+      allocate (v%xco(MLOC), v%yco(NLOC))
+      do i = 1, MLOC
+         v%xco(i) = real(i - (NG + 1), SP)*DXY
+      end do
+      do j = 1, NLOC
+         v%yco(j) = real(j - (NG + 1), SP)*DXY
+      end do
+   end subroutine make_vessel
+
+   ! Type 1 (Ertekin et al.): a flat-topped patch.  Inside the alpha/beta core
+   ! the pressure is exactly Pvessel; outside the hull rectangle it is exactly
+   ! zero.  This pins the taper branches against the hull frame.
+   @test
+   subroutine test_pressure_type1_flat_top_and_zero_outside()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      real(SP) :: eta(MLOC, NLOC)
+
+      call make_vessel(v, grid, 1, ZERO)
+      eta = ZERO
+      ! hull centred at (20,20); core is |L|<=0.5*20*0.5=5, |W|<=0.5*10*0.5=2.5
+      call vessel_pressure_source(v, grid, 1, 20.0_SP, 20.0_SP, eta)
+
+      ! dead centre -> full pressure
+      @assertEqual(3.0_SP, v%p_each(NG + 1 + 20, NG + 1 + 20), TOL)
+      ! still inside the flat core (L=+4, W=+2)
+      @assertEqual(3.0_SP, v%p_each(NG + 1 + 24, NG + 1 + 22), TOL)
+      ! well outside the hull rectangle (L=+15 > 0.5*20)
+      @assertEqual(ZERO, v%p_each(NG + 1 + 35, NG + 1 + 20), TOL)
+      ! outside in the beam direction (W=+8 > 0.5*10)
+      @assertEqual(ZERO, v%p_each(NG + 1 + 20, NG + 1 + 28), TOL)
+   end subroutine test_pressure_type1_flat_top_and_zero_outside
+
+   ! The patch is symmetric about the keel: alpha1 == alpha2 and the taper in
+   ! W uses |W|, so mirroring across the hull centreline must reproduce it.
+   ! Catches a sign slip in the wves rotation.
+   @test
+   subroutine test_pressure_symmetric_about_keel()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      real(SP) :: eta(MLOC, NLOC)
+      integer :: d
+
+      call make_vessel(v, grid, 1, ZERO)
+      eta = ZERO
+      call vessel_pressure_source(v, grid, 1, 20.0_SP, 20.0_SP, eta)
+
+      do d = 1, 4
+         @assertEqual(v%p_each(NG + 1 + 20, NG + 1 + 20 + d), &
+                      v%p_each(NG + 1 + 20, NG + 1 + 20 - d), TOL)
+      end do
+   end subroutine test_pressure_symmetric_about_keel
+
+   ! A hull rotated by 90 degrees must produce the transpose of the unrotated
+   ! one about its centre: what was along-keel is now across-beam.  This is the
+   ! real test of the (cos,sin) hull-frame rotation.
+   @test
+   subroutine test_pressure_rotated_90_transposes()
+      type(type_model_vessel) :: v0, v90
+      type(type_grid_2d) :: g0, g90
+      real(SP) :: eta(MLOC, NLOC)
+      integer :: a, b
+
+      eta = ZERO
+      call make_vessel(v0, g0, 1, ZERO)
+      call vessel_pressure_source(v0, g0, 1, 20.0_SP, 20.0_SP, eta)
+
+      call make_vessel(v90, g90, 1, 0.5_SP*PI)
+      call vessel_pressure_source(v90, g90, 1, 20.0_SP, 20.0_SP, eta)
+
+      ! P_rot(x0+a, y0+b) == P_0(x0+b, y0-a)
+      do a = -8, 8
+         do b = -8, 8
+            @assertEqual(v0%p_each(NG + 1 + 20 + b, NG + 1 + 20 - a), &
+                         v90%p_each(NG + 1 + 20 + a, NG + 1 + 20 + b), 1.0e-9_SP)
+         end do
+      end do
+   end subroutine test_pressure_rotated_90_transposes
+
+   ! Type 2 (Divid & Volker 2017) is a closed-form polynomial-Gaussian, so it
+   ! can be checked against the formula directly at the hull centre, where
+   ! L = W = 0 and every factor collapses to 1.
+   @test
+   subroutine test_pressure_type2_centre_value()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      real(SP) :: eta(MLOC, NLOC)
+
+      call make_vessel(v, grid, 2, ZERO)
+      eta = ZERO
+      call vessel_pressure_source(v, grid, 1, 20.0_SP, 20.0_SP, eta)
+
+      ! P = Pves * (1 - a1*0^4) * (1 - a2*0^2) * exp(-b*0^2) = Pves
+      @assertEqual(3.0_SP, v%p_each(NG + 1 + 20, NG + 1 + 20), TOL)
+   end subroutine test_pressure_type2_centre_value
+
+   ! Slender body type 1 is a sin(2*pi*L/Length) dipole: a source ahead of
+   ! midships and an equal sink behind it, and exactly zero ON midships.  The
+   ! antisymmetry is what makes it displace water without net mass injection.
+   @test
+   subroutine test_slender_is_antisymmetric_dipole()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      integer :: d
+
+      call make_vessel(v, grid, 1, ZERO)
+      call vessel_slender_source(v, grid, 1, 20.0_SP, 20.0_SP)
+
+      ! zero on the midships line (L = 0 -> sin(0) = 0)
+      @assertEqual(ZERO, v%flux_grad_each(NG + 1 + 20, NG + 1 + 20), TOL)
+
+      ! bow and stern are equal and opposite
+      do d = 1, 5
+         @assertEqual(-v%flux_grad_each(NG + 1 + 20 - d, NG + 1 + 20), &
+                      v%flux_grad_each(NG + 1 + 20 + d, NG + 1 + 20), 1.0e-9_SP)
+      end do
+
+      ! and it really is nonzero somewhere, or the above is vacuous
+      @assertTrue(maxval(abs(v%flux_grad_each)) > 0.1_SP)
+   end subroutine test_slender_is_antisymmetric_dipole
+
+   ! The pressure patch adds no net mass: it is a displacement, not a source.
+   ! (The slender dipole's integral is the thing that must vanish; the pressure
+   ! patch's does not, so only the dipole is checked.)
+   @test
+   subroutine test_slender_integrates_to_zero()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      real(SP) :: total
+
+      call make_vessel(v, grid, 1, ZERO)
+      call vessel_slender_source(v, grid, 1, 20.0_SP, 20.0_SP)
+
+      total = sum(v%flux_grad_each)
+      @assertEqual(ZERO, total, 1.0e-9_SP)
+   end subroutine test_slender_integrates_to_zero
+
+end module test_vessel
