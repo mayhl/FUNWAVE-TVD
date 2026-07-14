@@ -82,23 +82,9 @@ CONTAINS
       CHARACTER(LEN=80)::TMP_NAME = ' '
       INTEGER :: Ifile, ierr
 
-! read  from input.txt
+! SubMainGridRatio, OUT_POROSITY and DEPTH_SUBGRID_FILE are seeded by
+! the modern reader through the io.F bridge -- the READ_* calls are gone
       FILE_NAME = INPUT_FILE_NAME
-
-      CALL READ_INTEGER(SubMainGridRatio, FILE_NAME, 'SubMainGridRatio', ierr)
-      IF (ierr == 1) THEN
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A80)') 'SubMainGridRatio NOT FOUND, use 1 for default'
-            WRITE (3, '(A80)') 'SubMainGridRatio NOT FOUND, use 1 for default'
-         end if
-# else
-         WRITE (*, '(A80)') 'SubMainGridRatio NOT FOUND, use 1 for default'
-         WRITE (3, '(A80)') 'SubMainGridRatio NOT FOUND, use 1 for default'
-# endif
-      END IF
-
-      CALL READ_LOGICAL(OUT_POROSITY, FILE_NAME, 'Porosity', ierr)
 
       NumPixel = SubMainGridRatio*SubMainGridRatio
 
@@ -108,20 +94,6 @@ CONTAINS
       ALLOCATE (DepSubGrid(Mloc, Nloc, SubMainGridRatio, SubMainGridRatio))
 
 ! read subgrid bathymetry
-
-      CALL READ_STRING(DEPTH_FILE, FILE_NAME, 'DEPTH_FILE', ierr)
-# if defined (PARALLEL)
-      if (myid .eq. 0) WRITE (3, '(A12,A50)') 'DEPTH_FILE:', DEPTH_FILE
-# else
-      WRITE (3, '(A12,A50)') 'DEPTH_FILE:', DEPTH_FILE
-# endif
-
-      CALL READ_STRING(DEPTH_SUBGRID_FILE, FILE_NAME, 'DEPTH_SUBGRID_FILE', ierr)
-# if defined (PARALLEL)
-      if (myid .eq. 0) WRITE (3, '(A12,A50)') 'SUBGRID DEPTH_FILE:', DEPTH_SUBGRID_FILE
-# else
-      WRITE (3, '(A12,A50)') 'SUBGRID DEPTH_FILE:', DEPTH_SUBGRID_FILE
-# endif
 
 # if defined (PARALLEL)
       call GetFile(DEPTH_FILE, Depth)

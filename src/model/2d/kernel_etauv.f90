@@ -102,12 +102,16 @@ contains
    ! low side of cell i).  wavemaker_mass is the WK_* mass source
    ! (zero array when no wavemaker); prec_rate is the rainfall mass
    ! source appended AFTER it like legacy R1 += PrecRateModel (zero
-   ! array when inactive).  Legacy ETA_LIMITER (default off) is not
-   ! ported.
+   ! array when inactive).  subgrid_on divides the mass residual by the
+   ! sub-cell porosity in between the two, legacy's exact operand order
+   ! (porosity is never zero — the dry clamp lifts it to 1 — so legacy's
+   ! guard branch there is dead).  Legacy ETA_LIMITER (default off) is
+   ! not ported.
    ! ----------------------------------------------------------------
    pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
                                  pflx, qflx, fx, fy, gx, gy, &
                                  src_x, src_y, wavemaker_mass, prec_rate, &
+                                 subgrid_on, porosity, &
                                  eta0, ubar0, vbar0, eta, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in) :: alpha, beta, dt
@@ -116,6 +120,8 @@ contains
       real(SP), intent(in) :: fx(:, :), fy(:, :), gx(:, :), gy(:, :)
       real(SP), intent(in) :: src_x(:, :), src_y(:, :), wavemaker_mass(:, :)
       real(SP), intent(in) :: prec_rate(:, :)
+      logical, intent(in) :: subgrid_on
+      real(SP), intent(in) :: porosity(:, :)
       real(SP), intent(in) :: eta0(:, :), ubar0(:, :), vbar0(:, :)
       real(SP), intent(inout) :: eta(:, :), ubar(:, :), vbar(:, :)
 
@@ -126,7 +132,9 @@ contains
          do i = lp%ib, lp%ie
             r1 = -(pflx(i + 1, j) - pflx(i, j))*inv_dx(i, j) &
                  - (qflx(i, j + 1) - qflx(i, j))*inv_dy(i, j) &
-                 + wavemaker_mass(i, j) + prec_rate(i, j)
+                 + wavemaker_mass(i, j)
+            if (subgrid_on) r1 = r1/porosity(i, j)
+            r1 = r1 + prec_rate(i, j)
             eta(i, j) = alpha*eta0(i, j) + beta*(eta(i, j) + dt*r1)
 
             r2 = -(fx(i + 1, j) - fx(i, j))*inv_dx(i, j) &

@@ -152,6 +152,11 @@ SUBROUTINE READ_INPUT
    USE PRECIPITATION_MODULE, ONLY: RainWaveInteraction, &
                                    OUT_Precipitation, RAINFALL_FILE
 # endif
+# if defined (SUBGRID)
+   ! ONLY guard: the module's LINE/FDIR collide with the local ones
+   USE SUBGRID_MODULE, ONLY: SubMainGridRatio, OUT_POROSITY, &
+                             DEPTH_SUBGRID_FILE
+# endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
 # if defined(INTEL)
@@ -813,6 +818,18 @@ SUBROUTINE READ_INPUT
    OUT_Precipitation   = model%precipitation%out_precipitation
    IF (ALLOCATED(model%precipitation%rainfall_file%root)) &
       RAINFALL_FILE = model%precipitation%rainfall_file%root
+# endif
+
+# if defined (SUBGRID)
+   ! subgrid bridge: SUBGRID_MODULE variables seeded from the modern
+   ! reader, the READ calls in mod_subgrid.F stubbed out.  NumPixel is
+   ! still derived in SUBGRID_INITIAL.  DEPTH_FILE is left alone here —
+   ! legacy re-reads it inside SUBGRID_INITIAL from the same key the
+   ! geometry reader already consumed
+   SubMainGridRatio = model%subgrid%ratio
+   OUT_POROSITY     = model%subgrid%out_porosity
+   IF (ALLOCATED(model%subgrid%depth_subgrid_file%root)) &
+      DEPTH_SUBGRID_FILE = model%subgrid%depth_subgrid_file%root
 # endif
 
 END SUBROUTINE READ_INPUT

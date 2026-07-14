@@ -52,6 +52,7 @@ module model_stepper_2d_mod
    use model_means_mod, only: type_model_means
    use model_tide_mod, only: type_model_tide
    use model_precipitation_mod, only: type_model_precipitation
+   use model_subgrid_mod, only: type_model_subgrid
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -97,6 +98,7 @@ module model_stepper_2d_mod
       type(type_model_means), pointer :: means => null()
       type(type_model_tide), pointer :: tide => null()
       type(type_model_precipitation), pointer :: precipitation => null()
+      type(type_model_subgrid), pointer :: subgrid => null()
 
       type(type_model_bc) :: bc
 
@@ -189,7 +191,7 @@ contains
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
-                           precipitation)
+                           precipitation, subgrid)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -218,6 +220,9 @@ contains
       ! precipitation%init_compute must have run (index file open,
       ! first frame loaded)
       type(type_model_precipitation), intent(inout), target :: precipitation
+      ! subgrid%init_compute must have run (panels loaded, still-water
+      ! porosity seeded — stage 1 divides by it before the first update)
+      type(type_model_subgrid), intent(inout), target :: subgrid
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -236,6 +241,7 @@ contains
       this%means => means
       this%tide => tide
       this%precipitation => precipitation
+      this%subgrid => subgrid
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -504,11 +510,20 @@ contains
                             this%fws%gx, this%fws%gy, &
                             this%src_x, this%src_y, &
                             wm_mass(this), prec_rate(this), &
+                            this%subgrid%is_activated, porosity(this), &
                             f%eta0, f%p0, f%q0, f%eta, f%p, f%q)
 
          ! legacy GET_Eta_U_V_HU_HV: whole-array H (unclamped; ghost eta
          ! is one exchange behind, exactly as legacy)
          f%h = phy%Gamma3*f%eta + f%depth
+
+         ! sub-cell porosity/pixel average off the new eta, then the
+         ! pixel-averaged column replaces H at subgrid cells; the
+         ! porosity the NEXT stage divides by is the one left here
+         if (this%subgrid%is_activated) then
+            call this%subgrid%update(f%eta)
+            call this%subgrid%apply_h(f%h)
+         end if
 
          if (phy%dispersion) then
             call cal_etauv_assemble_x(lp, phy%Gamma1, num%MinDepthFrc, &
@@ -783,6 +798,20 @@ contains
       end if
    end function prec_rate
 
+   ! Sub-cell porosity for the eta RHS divide: the subgrid module's
+   ! array when active, zeros otherwise (unread — the kernel gates on
+   ! subgrid_on — but the dummy must still be associated)
+   function porosity(this) result(p)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: p(:, :)
+
+      if (this%subgrid%is_activated) then
+         p => this%subgrid%porosity
+      else
+         p => this%zeros
+      end if
+   end function porosity
+
    ! Per-cell Coriolis f for the momentum source: the stepper's array
    ! when active, zeros otherwise (the kernel also gates on coriolis_on)
    function cor_f(this) result(c)
@@ -873,6 +902,7 @@ contains
       this%means => null()
       this%tide => null()
       this%precipitation => null()
+      this%subgrid => null()
 
    end subroutine stepper_free
 

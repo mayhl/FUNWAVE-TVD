@@ -97,6 +97,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SPONGE_SPONGE_NORTH_WIDTH = "0.0"
    character(*), parameter :: DEF_SPONGE_SPONGE_SOUTH_WIDTH = "0.0"
    character(*), parameter :: DEF_SPONGE_SPONGE_WEST_WIDTH = "0.0"
+   ! ── subgrid ──
+   character(*), parameter :: DEF_SUBGRID_POROSITY = "NO"
+   character(*), parameter :: DEF_SUBGRID_SUBMAINGRIDRATIO = "1"
    ! ── tide ──
    character(*), parameter :: DEF_TIDE_TIDAL_BC_ABS = "NO"
    character(*), parameter :: DEF_TIDE_TIDAL_BC_GEN_ABS = "NO"

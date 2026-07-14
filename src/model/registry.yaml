@@ -982,6 +982,28 @@ parameters:
     default:      true
     latex:        ~
 
+  # ── subgrid (legacy mod_subgrid.F) ─────────────────────────────────────────
+  - name:         depth_subgrid_file
+    legacy_name:  DEPTH_SUBGRID_FILE
+    yaml_path:    "subgrid.DEPTH_SUBGRID_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         out_porosity
+    legacy_name:  Porosity
+    yaml_path:    "subgrid.Porosity"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         submaingridratio
+    legacy_name:  SubMainGridRatio
+    yaml_path:    "subgrid.SubMainGridRatio"
+    units:        ~
+    default:      1
+    latex:        ~
+
   - name:         amp
     legacy_name:  AMP
     yaml_path:    "wavemaker.AMP"

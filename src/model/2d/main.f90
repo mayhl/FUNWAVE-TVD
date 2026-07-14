@@ -38,6 +38,7 @@ module model_main_mod
    use model_coupling_mod, only: type_model_coupling
    use model_tide_mod, only: type_model_tide
    use model_precipitation_mod, only: type_model_precipitation
+   use model_subgrid_mod, only: type_model_subgrid
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -75,6 +76,7 @@ module model_main_mod
       type(type_model_coupling)   :: coupling
       type(type_model_tide)       :: tide
       type(type_model_precipitation) :: precipitation
+      type(type_model_subgrid) :: subgrid
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -122,6 +124,7 @@ contains
       call this%coupling%read_input(this%env)
       call this%tide%read_input(this%env)
       call this%precipitation%read_input(this%env)
+      call this%subgrid%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -163,6 +166,7 @@ contains
       call this%coupling%read_input(this%env)
       call this%tide%read_input(this%env)
       call this%precipitation%read_input(this%env)
+      call this%subgrid%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -214,6 +218,12 @@ contains
       end if
       call this%geometry%init_depth(this%grid, this%fields%depth, &
                                     this%fields%depth_x, this%fields%depth_y)
+      ! legacy SUBGRID_INITIAL sits here, off the ghost-filled but
+      ! UNCORRECTED depth (subgrid.f90 header NOTE 5)
+      if (this%subgrid%is_activated) then
+         call this%subgrid%init_compute(this%grid, this%fields%depth, this%env)
+         if (this%subgrid%out_porosity) call write_porosity(this)
+      end if
       ! legacy order: correction sits between the ghost fill and the
       ! (re)staggering; WaterLevel (when wired) comes after correction
       if (this%geometry%bathy_correction) call apply_bathy_correction(this)
@@ -345,6 +355,41 @@ contains
       call gatherer%finalize()
 
    end subroutine apply_bathy_correction
+
+   ! Legacy SUBGRID_INITIAL tail: PutFile the still-water porosity map
+   ! (FIELD_IO_TYPE-aware, like the correction diagnostics).  Setup-time,
+   ! so the result folder may not exist yet.
+   subroutine write_porosity(this)
+      use core_output_gatherer_mod, only: type_output_gatherer
+      class(type_model_main), intent(inout) :: this
+
+      type(type_output_gatherer) :: gatherer
+      type(type_path) :: outdir
+      character(:), allocatable :: folder
+      character(len=6) :: fmt
+      logical :: ok
+
+      folder = trim(this%output%result_folder)
+      if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
+      if (this%env%comm%is_io_node()) then
+         outdir = type_path(folder)
+         if (.not. outdir%is_dir()) ok = outdir%mkdir()
+      end if
+      call this%env%comm%barrier()
+
+      select case (this%output%field_io_type(1:1))
+      case ("B", "b")
+         fmt = "binary"
+      case default
+         fmt = "ascii"
+      end select
+
+      call gatherer%init_field(this%grid, this%env%comm)
+      call gather_write(this, gatherer, this%subgrid%porosity, &
+                        folder//"porosity.ini", fmt)
+      call gatherer%finalize()
+
+   end subroutine write_porosity
 
    ! Gather a raw (mloc,nloc) array and write it — the correction
    ! diagnostics aren't registry fields, so write_static_field can't serve
@@ -496,7 +541,7 @@ contains
                         this%numerics, this%breaking, this%friction, &
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
-                        this%precipitation)
+                        this%precipitation, this%subgrid)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -526,6 +571,7 @@ contains
       call this%stations%free()
       call this%tide%free()
       call this%precipitation%free()
+      call this%subgrid%free()
 
    end subroutine model_run
 

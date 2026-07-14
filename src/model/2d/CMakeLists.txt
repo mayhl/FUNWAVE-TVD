@@ -16,6 +16,7 @@ target_sources(${main_lib}_model PRIVATE
    hotstart.f90
    tide.f90
    precipitation.f90
+   subgrid.f90
    wavemaker.f90
    sponge.f90
    obstacle.f90

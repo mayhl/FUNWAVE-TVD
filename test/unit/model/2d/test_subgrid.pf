@@ -1,0 +1,191 @@
+! allow(E001)
+module test_subgrid
+
+   use pFUnit
+   use core_constants_mod,    only: SP, LARGE
+   use core_grid_mod,         only: type_loop_bounds
+   use model_subgrid_mod,     only: type_model_subgrid
+   use model_kernel_etauv_mod, only: cal_rk_update
+
+   implicit none
+
+   integer, parameter :: NG    = 3
+   integer, parameter :: LNX   = 4
+   integer, parameter :: LNY   = 4
+   integer, parameter :: MLOC  = LNX + 2*NG   ! 10
+   integer, parameter :: NLOC  = LNY + 2*NG   ! 10
+   integer, parameter :: RATIO = 2
+
+   real(SP), parameter :: TOL = 1.0e-12_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! A 2x2-panel subgrid over the whole window, panels supplied by the
+   ! caller; every cell is a subgrid cell unless mask_sub says otherwise.
+   subroutine make_subgrid(sg)
+      type(type_model_subgrid), intent(out) :: sg
+      sg%is_activated = .true.
+      sg%ratio = RATIO
+      sg%num_pixel = RATIO*RATIO
+      allocate (sg%porosity(MLOC, NLOC), source=0.0_SP)
+      allocate (sg%dep_avg(MLOC, NLOC), source=0.0_SP)
+      allocate (sg%mask_sub(MLOC, NLOC), source=1)
+      allocate (sg%dep_sub(MLOC, NLOC, RATIO, RATIO), source=0.0_SP)
+   end subroutine make_subgrid
+
+   ! Half the pixels standing proud of the water: porosity = wet/total and
+   ! the pixel average divides by the FULL pixel count, not the wet one.
+   @test
+   subroutine test_porosity_and_pixel_average()
+      type(type_model_subgrid) :: sg
+      real(SP) :: eta(MLOC, NLOC)
+      integer :: i, j
+
+      call make_subgrid(sg)
+      ! two pixels 1 m deep, two pixels 1 m above the datum
+      sg%dep_sub(:, :, 1, 1) = 1.0_SP
+      sg%dep_sub(:, :, 2, 1) = 1.0_SP
+      sg%dep_sub(:, :, 1, 2) = -1.0_SP
+      sg%dep_sub(:, :, 2, 2) = -1.0_SP
+      eta = 0.0_SP
+
+      call sg%update(eta)
+
+      i = NG + 1; j = NG + 1
+      @assertEqual(0.5_SP, sg%porosity(i, j), TOL)
+      ! (1 + 1)/4 — the two dry pixels contribute nothing but still count
+      @assertEqual(0.5_SP, sg%dep_avg(i, j), TOL)
+
+      ! lift the surface above the blocks: every pixel wets
+      eta = 2.0_SP
+      call sg%update(eta)
+      @assertEqual(1.0_SP, sg%porosity(i, j), TOL)
+      ! (3 + 3 + 1 + 1)/4
+      @assertEqual(2.0_SP, sg%dep_avg(i, j), TOL)
+
+      call sg%free()
+   end subroutine test_porosity_and_pixel_average
+
+   ! A fully dry cell has no wet pixel: legacy flags the average with
+   ! -LARGE and then lifts the zero porosity to 1 so the eta residual
+   ! never divides by zero.
+   @test
+   subroutine test_dry_cell_clamps_porosity_to_one()
+      type(type_model_subgrid) :: sg
+      real(SP) :: eta(MLOC, NLOC)
+      integer :: i, j
+
+      call make_subgrid(sg)
+      sg%dep_sub = -1.0_SP
+      eta = 0.0_SP
+
+      call sg%update(eta)
+
+      i = NG + 1; j = NG + 1
+      @assertEqual(1.0_SP, sg%porosity(i, j), TOL)
+      @assertEqual(-LARGE, sg%dep_avg(i, j), TOL)
+
+      call sg%free()
+   end subroutine test_dry_cell_clamps_porosity_to_one
+
+   ! Non-subgrid cells are never revisited by the update, and their H is
+   ! left alone by apply_h.
+   @test
+   subroutine test_non_subgrid_cells_untouched()
+      type(type_model_subgrid) :: sg
+      real(SP) :: eta(MLOC, NLOC), h(MLOC, NLOC)
+      integer :: i, j
+
+      call make_subgrid(sg)
+      sg%dep_sub = 1.0_SP
+      sg%mask_sub = 0
+      sg%mask_sub(NG + 1, NG + 1) = 1
+      sg%porosity = 0.25_SP        ! a sentinel the update must not rewrite
+      sg%dep_avg = -7.0_SP
+      eta = 0.0_SP
+
+      call sg%update(eta)
+
+      i = NG + 2; j = NG + 2
+      ! untouched by the sweep, but the trailing clamp still lifts a
+      ! below-SMALL porosity — 0.25 is above it, so the sentinel stands
+      @assertEqual(0.25_SP, sg%porosity(i, j), TOL)
+      @assertEqual(-7.0_SP, sg%dep_avg(i, j), TOL)
+      @assertEqual(1.0_SP, sg%porosity(NG + 1, NG + 1), TOL)
+
+      h = 5.0_SP
+      call sg%apply_h(h)
+      @assertEqual(5.0_SP, h(i, j), TOL)
+      @assertEqual(sg%dep_avg(NG + 1, NG + 1), h(NG + 1, NG + 1), TOL)
+
+      call sg%free()
+   end subroutine test_non_subgrid_cells_untouched
+
+   ! The eta residual divides by porosity BEFORE the rainfall term is
+   ! added (legacy etauv_solver operand order), and is bit-identical to
+   ! the no-subgrid path when the module is off.
+   @test
+   subroutine test_rk_update_porosity_divide()
+      type(type_loop_bounds) :: lp
+      real(SP), dimension(MLOC, NLOC) :: inv_dx, inv_dy, pflx, qflx
+      real(SP), dimension(MLOC, NLOC) :: fx, fy, gx, gy, src_x, src_y
+      real(SP), dimension(MLOC, NLOC) :: wm, prec, poros, zeros
+      real(SP), dimension(MLOC, NLOC) :: eta0, ubar0, vbar0, eta, ubar, vbar
+      real(SP) :: eta_off, expect
+      integer :: i, j
+
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
+
+      inv_dx = 0.5_SP; inv_dy = 0.5_SP
+      qflx = 0.0_SP; fx = 0.0_SP; fy = 0.0_SP; gx = 0.0_SP; gy = 0.0_SP
+      src_x = 0.0_SP; src_y = 0.0_SP; zeros = 0.0_SP
+      eta0 = 0.0_SP; ubar0 = 0.0_SP; vbar0 = 0.0_SP
+      ubar = 0.0_SP; vbar = 0.0_SP
+
+      ! a pure x mass-flux gradient of -2, plus a wavemaker and a rain term
+      do j = 1, NLOC
+         do i = 1, MLOC
+            pflx(i, j) = 4.0_SP*i
+         end do
+      end do
+      wm = 1.0_SP
+      prec = 3.0_SP
+      poros = 0.5_SP
+
+      i = NG + 1; j = NG + 1
+
+      eta = 0.0_SP
+      call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
+                         pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
+                         wm, prec, .false., zeros, &
+                         eta0, ubar0, vbar0, eta, ubar, vbar)
+      eta_off = eta(i, j)
+      ! -(4)*0.5 + 1 + 3
+      @assertEqual(2.0_SP, eta_off, TOL)
+
+      eta = 0.0_SP
+      call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
+                         pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
+                         wm, prec, .true., poros, &
+                         eta0, ubar0, vbar0, eta, ubar, vbar)
+      ! (-2 + 1)/0.5 + 3 — the rain is NOT scaled by the porosity
+      expect = -2.0_SP + 3.0_SP
+      @assertEqual(expect, eta(i, j), TOL)
+
+      ! porosity 1 reproduces the off path exactly
+      eta = 0.0_SP
+      poros = 1.0_SP
+      call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
+                         pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
+                         wm, prec, .true., poros, &
+                         eta0, ubar0, vbar0, eta, ubar, vbar)
+      @assertEqual(eta_off, eta(i, j), 0.0_SP)
+
+   end subroutine test_rk_update_porosity_divide
+
+end module test_subgrid
