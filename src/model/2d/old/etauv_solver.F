@@ -363,6 +363,9 @@ END SUBROUTINE ESTIMATE_HUV
 !-------------------------------------------------------------------------------------
 SUBROUTINE GET_Eta_U_V_HU_HV
    USE GLOBAL
+# if defined (SUBGRID)
+   USE SUBGRID_MODULE
+# endif
    IMPLICIT NONE
    REAL(SP)::Fr, Utotal, Utheta, dep, depl, depr, reta, retal, retar
    REAL(SP), DIMENSION(Mloc, Nloc) :: myA, myC, myD, myF
