@@ -475,14 +475,27 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         out['coupling'] = {'coupling_file': cf}
 
     # ---- meteo (atmospheric forcing) ---------------------------------------
-    # rung a: MeteoGausian only.  Legacy key names are preserved verbatim so
-    # both engines round-trip the same identifiers.
+    # a: MeteoGausian, b: WindConstantField.  Legacy key names are preserved
+    # verbatim so both engines round-trip the same identifiers.
     mt: dict = {}
     mg = pop_bool('MeteoGausian')
     if mg:
         mt['MeteoGausian'] = True
         gf = pop_str('METEO_GAUSIAN_FILE')
         if gf: mt['METEO_GAUSIAN_FILE'] = gf
+    wcf = pop_bool('WindConstantField')
+    if wcf:
+        mt['WindConstantField'] = True
+        cwf = pop_str('CONSTANT_WIND_FILE')
+        if cwf: mt['CONSTANT_WIND_FILE'] = cwf
+    if mg or wcf:
+        # shared wind/pressure knobs (only meaningful when a model is on)
+        for key, caster in (('WindForce', _bool), ('AirPressure', _bool),
+                            ('WindWaveInteraction', _bool), ('Cdw', _auto),
+                            ('WindCrestPercent', _auto)):
+            v = pop(key)
+            if v is not None:
+                mt[key] = caster(v)
     om = pop('OUT_METEO')
     if om is not None:
         mt['OUT_METEO'] = _bool(om)
