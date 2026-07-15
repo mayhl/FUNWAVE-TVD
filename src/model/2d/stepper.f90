@@ -519,8 +519,7 @@ contains
          ! previous step's values -- the legacy cadence, meteo.f90 NOTE 7)
          if (istage == 1 .and. this%meteo%is_activated) then
             call this%meteo%update(time, f%h, f%eta, this%etax, this%etay, &
-                                   this%etat, this%means%etamean, f%h_max, &
-                                   num%MinDepthFrc)
+                                   this%etat, this%means%etamean, f%h_max)
          end if
 
          if (phy%dispersion) call run_dispersion(this, dt)
@@ -763,6 +762,12 @@ contains
       if (this%meteo%is_activated .and. (this%meteo%meteo_gausian &
                                          .or. this%meteo%wind_holland_model .or. this%meteo%slide_model)) then
          call registry%register("meteo_pressure", this%meteo%p_total)
+      end if
+      ! legacy writes Ustorm_/Vstorm_ (WindU2D/WindV2D) only for the Holland
+      ! model (io.F:1712-1715) -- the gradient wind is its wind observable
+      if (this%meteo%is_activated .and. this%meteo%wind_holland_model) then
+         call registry%register("meteo_wind_u", this%meteo%wind_u)
+         call registry%register("meteo_wind_v", this%meteo%wind_v)
       end if
 
       if (this%vessel%is_activated) then

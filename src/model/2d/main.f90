@@ -721,6 +721,12 @@ contains
                     .or. this%meteo%slide_model)) then
             call add_var(vars, prefs, nv, "meteo_pressure", "Pstorm")
          end if
+         ! legacy writes Ustorm_/Vstorm_ under OUT_METEO only for Holland
+         if (this%meteo%is_activated .and. this%meteo%out_meteo &
+             .and. this%meteo%wind_holland_model) then
+            call add_var(vars, prefs, nv, "meteo_wind_u", "Ustorm")
+            call add_var(vars, prefs, nv, "meteo_wind_v", "Vstorm")
+         end if
          ! legacy writes its sediment fields straight out of PREVIEW, ungated
          ! (OUTPUT_SEDIMENT, which PLOT_INTV_SEDIMENT gates, is an empty stub),
          ! so every one of these rides the ordinary plot cadence.  dep_ is the
