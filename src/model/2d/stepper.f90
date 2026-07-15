@@ -518,8 +518,9 @@ contains
          ! forces off the current H, and the wave-envelope fields hold the
          ! previous step's values -- the legacy cadence, meteo.f90 NOTE 7)
          if (istage == 1 .and. this%meteo%is_activated) then
-            call this%meteo%update(time, f%h, f%eta, this%etax, this%etay, &
-                                   this%etat, this%means%etamean, f%h_max)
+            call this%meteo%update(time, f%h, f%eta, f%eta0, this%etax, &
+                                   this%etay, this%etat, this%means%etamean, &
+                                   f%h_max)
          end if
 
          if (phy%dispersion) call run_dispersion(this, dt)

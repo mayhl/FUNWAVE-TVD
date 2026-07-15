@@ -131,6 +131,14 @@ module model_meteo_mod
       type(type_path) :: gausian_file
       type(type_path) :: constant_wind_file
       type(type_path) :: storm_file        ! Holland Pn/Pc/A/B track
+      type(type_path) :: slide_file        ! landslide geometry + X/Y track
+
+      ! slide geometry (legacy LengthSlide/WidthSlide/AlphaSlide/BetaSlide/
+      ! PSlide) and the sech-shape parameter epsilon; first_call seeds eta once
+      real(SP) :: length_slide = ZERO, width_slide = ZERO
+      real(SP) :: alpha_slide = ZERO, beta_slide = ZERO, p_slide = ZERO
+      real(SP) :: epsilon = ZERO
+      logical :: first_call = .true.
 
       ! two-record storm-track bracket (legacy TimeStorm1/2, Xstorm1/2, ...).
       ! NOTE 1: only t/x/y advance into the low slot; the shape params do not
@@ -201,8 +209,10 @@ contains
                              val=this%slide_model, &
                              default=DEF_METEO_SLIDEMODEL)
 
-      ! MeteoGausian forces the pressure path on (mod_meteo.F:206-208)
+      ! MeteoGausian and SlideModel force the pressure path on (mod_meteo.F:206,
+      ! and Slide_Model_Setup sets AirPressure = .TRUE.)
       if (this%meteo_gausian) this%air_pressure = .true.
+      if (this%slide_model) this%air_pressure = .true.
 
       ! wind + pressure knobs, read only when a wind model is on (legacy gate)
       if (this%wind_holland_model .or. this%wind_constant_field) then
@@ -250,6 +260,12 @@ contains
                                            val=this%storm_file)
          if (no_key) error stop &
             "meteo: STORM_FILE is required when WindHollandModel is on"
+      end if
+      if (this%slide_model) then
+         call sub_env%yaml%read_input_path("SLIDE_FILE", silent=no_key, &
+                                           val=this%slide_file)
+         if (no_key) error stop &
+            "meteo: SLIDE_FILE is required when SlideModel is on"
       end if
 
    end subroutine meteo_read_input
@@ -321,6 +337,7 @@ contains
       if (this%meteo_gausian) call gausian_setup(this)
       if (this%wind_constant_field) call constant_wind_setup(this)
       if (this%wind_holland_model) call holland_setup(this)
+      if (this%slide_model) call slide_setup(this)
 
    end subroutine meteo_init_compute
 
@@ -372,6 +389,30 @@ contains
       this%bst1 = this%bst2
    end subroutine holland_setup
 
+   ! Legacy Slide_Model_Setup: epsilon = 0.717, open the slide file, read its
+   ! geometry (L/W/Alpha/Beta/P) and first (time, x, y) into slot2, copy t/x/y
+   ! to slot1.  AirPressure is already forced on in read_input.
+   subroutine slide_setup(this)
+      class(type_model_meteo), intent(inout) :: this
+      character(len=80) :: header
+
+      this%epsilon = 0.717_SP
+
+      open (newunit=this%unit_track, file=this%slide_file%root, &
+            status='old', action='read')
+      read (this%unit_track, *) header                  ! title
+      read (this%unit_track, *) header                  ! slide name
+      read (this%unit_track, *) header                  ! geometry banner
+      read (this%unit_track, *) this%length_slide, this%width_slide, &
+         this%alpha_slide, this%beta_slide, this%p_slide
+      read (this%unit_track, *) header                  ! t,x,y banner
+      read (this%unit_track, *) this%t2, this%x2, this%y2
+
+      this%t1 = this%t2
+      this%x1 = this%x2
+      this%y1 = this%y2
+   end subroutine slide_setup
+
    ! Open the wind file, read the record count and the (time, WU, WV) series.
    subroutine constant_wind_setup(this)
       class(type_model_meteo), intent(inout) :: this
@@ -399,10 +440,14 @@ contains
    ! fields (eta/etax/etay/etat/etamean/h_max) feed only the wind-wave and
    ! crest-mask refinements (NOTE 7); MeteoGausian ignores them.
    ! ----------------------------------------------------------------
-   subroutine meteo_update(this, time, h, eta, etax, etay, etat, etamean, h_max)
+   subroutine meteo_update(this, time, h, eta, eta0, etax, etay, etat, &
+                           etamean, h_max)
       class(type_model_meteo), intent(inout) :: this
       real(SP), intent(in) :: time
-      real(SP), intent(in) :: h(:, :), eta(:, :)
+      real(SP), intent(in) :: h(:, :)
+      ! eta/eta0 are inout: the slide seeds the initial surface on its first
+      ! call (legacy Eta = Eta0 = -StormPressureTotal); the wind models only read
+      real(SP), intent(inout) :: eta(:, :), eta0(:, :)
       real(SP), intent(in) :: etax(:, :), etay(:, :), etat(:, :)
       real(SP), intent(in) :: etamean(:, :), h_max(:, :)
 
@@ -415,6 +460,7 @@ contains
       if (this%wind_holland_model) &
          call holland_forcing(this, time, h, eta, etax, etay, etat, &
                               etamean, h_max)
+      if (this%slide_model) call slide_forcing(this, time, h, eta, eta0)
 
    end subroutine meteo_update
 
@@ -616,6 +662,69 @@ contains
       if (this%air_pressure) call pressure_gradient(this, h)
 
    end subroutine holland_forcing
+
+   ! Legacy Slide_Model_Forcing: advance the (x,y) track (t/x/y only, NOTE 1),
+   ! build the moving sech^2 pressure bump, seed the initial surface on the
+   ! first call (Eta = Eta0 = -P), then the -g*H*grad forcing.
+   subroutine slide_forcing(this, time, h, eta, eta0)
+      class(type_model_meteo), intent(inout) :: this
+      real(SP), intent(in) :: time, h(:, :)
+      real(SP), intent(inout) :: eta(:, :), eta0(:, :)
+
+      real(SP) :: w1, w2, xs, ys, cc, kb, kw, sech1, sech2
+      integer :: i, j, ios
+
+      this%p_total = ZERO
+
+      if (.not. this%eof) then
+         if (time > this%t1 .and. time > this%t2) then
+            this%t1 = this%t2
+            this%x1 = this%x2
+            this%y1 = this%y2
+            read (this%unit_track, *, iostat=ios) this%t2, this%x2, this%y2
+            if (ios /= 0) this%eof = .true.
+         end if
+      end if
+
+      w2 = ZERO
+      w1 = ZERO
+      if (time > this%t1) then
+         if (this%t1 == this%t2) then
+            w2 = ZERO
+            w1 = ZERO
+         else
+            w2 = (this%t2 - time)/max(SMALL, abs(this%t2 - this%t1))
+            w1 = 1.0_SP - w2
+         end if
+      end if
+
+      xs = this%x2*w1 + this%x1*w2
+      ys = this%y2*w1 + this%y1*w2
+
+      cc = acosh(1.0_SP/this%epsilon)
+      kb = 2.0_SP*cc/max(SMALL, this%width_slide)
+      kw = 2.0_SP*cc/max(SMALL, this%length_slide)
+
+      do i = 1, this%mloc
+         sech1 = kw*(this%xco(i) - xs)
+         do j = 1, this%nloc
+            sech2 = kb*(this%yco(j) - ys)
+            this%p_total(i, j) = (this%p_slide/(1.0_SP - this%epsilon)) &
+                                 *((1.0_SP/cosh(sech1))*(1.0_SP/cosh(sech2)) &
+                                   - this%epsilon)
+            if (this%p_total(i, j) < 0.0_SP) this%p_total(i, j) = 0.0_SP
+         end do
+      end do
+
+      if (this%first_call) then
+         eta = -this%p_total
+         eta0 = -this%p_total
+         this%first_call = .false.
+      end if
+
+      call pressure_gradient(this, h)
+
+   end subroutine slide_forcing
 
    ! Crest-only wind mask (NOTE 7): everywhere on when WindCrestPercent == LARGE,
    ! else off wherever the surface sits below the crest cutoff.
