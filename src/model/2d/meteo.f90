@@ -49,13 +49,12 @@
 !  crests (WindCrestPercent).  The stress then feeds the momentum source.
 !
 !  Bug-for-bug notes vs legacy:
-!    NOTE 1: the pressure record advance shifts ONLY (t, x, y) into the low
-!            bracket (mod_meteo.F:1061-1063 for MeteoGausian, and identically in
-!            Holland_Model_Forcing); dP / SigmaX / SigmaY / Theta (and Holland's
-!            Pn/Pc/A/B) are NOT shifted, so after the first advance they stay
-!            frozen at the FIRST record's setup values.  A LEGACY BUG: latent
-!            for a 2-record file (one interval), live for any 3+ record storm.
-!            Reproduced.
+!    NOTE 1: FIXED (cord cut) -- the record advance now slides ALL fields into
+!            the low bracket (t/x/y AND dP/SigmaX/SigmaY/Theta, and Holland's
+!            Pn/Pc/A/B), so the shape interpolates previous<->next like the
+!            position.  Legacy (mod_meteo.F:1061-1063 and Holland_Model_Forcing)
+!            shifted ONLY (t, x, y), freezing the shape at the FIRST record --
+!            latent for a 2-record file, live for any 3+ record storm.
 !    NOTE 2: params are ZERO for TIME <= the first record time (both weights
 !            stay 0), which drives SigmaX to 0 and legacy STOPs.  It does not
 !            bite in practice because the first forcing call runs at an
@@ -141,7 +140,7 @@ module model_meteo_mod
       logical :: first_call = .true.
 
       ! two-record storm-track bracket (legacy TimeStorm1/2, Xstorm1/2, ...).
-      ! NOTE 1: only t/x/y advance into the low slot; the shape params do not
+      ! the record advance slides all of these low <- high together (NOTE 1)
       real(SP) :: t1 = ZERO, t2 = ZERO
       real(SP) :: x1 = ZERO, x2 = ZERO, y1 = ZERO, y2 = ZERO
       real(SP) :: dp1 = ZERO, dp2 = ZERO
@@ -342,8 +341,8 @@ contains
    end subroutine meteo_init_compute
 
    ! Open the storm track, skip its three banner lines, read the first record
-   ! into slot2, then copy ALL seven fields to slot1 (the only place dp/sigx/
-   ! sigy/th ever reach the low slot -- NOTE 1).
+   ! into slot2, then copy ALL seven fields to slot1 (slot1 is also refreshed
+   ! from slot2 on each record advance now -- NOTE 1).
    subroutine gausian_setup(this)
       class(type_model_meteo), intent(inout) :: this
       character(len=80) :: header
@@ -478,10 +477,15 @@ contains
 
       if (.not. this%eof) then
          if (time > this%t1 .and. time > this%t2) then
-            ! NOTE 1: only t/x/y move into the low slot; dp/sigx/sigy/th do not
+            ! slide the WHOLE low slot down from the high slot (previous <->
+            ! next), shape params included — legacy shifted only t/x/y (NOTE 1)
             this%t1 = this%t2
             this%x1 = this%x2
             this%y1 = this%y2
+            this%dp1 = this%dp2
+            this%sigx1 = this%sigx2
+            this%sigy1 = this%sigy2
+            this%th1 = this%th2
             read (this%unit_track, *, iostat=ios) this%t2, this%x2, this%y2, &
                this%dp2, this%sigx2, this%sigy2, this%th2
             if (ios /= 0) this%eof = .true.
@@ -601,10 +605,15 @@ contains
 
       if (.not. this%eof) then
          if (time > this%t1 .and. time > this%t2) then
-            ! NOTE 1: only t/x/y move into the low slot; Pn/Pc/A/B do not
+            ! slide the WHOLE low slot down from the high slot (previous <->
+            ! next), shape params included — legacy shifted only t/x/y (NOTE 1)
             this%t1 = this%t2
             this%x1 = this%x2
             this%y1 = this%y2
+            this%pn1 = this%pn2
+            this%pc1 = this%pc2
+            this%ast1 = this%ast2
+            this%bst1 = this%bst2
             read (this%unit_track, *, iostat=ios) this%t2, this%x2, this%y2, &
                this%pn2, this%pc2, this%ast2, this%bst2
             if (ios /= 0) this%eof = .true.
