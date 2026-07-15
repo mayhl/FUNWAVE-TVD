@@ -39,6 +39,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_HOT_START_BED_DEFORMATION = "NO"
    character(*), parameter :: DEF_HOT_START_OUTPUT_START_NUMBER = "0"
    character(*), parameter :: DEF_HOT_START_TIME = "0.0"
+   ! ── meteo ──
+   character(*), parameter :: DEF_METEO_METEOGAUSIAN = "NO"
+   character(*), parameter :: DEF_METEO_OUT_METEO = "YES"
    ! ── numerics ──
    character(*), parameter :: DEF_NUMERICS_ARRTIMEMINH = "0.001"
    character(*), parameter :: DEF_NUMERICS_FROUDECAP = "3.0"

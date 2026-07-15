@@ -986,6 +986,28 @@ parameters:
     default:      true
     latex:        ~
 
+  # ── meteo (legacy mod_meteo.F) ─────────────────────────────────────────────
+  - name:         meteo_gausian
+    legacy_name:  MeteoGausian
+    yaml_path:    "meteo.MeteoGausian"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         meteo_gausian_file
+    legacy_name:  METEO_GAUSIAN_FILE
+    yaml_path:    "meteo.METEO_GAUSIAN_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         out_meteo
+    legacy_name:  OUT_METEO
+    yaml_path:    "meteo.OUT_METEO"
+    units:        ~
+    default:      true
+    latex:        ~
+
   # ── subgrid (legacy mod_subgrid.F) ─────────────────────────────────────────
   - name:         depth_subgrid_file
     legacy_name:  DEPTH_SUBGRID_FILE
