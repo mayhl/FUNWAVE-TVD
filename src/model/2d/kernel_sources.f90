@@ -60,6 +60,7 @@ contains
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, coriolis, &
                           cd_breakwater, cd_wavemaker, cd_vessel, ves_px, ves_py, &
+                          meteo_px, meteo_py, &
                           min_depth_frc, src_x, src_y)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: gamma1, gamma2
@@ -77,6 +78,7 @@ contains
       real(SP), intent(in)  :: coriolis(:, :), cd_breakwater(:, :)
       real(SP), intent(in)  :: cd_wavemaker(:, :)
       real(SP), intent(in)  :: cd_vessel(:, :), ves_px(:, :), ves_py(:, :)
+      real(SP), intent(in)  :: meteo_px(:, :), meteo_py(:, :)
       real(SP), intent(in)  :: min_depth_frc
       real(SP), intent(out) :: src_x(:, :), src_y(:, :)
 
@@ -191,6 +193,13 @@ contains
       ! so it lands last; zeros when no vessel is active.
       src_x = src_x + ves_px
       src_y = src_y + ves_py
+
+      ! atmospheric (storm) pressure gradient -g H grad(P).  Legacy adds the
+      ! meteo term right AFTER the vessel term (sources.F:529-533), gated on
+      ! AirPressure — which MeteoGausian forces .TRUE., so it is unconditional;
+      ! zeros when no meteo forcing is active.
+      src_x = src_x + meteo_px
+      src_y = src_y + meteo_py
 
    end subroutine cal_sources
 

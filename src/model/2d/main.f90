@@ -43,6 +43,7 @@ module model_main_mod
    use model_tracer_mod, only: type_model_tracer
    use model_vessel_mod, only: type_model_vessel
    use model_sediment_mod, only: type_model_sediment
+   use model_meteo_mod, only: type_model_meteo
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
@@ -87,6 +88,7 @@ module model_main_mod
       type(type_model_tracer) :: tracer
       type(type_model_vessel) :: vessel
       type(type_model_sediment) :: sediment
+      type(type_model_meteo) :: meteo
 
       ! Distributed state — built by setup() after all read_input calls
       type(type_grid_2d)        :: grid
@@ -140,6 +142,7 @@ contains
       call this%tracer%read_input(this%env)
       call this%vessel%read_input(this%env)
       call this%sediment%read_input(this%env)
+      call this%meteo%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -187,6 +190,7 @@ contains
       call this%tracer%read_input(this%env)
       call this%vessel%read_input(this%env)
       call this%sediment%read_input(this%env)
+      call this%meteo%read_input(this%env)
       ! Finalize YAML after reading all inputs
       call this%env%yaml%finalize()
 
@@ -572,6 +576,9 @@ contains
       ! legacy SEDIMENT_INITIAL: zeroed transport state plus the grain
       ! parameters, which depend on config alone
       call this%sediment%init_compute(this%grid, this%env, this%fields%depth)
+      ! legacy METEO_INITIAL: builds the ghost-inclusive pressure lattice and
+      ! opens the storm-track file, so the grid must already be spaced
+      call this%meteo%init_compute(this%grid)
       call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
                                        this%env, this%physics%Beta_ref)
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
@@ -583,7 +590,7 @@ contains
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
                         this%precipitation, this%subgrid, this%foam, &
-                        this%tracer, this%vessel, this%sediment)
+                        this%tracer, this%vessel, this%sediment, this%meteo)
       call stepper%register_output(this%registry)
 
       call build_field_channel(this, output_mgr)
@@ -620,6 +627,7 @@ contains
       call this%tracer%free()
       call this%vessel%free()
       call this%sediment%free()
+      call this%meteo%free()
 
    end subroutine model_run
 
@@ -705,6 +713,11 @@ contains
                call add_var(vars, prefs, nv, "vessel_up", "VesUp")
                call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
             end if
+         end if
+         ! legacy OUTPUT_METEO writes Pstorm_ under OUT_METEO (io.F:1718)
+         if (this%meteo%is_activated .and. this%meteo%meteo_gausian &
+             .and. this%meteo%out_meteo) then
+            call add_var(vars, prefs, nv, "meteo_pressure", "Pstorm")
          end if
          ! legacy writes its sediment fields straight out of PREVIEW, ungated
          ! (OUTPUT_SEDIMENT, which PLOT_INTV_SEDIMENT gates, is an empty stub),

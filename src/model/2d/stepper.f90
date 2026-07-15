@@ -57,6 +57,7 @@ module model_stepper_2d_mod
    use model_tracer_mod, only: type_model_tracer
    use model_vessel_mod, only: type_model_vessel
    use model_sediment_mod, only: type_model_sediment
+   use model_meteo_mod, only: type_model_meteo
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
@@ -107,6 +108,7 @@ module model_stepper_2d_mod
       type(type_model_tracer), pointer :: tracer => null()
       type(type_model_vessel), pointer :: vessel => null()
       type(type_model_sediment), pointer :: sediment => null()
+      type(type_model_meteo), pointer :: meteo => null()
 
       type(type_model_bc) :: bc
 
@@ -201,7 +203,7 @@ contains
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
                            precipitation, subgrid, foam, tracer, vessel, &
-                           sediment)
+                           sediment, meteo)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -248,6 +250,10 @@ contains
       ! H, but nothing feeds back into the momentum or continuity RHS until
       ! the morphology and source-term rungs land.
       type(type_model_sediment), intent(inout), target :: sediment
+      ! meteo%init_compute must have run (storm-track file open, first record
+      ! read, pressure lattice built).  TWO-WAY like the vessel: the storm
+      ! pressure gradient feeds the momentum RHS via cal_sources.
+      type(type_model_meteo), intent(inout), target :: meteo
 
       integer :: i, j, ii, jj, mloc, nloc
 
@@ -271,6 +277,7 @@ contains
       this%tracer => tracer
       this%vessel => vessel
       this%sediment => sediment
+      this%meteo => meteo
 
       call this%bc%init(grid, wavemaker%wavemaker_type)
 
@@ -506,6 +513,13 @@ contains
                                     f%eta, f%eta0, f%depth, f%h)
          end if
 
+         ! storm pressure field + its gradient forcing (legacy METEO_FORCING,
+         ! right after VESSEL_FORCING and before the RK loop, at the
+         ! already-advanced TIME; forces off the current total depth H)
+         if (istage == 1 .and. this%meteo%is_activated) then
+            call this%meteo%update(time, f%h)
+         end if
+
          if (phy%dispersion) call run_dispersion(this, dt)
 
          call fluxes(lp, num%high_order, num%construction, &
@@ -563,6 +577,7 @@ contains
                           merge_nu_vis(this), &
                           cor_f(this), bw_cd(this), wm_cd(this), &
                           ves_cd(this), ves_px(this), ves_py(this), &
+                          meteo_px(this), meteo_py(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
 
          call cal_rk_update(lp, RK_ALPHA(istage), RK_BETA(istage), dt, &
@@ -736,6 +751,11 @@ contains
       if (this%foam%is_activated) then
          call registry%register("eta_foam", this%foam%eta_foam)
          call registry%register("eta_foam_max", this%foam%eta_foam_max)
+      end if
+
+      ! legacy OUTPUT_METEO writes StormPressureTotal_ under OUT_METEO
+      if (this%meteo%is_activated .and. this%meteo%meteo_gausian) then
+         call registry%register("meteo_pressure", this%meteo%p_total)
       end if
 
       if (this%vessel%is_activated) then
@@ -1105,6 +1125,31 @@ contains
       end if
    end function ves_flux
 
+   ! ── meteo accessors ────────────────────────────────────────────────
+   ! Storm-pressure momentum source -g H grad(P): the module's gradient when
+   ! MeteoGausian is on, zeros otherwise (an inactive meteo adds exact zero).
+   function meteo_px(this) result(p)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: p(:, :)
+
+      if (this%meteo%is_activated .and. this%meteo%meteo_gausian) then
+         p => this%meteo%p_x
+      else
+         p => this%zeros
+      end if
+   end function meteo_px
+
+   function meteo_py(this) result(p)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: p(:, :)
+
+      if (this%meteo%is_activated .and. this%meteo%meteo_gausian) then
+         p => this%meteo%p_y
+      else
+         p => this%zeros
+      end if
+   end function meteo_py
+
    ! Sediment feedback into the flow's residual: the module's arrays when it
    ! is on, zeros otherwise.  The switches are separate dummies — when one is
    ! off its array holds live numbers the flow must not read (sediment.f90
@@ -1245,6 +1290,7 @@ contains
       this%foam => null()
       this%tracer => null()
       this%vessel => null()
+      this%meteo => null()
 
    end subroutine stepper_free
 
