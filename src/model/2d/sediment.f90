@@ -374,6 +374,10 @@ module model_sediment_mod
       real(SP), allocatable :: bed_flux_x(:, :), bed_flux_y(:, :)
       real(SP), allocatable :: zb(:, :), zs(:, :), depth_ini(:, :)
       real(SP), allocatable :: susp_load(:, :), bed_load(:, :)
+      ! the two loads scaled by 1/(1-n) -- output-only (DchgS / DchgB); legacy
+      ! divides at write time, we carry the divided copy so the registry can
+      ! point a plain array at it
+      real(SP), allocatable :: dchg_s(:, :), dchg_b(:, :)
 
       ! ---- feedback into the flow.  Filled whenever any of the three switches
       ! is on (NOTE 21), read by the flow's residual per switch
@@ -588,6 +592,8 @@ contains
          allocate (this%zb(m, n), source=ZERO)
          allocate (this%susp_load(m, n), source=ZERO)
          allocate (this%bed_load(m, n), source=ZERO)
+         allocate (this%dchg_s(m, n), source=ZERO)
+         allocate (this%dchg_b(m, n), source=ZERO)
          allocate (this%zb_aval(m, n), source=ZERO)
          allocate (this%aval_accum(m, n), source=ZERO)
 
@@ -1228,6 +1234,11 @@ contains
                this%zb(i, j) = -(this%susp_load(i, j) + this%bed_load(i, j)) &
                                /(1.0_SP - this%n_porosity)
 
+               ! output-only: each load carries a 1/(1-n) copy (DchgS / DchgB),
+               ! which legacy forms at write time from the same accumulators
+               this%dchg_s(i, j) = this%susp_load(i, j)/(1.0_SP - this%n_porosity)
+               this%dchg_b(i, j) = this%bed_load(i, j)/(1.0_SP - this%n_porosity)
+
                if (this%zb(i, j) > this%zs(i, j)) this%zb(i, j) = this%zs(i, j)
             end do
          end do
@@ -1359,6 +1370,8 @@ contains
       if (allocated(this%depth_ini)) deallocate (this%depth_ini)
       if (allocated(this%susp_load)) deallocate (this%susp_load)
       if (allocated(this%bed_load)) deallocate (this%bed_load)
+      if (allocated(this%dchg_s)) deallocate (this%dchg_s)
+      if (allocated(this%dchg_b)) deallocate (this%dchg_b)
       if (allocated(this%zb_aval)) deallocate (this%zb_aval)
       if (allocated(this%aval_accum)) deallocate (this%aval_accum)
       if (allocated(this%mass_sed)) deallocate (this%mass_sed)
