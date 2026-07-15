@@ -80,18 +80,8 @@ contains
       type(type_model_main), intent(inout) :: model
       type(type_env), intent(inout) :: env
 
-      external :: run_legacy_2d  ! src/model/2d/old/legacy_runner.F
-
       call model%init_from_env(env)
-      if (model%simulation%engine == "legacy") then
-         ! Parity escape hatch (simulation: engine: legacy):
-         ! run_legacy_2d calls READ_INPUT (re-reads via model%init()
-         ! internally) to populate MODULE GLOBALs, then runs the full
-         ! legacy loop.  Default is the stepper engine since 6e.
-         call run_legacy_2d()
-      else
-         call model%run()
-      end if
+      call model%run()
       call model%finalize()
    end subroutine run_2d
 
