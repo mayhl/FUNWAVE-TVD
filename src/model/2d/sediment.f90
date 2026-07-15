@@ -173,10 +173,11 @@
 !            presence-tested here and the two live as parameters below.  The mud
 !            value is NOT inert: it sets k_s = 2.5 D50, and k_s is in the bed
 !            shear every cohesive cell is picked up by.
-!    NOTE 14: cohesive silently retires the bedload.  BedFluxX/Y are zeroed at
-!            the top of the pickup loop and the cohesive branch never refills
-!            them, so BedLoad = YES with CohesiveSediment = YES gives no bedload
-!            and no warning.  The bed then moves on the suspended load alone.
+!    NOTE 14: cohesive retires the bedload — mud does not bedload.  BedFluxX/Y
+!            are zeroed at the top of the pickup loop and the cohesive branch
+!            never refills them, so BedLoad = YES with CohesiveSediment = YES
+!            moves the bed on the suspended load alone; setup warns when both
+!            are set (sediment_read_input).
 !    NOTE 16: k_coh is inert.  It is documented as the diffusion coefficient but
 !            legacy assigns it to the molecular viscosity, whose only consumers
 !            (Dstar and the WS formula) are both non-cohesive-only.  Setting it
@@ -486,6 +487,10 @@ contains
                              default=DEF_SEDIMENT_BED_CHANGE)
       call sub_env%yaml%read("BedLoad", silent=no_key, val=this%bedload, &
                              default=DEF_SEDIMENT_BEDLOAD)
+      if (this%bedload .and. this%cohesive) then
+         call env%log%warning("sediment: BedLoad is ignored with CohesiveSediment on — "// &
+                              "mud has no bedload; the bed moves on suspended load alone")
+      end if
 
       ! absent means "follow the suspended-load threshold", so no default
       call sub_env%yaml%read("Shields_cr_bedload", silent=no_key, &
