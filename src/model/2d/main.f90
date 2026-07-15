@@ -658,7 +658,7 @@ contains
       class(type_model_main), intent(inout), target :: this
       type(type_output_manager), intent(inout) :: mgr
 
-      character(len=16) :: vars(24), prefs(24)
+      character(len=16) :: vars(40), prefs(40)
       character(len=8) :: stats(1)
       character(:), allocatable :: folder, fmt
       real(SP) :: dummy_coord(1)
@@ -714,8 +714,13 @@ contains
             call add_var(vars, prefs, nv, "sediment_c", "C")
             call add_var(vars, prefs, nv, "sediment_pickup", "Pick")
             call add_var(vars, prefs, nv, "sediment_depo", "Depo")
+            call add_var(vars, prefs, nv, "sediment_pavg", "Pavg")
+            call add_var(vars, prefs, nv, "sediment_davg", "Davg")
+            call add_var(vars, prefs, nv, "sediment_dchgs", "DchgS")
+            call add_var(vars, prefs, nv, "sediment_dchgb", "DchgB")
             call add_var(vars, prefs, nv, "sediment_bedfx", "BedFx")
             call add_var(vars, prefs, nv, "sediment_bedfy", "BedFy")
+            call add_var(vars, prefs, nv, "sediment_bedstr", "BedStr")
             call add_var(vars, prefs, nv, "sediment_aval", "Aval")
             call add_var(vars, prefs, nv, "sediment_avalac", "AvalAc")
             call add_var(vars, prefs, nv, "depth", "dep")

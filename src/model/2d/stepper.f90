@@ -760,6 +760,11 @@ contains
          call registry%register("sediment_depo", this%sediment%depo)
          call registry%register("sediment_bedfx", this%sediment%bed_flux_x)
          call registry%register("sediment_bedfy", this%sediment%bed_flux_y)
+         call registry%register("sediment_bedstr", this%sediment%tau_xy)
+         call registry%register("sediment_pavg", this%sediment%p_ave)
+         call registry%register("sediment_davg", this%sediment%d_ave)
+         call registry%register("sediment_dchgs", this%sediment%dchg_s)
+         call registry%register("sediment_dchgb", this%sediment%dchg_b)
          call registry%register("sediment_aval", this%sediment%zb_aval)
          call registry%register("sediment_avalac", this%sediment%aval_accum)
       end if
