@@ -194,7 +194,7 @@ SUBROUTINE READ_INPUT
    USE METEO_MODULE, ONLY: MeteoGausian, OUT_METEO, STORM_FILE, &
                            WindConstantField, WIND_FILE, WindForce, &
                            AirPressure, WindWaveInteraction, Cdw, &
-                           WindCrestPercent
+                           WindCrestPercent, WindHollandModel
 # endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
@@ -992,13 +992,17 @@ SUBROUTINE READ_INPUT
    ! fallbacks, are all resolved on the modern side).
    MeteoGausian        = model%meteo%meteo_gausian
    WindConstantField   = model%meteo%wind_constant_field
+   WindHollandModel    = model%meteo%wind_holland_model
    OUT_METEO           = model%meteo%out_meteo
    AirPressure         = model%meteo%air_pressure
    WindForce           = model%meteo%wind_force
    WindWaveInteraction = model%meteo%wind_wave_interaction
    Cdw                 = model%meteo%cdw
    WindCrestPercent    = model%meteo%wind_crest_percent
+   ! STORM_FILE is the module global shared by MeteoGausian and Holland (only
+   ! one track model runs at a time); seed it from whichever is active
    IF (model%meteo%meteo_gausian) STORM_FILE = model%meteo%gausian_file%root
+   IF (model%meteo%wind_holland_model) STORM_FILE = model%meteo%storm_file%root
    IF (model%meteo%wind_constant_field) WIND_FILE = model%meteo%constant_wind_file%root
 # endif
 

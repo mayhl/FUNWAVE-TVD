@@ -147,20 +147,7 @@ CONTAINS
 ! type of meteo
       ! constant wind field: WindConstantField is seeded by the io.F bridge
 
-      ! holland wind field
-      CALL READ_LOGICAL(WindHollandModel, FILE_NAME, 'WindHollandModel', ierr)
-      IF (ierr == 1) THEN
-         WindHollandModel = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'not WindHollandModel'
-            WRITE (3, '(A40)') 'not WindHollandModel'
-         end if
-# else
-         WRITE (*, '(A40)') 'not WindHollandModel'
-         WRITE (3, '(A40)') 'not WindHollandModel'
-# endif
-      END IF
+      ! holland wind field: WindHollandModel is seeded by the io.F bridge
 
       ! meteo gausian 2D: MeteoGausian is seeded by the io.F bridge from the
       ! modern meteo reader; the READ_LOGICAL that used to pull it out of
@@ -253,7 +240,6 @@ CONTAINS
       USE INPUT_READ
       IMPLICIT NONE
       CHARACTER(LEN=80)::FILE_NAME = ' '
-      CHARACTER(LEN=80)::STORM_FILE = ' '
       CHARACTER(LEN=80)::TMP_NAME = ' '
       INTEGER :: Ifile, ierr
       CHARACTER(LEN=80):: StormName
@@ -261,13 +247,7 @@ CONTAINS
 ! read storm from input.txt
       FILE_NAME = INPUT_FILE_NAME
 
-! storm file
-      CALL READ_STRING(STORM_FILE, FILE_NAME, 'STORM_FILE', ierr)
-# if defined (PARALLEL)
-      if (myid .eq. 0) WRITE (3, '(A15,A50)') 'STORM_FILE:', STORM_FILE
-# else
-      WRITE (3, '(A15,A50)') 'STORM_FILE:', STORM_FILE
-# endif
+! storm file: STORM_FILE is the module global seeded by the io.F bridge
 
       ALLOCATE (Xco(Mloc), Yco(Nloc))
 
