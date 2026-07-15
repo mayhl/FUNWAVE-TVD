@@ -493,6 +493,11 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         mt['WindHollandModel'] = True
         sf = pop_str('STORM_FILE')
         if sf: mt['STORM_FILE'] = sf
+    sm = pop_bool('SlideModel')
+    if sm:
+        mt['SlideModel'] = True
+        slf = pop_str('SLIDE_FILE')
+        if slf: mt['SLIDE_FILE'] = slf
     if mg or wcf or whm:
         # shared wind/pressure knobs (only meaningful when a model is on)
         for key, caster in (('WindForce', _bool), ('AirPressure', _bool),
