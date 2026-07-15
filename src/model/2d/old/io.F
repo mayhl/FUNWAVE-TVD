@@ -191,7 +191,10 @@ SUBROUTINE READ_INPUT
 # endif
 # if defined (METEO)
    ! ONLY guard: the module re-exports I/J and its GLOBAL imports
-   USE METEO_MODULE, ONLY: MeteoGausian, OUT_METEO, STORM_FILE
+   USE METEO_MODULE, ONLY: MeteoGausian, OUT_METEO, STORM_FILE, &
+                           WindConstantField, WIND_FILE, WindForce, &
+                           AirPressure, WindWaveInteraction, Cdw, &
+                           WindCrestPercent
 # endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
@@ -983,11 +986,20 @@ SUBROUTINE READ_INPUT
 
 # if defined (METEO)
    ! METEO_MODULE variables seeded from the modern reader, the READ calls in
-   ! mod_meteo.F stubbed out.  RUNG a bridges MeteoGausian only; the storm-track
-   ! file (STORM_FILE) stays the parity-shared input -- both engines read it.
-   MeteoGausian = model%meteo%meteo_gausian
-   OUT_METEO    = model%meteo%out_meteo
+   ! mod_meteo.F stubbed out.  The storm-track / wind-series files stay the
+   ! parity-shared inputs -- both engines read them.  RUNG a = MeteoGausian,
+   ! rung b = WindConstantField (the wind knobs, with their conditional
+   ! fallbacks, are all resolved on the modern side).
+   MeteoGausian        = model%meteo%meteo_gausian
+   WindConstantField   = model%meteo%wind_constant_field
+   OUT_METEO           = model%meteo%out_meteo
+   AirPressure         = model%meteo%air_pressure
+   WindForce           = model%meteo%wind_force
+   WindWaveInteraction = model%meteo%wind_wave_interaction
+   Cdw                 = model%meteo%cdw
+   WindCrestPercent    = model%meteo%wind_crest_percent
    IF (model%meteo%meteo_gausian) STORM_FILE = model%meteo%gausian_file%root
+   IF (model%meteo%wind_constant_field) WIND_FILE = model%meteo%constant_wind_file%root
 # endif
 
 END SUBROUTINE READ_INPUT

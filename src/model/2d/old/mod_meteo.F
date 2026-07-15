@@ -145,20 +145,7 @@ CONTAINS
 # endif
 
 ! type of meteo
-      ! constant wind field
-      CALL READ_LOGICAL(WindConstantField, FILE_NAME, 'WindConstantField', ierr)
-      IF (ierr == 1) THEN
-         WindConstantField = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'not constant wind field'
-            WRITE (3, '(A40)') 'not constant wind field'
-         end if
-# else
-         WRITE (*, '(A40)') 'not constant wind field'
-         WRITE (3, '(A40)') 'not constant wind field'
-# endif
-      END IF
+      ! constant wind field: WindConstantField is seeded by the io.F bridge
 
       ! holland wind field
       CALL READ_LOGICAL(WindHollandModel, FILE_NAME, 'WindHollandModel', ierr)
@@ -194,121 +181,12 @@ CONTAINS
 # endif
       END IF
 
-! ------------------ meteo gausian
-      IF (MeteoGausian) THEN
-         AirPressure = .TRUE.
-      END IF
-
-! -------------------wind and pressure---------------
-      IF (WindHollandModel .OR. WindConstantField) THEN
-
-         CALL READ_LOGICAL(WindWaveInteraction, &
-                           FILE_NAME, 'WindWaveInteraction', ierr)
-         IF (ierr == 1) THEN
-            WindWaveInteraction = .FALSE.
-# if defined (PARALLEL)
-            if (myid .eq. 0) THEN
-               WRITE (*, '(A40)') 'no WindWaveInteraction'
-               WRITE (3, '(A40)') 'no WindWaveInteraction'
-            end if
-# else
-            WRITE (*, '(A40)') 'no WindWaveInteraction'
-            WRITE (3, '(A40)') 'no WindWaveInteraction'
-# endif
-         END IF
-
-! air pressure
-         CALL READ_LOGICAL(AirPressure, FILE_NAME, 'AirPressure', ierr)
-
-         IF (ierr == 1) THEN
-            AirPressure = .FALSE.
-# if defined (PARALLEL)
-            if (myid .eq. 0) THEN
-               WRITE (*, '(A40)') 'NO air pressure effect'
-               WRITE (3, '(A40)') 'NO air pressure effect'
-            end if
-# else
-            WRITE (*, '(A40)') 'NO air pressure effect'
-            WRITE (3, '(A40)') 'NO air pressure effect'
-# endif
-         END IF
-
-! wind
-         CALL READ_LOGICAL(WindForce, FILE_NAME, 'WindForce', ierr)
-
-         IF (ierr == 1) THEN
-            IF (WindConstantField) THEN
-               WindForce = .TRUE.
-# if defined (PARALLEL)
-               if (myid .eq. 0) THEN
-                  WRITE (*, '(A80)') 'force set windforce=true because use windconstantfield'
-                  WRITE (3, '(A80)') 'force set windforce=true because use windconstantfield'
-               end if
-# else
-               WRITE (*, '(A80)') 'force set windforce=true because use windconstantfield'
-               WRITE (3, '(A80)') 'force set windforce=true because use windconstantfield'
-# endif
-            ELSE
-               WindForce = .FALSE.
-# if defined (PARALLEL)
-               if (myid .eq. 0) THEN
-                  WRITE (*, '(A40)') 'NO wind effect'
-                  WRITE (3, '(A40)') 'NO wind effect'
-               end if
-# else
-               WRITE (*, '(A40)') 'NO wind effect'
-               WRITE (3, '(A40)') 'NO wind effect'
-# endif
-            END IF ! end windconstantfield
-         END IF ! end ierr
-
-         IF (WindForce) THEN
-
-            CALL READ_FLOAT(Cdw, FILE_NAME, 'Cdw', ierr)
-            IF (ierr == 1) THEN
-               Cdw = 0.002_SP
-# if defined (PARALLEL)
-               if (myid .eq. 0) THEN
-                  WRITE (*, '(A40)') 'Cdw Default:  Cdw=0.002'
-                  WRITE (3, '(A40)') 'Cdw Default:  Cdw=0.002'
-               end if
-# else
-               WRITE (*, '(A40)') 'Cdw Default:  Cdw=0.002'
-               WRITE (3, '(A40)') 'Cdw Default:  Cdw=0.002'
-# endif
-            END IF  ! end ierr default
-
-            CALL READ_FLOAT(WindCrestPercent, FILE_NAME, 'WindCrestPercent', ierr)
-
-            IF (ierr == 1) THEN
-               WindCrestPercent = LARGE
-# if defined (PARALLEL)
-               if (myid .eq. 0) THEN
-                  WRITE (*, '(A40)') 'WindCrestPercent Default:  LARGE'
-                  WRITE (3, '(A40)') 'WindCrestPercent Default:  LARGE'
-               end if
-# else
-               WRITE (*, '(A40)') 'WindCrestPercent Default:  LARGE'
-               WRITE (3, '(A40)') 'WindCrestPercent Default:  LARGE'
-# endif
-            ELSE
-               IF (.NOT. WindWaveInteraction) THEN
-                  WindCrestPercent = LARGE
-               END IF
-
-            END IF ! end ierr windcrestpercent default
-
-# if defined (PARALLEL)
-            if (myid .eq. 0) WRITE (3, '(A7,F12.5)') 'Cdw = ', Cdw
-            if (myid .eq. 0) WRITE (3, '(A21,F12.5)') 'WindCrestPercent = ', WindCrestPercent
-# else
-            WRITE (3, '(A7,F12.5)') 'Cdw = ', Cdw
-            WRITE (3, '(A21,F12.5)') 'WindCrestPercent = ', WindCrestPercent
-# endif
-
-         END IF ! end windforce
-
-      END IF ! end wind and pressure
+! ------------------ wind and pressure knobs -----------------
+      ! WindWaveInteraction, AirPressure, WindForce, Cdw and WindCrestPercent
+      ! (and the MeteoGausian->AirPressure force) are all resolved in the modern
+      ! meteo reader -- including the WindForce and WindCrestPercent conditional
+      ! fallbacks -- and seeded here by the io.F bridge; the READ_* block that
+      ! used to pull them from input.txt is gone.
 ! ----------------------------------------------------
 
       IF (WindHollandModel) THEN
@@ -493,7 +371,7 @@ CONTAINS
 ! read storm from input.txt
       FILE_NAME = INPUT_FILE_NAME
 
-      CALL READ_STRING(WIND_FILE, FILE_NAME, 'CONSTANT_WIND_FILE', ierr)
+! WIND_FILE is now seeded by the io.F bridge from the modern reader
 
       INQUIRE (FILE=TRIM(WIND_FILE), EXIST=FILE_EXIST)
       IF (.NOT. FILE_EXIST) THEN
