@@ -93,7 +93,7 @@
 !-------------------------------------------------
 
 module model_meteo_mod
-   use core_constants_mod, only: SP, ZERO, SMALL, LARGE, PI, GRAV, RHO_AW
+   use core_constants_mod, only: SP, ZERO, SMALL, LARGE, PI, GRAV, RHO_AW, RHO_AIR
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
@@ -130,14 +130,18 @@ module model_meteo_mod
 
       type(type_path) :: gausian_file
       type(type_path) :: constant_wind_file
+      type(type_path) :: storm_file        ! Holland Pn/Pc/A/B track
 
       ! two-record storm-track bracket (legacy TimeStorm1/2, Xstorm1/2, ...).
-      ! NOTE 1: only t/x/y advance into the low slot; dp/sigx/sigy/th do not
+      ! NOTE 1: only t/x/y advance into the low slot; the shape params do not
       real(SP) :: t1 = ZERO, t2 = ZERO
       real(SP) :: x1 = ZERO, x2 = ZERO, y1 = ZERO, y2 = ZERO
       real(SP) :: dp1 = ZERO, dp2 = ZERO
       real(SP) :: sigx1 = ZERO, sigx2 = ZERO, sigy1 = ZERO, sigy2 = ZERO
       real(SP) :: th1 = ZERO, th2 = ZERO
+      ! Holland shape bracket (Pn/Pc/A/B); frozen after the first advance too
+      real(SP) :: pn1 = ZERO, pn2 = ZERO, pc1 = ZERO, pc2 = ZERO
+      real(SP) :: ast1 = ZERO, ast2 = ZERO, bst1 = ZERO, bst2 = ZERO
       integer :: unit_track = -1        ! -1 marks never-opened
       logical :: eof = .false.
 
@@ -241,6 +245,12 @@ contains
          if (no_key) error stop &
             "meteo: CONSTANT_WIND_FILE is required when WindConstantField is on"
       end if
+      if (this%wind_holland_model) then
+         call sub_env%yaml%read_input_path("STORM_FILE", silent=no_key, &
+                                           val=this%storm_file)
+         if (no_key) error stop &
+            "meteo: STORM_FILE is required when WindHollandModel is on"
+      end if
 
    end subroutine meteo_read_input
 
@@ -310,6 +320,7 @@ contains
 
       if (this%meteo_gausian) call gausian_setup(this)
       if (this%wind_constant_field) call constant_wind_setup(this)
+      if (this%wind_holland_model) call holland_setup(this)
 
    end subroutine meteo_init_compute
 
@@ -336,6 +347,30 @@ contains
       this%sigy1 = this%sigy2
       this%th1 = this%th2
    end subroutine gausian_setup
+
+   ! Open the Holland track, skip its three banner lines, read the first record
+   ! (Time, X, Y, Pn, Pc, A, B) into slot2, then copy ALL seven to slot1 (the
+   ! only place Pn/Pc/A/B ever reach the low slot -- NOTE 1).
+   subroutine holland_setup(this)
+      class(type_model_meteo), intent(inout) :: this
+      character(len=80) :: header
+
+      open (newunit=this%unit_track, file=this%storm_file%root, &
+            status='old', action='read')
+      read (this%unit_track, *) header                  ! title
+      read (this%unit_track, *) header                  ! storm name
+      read (this%unit_track, *) header                  ! column banner
+      read (this%unit_track, *) this%t2, this%x2, this%y2, &
+         this%pn2, this%pc2, this%ast2, this%bst2
+
+      this%t1 = this%t2
+      this%x1 = this%x2
+      this%y1 = this%y2
+      this%pn1 = this%pn2
+      this%pc1 = this%pc2
+      this%ast1 = this%ast2
+      this%bst1 = this%bst2
+   end subroutine holland_setup
 
    ! Open the wind file, read the record count and the (time, WU, WV) series.
    subroutine constant_wind_setup(this)
@@ -364,21 +399,22 @@ contains
    ! fields (eta/etax/etay/etat/etamean/h_max) feed only the wind-wave and
    ! crest-mask refinements (NOTE 7); MeteoGausian ignores them.
    ! ----------------------------------------------------------------
-   subroutine meteo_update(this, time, h, eta, etax, etay, etat, etamean, &
-                           h_max, min_depth_frc)
+   subroutine meteo_update(this, time, h, eta, etax, etay, etat, etamean, h_max)
       class(type_model_meteo), intent(inout) :: this
       real(SP), intent(in) :: time
       real(SP), intent(in) :: h(:, :), eta(:, :)
       real(SP), intent(in) :: etax(:, :), etay(:, :), etat(:, :)
       real(SP), intent(in) :: etamean(:, :), h_max(:, :)
-      real(SP), intent(in) :: min_depth_frc
 
       if (.not. this%is_activated) return
 
       if (this%meteo_gausian) call gausian_forcing(this, time, h)
       if (this%wind_constant_field) &
          call constant_wind_forcing(this, time, h, eta, etax, etay, etat, &
-                                    etamean, h_max, min_depth_frc)
+                                    etamean, h_max)
+      if (this%wind_holland_model) &
+         call holland_forcing(this, time, h, eta, etax, etay, etat, &
+                              etamean, h_max)
 
    end subroutine meteo_update
 
@@ -452,14 +488,13 @@ contains
    ! into a uniform wind, optionally adjust by the wave celerity, build the
    ! crest mask, then precompute the wind stress source.
    subroutine constant_wind_forcing(this, time, h, eta, etax, etay, etat, &
-                                    etamean, h_max, min_depth_frc)
+                                    etamean, h_max)
       class(type_model_meteo), intent(inout) :: this
       real(SP), intent(in) :: time, h(:, :), eta(:, :)
       real(SP), intent(in) :: etax(:, :), etay(:, :), etat(:, :)
       real(SP), intent(in) :: etamean(:, :), h_max(:, :)
-      real(SP), intent(in) :: min_depth_frc
 
-      real(SP) :: w2, t1, tmp1, celerity, angle
+      real(SP) :: w2, t1, celerity, angle
       integer :: i, j
 
       if (.not. this%wind_force) return
@@ -496,7 +531,99 @@ contains
          end do
       end if
 
-      ! crest mask (NOTE 7): everywhere on when WindCrestPercent == LARGE
+      call crest_mask(this, eta, h_max, etamean)
+      call wind_stress(this)
+
+   end subroutine constant_wind_forcing
+
+   ! Legacy Holland_Model_Forcing: one optional record advance (t/x/y only,
+   ! NOTE 1), linear-in-time blend of the Pn/Pc/A/B shape, then the radial
+   ! Holland pressure Pw and gradient wind Vw over the lattice.  Feeds both the
+   ! pressure path (if AirPressure) and the wind path (if WindForce).
+   subroutine holland_forcing(this, time, h, eta, etax, etay, etat, &
+                              etamean, h_max)
+      class(type_model_meteo), intent(inout) :: this
+      real(SP), intent(in) :: time, h(:, :), eta(:, :)
+      real(SP), intent(in) :: etax(:, :), etay(:, :), etat(:, :)
+      real(SP), intent(in) :: etamean(:, :), h_max(:, :)
+
+      real(SP) :: w1, w2, xs, ys, pn, pc, ast, bst
+      real(SP) :: rdis, expt, pw, vw, angle, t1, celerity, waveangle
+      integer :: i, j, ios
+
+      this%p_total = ZERO
+
+      if (.not. this%eof) then
+         if (time > this%t1 .and. time > this%t2) then
+            ! NOTE 1: only t/x/y move into the low slot; Pn/Pc/A/B do not
+            this%t1 = this%t2
+            this%x1 = this%x2
+            this%y1 = this%y2
+            read (this%unit_track, *, iostat=ios) this%t2, this%x2, this%y2, &
+               this%pn2, this%pc2, this%ast2, this%bst2
+            if (ios /= 0) this%eof = .true.
+         end if
+      end if
+
+      w2 = ZERO
+      w1 = ZERO
+      if (time > this%t1) then
+         if (this%t1 == this%t2) then
+            w2 = ZERO
+            w1 = ZERO
+         else
+            w2 = (this%t2 - time)/max(SMALL, abs(this%t2 - this%t1))
+            w1 = 1.0_SP - w2
+         end if
+      end if
+
+      xs = this%x2*w1 + this%x1*w2
+      ys = this%y2*w1 + this%y1*w2
+      pn = this%pn2*w1 + this%pn1*w2
+      pc = this%pc2*w1 + this%pc1*w2
+      ast = this%ast2*w1 + this%ast1*w2
+      bst = this%bst2*w1 + this%bst1*w2
+
+      ! Holland radial pressure (mb) and gradient wind (m/s), full lattice
+      do j = 1, this%nloc
+         do i = 1, this%mloc
+            rdis = sqrt((this%xco(i) - xs)**2 + (this%yco(j) - ys)**2)/1000.0_SP
+            rdis = max(SMALL, rdis)                        ! km
+            expt = exp(-ast/rdis**bst)
+            pw = pc + (pn - pc)*expt
+            if (this%air_pressure) this%p_total(i, j) = pw/100.0_SP   ! NOTE 3
+            if (this%wind_force) then
+               vw = sqrt(ast*bst*100.0_SP*abs(pn - pc)*expt/RHO_AIR/rdis**bst)
+               angle = atan2(this%xco(i) - xs, this%yco(j) - ys)
+               if (this%wind_wave_interaction) then
+                  t1 = max(sqrt(etax(i, j)*etax(i, j) + etay(i, j)*etay(i, j)), SMALL)
+                  celerity = min(abs(etat(i, j))/t1, sqrt(GRAV*abs(h(i, j))))
+                  waveangle = atan2(etay(i, j), etax(i, j))
+                  this%wind_u(i, j) = -vw*cos(angle) - celerity*cos(waveangle)
+                  this%wind_v(i, j) = vw*sin(angle) - celerity*sin(waveangle)
+               else
+                  this%wind_u(i, j) = -vw*cos(angle)
+                  this%wind_v(i, j) = vw*sin(angle)
+               end if
+            end if
+         end do
+      end do
+
+      if (this%wind_force) then
+         call crest_mask(this, eta, h_max, etamean)
+         call wind_stress(this)
+      end if
+      if (this%air_pressure) call pressure_gradient(this, h)
+
+   end subroutine holland_forcing
+
+   ! Crest-only wind mask (NOTE 7): everywhere on when WindCrestPercent == LARGE,
+   ! else off wherever the surface sits below the crest cutoff.
+   subroutine crest_mask(this, eta, h_max, etamean)
+      class(type_model_meteo), intent(inout) :: this
+      real(SP), intent(in) :: eta(:, :), h_max(:, :), etamean(:, :)
+      integer :: i, j
+
       this%mask_wind = 1
       if (this%wind_crest_percent /= LARGE) then
          do j = 1, this%nloc
@@ -506,10 +633,7 @@ contains
             end do
          end do
       end if
-
-      call wind_stress(this)
-
-   end subroutine constant_wind_forcing
+   end subroutine crest_mask
 
    ! -g H grad(P) into the pressure source, centred on the scalar dx/dy.
    subroutine pressure_gradient(this, h)
