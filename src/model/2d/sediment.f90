@@ -122,12 +122,6 @@
 !    SedimentMomentEXG:  <bool>    exchanged momentum,           default NO
 !
 !  Legacy quirks kept:
-!    NOTE 1: the y-diffusion loop never recomputes ustar_c — it reads the
-!            value the x-diffusion loop left in the module-SAVE scalar at
-!            its last wet cell, so k4 mixes a local ustar_c4 with a bed
-!            shear velocity from somewhere else entirely.  Reproduced by
-!            keeping ustar_c a component (legacy SAVE), not a local: on the
-!            first call, before any wet cell, it is the initialised zero.
 !    NOTE 2: the deposition loop runs to Iend+1/Jend+1, one cell past the
 !            interior every other loop in the file stops at.  The extra
 !            column/row is never read back, but D carries it.
@@ -390,10 +384,6 @@ module model_sediment_mod
       ! its running total
       real(SP), allocatable :: zb_aval(:, :), aval_accum(:, :)
       real(SP) :: t_aval = ZERO
-
-      ! Legacy SAVE scalar, deliberately NOT a local: the y-diffusion loop
-      ! reads it stale across loops and across calls (header NOTE 1)
-      real(SP) :: ustar_c = ZERO
 
    contains
       procedure :: read_input => sediment_read_input
@@ -773,8 +763,8 @@ contains
    !   $$ k = \tfrac{5.93}{4}(u_{*,i-1} + u_{*,i})(h_{i-1} + h_{i}), \qquad
    !      F_i \mathrel{-}= k\,\frac{h_{i-1}+h_{i}}{2}\,
    !          \frac{CH_i - CH_{i-1}}{\Delta x} $$
-   ! ustar_c is the module-SAVE scalar of header NOTE 1: computed in the x
-   ! sweep, read (never rewritten) by the y sweep.
+   ! ustar_c is computed locally on each face: the x sweep at cell (i,j), the
+   ! y sweep at (i,j) again, so k2/k4 each average the two cells they straddle.
    ! ----------------------------------------------------------------
    subroutine sediment_diffuse(this, lp, inv_dx, inv_dy, mask, u, v, prop_on, upc)
       class(type_model_sediment), intent(inout) :: this
@@ -789,19 +779,19 @@ contains
       real(SP), intent(in) :: upc(:, :)
 
       integer :: i, j
-      real(SP) :: ustar_c2, ustar_c4, k2, k4
+      real(SP) :: ustar_c, ustar_c_j, ustar_c2, ustar_c4, k2, k4
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie + 1
             if (mask(i, j) > 0) then
-               this%ustar_c = shear_velocity(this, u(i, j), v(i, j), this%hpo(i, j))
-               if (prop_on) this%ustar_c = this%ustar_c + upc(i, j)
+               ustar_c = shear_velocity(this, u(i, j), v(i, j), this%hpo(i, j))
+               if (prop_on) ustar_c = ustar_c + upc(i, j)
 
                if (mask(i - 1, j) > 0) then
                   ustar_c2 = shear_velocity(this, u(i - 1, j), v(i - 1, j), &
                                             this%hpo(i - 1, j))
                   if (prop_on) ustar_c2 = ustar_c2 + upc(i - 1, j)
-                  k2 = K_DIFF*(ustar_c2 + this%ustar_c) &
+                  k2 = K_DIFF*(ustar_c2 + ustar_c) &
                        *(this%hpo(i - 1, j) + this%hpo(i, j))/4.0_SP
                   this%scal_x(i, j) = this%scal_x(i, j) &
                                       - k2*(this%hpo(i - 1, j) + this%hpo(i, j)) &
@@ -819,8 +809,9 @@ contains
                   ustar_c4 = shear_velocity(this, u(i, j - 1), v(i, j - 1), &
                                             this%hpo(i, j - 1))
                   if (prop_on) ustar_c4 = ustar_c4 + upc(i, j - 1)
-                  ! NOTE 1: ustar_c is whatever the x sweep left behind
-                  k4 = K_DIFF*(ustar_c4 + this%ustar_c) &
+                  ustar_c_j = shear_velocity(this, u(i, j), v(i, j), this%hpo(i, j))
+                  if (prop_on) ustar_c_j = ustar_c_j + upc(i, j)
+                  k4 = K_DIFF*(ustar_c4 + ustar_c_j) &
                        *(this%hpo(i, j) + this%hpo(i, j - 1))/4.0_SP
                   this%scal_y(i, j) = this%scal_y(i, j) &
                                       - k4*(this%hpo(i, j - 1) + this%hpo(i, j)) &
