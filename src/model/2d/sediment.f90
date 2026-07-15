@@ -177,10 +177,6 @@
 !            the top of the pickup loop and the cohesive branch never refills
 !            them, so BedLoad = YES with CohesiveSediment = YES gives no bedload
 !            and no warning.  The bed then moves on the suspended load alone.
-!    NOTE 15: cohesive deposition goes NEGATIVE above Tau_crd_coh — Pd = 1 -
-!            tau/tau_crd is unbounded below — so D turns into a second erosion
-!            term stacked on top of the pickup, and the residual's P - D adds
-!            them instead of opposing them.  Legacy does not clamp it; kept.
 !    NOTE 16: k_coh is inert.  It is documented as the diffusion coefficient but
 !            legacy assigns it to the molecular viscosity, whose only consumers
 !            (Dstar and the WS formula) are both non-cohesive-only.  Setting it
@@ -1047,8 +1043,8 @@ contains
    ! the near-bed mass concentration, and hinders on the shear rather than on
    ! the concentration:
    !   $$ w_s = \frac{a\,c_b^{\,n}}{(c_b^2 + b^2)^m}, \qquad c_b = c\,s\,\rho_w $$
-   !   $$ D = w_s\,c\,\left(1 - \frac{\tau}{\tau_{cr,d}}\right) $$
-   ! which goes negative above tau_crd and erodes instead (header NOTE 15).
+   !   $$ D = w_s\,c\,\max\!\left(0,\ 1 - \frac{\tau}{\tau_{cr,d}}\right) $$
+   ! clamped at zero: deposition below tau_crd, none above (Krone).
    !
    ! Loop bounds are legacy's, one cell past the interior (header NOTE 2).
    ! ----------------------------------------------------------------
@@ -1071,7 +1067,9 @@ contains
                   c_b = this%ch(i, j)*this%sdensity*RHO_WATER
                   ws_floc = this%a_coh*c_b**this%n_coh &
                             /max(SMALL, (c_b**2 + this%b_coh**2)**this%m_coh)
-                  p_d = 1.0_SP - this%tau_xy(i, j)/max(this%tau_crd_coh, SMALL)
+                  ! deposition below the critical stress, zero above (Krone):
+                  ! never a sign-flipped erosion term
+                  p_d = max(ZERO, 1.0_SP - this%tau_xy(i, j)/max(this%tau_crd_coh, SMALL))
                   this%depo(i, j) = ws_floc*this%ch(i, j)*p_d
                else
                   gamma_cao = min(CAO_GAMMA_MAX, &
