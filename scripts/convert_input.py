@@ -474,6 +474,21 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     if cf:
         out['coupling'] = {'coupling_file': cf}
 
+    # ---- meteo (atmospheric forcing) ---------------------------------------
+    # rung a: MeteoGausian only.  Legacy key names are preserved verbatim so
+    # both engines round-trip the same identifiers.
+    mt: dict = {}
+    mg = pop_bool('MeteoGausian')
+    if mg:
+        mt['MeteoGausian'] = True
+        gf = pop_str('METEO_GAUSIAN_FILE')
+        if gf: mt['METEO_GAUSIAN_FILE'] = gf
+    om = pop('OUT_METEO')
+    if om is not None:
+        mt['OUT_METEO'] = _bool(om)
+    if mt:
+        out['meteo'] = mt
+
     # ---- collect unknown keys ----------------------------------------------
     for k in params:
         if k not in consumed:
