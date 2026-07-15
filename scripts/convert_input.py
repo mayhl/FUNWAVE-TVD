@@ -488,7 +488,12 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         mt['WindConstantField'] = True
         cwf = pop_str('CONSTANT_WIND_FILE')
         if cwf: mt['CONSTANT_WIND_FILE'] = cwf
-    if mg or wcf:
+    whm = pop_bool('WindHollandModel')
+    if whm:
+        mt['WindHollandModel'] = True
+        sf = pop_str('STORM_FILE')
+        if sf: mt['STORM_FILE'] = sf
+    if mg or wcf or whm:
         # shared wind/pressure knobs (only meaningful when a model is on)
         for key, caster in (('WindForce', _bool), ('AirPressure', _bool),
                             ('WindWaveInteraction', _bool), ('Cdw', _auto),
