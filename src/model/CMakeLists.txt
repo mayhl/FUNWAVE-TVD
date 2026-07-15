@@ -9,7 +9,7 @@ set_target_properties(
   ${main_lib}_model PROPERTIES Fortran_MODULE_DIRECTORY
                                "${CMAKE_BINARY_DIR}/modules/model")
 
-# Expose model modules to dependents (legacy old/ code)
+# Expose model modules to dependents (the exe and unit tests)
 target_include_directories(
   ${main_lib}_model PUBLIC
   "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/model>"

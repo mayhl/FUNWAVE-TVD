@@ -15,14 +15,7 @@ set(_new_libs ${main_lib}_core ${main_lib}_model)
 add_library(${main_lib} INTERFACE)
 list(APPEND all_targets ${_new_libs})
 
-# NOTE: Temporary hack to not compile old code
-if(ENABLE_DEV_MODE)
-  target_link_libraries(${main_lib} INTERFACE ${_new_libs})
-else()
-  add_subdirectory(model/2d/old)
-  target_link_libraries(${main_lib}_old PRIVATE ${_new_libs})
-  list(APPEND all_targets ${main_lib}_old)
-endif()
+target_link_libraries(${main_lib} INTERFACE ${_new_libs})
 
 set(all_targets
     "${all_targets}"

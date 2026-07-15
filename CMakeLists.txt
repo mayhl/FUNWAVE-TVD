@@ -127,10 +127,9 @@ if(NOT ENABLE_DEV_MODE)
   add_executable(${exe_name} ${PROJECT_SOURCE_DIR}/app/main.f90)
   target_include_directories(
     ${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules"
-                        "${CMAKE_BINARY_DIR}/modules/model"
-                        "${CMAKE_BINARY_DIR}/modules/old")
+                        "${CMAKE_BINARY_DIR}/modules/model")
   target_compile_definitions(${exe_name} PRIVATE ${MODULE_FLAGS})
-  target_link_libraries(${exe_name} PRIVATE ${main_lib} ${main_lib}_old)
+  target_link_libraries(${exe_name} PRIVATE ${main_lib})
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
