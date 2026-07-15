@@ -21,6 +21,7 @@ target_sources(${main_lib}_model PRIVATE
    tracer.f90
    vessel.f90
    sediment.f90
+   meteo.f90
    wavemaker.f90
    sponge.f90
    obstacle.f90
