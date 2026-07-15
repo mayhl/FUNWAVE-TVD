@@ -1008,6 +1008,83 @@ parameters:
     default:      true
     latex:        ~
 
+  - name:         wind_constant_field
+    legacy_name:  WindConstantField
+    yaml_path:    "meteo.WindConstantField"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         constant_wind_file
+    legacy_name:  CONSTANT_WIND_FILE
+    yaml_path:    "meteo.CONSTANT_WIND_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         wind_holland_model
+    legacy_name:  WindHollandModel
+    yaml_path:    "meteo.WindHollandModel"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         storm_file
+    legacy_name:  STORM_FILE
+    yaml_path:    "meteo.STORM_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         slide_model
+    legacy_name:  SlideModel
+    yaml_path:    "meteo.SlideModel"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         slide_file
+    legacy_name:  SLIDE_FILE
+    yaml_path:    "meteo.SLIDE_FILE"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         wind_force
+    legacy_name:  WindForce
+    yaml_path:    "meteo.WindForce"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         air_pressure
+    legacy_name:  AirPressure
+    yaml_path:    "meteo.AirPressure"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         wind_wave_interaction
+    legacy_name:  WindWaveInteraction
+    yaml_path:    "meteo.WindWaveInteraction"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         cdw
+    legacy_name:  Cdw
+    yaml_path:    "meteo.Cdw"
+    units:        ~
+    default:      0.002
+    latex:        ~
+
+  - name:         wind_crest_percent
+    legacy_name:  WindCrestPercent
+    yaml_path:    "meteo.WindCrestPercent"
+    units:        ~
+    default:      999999.0
+    latex:        ~
+
   # ── subgrid (legacy mod_subgrid.F) ─────────────────────────────────────────
   - name:         depth_subgrid_file
     legacy_name:  DEPTH_SUBGRID_FILE

@@ -40,8 +40,16 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_HOT_START_OUTPUT_START_NUMBER = "0"
    character(*), parameter :: DEF_HOT_START_TIME = "0.0"
    ! ── meteo ──
+   character(*), parameter :: DEF_METEO_AIRPRESSURE = "NO"
+   character(*), parameter :: DEF_METEO_CDW = "0.002"
    character(*), parameter :: DEF_METEO_METEOGAUSIAN = "NO"
    character(*), parameter :: DEF_METEO_OUT_METEO = "YES"
+   character(*), parameter :: DEF_METEO_SLIDEMODEL = "NO"
+   character(*), parameter :: DEF_METEO_WINDCONSTANTFIELD = "NO"
+   character(*), parameter :: DEF_METEO_WINDCRESTPERCENT = "999999.0"
+   character(*), parameter :: DEF_METEO_WINDFORCE = "NO"
+   character(*), parameter :: DEF_METEO_WINDHOLLANDMODEL = "NO"
+   character(*), parameter :: DEF_METEO_WINDWAVEINTERACTION = "NO"
    ! ── numerics ──
    character(*), parameter :: DEF_NUMERICS_ARRTIMEMINH = "0.001"
    character(*), parameter :: DEF_NUMERICS_FROUDECAP = "3.0"
