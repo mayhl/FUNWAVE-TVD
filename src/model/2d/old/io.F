@@ -189,6 +189,10 @@ SUBROUTINE READ_INPUT
    USE MOD_FOAM, ONLY: PLOT_INTV_FOAM, f_source, FoamTimeScale, &
                        BurstTimeNonBreaking, MinThick, CdFoam
 # endif
+# if defined (METEO)
+   ! ONLY guard: the module re-exports I/J and its GLOBAL imports
+   USE METEO_MODULE, ONLY: MeteoGausian, OUT_METEO, STORM_FILE
+# endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
 # if defined(INTEL)
@@ -975,6 +979,15 @@ SUBROUTINE READ_INPUT
    SedimentMassSource = model%sediment%mass_source
    SedimentMomentDC   = model%sediment%moment_dc
    SedimentMomentEXG  = model%sediment%moment_exg
+# endif
+
+# if defined (METEO)
+   ! METEO_MODULE variables seeded from the modern reader, the READ calls in
+   ! mod_meteo.F stubbed out.  RUNG a bridges MeteoGausian only; the storm-track
+   ! file (STORM_FILE) stays the parity-shared input -- both engines read it.
+   MeteoGausian = model%meteo%meteo_gausian
+   OUT_METEO    = model%meteo%out_meteo
+   IF (model%meteo%meteo_gausian) STORM_FILE = model%meteo%gausian_file%root
 # endif
 
 END SUBROUTINE READ_INPUT

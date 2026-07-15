@@ -94,6 +94,9 @@ MODULE METEO_MODULE
                                              StormPressureX, StormPressureY
    REAL(SP), DIMENSION(:), ALLOCATABLE ::  Xco, Yco
    LOGICAL :: OUT_METEO = .TRUE.
+   ! promoted from a MeteoGausian_Setup local so the io.F bridge can seed it
+   ! from the modern reader (the READ_STRING that used to fill it is gone)
+   CHARACTER(LEN=80) :: STORM_FILE = ' '
 !    REAL(SP):: PLOT_INTV_STORM,PLOT_COUNT_STORM
 ! slide
    REAL(SP) :: LengthSlide, WidthSlide, AlphaSlide, BetaSlide, PSlide, epsilon
@@ -172,20 +175,9 @@ CONTAINS
 # endif
       END IF
 
-      ! meteo gausian 2D
-      CALL READ_LOGICAL(MeteoGausian, FILE_NAME, 'MeteoGausian', ierr)
-      IF (ierr == 1) THEN
-         MeteoGausian = .FALSE.
-# if defined (PARALLEL)
-         if (myid .eq. 0) THEN
-            WRITE (*, '(A40)') 'not use MeteoGausian'
-            WRITE (3, '(A40)') 'not use MeteoGausian'
-         end if
-# else
-         WRITE (*, '(A40)') 'not use MeteoGausian'
-         WRITE (3, '(A40)') 'not use MeteoGausian'
-# endif
-      END IF
+      ! meteo gausian 2D: MeteoGausian is seeded by the io.F bridge from the
+      ! modern meteo reader; the READ_LOGICAL that used to pull it out of
+      ! input.txt is gone (the modern YAML path is the single source now)
 
       ! slide model
       CALL READ_LOGICAL(SlideModel, FILE_NAME, 'SlideModel', ierr)
@@ -341,7 +333,7 @@ CONTAINS
          CALL Slide_Model_Setup
       END IF
 
-      CALL READ_LOGICAL(OUT_METEO, FILE_NAME, 'OUT_METEO', ierr)
+      ! OUT_METEO is seeded by the io.F bridge from the modern reader
 
    End SUBROUTINE METEO_INITIAL
 
@@ -942,7 +934,6 @@ CONTAINS
       USE INPUT_READ
       IMPLICIT NONE
       CHARACTER(LEN=80)::FILE_NAME = ' '
-      CHARACTER(LEN=80)::STORM_FILE = ' '
       CHARACTER(LEN=80)::TMP_NAME = ' '
       INTEGER :: Ifile, ierr
       CHARACTER(LEN=80):: StormName
@@ -950,8 +941,8 @@ CONTAINS
 ! read storm from input.txt
       FILE_NAME = INPUT_FILE_NAME
 
-! storm file
-      CALL READ_STRING(STORM_FILE, FILE_NAME, 'METEO_GAUSIAN_FILE', ierr)
+! storm file: STORM_FILE is now a module global seeded by the io.F bridge
+! from the modern reader; the READ_STRING that used to fill it is gone
 # if defined (PARALLEL)
       if (myid .eq. 0) WRITE (3, '(A15,A50)') 'STORM_FILE:', STORM_FILE
 # else
