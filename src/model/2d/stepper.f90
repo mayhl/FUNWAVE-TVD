@@ -658,7 +658,9 @@ contains
                                       f%mask, f%eta, f%depth, f%u, f%v, &
                                       this%fws%p, this%fws%q, f%h, &
                                       this%breaking%roller, &
-                                      this%undertow_u, this%undertow_v)
+                                      this%undertow_u, this%undertow_v, &
+                                      this%vessel%is_activated .and. this%vessel%propeller, &
+                                      prop_upc(this), prop_up(this), prop_vp(this))
          end if
 
          if (this%run_breaker) then
@@ -1156,6 +1158,43 @@ contains
          s => this%zeros
       end if
    end function sed_exg_y
+
+   ! Propeller jet velocities the sediment bed-shear reads (sediment.f90 NOTE
+   ! 22): the vessel's fields when the propeller is on, zeros otherwise.  The
+   ! arrays only exist when the propeller allocated them, so the off case must
+   ! point at zeros -- the prop_on gate makes the sediment skip the add anyway.
+   function prop_upc(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%vessel%is_activated .and. this%vessel%propeller) then
+         s => this%vessel%upc_total
+      else
+         s => this%zeros
+      end if
+   end function prop_upc
+
+   function prop_up(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%vessel%is_activated .and. this%vessel%propeller) then
+         s => this%vessel%up_total
+      else
+         s => this%zeros
+      end if
+   end function prop_up
+
+   function prop_vp(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (this%vessel%is_activated .and. this%vessel%propeller) then
+         s => this%vessel%vp_total
+      else
+         s => this%zeros
+      end if
+   end function prop_vp
 
    subroutine stepper_free(this)
       class(type_model_stepper_2d), intent(inout) :: this
