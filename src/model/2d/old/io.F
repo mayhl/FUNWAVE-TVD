@@ -194,7 +194,8 @@ SUBROUTINE READ_INPUT
    USE METEO_MODULE, ONLY: MeteoGausian, OUT_METEO, STORM_FILE, &
                            WindConstantField, WIND_FILE, WindForce, &
                            AirPressure, WindWaveInteraction, Cdw, &
-                           WindCrestPercent, WindHollandModel
+                           WindCrestPercent, WindHollandModel, &
+                           SlideModel, SLIDE_FILE
 # endif
 !    USE TIME_SPECTRA_MODULE
 ![jychoi added this for intel compiler 14.12.23
@@ -993,6 +994,7 @@ SUBROUTINE READ_INPUT
    MeteoGausian        = model%meteo%meteo_gausian
    WindConstantField   = model%meteo%wind_constant_field
    WindHollandModel    = model%meteo%wind_holland_model
+   SlideModel          = model%meteo%slide_model
    OUT_METEO           = model%meteo%out_meteo
    AirPressure         = model%meteo%air_pressure
    WindForce           = model%meteo%wind_force
@@ -1004,6 +1006,7 @@ SUBROUTINE READ_INPUT
    IF (model%meteo%meteo_gausian) STORM_FILE = model%meteo%gausian_file%root
    IF (model%meteo%wind_holland_model) STORM_FILE = model%meteo%storm_file%root
    IF (model%meteo%wind_constant_field) WIND_FILE = model%meteo%constant_wind_file%root
+   IF (model%meteo%slide_model) SLIDE_FILE = model%meteo%slide_file%root
 # endif
 
 END SUBROUTINE READ_INPUT
