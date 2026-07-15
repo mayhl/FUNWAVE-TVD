@@ -513,11 +513,14 @@ contains
                                     f%eta, f%eta0, f%depth, f%h)
          end if
 
-         ! storm pressure field + its gradient forcing (legacy METEO_FORCING,
-         ! right after VESSEL_FORCING and before the RK loop, at the
-         ! already-advanced TIME; forces off the current total depth H)
+         ! storm pressure + wind stress (legacy METEO_FORCING, right after
+         ! VESSEL_FORCING and before the RK loop, at the already-advanced TIME;
+         ! forces off the current H, and the wave-envelope fields hold the
+         ! previous step's values -- the legacy cadence, meteo.f90 NOTE 7)
          if (istage == 1 .and. this%meteo%is_activated) then
-            call this%meteo%update(time, f%h)
+            call this%meteo%update(time, f%h, f%eta, this%etax, this%etay, &
+                                   this%etat, this%means%etamean, f%h_max, &
+                                   num%MinDepthFrc)
          end if
 
          if (phy%dispersion) call run_dispersion(this, dt)
@@ -564,7 +567,7 @@ contains
 
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
                           phy%coriolis_on, this%obstacle%breakwater, &
-                          ves_drag_on(this), &
+                          ves_drag_on(this), meteo_wind_on(this), &
                           f%mask, f%mask9, this%inv_dx, this%inv_dy, &
                           f%depth, this%depth_fx, this%depth_fy, &
                           f%eta, f%h, f%u, f%v, &
@@ -578,6 +581,7 @@ contains
                           cor_f(this), bw_cd(this), wm_cd(this), &
                           ves_cd(this), ves_px(this), ves_py(this), &
                           meteo_px(this), meteo_py(this), &
+                          meteo_wsx(this), meteo_wsy(this), &
                           num%MinDepthFrc, this%src_x, this%src_y)
 
          call cal_rk_update(lp, RK_ALPHA(istage), RK_BETA(istage), dt, &
@@ -753,8 +757,11 @@ contains
          call registry%register("eta_foam_max", this%foam%eta_foam_max)
       end if
 
-      ! legacy OUTPUT_METEO writes StormPressureTotal_ under OUT_METEO
-      if (this%meteo%is_activated .and. this%meteo%meteo_gausian) then
+      ! legacy OUTPUT_METEO writes StormPressureTotal_ (Pstorm_) under OUT_METEO
+      ! for every spatial pressure model (Gausian/Holland/Slide); a wind-only
+      ! field has no pressure array to register
+      if (this%meteo%is_activated .and. (this%meteo%meteo_gausian &
+                                         .or. this%meteo%wind_holland_model .or. this%meteo%slide_model)) then
          call registry%register("meteo_pressure", this%meteo%p_total)
       end if
 
@@ -1126,13 +1133,14 @@ contains
    end function ves_flux
 
    ! ── meteo accessors ────────────────────────────────────────────────
-   ! Storm-pressure momentum source -g H grad(P): the module's gradient when
-   ! MeteoGausian is on, zeros otherwise (an inactive meteo adds exact zero).
+   ! Storm-pressure momentum source -g H grad(P): the module's gradient when the
+   ! pressure path is on (legacy AirPressure), zeros otherwise (an inactive or
+   ! wind-only meteo adds exact zero).
    function meteo_px(this) result(p)
       class(type_model_stepper_2d), intent(in), target :: this
       real(SP), pointer :: p(:, :)
 
-      if (this%meteo%is_activated .and. this%meteo%meteo_gausian) then
+      if (this%meteo%is_activated .and. this%meteo%air_pressure) then
          p => this%meteo%p_x
       else
          p => this%zeros
@@ -1143,12 +1151,42 @@ contains
       class(type_model_stepper_2d), intent(in), target :: this
       real(SP), pointer :: p(:, :)
 
-      if (this%meteo%is_activated .and. this%meteo%meteo_gausian) then
+      if (this%meteo%is_activated .and. this%meteo%air_pressure) then
          p => this%meteo%p_y
       else
          p => this%zeros
       end if
    end function meteo_py
+
+   ! Wind stress momentum source (legacy WindForce gate): the precomputed
+   ! stress when a wind model drives the flow, zeros otherwise.
+   function meteo_wind_on(this) result(on)
+      class(type_model_stepper_2d), intent(in) :: this
+      logical :: on
+      on = this%meteo%is_activated .and. this%meteo%wind_force
+   end function meteo_wind_on
+
+   function meteo_wsx(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (meteo_wind_on(this)) then
+         s => this%meteo%wind_sx
+      else
+         s => this%zeros
+      end if
+   end function meteo_wsx
+
+   function meteo_wsy(this) result(s)
+      class(type_model_stepper_2d), intent(in), target :: this
+      real(SP), pointer :: s(:, :)
+
+      if (meteo_wind_on(this)) then
+         s => this%meteo%wind_sy
+      else
+         s => this%zeros
+      end if
+   end function meteo_wsy
 
    ! Sediment feedback into the flow's residual: the module's arrays when it
    ! is on, zeros otherwise.  The switches are separate dummies — when one is

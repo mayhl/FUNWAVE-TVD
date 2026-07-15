@@ -55,17 +55,17 @@ contains
    !      += order after every other term.
    ! ----------------------------------------------------------------
    subroutine cal_sources(lp, gamma1, gamma2, dispersion, coriolis_on, &
-                          breakwater_on, vessel_drag_on, mask, mask9, inv_dx, inv_dy, &
+                          breakwater_on, vessel_drag_on, wind_on, mask, mask9, inv_dx, inv_dy, &
                           depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                           u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                           wavemaker_mass, cd, nu_vis, coriolis, &
                           cd_breakwater, cd_wavemaker, cd_vessel, ves_px, ves_py, &
-                          meteo_px, meteo_py, &
+                          meteo_px, meteo_py, wind_sx, wind_sy, &
                           min_depth_frc, src_x, src_y)
       type(type_loop_bounds), intent(in)  :: lp
       real(SP), intent(in)  :: gamma1, gamma2
       logical, intent(in)  :: dispersion, coriolis_on, breakwater_on
-      logical, intent(in)  :: vessel_drag_on
+      logical, intent(in)  :: vessel_drag_on, wind_on
       integer, intent(in)  :: mask(:, :), mask9(:, :)
       real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)  :: depth(:, :), depth_x(:, :), depth_y(:, :)
@@ -79,6 +79,7 @@ contains
       real(SP), intent(in)  :: cd_wavemaker(:, :)
       real(SP), intent(in)  :: cd_vessel(:, :), ves_px(:, :), ves_py(:, :)
       real(SP), intent(in)  :: meteo_px(:, :), meteo_py(:, :)
+      real(SP), intent(in)  :: wind_sx(:, :), wind_sy(:, :)
       real(SP), intent(in)  :: min_depth_frc
       real(SP), intent(out) :: src_x(:, :), src_y(:, :)
 
@@ -161,6 +162,14 @@ contains
                              - cd_breakwater(i, j)*u(i, j)*spd*depth(i, j)
                src_y(i, j) = src_y(i, j) &
                              - cd_breakwater(i, j)*v(i, j)*spd*depth(i, j)
+            end if
+
+            ! wind stress (legacy sources.F:348-357, right after the breakwater
+            ! term inside the loop); wind_sx/wind_sy carry the full precomputed
+            ! mask*rho*Cd*W|W| product so the add matches legacy bit-for-bit
+            if (wind_on) then
+               src_x(i, j) = src_x(i, j) + wind_sx(i, j)
+               src_y(i, j) = src_y(i, j) + wind_sy(i, j)
             end if
 
          end do

@@ -714,9 +714,11 @@ contains
                call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
             end if
          end if
-         ! legacy OUTPUT_METEO writes Pstorm_ under OUT_METEO (io.F:1718)
-         if (this%meteo%is_activated .and. this%meteo%meteo_gausian &
-             .and. this%meteo%out_meteo) then
+         ! legacy OUTPUT_METEO writes Pstorm_ under OUT_METEO for every spatial
+         ! pressure model (io.F:1709-1726); wind-only fields have no Pstorm
+         if (this%meteo%is_activated .and. this%meteo%out_meteo &
+             .and. (this%meteo%meteo_gausian .or. this%meteo%wind_holland_model &
+                    .or. this%meteo%slide_model)) then
             call add_var(vars, prefs, nv, "meteo_pressure", "Pstorm")
          end if
          ! legacy writes its sediment fields straight out of PREVIEW, ungated
