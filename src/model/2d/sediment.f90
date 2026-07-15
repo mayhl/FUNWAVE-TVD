@@ -220,6 +220,18 @@
 !            on, and the flow solver then reads only the ones whose switch is
 !            set.  Kept: it costs one array of arithmetic and keeps the branch
 !            structure where legacy put it.
+!    NOTE 22: the propeller jet feeds the sediment through the bed shear, at
+!            three sites: it adds its shear velocity onto the log-law u_* used
+!            in the diffusivity, adds its dynamic head onto tau in the pickup,
+!            and swings the bedload onto the total (flow + jet) velocity:
+!              $$ u_* \mathrel{+}= u_{*p}, \quad
+!                 \tau \mathrel{+}= u_{*p}^2, \quad
+!                 \phi = \mathrm{atan2}(v + v_p,\, u + u_p). $$
+!            Legacy guards them with the PROPELLER && VESSEL compile flags; the
+!            modern gate prop_on is true only when the vessel is active with the
+!            propeller on, so a propeller-off run is bitwise the pre-coupling
+!            path.  The jet velocities come from the vessel module (its upc/up/
+!            vp totals), passed in by the stepper.
 !
 !  Legacy config NOT ported: Kappa1 / Kappa2 are read, echoed to the log and
 !  never used in any formula.  Mask_s is allocated and zeroed but never read —
@@ -636,7 +648,8 @@ contains
    ! ----------------------------------------------------------------
    subroutine sediment_update(this, bc, grid, alpha, beta, dt, gamma3, min_depth, &
                               inv_dx, inv_dy, mask, eta, depth, u, v, &
-                              p_face, q_face, h, roller, undertow_u, undertow_v)
+                              p_face, q_face, h, roller, undertow_u, undertow_v, &
+                              prop_on, upc, up, vp)
       class(type_model_sediment), intent(inout) :: this
       type(type_model_bc), intent(in) :: bc
       type(type_grid_2d), intent(in) :: grid
@@ -651,6 +664,10 @@ contains
       real(SP), intent(inout) :: h(:, :)
       logical, intent(in) :: roller
       real(SP), intent(in) :: undertow_u(:, :), undertow_v(:, :)
+      ! NOTE 22: propeller jet bed-shear coupling -- prop_on true only when the
+      ! vessel is active with the propeller on, upc/up/vp its jet velocities
+      logical, intent(in) :: prop_on
+      real(SP), intent(in) :: upc(:, :), up(:, :), vp(:, :)
 
       if (.not. this%is_activated) return
 
@@ -659,12 +676,12 @@ contains
 
       call sediment_advect(this, grid%lp, mask, p_face, q_face, roller, &
                            undertow_u, undertow_v)
-      call sediment_diffuse(this, grid%lp, inv_dx, inv_dy, mask, u, v)
+      call sediment_diffuse(this, grid%lp, inv_dx, inv_dy, mask, u, v, prop_on, upc)
       call sediment_flux_bc(this, grid, mask)
       call sediment_solve(this, grid%lp, alpha, beta, dt, inv_dx, inv_dy, mask)
       call bc%exchange_scalar(grid, this%ch)
 
-      call sediment_pickup(this, grid%lp, mask, u, v, h)
+      call sediment_pickup(this, grid%lp, mask, u, v, h, prop_on, upc, up, vp)
       ! the morphology's divergence reads i+-1 / j+-1, so the cell-centred
       ! bedload flux has to carry its ghosts
       if (this%bedload) then
@@ -753,12 +770,17 @@ contains
    ! ustar_c is the module-SAVE scalar of header NOTE 1: computed in the x
    ! sweep, read (never rewritten) by the y sweep.
    ! ----------------------------------------------------------------
-   subroutine sediment_diffuse(this, lp, inv_dx, inv_dy, mask, u, v)
+   subroutine sediment_diffuse(this, lp, inv_dx, inv_dy, mask, u, v, prop_on, upc)
       class(type_model_sediment), intent(inout) :: this
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in) :: inv_dx(:, :), inv_dy(:, :)
       integer, intent(in) :: mask(:, :)
       real(SP), intent(in) :: u(:, :), v(:, :)
+      ! NOTE 22: the propeller jet's bed-shear velocity, added onto the log-law
+      ! u_* at each cell (legacy PROPELLER && VESSEL).  prop_on gates the add so
+      ! propeller-off is bitwise the pre-e2 path — upc is zeros then anyway
+      logical, intent(in) :: prop_on
+      real(SP), intent(in) :: upc(:, :)
 
       integer :: i, j
       real(SP) :: ustar_c2, ustar_c4, k2, k4
@@ -767,10 +789,12 @@ contains
          do i = lp%ib, lp%ie + 1
             if (mask(i, j) > 0) then
                this%ustar_c = shear_velocity(this, u(i, j), v(i, j), this%hpo(i, j))
+               if (prop_on) this%ustar_c = this%ustar_c + upc(i, j)
 
                if (mask(i - 1, j) > 0) then
                   ustar_c2 = shear_velocity(this, u(i - 1, j), v(i - 1, j), &
                                             this%hpo(i - 1, j))
+                  if (prop_on) ustar_c2 = ustar_c2 + upc(i - 1, j)
                   k2 = K_DIFF*(ustar_c2 + this%ustar_c) &
                        *(this%hpo(i - 1, j) + this%hpo(i, j))/4.0_SP
                   this%scal_x(i, j) = this%scal_x(i, j) &
@@ -788,6 +812,7 @@ contains
                if (mask(i, j - 1) > 0) then
                   ustar_c4 = shear_velocity(this, u(i, j - 1), v(i, j - 1), &
                                             this%hpo(i, j - 1))
+                  if (prop_on) ustar_c4 = ustar_c4 + upc(i, j - 1)
                   ! NOTE 1: ustar_c is whatever the x sweep left behind
                   k4 = K_DIFF*(ustar_c4 + this%ustar_c) &
                        *(this%hpo(i, j) + this%hpo(i, j - 1))/4.0_SP
@@ -905,11 +930,15 @@ contains
    !      P = E\left(\frac{\tau}{\tau_{cr}} - 1\right) $$
    ! and takes the bedload with it (header NOTE 14).
    ! ----------------------------------------------------------------
-   subroutine sediment_pickup(this, lp, mask, u, v, h)
+   subroutine sediment_pickup(this, lp, mask, u, v, h, prop_on, upc, up, vp)
       class(type_model_sediment), intent(inout) :: this
       type(type_loop_bounds), intent(in) :: lp
       integer, intent(in) :: mask(:, :)
       real(SP), intent(in) :: u(:, :), v(:, :), h(:, :)
+      ! NOTE 22: the propeller jet raises tau by upc^2 in the bed-shear, and
+      ! swings the bedload direction onto the total (flow + jet) velocity
+      logical, intent(in) :: prop_on
+      real(SP), intent(in) :: upc(:, :), up(:, :), vp(:, :)
 
       integer :: i, j
       real(SP) :: u_c, c_b, c_a, reduction, angle_cur, bedf
@@ -927,6 +956,7 @@ contains
                this%tau_xy(i, j) = 0.16_SP &
                                    /(1.0_SP + log(this%k_s/(30.0_SP*this%hpo(i, j))))**2 &
                                    *(u_c**2.0_SP)
+               if (prop_on) this%tau_xy(i, j) = this%tau_xy(i, j) + upc(i, j)**2.0_SP
 
                if (this%cohesive) then
 
@@ -974,7 +1004,11 @@ contains
 
                   if (this%bedload) then
                      if (this%tau_xy(i, j) > this%tau_cr_bedload) then
-                        angle_cur = atan2(v(i, j), u(i, j))
+                        if (prop_on) then
+                           angle_cur = atan2(v(i, j) + vp(i, j), u(i, j) + up(i, j))
+                        else
+                           angle_cur = atan2(v(i, j), u(i, j))
+                        end if
                         bedf = MPM_COEF &
                                *(this%tau_xy(i, j) - this%tau_cr_bedload)**1.5_SP &
                                /GRAV/(this%sdensity - 1.0_SP)
