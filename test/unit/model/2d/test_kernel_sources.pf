@@ -93,11 +93,11 @@ contains
       eta = ETA0
 
       coriolis = 0.0_SP;  depth = 10.0_SP;  cd_bw = 0.0_SP
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -141,11 +141,11 @@ contains
       u  = U0
 
       coriolis = 0.0_SP;  depth = 10.0_SP;  cd_bw = 0.0_SP
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -189,11 +189,11 @@ contains
       u = U0;  v = V0
 
       coriolis = 0.0_SP;  depth = 10.0_SP;  cd_bw = 0.0_SP
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       ! friction off (cd=0), bathy flat: src = wavemaker mass term - drag on |UV|
       do j = lp%jb, lp%je
@@ -243,11 +243,11 @@ contains
       p = 0.0_SP;  q = 0.0_SP
 
       coriolis = 0.0_SP;  depth = 10.0_SP;  cd_bw = 0.0_SP
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -292,11 +292,11 @@ contains
       p = P0;  q = Q0
       coriolis = F0;  depth = 10.0_SP;  cd_bw = 0.0_SP
 
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .true., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .true., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -306,11 +306,11 @@ contains
       end do
 
       ! gated off: identical inputs contribute nothing
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -355,11 +355,11 @@ contains
       coriolis = 0.0_SP;  depth = D0;  cd_bw = CBW
       u = U0
 
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .true., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .true., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
@@ -369,11 +369,11 @@ contains
       end do
 
       ! gated off: identical inputs contribute nothing
-      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
+      call cal_sources(lp, 0.0_SP, 0.0_SP, .false., .false., .false., .false., .false., mask, mask9, inv_dx, inv_dy, &
                        depth, depth_x, depth_y, eta, h, u, v, p, q, hu, hv, &
                        u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3, &
                        wavemaker_mass, cd, nu_vis, coriolis, cd_bw, &
-                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
+                       zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, zero2d, MIN_DEPTH_FRC, src_x, src_y)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
