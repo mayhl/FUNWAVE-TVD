@@ -707,16 +707,6 @@ contains
                                   this%in_wm_zone, f%nu_break)
          end if
 
-         ! foam rides the breaker output (legacy FOAM_* between
-         ! WAVE_BREAKING and EXCHANGE, so it reads the pre-exchange
-         ! nu_break/age ghosts).  One-way: nothing below reads it back,
-         ! and it steps the FULL dt every stage (foam.f90 NOTE 1)
-         if (this%foam%is_activated) then
-            call this%foam%update(this%grid, dt, this%dx, this%dy, &
-                                  this%inv_dx, this%inv_dy, &
-                                  f%u, f%v, f%nu_break, f%age_break)
-         end if
-
          call this%bc%exchange_state(this%grid, f)
 
          call this%wavemaker%apply_boundary(this%grid, istage, dt, time, &
@@ -848,10 +838,21 @@ contains
 
       ! legacy TRACK_XY: outside the RK loop, between MIXING_STUFF and
       ! MAX_MIN_PROPERTY, so the trackers advect on the completed step's
-      ! u/v with the full dt (unlike foam, which sits inside the stages)
+      ! u/v with the full dt (like foam below)
       if (this%tracer%is_activated) then
          call this%tracer%update(this%grid, time, this%dt_step, &
                                  this%fields%u, this%fields%v, this%fields%mask)
+      end if
+
+      ! foam: one-way diagnostic, stepped ONCE per completed step like the
+      ! trackers (was per RK stage in legacy — the 3x-dt bug, fixed at the
+      ! cord cut).  Reads the last stage's breaker output (nu_break/age) and
+      ! the completed step's u/v.
+      if (this%foam%is_activated) then
+         call this%foam%update(this%grid, this%dt_step, this%dx, this%dy, &
+                               this%inv_dx, this%inv_dy, &
+                               this%fields%u, this%fields%v, &
+                               this%fields%nu_break, this%fields%age_break)
       end if
 
       call update_max_min(this, time)

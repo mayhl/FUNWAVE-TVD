@@ -28,10 +28,11 @@
 !  WAVE_BREAKING and EXCHANGE.
 !
 !  Bug-for-bug notes vs legacy:
-!    1. NOTE: foam is integrated INSIDE the RK stage loop but steps with
-!       the FULL dt, so it advances 3 dt per timestep — the foam clock
-!       runs 3x fast against the wave clock.  Ported as-is: the stepper
-!       calls update() once per stage with the step dt
+!    1. FIXED (cord cut): foam is a one-way diagnostic, so the stepper
+!       calls update() ONCE per timestep from its post_step hook (beside
+!       the trackers) with the full step dt.  Legacy called it every RK
+!       stage with the full dt, advancing 3 dt per timestep — the foam
+!       clock ran 3x fast against the wave clock
 !    2. NOTE: the flux stage reads the ghost eta_foam/u_foam/v_foam left
 !       by the PREVIOUS stage's bc (halo + wall), so foam is always one
 !       stage behind at the halo, exactly as legacy
@@ -178,8 +179,9 @@ contains
    end subroutine foam_init_compute
 
    ! ----------------------------------------------------------------
-   ! One stage: legacy FOAM_FLUX -> FOAM_UPDATE -> FOAM_BC, in that
-   ! order.  `dt` is the full step dt every stage (header NOTE 1).
+   ! One foam step: FOAM_FLUX -> FOAM_UPDATE -> FOAM_BC, in that order.
+   ! Called ONCE per timestep from the stepper's post_step hook with the
+   ! full step dt (header NOTE 1 — was per RK stage in legacy).
    ! ----------------------------------------------------------------
    ! dx/dy/inv_dx/inv_dy are the GHOST-INCLUSIVE spacing arrays the stepper
    ! owns (grid%dx is interior-only), same as the breaker takes.
