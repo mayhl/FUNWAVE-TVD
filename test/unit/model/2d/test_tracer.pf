@@ -172,12 +172,12 @@ contains
       @assertEqual(3.25_SP, tr%x_track(1), TOL)
    end subroutine test_t_start_gates_motion
 
-   ! The wet-cell revert counts vertex 2 TWICE and vertex 3 never (tracer.f90
-   ! NOTE 1).  Vertex 3 wet but 1 and 2 dry therefore sums to 0 and the
-   ! tracker is dragged back — where a correct mask sum would let it through.
-   ! This pins the legacy typo; if the sum is ever "fixed", this test fails.
+   ! The wet-cell revert sums all three triangle vertices (tracer.f90 NOTE 1).
+   ! With vertices 1 and 2 dry but vertex 3 WET the sum clears 1, so the move
+   ! is kept — exercising that vertex 3 IS read (the fixed legacy typo, which
+   ! double-counted vertex 2 and dropped vertex 3).
    @test
-   subroutine test_dry_revert_ignores_vertex3()
+   subroutine test_dry_revert_reads_vertex3()
       type(type_model_tracer) :: tr
       type(type_grid_2d) :: grid
       real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
@@ -195,17 +195,40 @@ contains
       mask = 1
       mask(5, 4) = 0     ! vertex 1 dry
       mask(6, 4) = 0     ! vertex 2 dry
-      mask(5, 5) = 1     ! vertex 3 WET — but the typo never reads it
+      mask(5, 5) = 1     ! vertex 3 WET — now read, so the move is kept
+
+      call tr%update(grid, 1.0_SP, 1.0_SP, u, v, mask)
+
+      ! move kept because vertex 3 is wet
+      @assertEqual(3.4_SP, tr%x_track(1), TOL)
+   end subroutine test_dry_revert_reads_vertex3
+
+   ! All three triangle vertices dry: the sum is 0, so the tracker is dragged
+   ! back to its pre-move position.
+   @test
+   subroutine test_dry_revert_all_vertices_dry()
+      type(type_model_tracer) :: tr
+      type(type_grid_2d) :: grid
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+
+      call make_tracer(tr, grid, 1, [3.0_SP], [0.5_SP])
+      call tracer_locate(tr, grid)
+
+      u = 0.4_SP
+      v = 0.0_SP
+      mask = 1
+      mask(5, 4) = 0     ! vertex 1 dry
+      mask(6, 4) = 0     ! vertex 2 dry
+      mask(5, 5) = 0     ! vertex 3 dry
 
       call tr%update(grid, 1.0_SP, 1.0_SP, u, v, mask)
 
       ! dragged back to its pre-move position
       @assertEqual(3.0_SP, tr%x_track(1), TOL)
-   end subroutine test_dry_revert_ignores_vertex3
+   end subroutine test_dry_revert_all_vertices_dry
 
-   ! Control for the above: with vertex 1 wet the sum clears 1, so the same
-   ! move is kept.  Together the pair shows the revert reads vertices 1 and 2
-   ! only.
+   ! Control: with vertex 1 wet the sum clears 1, so the move is kept.
    @test
    subroutine test_wet_cell_keeps_move()
       type(type_model_tracer) :: tr

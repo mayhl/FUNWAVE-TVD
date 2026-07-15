@@ -28,9 +28,10 @@
 !    <x> <y> <t_start> <layer>     x NumTracker
 !
 !  Legacy quirks kept:
-!    NOTE 1: the wet-cell revert test counts vertex 2 TWICE and vertex 3
-!            never (a copy-paste typo in the legacy MASK sum), so a tracker
-!            is held back only when vertices 1 and 2 are both dry.
+!    NOTE 1: FIXED (cord cut) — the wet-cell revert now sums all three
+!            triangle vertices.  Legacy counted vertex 2 TWICE and vertex 3
+!            never (a copy-paste typo in the MASK sum), holding a tracker
+!            back only when vertices 1 and 2 were both dry.
 !    NOTE 2: a tracker lost by the search is re-searched exactly once, over
 !            identical state, so the retry always fails; it then sets
 !            stop_search and freezes at its last position for the rest of
@@ -417,10 +418,11 @@ contains
       do i = 1, this%n_tracker
          if (.not. this%in_cell(i)) cycle
 
-         ! NOTE 1: vertex 2 is counted twice and vertex 3 never — legacy typo
+         ! NOTE 1: revert only when all three triangle vertices are dry
+         ! (legacy typo double-counted vertex 2 and dropped vertex 3)
          if (mask(this%nx1(i), this%ny1(i)) &
              + mask(this%nx2(i), this%ny2(i)) &
-             + mask(this%nx2(i), this%ny2(i)) < 1) then
+             + mask(this%nx3(i), this%ny3(i)) < 1) then
             this%nx1(i) = this%nx1_pre(i); this%ny1(i) = this%ny1_pre(i)
             this%nx2(i) = this%nx2_pre(i); this%ny2(i) = this%ny2_pre(i)
             this%nx3(i) = this%nx3_pre(i); this%ny3(i) = this%ny3_pre(i)
