@@ -10,12 +10,6 @@ executables:
   central:
     cmake_flags: [ZERO_PHASE=ON]
     ref: 2d
-  vessel:
-    cmake_flags: [USE_VESSEL=ON, ZERO_PHASE=ON]
-    ref: 2d
-  vessel-sediment:
-    cmake_flags: [USE_VESSEL=ON, USE_SEDIMENT=ON, ZERO_PHASE=ON]
-    ref: 2d
 
   # ── 3D  (ref: vendor/3d-fd) ───────────────────────────────────────────
   central-3d:
