@@ -8,6 +8,7 @@
 !  Wavemaker taxonomy — three distinct integration points in the engine:
 !    * initial-condition types (INI_SOLITARY, INI_REC/GAU/DIP, N_WAVE):
 !      one-shot state fill at t=0 via apply_ic(); no per-step work.
+!      Configured via the initial: section, not wavemaker.type.
 !    * internal source types (WK_REG, WK_IRR, TMA_1D/JON_1D/JON_2D,
 !      WK_TIME, WK_NEW_*): continuous generation — init_compute derives
 !      the generation coefficients, update_source refreshes the mass
@@ -19,7 +20,16 @@
 !      JON spectrum live (apply_boundary per stage); the DATA
 !      (WaveCompFile) spectrum and LEF_SOL are pending.
 !
-!  YAML block: wavemaker:       (top-level; omit for no wavemaker)
+!  YAML block: initial:         (initial-condition types, nee INI_*/N_WAVE;
+!                                block presence selects the type)
+!    water_level: <length>      default 0 — PORT GAP, non-zero gates pending
+!    solitary:  {amplitude, depth, x_center, direction: +x|-x}
+!    sine_mode: {amplitude, depth, mode_x (default 1), mode_y (default 0)}
+!    hump:      pending (INI_REC/GAU/DIP not in apply_ic yet)
+!    n_wave:    pending
+!
+!  YAML block: wavemaker:       (top-level; omit for no wavemaker;
+!                                cannot combine with initial: yet)
 !    type: <string>             default 'nothing'
 !    --- shared position/ramp ---
 !    Xc_WK: <length>
@@ -28,19 +38,8 @@
 !    Time_ramp: <time>          default 0
 !    Delta_WK: <length>         default 0.5
 !    Ywidth_WK: <length>        default 999999 (= no limit)
-!    --- solitary / initial IC ---
-!    AMP: <length>              AMP_SOLI
-!    mode_x: <int>              MODE_X, default 1 (INI_SINE x basin mode)
-!    mode_y: <int>              MODE_Y, default 0 (INI_SINE y basin mode; 0 = 1D)
-!    DEP: <length>              DEP_SOLI
+!    --- boundary solitary (LEF_SOL) ---
 !    LAGTIME: <time>            LAG_SOLI, default 0
-!    XWAVEMAKER: <length>
-!    SolitaryPositiveDirection: <bool>  default YES
-!    Xc: <length>
-!    Yc: <length>               default 0
-!    WID: <length>
-!    --- N-wave ---
-!    x1_Nwave, x2_Nwave, a0_Nwave, gamma_Nwave, dep_Nwave
 !    --- regular (WK_REG) ---
 !    Tperiod: <time>
 !    AMP_WK: <length>
@@ -78,29 +77,34 @@ module model_wavemaker_mod
    use model_base_mod, only: type_model_base
    use model_tide_mod, only: type_model_tide
 
-   use model_config_defaults_mod, only: DEF_WAVEMAKER_A0_NWAVE, DEF_WAVEMAKER_ALPHA_C, &
-                                        DEF_WAVEMAKER_AMP, DEF_WAVEMAKER_AMP_WK, &
+   use model_config_defaults_mod, only: DEF_INITIAL_SINE_MODE_AMPLITUDE, &
+                                        DEF_INITIAL_SINE_MODE_DEPTH, &
+                                        DEF_INITIAL_SINE_MODE_MODE_X, &
+                                        DEF_INITIAL_SINE_MODE_MODE_Y, &
+                                        DEF_INITIAL_SOLITARY_AMPLITUDE, &
+                                        DEF_INITIAL_SOLITARY_DEPTH, &
+                                        DEF_INITIAL_SOLITARY_DIRECTION, &
+                                        DEF_INITIAL_SOLITARY_X_CENTER, &
+                                        DEF_INITIAL_WATER_LEVEL, &
+                                        DEF_WAVEMAKER_ALPHA_C, &
+                                        DEF_WAVEMAKER_AMP_WK, &
                                         DEF_WAVEMAKER_A_SPONGE_WAVEMAKER, &
-                                        DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP, &
-                                        DEF_WAVEMAKER_DEP_NWAVE, DEF_WAVEMAKER_DEP_WK, &
+                                        DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP_WK, &
                                         DEF_WAVEMAKER_EQUALENERGY, &
                                         DEF_WAVEMAKER_ETA_LIMITER, DEF_WAVEMAKER_FREQMAX, &
                                         DEF_WAVEMAKER_FREQMIN, DEF_WAVEMAKER_FREQPEAK, &
-                                        DEF_WAVEMAKER_GAMMATMA, DEF_WAVEMAKER_GAMMA_NWAVE, &
+                                        DEF_WAVEMAKER_GAMMATMA, &
                                         DEF_WAVEMAKER_HMO, DEF_WAVEMAKER_LAGTIME, &
                                         DEF_WAVEMAKER_NFREQ, DEF_WAVEMAKER_NTHETA, &
                                         DEF_WAVEMAKER_NUMWAVECOMP, DEF_WAVEMAKER_PEAKPERIOD, &
                                         DEF_WAVEMAKER_R_SPONGE_WAVEMAKER, &
                                         DEF_WAVEMAKER_SIGMA_THETA, &
-                                        DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION, &
                                         DEF_WAVEMAKER_THETAPEAK, DEF_WAVEMAKER_THETA_WK, &
                                         DEF_WAVEMAKER_TIME_RAMP, DEF_WAVEMAKER_TPERIOD, &
                                         DEF_WAVEMAKER_TYPE, &
-                                        DEF_WAVEMAKER_WAVE_DATA_TYPE, DEF_WAVEMAKER_WID, &
+                                        DEF_WAVEMAKER_WAVE_DATA_TYPE, &
                                         DEF_WAVEMAKER_WIDTHWAVEMAKER, &
-                                        DEF_WAVEMAKER_X1_NWAVE, DEF_WAVEMAKER_X2_NWAVE, &
-                                        DEF_WAVEMAKER_XC, DEF_WAVEMAKER_XC_WK, &
-                                        DEF_WAVEMAKER_XWAVEMAKER, DEF_WAVEMAKER_YC, &
+                                        DEF_WAVEMAKER_XC_WK, &
                                         DEF_WAVEMAKER_YC_WK, DEF_WAVEMAKER_YWIDTH_WK
 
    implicit none
@@ -246,14 +250,29 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_wm, no_key
+      logical :: no_wm, no_key, has_initial
 
       this%wavemaker_type = "nothing"
+      call wavemaker_read_initial(this, env, has_initial)
+
       sub_env = get_sub_env(env, "wavemaker", is_empty=no_wm)
-      this%is_activated = .not. no_wm
-      if (.not. this%is_activated) return
+      this%is_activated = has_initial .or. .not. no_wm
+      if (no_wm) return
+
+      if (has_initial) then
+         ! single-slot machinery: the IC fills wavemaker_type, so a
+         ! wavemaker: section cannot coexist until the wavemaker refactor
+         call env%log%exit_on_error( &
+            "wavemaker: cannot combine with an initial: condition yet")
+      end if
 
       call sub_env%yaml%read("type", val=this%wavemaker_type, default=DEF_WAVEMAKER_TYPE)
+      select case (trim(this%wavemaker_type))
+      case ("INI_SOLITARY", "INI_SOL", "INI_SINE", "INI_REC", "INI_GAU", &
+            "INI_DIP", "N_WAVE")
+         call env%log%exit_on_error("wavemaker/type: initial-condition types"// &
+                                    " moved to the initial: section")
+      end select
 
       ! Shared position / depth / ramp
       call sub_env%yaml%read("Xc_WK", silent=no_key, val=this%Xc_WK, default=DEF_WAVEMAKER_XC_WK)
@@ -263,27 +282,8 @@ contains
       call sub_env%yaml%read("Delta_WK", silent=no_key, val=this%Delta_WK, default=DEF_WAVEMAKER_DELTA_WK)
       call sub_env%yaml%read("Ywidth_WK", silent=no_key, val=this%Ywidth_WK, default=DEF_WAVEMAKER_YWIDTH_WK)
 
-      ! Solitary
-      call sub_env%yaml%read("AMP", silent=no_key, val=this%AMP_SOLI, default=DEF_WAVEMAKER_AMP)
-      call sub_env%yaml%read("mode_x", silent=no_key, val=this%MODE_X, default="1")
-      call sub_env%yaml%read("mode_y", silent=no_key, val=this%MODE_Y, default="0")
-      call sub_env%yaml%read("DEP", silent=no_key, val=this%DEP_SOLI, default=DEF_WAVEMAKER_DEP)
+      ! Boundary-solitary lag (LEF_SOL)
       call sub_env%yaml%read("LAGTIME", silent=no_key, val=this%LAG_SOLI, default=DEF_WAVEMAKER_LAGTIME)
-      call sub_env%yaml%read("XWAVEMAKER", silent=no_key, val=this%XWAVEMAKER, default=DEF_WAVEMAKER_XWAVEMAKER)
-      call sub_env%yaml%read("SolitaryPositiveDirection", silent=no_key, &
-                             val=this%SolitaryPositiveDirection, default=DEF_WAVEMAKER_SOLITARYPOSITIVEDIRECTION)
-
-      ! Initial condition
-      call sub_env%yaml%read("Xc", silent=no_key, val=this%Xc, default=DEF_WAVEMAKER_XC)
-      call sub_env%yaml%read("Yc", silent=no_key, val=this%Yc, default=DEF_WAVEMAKER_YC)
-      call sub_env%yaml%read("WID", silent=no_key, val=this%WID, default=DEF_WAVEMAKER_WID)
-
-      ! N-wave
-      call sub_env%yaml%read("x1_Nwave", silent=no_key, val=this%x1_Nwave, default=DEF_WAVEMAKER_X1_NWAVE)
-      call sub_env%yaml%read("x2_Nwave", silent=no_key, val=this%x2_Nwave, default=DEF_WAVEMAKER_X2_NWAVE)
-      call sub_env%yaml%read("a0_Nwave", silent=no_key, val=this%a0_Nwave, default=DEF_WAVEMAKER_A0_NWAVE)
-      call sub_env%yaml%read("gamma_Nwave", silent=no_key, val=this%gamma_Nwave, default=DEF_WAVEMAKER_GAMMA_NWAVE)
-      call sub_env%yaml%read("dep_Nwave", silent=no_key, val=this%dep_Nwave, default=DEF_WAVEMAKER_DEP_NWAVE)
 
       ! Regular wave
       call sub_env%yaml%read("Tperiod", silent=no_key, val=this%Tperiod, default=DEF_WAVEMAKER_TPERIOD)
@@ -332,6 +332,85 @@ contains
       this%WaveMakerCurrentBalance = .not. no_key
 
    end subroutine wavemaker_read_input
+
+   ! ----------------------------------------------------------------
+   ! initial: section (nee wavemaker INI_*/N_WAVE) — block presence
+   ! selects the IC type; the blocks fill the same single-slot
+   ! wavemaker machinery until the wavemaker refactor.  solitary +
+   ! sine_mode are live in apply_ic; hump + n_wave gate pending.
+   ! water_level is a PORT GAP: legacy added it to Depth/DEP_WK/Dep_Ser
+   ! (old init.F:807-810) and the modern engine never wired it.
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_read_initial(this, env, has_initial)
+      use core_yaml_file_mod, only: type_yaml_reader
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_env), intent(inout), target :: env
+      logical, intent(out) :: has_initial
+
+      type(type_env) :: ini_env
+      type(type_yaml_reader) :: blk_yaml
+      character(:), allocatable :: direction
+      real(SP) :: water_level
+      logical :: no_ini, no_blk, no_key
+
+      has_initial = .false.
+      ini_env = get_sub_env(env, "initial", no_ini)
+      if (no_ini) return
+
+      call ini_env%yaml%read("water_level", silent=no_key, val=water_level, &
+                             default=DEF_INITIAL_WATER_LEVEL)
+      if (water_level /= 0.0_SP) then
+         call env%log%exit_on_error("initial/water_level: pending — the"// &
+                                    " legacy still-water offset is not wired yet")
+      end if
+
+      blk_yaml = ini_env%yaml%cast_dictionary("solitary", no_blk)
+      if (.not. no_blk) then
+         has_initial = .true.
+         this%wavemaker_type = "INI_SOLITARY"
+         call blk_yaml%read("amplitude", silent=no_key, val=this%AMP_SOLI, &
+                            default=DEF_INITIAL_SOLITARY_AMPLITUDE)
+         call blk_yaml%read("depth", silent=no_key, val=this%DEP_SOLI, &
+                            default=DEF_INITIAL_SOLITARY_DEPTH)
+         call blk_yaml%read("x_center", silent=no_key, val=this%XWAVEMAKER, &
+                            default=DEF_INITIAL_SOLITARY_X_CENTER)
+         call blk_yaml%read("direction", silent=no_key, val=direction, &
+                            default=DEF_INITIAL_SOLITARY_DIRECTION)
+         select case (trim(direction))
+         case ("+x")
+            this%SolitaryPositiveDirection = .true.
+         case ("-x")
+            this%SolitaryPositiveDirection = .false.
+         case default
+            call env%log%exit_on_error( &
+               "initial/solitary/direction: expected +x or -x")
+         end select
+      end if
+
+      blk_yaml = ini_env%yaml%cast_dictionary("sine_mode", no_blk)
+      if (.not. no_blk) then
+         if (has_initial) call env%log%exit_on_error( &
+            "initial: only one initial-condition block allowed")
+         has_initial = .true.
+         this%wavemaker_type = "INI_SINE"
+         call blk_yaml%read("amplitude", silent=no_key, val=this%AMP_SOLI, &
+                            default=DEF_INITIAL_SINE_MODE_AMPLITUDE)
+         call blk_yaml%read("depth", silent=no_key, val=this%DEP_SOLI, &
+                            default=DEF_INITIAL_SINE_MODE_DEPTH)
+         call blk_yaml%read("mode_x", silent=no_key, val=this%MODE_X, &
+                            default=DEF_INITIAL_SINE_MODE_MODE_X)
+         call blk_yaml%read("mode_y", silent=no_key, val=this%MODE_Y, &
+                            default=DEF_INITIAL_SINE_MODE_MODE_Y)
+      end if
+
+      blk_yaml = ini_env%yaml%cast_dictionary("hump", no_blk)
+      if (.not. no_blk) call env%log%exit_on_error( &
+         "initial/hump: pending — INI_REC/GAU/DIP are not ported to apply_ic yet")
+      blk_yaml = ini_env%yaml%cast_dictionary("n_wave", no_blk)
+      if (.not. no_blk) call env%log%exit_on_error( &
+         "initial/n_wave: pending — N_WAVE is not ported to apply_ic yet")
+
+   end subroutine wavemaker_read_initial
 
    ! ----------------------------------------------------------------
    ! Internal-source wavemaker setup (legacy WAVEMAKER_INITIALIZATION,

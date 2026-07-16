@@ -119,11 +119,6 @@ _VAR_FLAGS: dict[str, str] = {
 
 _WK_PARAMS: dict[str, list[str]] = {
     'LEF_SOL':      ['AMP', 'DEP', 'LAGTIME'],
-    'INI_SOL':      ['AMP', 'DEP', 'XWAVEMAKER'],
-    'INI_SOLITARY': ['AMP', 'DEP', 'XWAVEMAKER'],
-    'INI_REC': ['Xc', 'Yc', 'WID', 'AMP'],
-    'INI_Gau': ['AMP', 'Xc', 'Yc', 'WID', 'GauRadius'],
-    'INI_SINE': ['AMP', 'mode_x', 'mode_y'],
     'WK_REG': [
         'Xc_WK', 'Yc_WK', 'DEP_WK', 'Tperiod', 'AMP_WK',
         'Theta_WK', 'Time_ramp', 'Delta_WK', 'Ywidth_WK',
@@ -301,8 +296,49 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
                   'HotStartTime', 'BED_DEFORMATION', 'HOT_START_RES_NUM'):
             pop(k)
 
-    # ---- wavemaker ---------------------------------------------------------
+    # ---- wavemaker / initial -------------------------------------------------
+    # Initial-condition types (INI_*/N_WAVE) moved to the initial: section.
     wm_type = pop_str('WAVEMAKER', 'NONE')
+    if wm_type in ('INI_SOL', 'INI_SOLITARY'):
+        sol: dict = {}
+        for k, yk in (('AMP', 'amplitude'), ('DEP', 'depth'),
+                      ('XWAVEMAKER', 'x_center')):
+            v = pop_val(k)
+            if v is not None: sol[yk] = v
+        if not pop_bool('SolitaryPositiveDirection', True):
+            sol['direction'] = '-x'
+        out.setdefault('initial', {})['solitary'] = sol
+        wm_type = 'NONE'
+    elif wm_type == 'INI_SINE':
+        sine: dict = {}
+        for k, yk in (('AMP', 'amplitude'), ('DEP', 'depth'),
+                      ('mode_x', 'mode_x'), ('mode_y', 'mode_y')):
+            v = pop_val(k)
+            if v is not None: sine[yk] = v
+        out.setdefault('initial', {})['sine_mode'] = sine
+        wm_type = 'NONE'
+    elif wm_type in ('INI_REC', 'INI_Gau', 'INI_GAU', 'INI_DIP', 'N_WAVE'):
+        # pending in the modern engine (hump/n_wave blocks gate at init);
+        # emit the block anyway so the gate fires loudly instead of the
+        # keys vanishing into the unknown-key comment block
+        shape = {'INI_REC': 'rect', 'INI_DIP': 'dipole'}.get(wm_type, 'gaussian')
+        if wm_type == 'N_WAVE':
+            nw: dict = {}
+            for k, yk in (('x1_Nwave', 'x1'), ('x2_Nwave', 'x2'),
+                          ('a0_Nwave', 'a0'), ('gamma_Nwave', 'gamma'),
+                          ('dep_Nwave', 'depth')):
+                v = pop_val(k)
+                if v is not None: nw[yk] = v
+            out.setdefault('initial', {})['n_wave'] = nw
+        else:
+            hp: dict = {'shape': shape}
+            for k, yk in (('AMP', 'amplitude'), ('Xc', 'x_center'),
+                          ('Yc', 'y_center'), ('WID', 'width'),
+                          ('GauRadius', 'radius')):
+                v = pop_val(k)
+                if v is not None: hp[yk] = v
+            out.setdefault('initial', {})['hump'] = hp
+        wm_type = 'NONE'
     if wm_type.upper() != 'NONE':
         wm: dict = {'type': wm_type}
         wm_keys = _WK_PARAMS.get(wm_type, []) + _WK_COMMON

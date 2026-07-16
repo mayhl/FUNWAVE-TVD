@@ -12,11 +12,11 @@ simulation:
   title: test_model_setup
   total_time: 1.0
   output_interval: 1.0
-wavemaker:
-  type: INI_SOLITARY
-  AMP: 0.5
-  DEP: 10.0
-  XWAVEMAKER: 20.0
+initial:
+  solitary:
+    amplitude: 0.5
+    depth: 10.0
+    x_center: 20.0
 boundaries:
   periodic: [y]
 breaking:

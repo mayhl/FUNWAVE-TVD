@@ -934,6 +934,152 @@ parameters:
     default:      true
     latex:        ~
 
+  # ── initial ────────────────────────────────────────────────────────────────
+  # Initial-condition types (nee wavemaker INI_*/N_WAVE).  Block presence
+  # selects the type; solitary + sine_mode are live in apply_ic, hump +
+  # n_wave are init-gated pending their port.  water_level is the legacy
+  # still-water offset (Depth/DEP_WK/Dep_Ser += value) — a port gap, so a
+  # non-zero value is init-gated pending until it is wired.
+  - name:         initial_water_level
+    legacy_name:  WaterLevel
+    yaml_path:    "initial.water_level"
+    units:        "m"
+    default:      0.0
+    latex:        "$\\eta_0$"
+
+  - name:         hump_amplitude
+    legacy_name:  AMP_SOLI
+    yaml_path:    "initial.hump.amplitude"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         hump_radius
+    legacy_name:  GauRadius
+    yaml_path:    "initial.hump.radius"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         hump_shape
+    legacy_name:  ~
+    yaml_path:    "initial.hump.shape"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         hump_width
+    legacy_name:  WID
+    yaml_path:    "initial.hump.width"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         hump_x_center
+    legacy_name:  Xc
+    yaml_path:    "initial.hump.x_center"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         hump_y_center
+    legacy_name:  Yc
+    yaml_path:    "initial.hump.y_center"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         n_wave_a0
+    legacy_name:  a0_Nwave
+    yaml_path:    "initial.n_wave.a0"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         n_wave_depth
+    legacy_name:  dep_Nwave
+    yaml_path:    "initial.n_wave.depth"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         n_wave_gamma
+    legacy_name:  gamma_Nwave
+    yaml_path:    "initial.n_wave.gamma"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         n_wave_x1
+    legacy_name:  x1_Nwave
+    yaml_path:    "initial.n_wave.x1"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         n_wave_x2
+    legacy_name:  x2_Nwave
+    yaml_path:    "initial.n_wave.x2"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
+  - name:         sine_mode_amplitude
+    legacy_name:  AMP_SOLI
+    yaml_path:    "initial.sine_mode.amplitude"
+    units:        "m"
+    default:      0.0
+    latex:        "$a$"
+
+  - name:         sine_mode_depth
+    legacy_name:  DEP_SOLI
+    yaml_path:    "initial.sine_mode.depth"
+    units:        "m"
+    default:      0.0
+    latex:        "$d$"
+
+  - name:         sine_mode_x
+    legacy_name:  MODE_X
+    yaml_path:    "initial.sine_mode.mode_x"
+    units:        ~
+    default:      1
+    latex:        ~
+
+  - name:         sine_mode_y
+    legacy_name:  MODE_Y
+    yaml_path:    "initial.sine_mode.mode_y"
+    units:        ~
+    default:      0
+    latex:        ~
+
+  - name:         solitary_amplitude
+    legacy_name:  AMP_SOLI
+    yaml_path:    "initial.solitary.amplitude"
+    units:        "m"
+    default:      0.0
+    latex:        "$a$"
+
+  - name:         solitary_depth
+    legacy_name:  DEP_SOLI
+    yaml_path:    "initial.solitary.depth"
+    units:        "m"
+    default:      0.0
+    latex:        "$d$"
+
+  - name:         solitary_direction
+    legacy_name:  SolitaryPositiveDirection
+    yaml_path:    "initial.solitary.direction"
+    units:        ~
+    default:      "+x"
+    latex:        ~
+
+  - name:         solitary_x_center
+    legacy_name:  XWAVEMAKER
+    yaml_path:    "initial.solitary.x_center"
+    units:        "m"
+    default:      0.0
+    latex:        ~
+
   # ── meteo (legacy mod_meteo.F) ─────────────────────────────────────────────
   - name:         meteo_gausian
     legacy_name:  MeteoGausian
@@ -1462,13 +1608,6 @@ parameters:
     default:      false
     latex:        ~
 
-  - name:         amp
-    legacy_name:  AMP
-    yaml_path:    "wavemaker.AMP"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
   - name:         amp_wk
     legacy_name:  AMP_WK
     yaml_path:    "wavemaker.AMP_WK"
@@ -1488,13 +1627,6 @@ parameters:
     yaml_path:    "wavemaker.CrestLimit"
     units:        ~
     default:      ~
-    latex:        ~
-
-  - name:         dep
-    legacy_name:  DEP
-    yaml_path:    "wavemaker.DEP"
-    units:        ~
-    default:      0.0
     latex:        ~
 
   - name:         dep_wk
@@ -1617,13 +1749,6 @@ parameters:
     default:      0.0         # PENDING adjudication: legacy uses 10.0 in directional TMA/JON branch
     latex:        ~
 
-  - name:         solitarypositivedirection
-    legacy_name:  SolitaryPositiveDirection
-    yaml_path:    "wavemaker.SolitaryPositiveDirection"
-    units:        ~
-    default:      true
-    latex:        ~
-
   - name:         thetapeak
     legacy_name:  ThetaPeak
     yaml_path:    "wavemaker.ThetaPeak"
@@ -1666,13 +1791,6 @@ parameters:
     default:      DATA_1D
     latex:        ~
 
-  - name:         wid
-    legacy_name:  WID
-    yaml_path:    "wavemaker.WID"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
   - name:         wavecompfile
     legacy_name:  WaveCompFile
     yaml_path:    "wavemaker.WaveCompFile"
@@ -1696,30 +1814,9 @@ parameters:
     default:      0.0
     latex:        ~
 
-  - name:         xwavemaker
-    legacy_name:  XWAVEMAKER
-    yaml_path:    "wavemaker.XWAVEMAKER"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
-  - name:         xc
-    legacy_name:  Xc
-    yaml_path:    "wavemaker.Xc"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
   - name:         xc_wk
     legacy_name:  Xc_WK
     yaml_path:    "wavemaker.Xc_WK"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
-  - name:         yc
-    legacy_name:  Yc
-    yaml_path:    "wavemaker.Yc"
     units:        ~
     default:      0.0
     latex:        ~
@@ -1738,30 +1835,9 @@ parameters:
     default:      999999.0
     latex:        ~
 
-  - name:         a0_nwave
-    legacy_name:  a0_Nwave
-    yaml_path:    "wavemaker.a0_Nwave"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
   - name:         alpha_c
     legacy_name:  alpha_c
     yaml_path:    "wavemaker.alpha_c"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
-  - name:         dep_nwave
-    legacy_name:  dep_Nwave
-    yaml_path:    "wavemaker.dep_Nwave"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
-  - name:         gamma_nwave
-    legacy_name:  gamma_Nwave
-    yaml_path:    "wavemaker.gamma_Nwave"
     units:        ~
     default:      0.0
     latex:        ~
@@ -1771,19 +1847,5 @@ parameters:
     yaml_path:    "wavemaker.type"
     units:        ~
     default:      nothing
-    latex:        ~
-
-  - name:         x1_nwave
-    legacy_name:  x1_Nwave
-    yaml_path:    "wavemaker.x1_Nwave"
-    units:        ~
-    default:      0.0
-    latex:        ~
-
-  - name:         x2_nwave
-    legacy_name:  x2_Nwave
-    yaml_path:    "wavemaker.x2_Nwave"
-    units:        ~
-    default:      0.0
     latex:        ~
 
