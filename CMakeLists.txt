@@ -118,13 +118,10 @@ endif()
 
 option(ENABLE_TESTING "Enable unit testing" OFF)
 option(ENABLE_REGRESSION_TESTING "Enable regression testing" OFF)
-option(ENABLE_VALIDATION_TESTING "Enable validation testing" OFF)
 option(ENABLE_DEV_MODE "Enable development mode (skip executable)" OFF)
 
 # Enable CTest globally if ANY testing is enabled
-if(ENABLE_TESTING
-   OR ENABLE_REGRESSION_TESTING
-   OR ENABLE_VALIDATION_TESTING)
+if(ENABLE_TESTING OR ENABLE_REGRESSION_TESTING)
   enable_testing()
 endif()
 
@@ -156,9 +153,7 @@ if(ENABLE_TESTING)
 endif()
 
 # Only include test subdirectory if testing is enabled
-if(ENABLE_TESTING
-   OR ENABLE_REGRESSION_TESTING
-   OR ENABLE_VALIDATION_TESTING)
+if(ENABLE_TESTING OR ENABLE_REGRESSION_TESTING)
   add_subdirectory(test)
 endif()
 
