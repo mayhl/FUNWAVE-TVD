@@ -136,6 +136,17 @@ variables:
 
 parameters:
 
+  # ── boundaries ─────────────────────────────────────────────────────────────
+  # Axis-level periodic list (a face is never "periodic" — the axis
+  # identifies the pair).  x is pending trid_x_periodic.  Face blocks
+  # (sponge/forcing per face) land with the boundaries module (reorg rung 2).
+  - name:         periodic
+    legacy_name:  PERIODIC
+    yaml_path:    "boundaries.periodic"
+    units:        ~
+    default:      ~
+    latex:        ~
+
   # ── breaking ───────────────────────────────────────────────────────────────
   - name:         cbrk1
     legacy_name:  Cbrk1
@@ -172,11 +183,14 @@ parameters:
     default:      true
     latex:        ~
 
-  - name:         viscosity_breaking
+  # nee physics.viscosity_breaking (T -> eddy_viscosity, F -> shock_capturing);
+  # default applies with no breaking: section — breaking is core physics,
+  # not presence-gated.
+  - name:         breaking_model
     legacy_name:  VISCOSITY_BREAKING
-    yaml_path:    "physics.viscosity_breaking"
+    yaml_path:    "breaking.model"
     units:        ~
-    default:      true
+    default:      "eddy_viscosity"
     latex:        ~
 
   - name:         visbrk
@@ -229,87 +243,104 @@ parameters:
     default:      false
     latex:        ~
 
-  # ── geometry ───────────────────────────────────────────────────────────────
+  # ── grid (nee geometry; 3-D keeps geometry:) ────────────────────────────────
+  # coriolis: f-plane escape hatch for non-georeferenced grids; a geographic
+  # CRS derives f per cell once the metric provider exists ([[design-grid-crs]]).
+  # f wins over latitude when both are given.
+  - name:         coriolis_f
+    legacy_name:  ~
+    yaml_path:    "grid.coriolis.f"
+    units:        "s-1"
+    default:      ~
+    latex:        "$f$"
+
+  - name:         coriolis_latitude
+    legacy_name:  ~
+    yaml_path:    "grid.coriolis.latitude"
+    units:        "degrees_north"
+    default:      ~
+    latex:        "$\\varphi$"
+
   - name:         bathy_correction
     legacy_name:  BATHY_CORRECTION
-    yaml_path:    "geometry.bathy_correction"
+    yaml_path:    "grid.bathy_correction"
     units:        ~
     default:      false
     latex:        ~
 
   - name:         bathy_depth
     legacy_name:  Depth_Flat
-    yaml_path:    "geometry.bathy_depth"
+    yaml_path:    "grid.bathy_depth"
     units:        "m"
     default:      ~
     latex:        "$d_0$"
 
   - name:         bathy_file
     legacy_name:  DEPTH_FILE
-    yaml_path:    "geometry.bathy_file"
+    yaml_path:    "grid.bathy_file"
     units:        ~
     default:      ~
     latex:        ~
 
   - name:         bathy_slope
     legacy_name:  SLP
-    yaml_path:    "geometry.bathy_slope"
+    yaml_path:    "grid.bathy_slope"
     units:        ~
     default:      ~
     latex:        "$s$"
 
   - name:         bathy_slope_x0
     legacy_name:  Xslp
-    yaml_path:    "geometry.bathy_slope_x0"
+    yaml_path:    "grid.bathy_slope_x0"
     units:        "m"
     default:      ~
     latex:        "$x_{s0}$"
 
   - name:         bathy_type
     legacy_name:  DEPTH_TYPE
-    yaml_path:    "geometry.bathy_type"
+    yaml_path:    "grid.bathy_type"
     units:        ~
     default:      "flat"
     latex:        ~
 
   - name:         dx
     legacy_name:  DX
-    yaml_path:    "geometry.dx"
+    yaml_path:    "grid.dx"
     units:        "m"
     default:      ~
     latex:        "$\\Delta x$"
 
   - name:         dy
     legacy_name:  DY
-    yaml_path:    "geometry.dy"
+    yaml_path:    "grid.dy"
     units:        "m"
     default:      ~
     latex:        "$\\Delta y$"
 
   - name:         grid_nx
     legacy_name:  Mglob
-    yaml_path:    "geometry.grid_nx"
+    yaml_path:    "grid.grid_nx"
     units:        ~
     default:      ~
     latex:        "$N_x$"
 
   - name:         grid_ny
     legacy_name:  Nglob
-    yaml_path:    "geometry.grid_ny"
+    yaml_path:    "grid.grid_ny"
     units:        ~
     default:      ~
     latex:        "$N_y$"
 
   - name:         nx_proc
     legacy_name:  px
-    yaml_path:    "geometry.nx_proc"
+    yaml_path:    "grid.nx_proc"
     units:        ~
     default:      ~
     latex:        "$P_x$"
 
   - name:         ny_proc
     legacy_name:  py
-    yaml_path:    "geometry.ny_proc"
+    yaml_path:    "grid.ny_proc"
     units:        ~
     default:      ~
     latex:        "$P_y$"
@@ -500,68 +531,56 @@ parameters:
     latex:        "$T_{\\mathrm{mean}}$"
 
   # ── physics ────────────────────────────────────────────────────────────────
-  - name:         beta_ref
+  # dispersion.scheme presets Gamma1/2/3 (fully_nonlinear 1,1,1 /
+  # weakly_nonlinear 1,1,0 / linear 1,0,1 / nswe 0,0,1 + dispersion off);
+  # the gamma entries have no static default — explicit values override
+  # the preset.  physics.{breaking,wavemaker,sediment,c_smg,water_level,
+  # periodic,viscosity_breaking,disp_time_left} removed 2026-07-16:
+  # dead toggles (section presence activates), Smagorinsky amputated
+  # upstream, water_level -> initial: (port gap, pending), periodic ->
+  # boundaries:, viscosity_breaking -> breaking.model, disp_time_left
+  # keyless until the semi-implicit Gamma2 chain is ported.
+  - name:         dispersion_beta_ref
     legacy_name:  Beta_ref
-    yaml_path:    "physics.beta_ref"
+    yaml_path:    "physics.dispersion.beta_ref"
     units:        ~
     default:      -0.531
     latex:        "$\\beta_{\\mathrm{ref}}$"
 
-  - name:         c_smg
-    legacy_name:  C_smg
-    yaml_path:    "physics.c_smg"
-    units:        ~
-    default:      0.0
-    latex:        "$C_{\\mathrm{smg}}$"
-
-  - name:         dispersion
-    legacy_name:  DISPERSION
-    yaml_path:    "physics.dispersion"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  - name:         gamma1
+  - name:         dispersion_gamma1
     legacy_name:  gamma1
-    yaml_path:    "physics.gamma1"
+    yaml_path:    "physics.dispersion.gamma1"
     units:        ~
-    default:      1.0
+    default:      ~
     latex:        "$\\Gamma_1$"
 
-  - name:         gamma2
+  - name:         dispersion_gamma2
     legacy_name:  gamma2
-    yaml_path:    "physics.gamma2"
+    yaml_path:    "physics.dispersion.gamma2"
     units:        ~
-    default:      1.0
+    default:      ~
     latex:        "$\\Gamma_2$"
 
-  - name:         gamma3
+  - name:         dispersion_gamma3
     legacy_name:  gamma3
-    yaml_path:    "physics.gamma3"
+    yaml_path:    "physics.dispersion.gamma3"
     units:        ~
-    default:      1.0
+    default:      ~
     latex:        "$\\Gamma_3$"
 
-  - name:         periodic
-    legacy_name:  PERIODIC
-    yaml_path:    "physics.periodic"
+  - name:         dispersion_scheme
+    legacy_name:  DISPERSION
+    yaml_path:    "physics.dispersion.scheme"
     units:        ~
-    default:      false
+    default:      "fully_nonlinear"
     latex:        ~
 
-  - name:         swe_eta_dep
+  - name:         dispersion_swe_eta_dep
     legacy_name:  SWE_ETA_DEP
-    yaml_path:    "physics.swe_eta_dep"
+    yaml_path:    "physics.dispersion.swe_eta_dep"
     units:        ~
     default:      0.7
     latex:        "$\\eta_{\\mathrm{SWE}}$"
-
-  - name:         water_level
-    legacy_name:  WaterLevel
-    yaml_path:    "physics.water_level"
-    units:        "m"
-    default:      0.0
-    latex:        "$\\eta_0$"
 
   # ── simulation ─────────────────────────────────────────────────────────────
   - name:         output_interval
@@ -729,34 +748,6 @@ parameters:
     yaml_path:    "output.EtaBlowVal"
     units:        "m"
     default:      ~
-    latex:        ~
-
-  - name:         breaking_flag
-    legacy_name:  ~
-    yaml_path:    "physics.breaking"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         disp_time_left
-    legacy_name:  DISP_TIME_LEFT
-    yaml_path:    "physics.disp_time_left"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         sediment_flag
-    legacy_name:  ~
-    yaml_path:    "physics.sediment"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         wavemaker_flag
-    legacy_name:  ~
-    yaml_path:    "physics.wavemaker"
-    units:        ~
-    default:      false
     latex:        ~
 
   - name:         plot_intv_station

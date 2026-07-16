@@ -1,5 +1,5 @@
 # Fixture for test_model_setup — solitary IC on a flat 4-rank flume
-geometry:
+grid:
   cell_size: [1.0, 1.0]
   grid_size: [40, 4]
   decomposition:
@@ -17,9 +17,10 @@ wavemaker:
   AMP: 0.5
   DEP: 10.0
   XWAVEMAKER: 20.0
-physics:
-  periodic: true
-  viscosity_breaking: false
+boundaries:
+  periodic: [y]
+breaking:
+  model: shock_capturing
 numerics:
   cfl: 0.5
   min_depth: 0.01

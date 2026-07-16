@@ -5,22 +5,29 @@
 !
 !  Physics parameters YAML reader
 !
-!  YAML block: physics:
-!    water_level: <length>   optional, default 0 (still-water offset added to bathymetry)
-!    periodic:   <bool>      Cartesian only; south-north periodic BC, default NO
-!    dispersion: <bool>      default YES
-!    Gamma1:     <real>      dispersion coefficient,           default 1.0
-!    Gamma2:     <real>      nonlinearity coefficient (CART),  default 1.0
-!    Beta_ref:   <real>      reference level (CART/ZALPHA),    default -0.531
-!    Gamma3:     <real>      linearity switch coefficient,     default 1.0
-!    viscosity_breaking: <bool>   default YES
-!    SWE_ETA_DEP: <real>    SWE depth fraction,               default 0.7
-!    breaking: <bool>
-!    wavemaker: <bool>
-!    sediment: <bool>
-!    coriolis:               optional dictionary — f-plane rotation
-!      f: <real>             Coriolis parameter (1/s); wins over latitude
-!      latitude: <real>      centre latitude (deg), f = pi*sin(lat)/21600
+!  YAML block: physics:        (all optional; defaults = fully-nonlinear Boussinesq)
+!    dispersion:
+!      scheme:      <string>   fully_nonlinear | weakly_nonlinear | linear | nswe,
+!                              default fully_nonlinear.  Presets Gamma1/2/3:
+!                                fully_nonlinear  -> 1, 1, 1
+!                                weakly_nonlinear -> 1, 1, 0
+!                                linear           -> 1, 0, 1
+!                                nswe             -> 0, 0, 1  + dispersion terms off
+!      gamma1:      <real>     dispersion coefficient — explicit override of the preset
+!      gamma2:      <real>     nonlinearity coefficient (CART) — override
+!      gamma3:      <real>     linearity switch coefficient — override
+!      beta_ref:    <real>     reference level (CART/ZALPHA),  default -0.531
+!      swe_eta_dep: <real>     SWE transition depth fraction,  default 0.7
+!
+!  Also read here as stop-gap adapters (final owners come later in the
+!  config reorg; see design notes):
+!    boundaries: > periodic: [y]   axis-level periodic list (x pending
+!                                  trid_x_periodic; owner = rung-2 module)
+!    grid: > coriolis:             f-plane rotation for non-georeferenced
+!      f: <real>                   Coriolis parameter (1/s); wins over latitude
+!      latitude: <real>            centre latitude (deg), f = pi*sin(lat)/21600
+!                                  (a geographic CRS will derive f per cell
+!                                  once the metric provider exists)
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -28,41 +35,37 @@
 !-------------------------------------------------
 
 module model_physics_mod
-   use core_constants_mod, only: SP, PI
+   use core_constants_mod, only: SP, PI, type_string
    use core_env_mod, only: type_env, get_sub_env
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_PHYSICS_BETA_REF, DEF_PHYSICS_BREAKING, &
-                                        DEF_PHYSICS_C_SMG, DEF_PHYSICS_DISPERSION, &
-                                        DEF_PHYSICS_DISP_TIME_LEFT, DEF_PHYSICS_GAMMA1, &
-                                        DEF_PHYSICS_GAMMA2, DEF_PHYSICS_GAMMA3, &
-                                        DEF_PHYSICS_PERIODIC, DEF_PHYSICS_SEDIMENT, &
-                                        DEF_PHYSICS_SWE_ETA_DEP, &
-                                        DEF_PHYSICS_VISCOSITY_BREAKING, &
-                                        DEF_PHYSICS_WATER_LEVEL, DEF_PHYSICS_WAVEMAKER
+   use model_config_defaults_mod, only: DEF_PHYSICS_DISPERSION_BETA_REF, &
+                                        DEF_PHYSICS_DISPERSION_SCHEME, &
+                                        DEF_PHYSICS_DISPERSION_SWE_ETA_DEP
 
    implicit none
 
    private
    public :: type_model_physics
 
+   character(len=16), parameter :: DISPERSION_SCHEMES(4) = &
+                                   [character(len=16) :: "fully_nonlinear", &
+                                                          "weakly_nonlinear", "linear", "nswe"]
+
    type, extends(type_model_base) :: type_model_physics
 
-      real(SP) :: water_level = 0.0_SP
-      logical  :: periodic = .false.
+      logical  :: periodic = .false.   ! y-axis periodic (south-north wrap)
       logical  :: dispersion = .true.
       real(SP) :: Gamma1 = 1.0_SP
       real(SP) :: Gamma2 = 1.0_SP
-      logical  :: disp_time_left = .false.   ! semi-implicit Gamma2 LHS correction; deferred post-refactor
+      ! semi-implicit Gamma2 LHS correction: only the .false. chain is
+      ! ported (kernel_etauv), so no YAML key until the feature lands
+      logical  :: disp_time_left = .false.
       real(SP) :: Beta_ref = -0.531_SP
       real(SP) :: Gamma3 = 1.0_SP
-      logical  :: viscosity_breaking = .true.
+      logical  :: viscosity_breaking = .true.   ! set from breaking.model in model_setup
       real(SP) :: SWE_ETA_DEP = 0.70_SP
-      real(SP) :: C_smg = 0.0_SP   ! Smagorinsky sub-grid viscosity coefficient
-      logical  :: breaking = .false.
-      logical  :: wavemaker = .false.
-      logical  :: sediment = .false.
 
       ! f-plane Coriolis (legacy has the source term in the spherical
       ! branch only; [[design-grid-crs]] decouples f from the metric —
@@ -80,55 +83,91 @@ contains
       class(type_model_physics), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
-      type(type_env) :: sub_env
-      type(type_yaml_reader) :: cor_yaml
-      logical :: is_empty, no_key, no_cor, no_f, no_lat
-      real(SP) :: lat
+      type(type_env) :: sub_env, bnd_env, grid_env
+      type(type_yaml_reader) :: disp_yaml, cor_yaml
+      type(type_string), allocatable :: axes(:)
+      character(:), allocatable :: scheme
+      logical :: is_empty, no_key, no_bnd, no_grid, no_disp, no_cor, no_f, no_lat
+      real(SP) :: lat, g_tmp
+      integer :: i
+
+      ! boundaries.periodic — axis-level list (a face is never "periodic";
+      ! the axis identifies the pair).  Stop-gap adapter until the
+      ! boundaries module owns the section.
+      bnd_env = get_sub_env(env, "boundaries", no_bnd)
+      if (.not. no_bnd) then
+         call bnd_env%yaml%read_string_array("periodic", silent=no_key, val=axes)
+         if (.not. no_key) then
+            do i = 1, size(axes)
+               select case (trim(axes(i)%s))
+               case ("y")
+                  this%periodic = .true.
+               case ("x")
+                  call env%log%exit_on_error( &
+                     "boundaries/periodic: x is pending trid_x_periodic")
+               case default
+                  call env%log%exit_on_error( &
+                     "boundaries/periodic: expected axis labels x and/or y")
+               end select
+            end do
+         end if
+      end if
+
+      ! grid.coriolis — f-plane escape hatch for non-georeferenced grids:
+      !   $$ f = \frac{\pi \sin\varphi}{21600} = 2\Omega\sin\varphi,
+      !      \quad \Omega = \frac{2\pi}{86400} $$
+      ! same discrete constant as the legacy spherical fill (init.F)
+      grid_env = get_sub_env(env, "grid", no_grid)
+      if (.not. no_grid) then
+         cor_yaml = grid_env%yaml%cast_dictionary("coriolis", no_cor)
+         if (.not. no_cor) then
+            this%coriolis_on = .true.
+            call cor_yaml%read("f", silent=no_f, val=this%coriolis_f, default="0.0")
+            if (no_f) then
+               call cor_yaml%read("latitude", silent=no_lat, val=lat, default="0.0")
+               if (no_lat) then
+                  call env%log%exit_on_error( &
+                     "grid/coriolis: f or latitude required")
+               end if
+               this%coriolis_f = PI*sin(lat*PI/180.0_SP)/21600.0_SP
+            end if
+         end if
+      end if
 
       sub_env = get_sub_env(env, "physics", is_empty)
       this%is_activated = .not. is_empty
       if (is_empty) return
 
-      call sub_env%yaml%read("water_level", val=this%water_level, default=DEF_PHYSICS_WATER_LEVEL)
-      call sub_env%yaml%read("periodic", val=this%periodic, default=DEF_PHYSICS_PERIODIC)
-      call sub_env%yaml%read("dispersion", val=this%dispersion, default=DEF_PHYSICS_DISPERSION)
-      ! TODO: add mode enum (e.g. mode: boussinesq_full / boussinesq_linear / nswe /
-      !       weakly_nonlinear) that sets Gamma1/Gamma2/Gamma3 automatically, so
-      !       users never need to specify raw Gamma values directly in YAML.
-      !   boussinesq_full    -> Gamma1=1, Gamma2=1, Gamma3=1  (default)
-      !   boussinesq_linear  -> Gamma1=1, Gamma2=0, Gamma3=1
-      !   weakly_nonlinear   -> Gamma1=1, Gamma2=1, Gamma3=0
-      !   nswe               -> Gamma1=0, Gamma2=0, Gamma3=1
-      call sub_env%yaml%read("Gamma1", silent=no_key, val=this%Gamma1, default=DEF_PHYSICS_GAMMA1)
-      call sub_env%yaml%read("Gamma2", silent=no_key, val=this%Gamma2, default=DEF_PHYSICS_GAMMA2)
-      call sub_env%yaml%read("disp_time_left", silent=no_key, val=this%disp_time_left, default=DEF_PHYSICS_DISP_TIME_LEFT)
-      call sub_env%yaml%read("Beta_ref", silent=no_key, val=this%Beta_ref, default=DEF_PHYSICS_BETA_REF)
-      call sub_env%yaml%read("Gamma3", silent=no_key, val=this%Gamma3, default=DEF_PHYSICS_GAMMA3)
-      call sub_env%yaml%read("viscosity_breaking", val=this%viscosity_breaking, default=DEF_PHYSICS_VISCOSITY_BREAKING)
-      ! 0.7 matches the legacy default (old/mod_global.F); the earlier 0.8 here
-      ! was unintentional drift.
-      call sub_env%yaml%read("SWE_ETA_DEP", silent=no_key, val=this%SWE_ETA_DEP, default=DEF_PHYSICS_SWE_ETA_DEP)
-      call sub_env%yaml%read("C_smg", silent=no_key, val=this%C_smg, default=DEF_PHYSICS_C_SMG)
-      call sub_env%yaml%read("breaking", val=this%breaking, default=DEF_PHYSICS_BREAKING)
-      call sub_env%yaml%read("wavemaker", val=this%wavemaker, default=DEF_PHYSICS_WAVEMAKER)
-      call sub_env%yaml%read("sediment", val=this%sediment, default=DEF_PHYSICS_SEDIMENT)
-
-      ! f-plane Coriolis:
-      !   $$ f = \frac{\pi \sin\varphi}{21600} = 2\Omega\sin\varphi,
-      !      \quad \Omega = \frac{2\pi}{86400} $$
-      ! same discrete constant as the legacy spherical fill (init.F)
-      cor_yaml = sub_env%yaml%cast_dictionary("coriolis", no_cor)
-      if (.not. no_cor) then
-         this%coriolis_on = .true.
-         call cor_yaml%read("f", silent=no_f, val=this%coriolis_f, default="0.0")
-         if (no_f) then
-            call cor_yaml%read("latitude", silent=no_lat, val=lat, default="0.0")
-            if (no_lat) then
-               call sub_env%log%exit_on_error( &
-                  "physics/coriolis: f or latitude required")
-            end if
-            this%coriolis_f = PI*sin(lat*PI/180.0_SP)/21600.0_SP
-         end if
+      disp_yaml = sub_env%yaml%cast_dictionary("dispersion", no_disp)
+      if (.not. no_disp) then
+         call disp_yaml%read_enum("scheme", DISPERSION_SCHEMES, val=scheme, &
+                                  default=DEF_PHYSICS_DISPERSION_SCHEME)
+         select case (trim(scheme))
+         case ("fully_nonlinear")
+            ! declaration defaults already 1, 1, 1
+         case ("weakly_nonlinear")
+            this%Gamma3 = 0.0_SP
+         case ("linear")
+            this%Gamma2 = 0.0_SP
+         case ("nswe")
+            this%Gamma1 = 0.0_SP
+            this%Gamma2 = 0.0_SP
+            this%dispersion = .false.
+         end select
+         ! explicit coefficient overrides on top of the scheme preset.
+         ! NOTE: yaml read val is intent(out) — a silent-miss WIPES the
+         ! passed component (the slope_cap->0 trap), so read into a temp
+         ! and assign only when the key is present
+         call disp_yaml%read("gamma1", silent=no_key, val=g_tmp)
+         if (.not. no_key) this%Gamma1 = g_tmp
+         call disp_yaml%read("gamma2", silent=no_key, val=g_tmp)
+         if (.not. no_key) this%Gamma2 = g_tmp
+         call disp_yaml%read("gamma3", silent=no_key, val=g_tmp)
+         if (.not. no_key) this%Gamma3 = g_tmp
+         call disp_yaml%read("beta_ref", silent=no_key, val=this%Beta_ref, &
+                             default=DEF_PHYSICS_DISPERSION_BETA_REF)
+         call disp_yaml%read("swe_eta_dep", silent=no_key, val=this%SWE_ETA_DEP, &
+                             default=DEF_PHYSICS_DISPERSION_SWE_ETA_DEP)
       end if
 
    end subroutine physics_read_input

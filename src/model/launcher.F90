@@ -39,7 +39,7 @@ contains
       type(type_env)           :: env, grid_env
       integer, allocatable     :: dims(:)
       integer                  :: ndim
-      logical                  :: missing
+      logical                  :: missing, no_grid
       type(type_model_main)    :: model_2d
 # if defined (ENABLE_3D)
       type(type_model_3d)      :: model_3d
@@ -54,10 +54,20 @@ contains
       ! Initialise environment once — owns MPI, YAML, and logging for this run.
       call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path="funwave.log")
 
-      ! Peek at grid_size under the geometry section to decide dimensionality.
-      ! 2 elements → 2D path; 3 elements → 3D path.  Matches the 2D YAML layout.
-      grid_env = get_sub_env(env, "geometry")
-      call grid_env%yaml%read_integer_array("grid_size", val=dims, silent=missing)
+      ! Peek at grid_size to decide dimensionality: 2 elements → 2D path,
+      ! 3 elements → 3D path.  The 2D schema owns grid:; the 3D schema
+      ! still uses geometry: (review-gated separately), so fall back.
+      grid_env = get_sub_env(env, "grid", no_grid)
+      missing = .true.
+      if (.not. no_grid) then
+         call grid_env%yaml%read_integer_array("grid_size", val=dims, silent=missing)
+      end if
+      if (missing) then
+         grid_env = get_sub_env(env, "geometry", no_grid)
+         if (.not. no_grid) then
+            call grid_env%yaml%read_integer_array("grid_size", val=dims, silent=missing)
+         end if
+      end if
       ndim = 0
       if (.not. missing .and. allocated(dims)) ndim = size(dims)
 

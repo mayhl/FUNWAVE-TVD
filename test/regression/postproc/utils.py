@@ -283,7 +283,9 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     with open(path) as f:
         cfg = yaml.safe_load(f)
 
-    geo = cfg.get("geometry", {})
+    # 2-D schema renamed geometry: -> grid: (config reorg); the ref side and
+    # 3-D configs still say geometry:
+    geo = cfg.get("grid", cfg.get("geometry", {}))
     out = cfg.get("output", {})
 
     grid_size = geo.get("grid_size", [0, 0])    # [nx, ny] or [nx, ny, nz]

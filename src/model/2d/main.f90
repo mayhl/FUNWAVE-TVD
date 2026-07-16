@@ -218,6 +218,9 @@ contains
 
       integer :: i, j
 
+      ! breaking.model selects the breaker mechanism (nee
+      ! physics.viscosity_breaking); the stepper keeps reading the flag
+      this%physics%viscosity_breaking = trim(this%breaking%model) == "eddy_viscosity"
       ! legacy io.F flag forcing (io.F:622-623): roller implies the
       ! breaking viscosity scheme, and breaking viscosity implies the
       ! show/display scheme — every downstream consumer (allocations,

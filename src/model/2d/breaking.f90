@@ -29,6 +29,7 @@ module model_breaking_mod
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_BREAKING_CBRK1, DEF_BREAKING_CBRK2, &
+                                        DEF_BREAKING_MODEL, &
                                         DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER_EFFECT, &
                                         DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK, &
                                         DEF_BREAKING_WAVEMAKER_CBRK, &
@@ -40,7 +41,16 @@ module model_breaking_mod
    private
    public :: type_model_breaking
 
+   character(len=16), parameter :: BREAKING_MODELS(2) = &
+                                   [character(len=16) :: "eddy_viscosity", "shock_capturing"]
+
    type, extends(type_model_base) :: type_model_breaking
+
+      ! Breaker mechanism (nee physics.viscosity_breaking): eddy_viscosity
+      ! runs the Kennedy-style breaker; shock_capturing leaves dissipation
+      ! to the TVD scheme + SWE transition.  Default applies with NO
+      ! breaking: section — breaking is core physics, not presence-gated.
+      character(:), allocatable :: model
 
       logical  :: roller = .false.
       logical  :: show_breaking = .true.
@@ -68,10 +78,14 @@ contains
       type(type_env) :: sub_env
       logical :: no_blk, no_key
 
+      this%model = "eddy_viscosity"
+
       sub_env = get_sub_env(env, "breaking", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (.not. this%is_activated) return
 
+      call sub_env%yaml%read_enum("model", BREAKING_MODELS, val=this%model, &
+                                  default=DEF_BREAKING_MODEL)
       call sub_env%yaml%read("roller_effect", val=this%roller, default=DEF_BREAKING_ROLLER_EFFECT)
       call sub_env%yaml%read("show_breaking", val=this%show_breaking, default=DEF_BREAKING_SHOW_BREAKING)
 

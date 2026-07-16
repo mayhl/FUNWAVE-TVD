@@ -14,6 +14,7 @@ module model_config_defaults_mod
    ! ── breaking ──
    character(*), parameter :: DEF_BREAKING_CBRK1 = "0.65"
    character(*), parameter :: DEF_BREAKING_CBRK2 = "0.35"
+   character(*), parameter :: DEF_BREAKING_MODEL = "eddy_viscosity"
    character(*), parameter :: DEF_BREAKING_NU_BKG = "0.0"
    character(*), parameter :: DEF_BREAKING_ROLLER = "NO"
    character(*), parameter :: DEF_BREAKING_ROLLER_EFFECT = "NO"
@@ -32,9 +33,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_FRICTION_CD = "0.0"
    character(*), parameter :: DEF_FRICTION_FRICTION_MATRIX = "NO"
    character(*), parameter :: DEF_FRICTION_MANNING = "NO"
-   ! ── geometry ──
-   character(*), parameter :: DEF_GEOMETRY_BATHY_CORRECTION = "NO"
-   character(*), parameter :: DEF_GEOMETRY_BATHY_TYPE = "flat"
+   ! ── grid ──
+   character(*), parameter :: DEF_GRID_BATHY_CORRECTION = "NO"
+   character(*), parameter :: DEF_GRID_BATHY_TYPE = "flat"
    ! ── hot_start ──
    character(*), parameter :: DEF_HOT_START_BED_DEFORMATION = "NO"
    character(*), parameter :: DEF_HOT_START_OUTPUT_START_NUMBER = "0"
@@ -70,20 +71,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_OUTPUT_STEADY_TIME = "999999.0"
    character(*), parameter :: DEF_OUTPUT_T_INTV_MEAN = "999999.0"
    ! ── physics ──
-   character(*), parameter :: DEF_PHYSICS_BETA_REF = "-0.531"
-   character(*), parameter :: DEF_PHYSICS_BREAKING = "NO"
-   character(*), parameter :: DEF_PHYSICS_C_SMG = "0.0"
-   character(*), parameter :: DEF_PHYSICS_DISP_TIME_LEFT = "NO"
-   character(*), parameter :: DEF_PHYSICS_DISPERSION = "YES"
-   character(*), parameter :: DEF_PHYSICS_GAMMA1 = "1.0"
-   character(*), parameter :: DEF_PHYSICS_GAMMA2 = "1.0"
-   character(*), parameter :: DEF_PHYSICS_GAMMA3 = "1.0"
-   character(*), parameter :: DEF_PHYSICS_PERIODIC = "NO"
-   character(*), parameter :: DEF_PHYSICS_SEDIMENT = "NO"
-   character(*), parameter :: DEF_PHYSICS_SWE_ETA_DEP = "0.7"
-   character(*), parameter :: DEF_PHYSICS_VISCOSITY_BREAKING = "YES"
-   character(*), parameter :: DEF_PHYSICS_WATER_LEVEL = "0.0"
-   character(*), parameter :: DEF_PHYSICS_WAVEMAKER = "NO"
+   character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
+   character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"
+   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.7"
    ! ── precipitation ──
    character(*), parameter :: DEF_PRECIPITATION_OUT_PRECIPITATION = "YES"
    character(*), parameter :: DEF_PRECIPITATION_RAINWAVEINTERACTION = "NO"

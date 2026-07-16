@@ -5,7 +5,7 @@
 !
 !  Model geometry / bathymetry YAML reader
 !
-!  YAML block: geometry:
+!  YAML block: grid:          (nee geometry:; the 3-D model keeps geometry:)
 !    cell_size: [dx, dy]        OR dx_file/dy_file for variable spacing
 !    grid_size: [nx, ny]        required for flat and slope bathymetry types
 !    origin: [x0, y0]           optional, default [0, 0]
@@ -100,7 +100,7 @@ contains
       logical :: no_nx_proc, no_ny_proc, no_dx_file, no_dy_file
       logical :: no_bathy_nx, no_bathy_ny
 
-      sub_env = get_sub_env(env, "geometry")
+      sub_env = get_sub_env(env, "grid")
       this%is_activated = .true.
 
       ! --- Spacing ---

@@ -255,7 +255,7 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             pop('SLP'); pop('Xslp')
 
     geo['bathymetry'] = bathy
-    out['geometry'] = geo
+    out['grid'] = geo
 
     # ---- simulation --------------------------------------------------------
     sim: dict = {}
@@ -378,24 +378,25 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         if cd_file:             fr['cd_file']  = cd_file
         out['friction'] = fr
 
-    # ---- physics -----------------------------------------------------------
-    ph: dict = {}
+    # ---- physics / boundaries / initial --------------------------------------
+    # C_smg intentionally not consumed (Smagorinsky was amputated upstream);
+    # it falls through to the unknown-key comment block.
+    if pop_bool('PERIODIC'):
+        out['boundaries'] = {'periodic': ['y']}
     wl = pop_val('WATER_LEVEL')
-    if wl is not None: ph['water_level'] = wl
-    if pop_bool('PERIODIC'): ph['periodic'] = True
-    disp = pop_bool('DISPERSION', True)
-    if not disp: ph['dispersion'] = False
-    for k, yk in (('Gamma1', 'Gamma1'), ('Gamma2', 'Gamma2'),
-                  ('Beta_ref', 'Beta_ref'), ('Gamma3', 'Gamma3'),
-                  ('SWE_ETA_DEP', 'SWE_ETA_DEP'), ('C_smg', 'C_smg')):
+    if wl is not None:
+        out['initial'] = {'water_level': wl}
+
+    disp: dict = {}
+    if not pop_bool('DISPERSION', True):
+        disp['scheme'] = 'nswe'
+    for k, yk in (('Gamma1', 'gamma1'), ('Gamma2', 'gamma2'),
+                  ('Gamma3', 'gamma3'), ('Beta_ref', 'beta_ref'),
+                  ('SWE_ETA_DEP', 'swe_eta_dep')):
         v = pop_val(k)
-        if v is not None: ph[yk] = v
-    vb = pop_bool('VISCOSITY_BREAKING', True)
-    if not vb: ph['viscosity_breaking'] = False
-    if ph:
-        out['physics'] = ph
-    else:
-        pop('DISPERSION'); pop('VISCOSITY_BREAKING')
+        if v is not None: disp[yk] = v
+    if disp:
+        out['physics'] = {'dispersion': disp}
 
     # ---- numerics ----------------------------------------------------------
     # Time_Scheme dropped: the modern stepper is RK3-only (falls through to
@@ -417,6 +418,9 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
 
     # ---- breaking ----------------------------------------------------------
     br: dict = {}
+    # nee VISCOSITY_BREAKING (T -> eddy_viscosity, default; F -> shock_capturing)
+    if not pop_bool('VISCOSITY_BREAKING', True):
+        br['model'] = 'shock_capturing'
     roller = pop_bool('ROLLER')
     if roller: br['roller'] = True
     sb = pop_bool('SHOW_BREAKING', True)
