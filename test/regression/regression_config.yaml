@@ -6,7 +6,7 @@ refs:
     cmake_flags: ["HYPRE_DIR={repo_root}/extern/hypre/installed"]
 
 executables:
-  # ── 2D  (ref: regression-ref/v4.0-modern @ fb431bf — cord cut) ───────
+  # ── 2D  (ref: regression-ref/v4.0-modern @ ac15e8f — post-cord-cut baseline) ───────
   central:
     cmake_flags: [ZERO_PHASE=ON]
     ref: 2d
