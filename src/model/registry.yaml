@@ -365,13 +365,8 @@ parameters:
     latex:        ~
 
   # ── numerics ───────────────────────────────────────────────────────────────
-  - name:         arr_time_min_h
-    legacy_name:  ArrTimeMin
-    yaml_path:    "numerics.arr_time_min_h"
-    units:        "m"
-    default:      0.001
-    latex:        "$H_{\\mathrm{arr}}$"
-
+  # Enum values are lowercase in YAML; the reader upcases before the
+  # prefix-dispatch comparisons in kernel_fluxes.
   - name:         cfl
     legacy_name:  CFL
     yaml_path:    "numerics.cfl"
@@ -379,53 +374,34 @@ parameters:
     default:      0.5
     latex:        "$C_{\\mathrm{CFL}}$"
 
-  - name:         construction
+  - name:         flux_solver
     legacy_name:  CONSTR
-    yaml_path:    "numerics.construction"
+    yaml_path:    "numerics.flux_solver"
     units:        ~
-    default:      "HLLC"
+    default:      "hllc"
     latex:        ~
 
   - name:         froude_cap
     legacy_name:  FroudeCap
     yaml_path:    "numerics.froude_cap"
     units:        ~
-    default:      10.0
+    default:      3.0
     latex:        "$Fr_{\\mathrm{cap}}$"
 
-  - name:         high_order
-    legacy_name:  HIGH_ORDER
-    yaml_path:    "numerics.high_order"
-    units:        ~
-    default:      "FOURTH"
-    latex:        ~
-
+  # Single wet/dry floor: legacy folded MinDepth/MinDepthFrc to their
+  # minimum (old io.F), so the pair was one value in practice.
   - name:         min_depth
     legacy_name:  MinDepth
     yaml_path:    "numerics.min_depth"
     units:        "m"
-    default:      0.001
+    default:      0.1
     latex:        "$d_{\\min}$"
 
-  - name:         min_depth_frc
-    legacy_name:  MinDepthFrc
-    yaml_path:    "numerics.min_depth_frc"
-    units:        "m"
-    default:      0.5
-    latex:        "$d_{\\min,f}$"
-
-  - name:         out_time
-    legacy_name:  OUT_Time
-    yaml_path:    "numerics.out_time"
+  - name:         reconstruction
+    legacy_name:  HIGH_ORDER
+    yaml_path:    "numerics.reconstruction"
     units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         time_scheme
-    legacy_name:  Time_Scheme
-    yaml_path:    "numerics.time_scheme"
-    units:        ~
-    default:      "Runge_Kutta"
+    default:      "fourth"
     latex:        ~
 
   # ── obstacle ───────────────────────────────────────────────────────────────
@@ -451,6 +427,15 @@ parameters:
     latex:        ~
 
   # ── output ─────────────────────────────────────────────────────────────────
+  # arrival_time: block presence enables the first-arrival map (nee
+  # numerics.OUT_Time); time-of-first-exceedance reducer, no cadence.
+  - name:         arrival_time_min_height
+    legacy_name:  ArrTimeMin
+    yaml_path:    "output.arrival_time.min_height"
+    units:        "m"
+    default:      0.001
+    latex:        "$H_{\\mathrm{arr}}$"
+
   - name:         depth_out
     legacy_name:  OUT_DEPTH
     yaml_path:    "output.depth_out"
@@ -726,34 +711,6 @@ parameters:
     yaml_path:    "friction.manning"
     units:        ~
     default:      false
-    latex:        ~
-
-  - name:         arrtime_min_h
-    legacy_name:  ArrTimeMinH
-    yaml_path:    "numerics.ArrTimeMinH"
-    units:        ~
-    default:      0.001
-    latex:        ~
-
-  - name:         froude_cap
-    legacy_name:  FroudeCap
-    yaml_path:    "numerics.FroudeCap"
-    units:        ~
-    default:      3.0
-    latex:        ~
-
-  - name:         min_depth
-    legacy_name:  MinDepth
-    yaml_path:    "numerics.MinDepth"
-    units:        ~
-    default:      0.1
-    latex:        ~
-
-  - name:         min_depth_frc
-    legacy_name:  MinDepthFrc
-    yaml_path:    "numerics.MinDepthFrc"
-    units:        ~
-    default:      0.1
     latex:        ~
 
   - name:         breakwater_absorb_coef

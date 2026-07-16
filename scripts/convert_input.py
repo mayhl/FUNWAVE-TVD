@@ -398,20 +398,20 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         pop('DISPERSION'); pop('VISCOSITY_BREAKING')
 
     # ---- numerics ----------------------------------------------------------
+    # Time_Scheme dropped: the modern stepper is RK3-only (falls through to
+    # the unknown-key comment block if present).
     nu: dict = {}
-    for k, yk in (('Time_Scheme', 'Time_Scheme'),
-                  ('CONSTRUCTION', 'CONSTRUCTION'),
-                  ('HIGH_ORDER', 'HIGH_ORDER')):
+    for k, yk in (('CONSTRUCTION', 'flux_solver'),
+                  ('HIGH_ORDER', 'reconstruction')):
         v = pop_str(k)
-        if v is not None: nu[yk] = v
-    for k, yk in (('CFL', 'CFL'), ('FroudeCap', 'FroudeCap'),
-                  ('MinDepth', 'MinDepth'), ('MinDepthFrc', 'MinDepthFrc')):
+        if v is not None: nu[yk] = v.lower()
+    for k, yk in (('CFL', 'cfl'), ('FroudeCap', 'froude_cap')):
         v = pop_val(k)
         if v is not None: nu[yk] = v
-    ot = pop_bool('OUT_Time')
-    if ot: nu['OUT_Time'] = True
-    atm = pop_val('ArrTimeMin')
-    if atm is not None: nu['ArrTimeMinH'] = atm
+    # legacy folded the MinDepth/MinDepthFrc pair to their minimum (old io.F)
+    md = pop_val('MinDepth'); mdf = pop_val('MinDepthFrc')
+    floors = [v for v in (md, mdf) if v is not None]
+    if floors: nu['min_depth'] = min(floors)
     if nu:
         out['numerics'] = nu
 
@@ -450,6 +450,14 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     if ti is not None: op['T_INTV_mean'] = ti
     st = pop_val('STEADY_TIME')
     if st is not None: op['STEADY_TIME'] = st
+
+    # first-arrival map (nee numerics OUT_Time/ArrTimeMin); min_height is
+    # always written so the block never serialises as a bare null key
+    if _bool(pop('OUT_Time') or 'F'):
+        atm = pop_val('ArrTimeMin')
+        op['arrival_time'] = {'min_height': atm if atm is not None else 0.001}
+    else:
+        pop('ArrTimeMin')
 
     # depth_out — static field, separate from variables list
     depth_out = pop_bool('DEPTH_OUT')

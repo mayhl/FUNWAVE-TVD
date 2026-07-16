@@ -685,7 +685,7 @@ contains
          if (out%OUT_Umax) call add_var(vars, prefs, nv, "u_max", "umax")
          if (out%OUT_MFmax) call add_var(vars, prefs, nv, "mf_max", "MFmax")
          if (out%OUT_VORmax) call add_var(vars, prefs, nv, "vort_max", "VORmax")
-         if (this%numerics%OUT_Time) call add_var(vars, prefs, nv, "arr_time", "time")
+         if (this%output%out_arr_time) call add_var(vars, prefs, nv, "arr_time", "time")
          ! Legacy gates the nubrk write on VISCOSITY_BREAKING, not OUT_NU alone
          if (out%OUT_NU .and. this%physics%viscosity_breaking) &
             call add_var(vars, prefs, nv, "nu_break", "nubrk")

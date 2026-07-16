@@ -886,7 +886,7 @@ contains
                  out => this%output, num => this%numerics)
 
          if (.not. (out%OUT_Hmax .or. out%OUT_Hmin .or. out%OUT_Umax &
-                    .or. out%OUT_MFmax .or. num%OUT_Time)) return
+                    .or. out%OUT_MFmax .or. out%out_arr_time)) return
 
          do j = 1, lp%nloc
             do i = 1, lp%mloc
@@ -906,9 +906,9 @@ contains
                   maxv = (f%u(i, j)**2 + f%v(i, j)**2)*f%h(i, j)
                   if (maxv > f%mf_max(i, j)) f%mf_max(i, j) = maxv
                end if
-               if (num%OUT_Time) then
+               if (out%out_arr_time) then
                   if (f%arr_time(i, j) == 0.0_SP .and. &
-                      abs(f%eta(i, j)) > num%ArrTimeMin) then
+                      abs(f%eta(i, j)) > out%arr_time_min_h) then
                      f%arr_time(i, j) = time
                   end if
                end if

@@ -6,17 +6,20 @@
 !  Numerics parameters YAML reader
 !
 !  YAML block: numerics:
-!    Time_Scheme:  <string>   'Runge_Kutta' | 'Predictor_Corrector',  default Runge_Kutta
-!    CONSTRUCTION: <string>   'HLLC' | 'HLL' | ...,                   default HLLC
-!    HIGH_ORDER:   <string>   'FOURTH' | 'SECOND' | ...,              default FOURTH
-!    CFL:          <real>     CFL number,                              default 0.5
-!    FroudeCap:    <real>     maximum Froude number,                   default 3.0
-!    MinDepth:     <real>     minimum wet depth (m),                   default 0.1
-!    MinDepthFrc:  <real>     minimum depth for friction (m),          default 0.1
-!    OUT_Time:     <bool>     record wave arrival time,                default NO
-!    ArrTimeMinH:  <real>     wave height threshold for arrival (m),   default 0.001
+!    cfl:            <real>    CFL number,                             default 0.5
+!    flux_solver:    <string>  'hllc' | 'hll',                         default hllc
+!    froude_cap:     <real>    maximum Froude number,                  default 3.0
+!    min_depth:      <real>    wet/dry + friction floor (m),           default 0.1
+!    reconstruction: <string>  'fourth' | 'fminmod' | 'weno' | 'mlp' | 'basic',
+!                              default fourth
 !
-!  Note: fixed_dt / dt live in simulation: > time_stepping:.
+!  Enum values are lowercase in YAML and upcased here for the prefix
+!  dispatch in kernel_fluxes.  min_depth is a single floor: legacy folded
+!  MinDepth/MinDepthFrc to their minimum (old io.F), so the pair was one
+!  value in practice.
+!
+!  Note: fixed_dt / dt live in simulation: > time_stepping:.  The arrival
+!  time map moved to output: > arrival_time: (it is an output product).
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -28,11 +31,9 @@ module model_numerics_mod
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_NUMERICS_ARRTIMEMINH, DEF_NUMERICS_CFL, &
-                                        DEF_NUMERICS_CONSTRUCTION, DEF_NUMERICS_FROUDECAP, &
-                                        DEF_NUMERICS_HIGH_ORDER, DEF_NUMERICS_MINDEPTH, &
-                                        DEF_NUMERICS_MINDEPTHFRC, DEF_NUMERICS_OUT_TIME, &
-                                        DEF_NUMERICS_TIME_SCHEME
+   use model_config_defaults_mod, only: DEF_NUMERICS_CFL, DEF_NUMERICS_FLUX_SOLVER, &
+                                        DEF_NUMERICS_FROUDE_CAP, DEF_NUMERICS_MIN_DEPTH, &
+                                        DEF_NUMERICS_RECONSTRUCTION
 
    implicit none
 
@@ -41,17 +42,13 @@ module model_numerics_mod
 
    type, extends(type_model_base) :: type_model_numerics
 
-      character(:), allocatable :: Time_Scheme
-      character(:), allocatable :: construction   ! YAML key: CONSTRUCTION → CONSTR
-      character(:), allocatable :: high_order     ! YAML key: HIGH_ORDER
+      character(:), allocatable :: construction   ! YAML key: flux_solver
+      character(:), allocatable :: high_order     ! YAML key: reconstruction
 
       real(SP) :: CFL = 0.5_SP
       real(SP) :: FroudeCap = 3.0_SP
       real(SP) :: MinDepth = 0.1_SP
-      real(SP) :: MinDepthFrc = 0.1_SP
-
-      logical  :: OUT_Time = .false.
-      real(SP) :: ArrTimeMin = 0.001_SP
+      real(SP) :: MinDepthFrc = 0.1_SP   ! kept == MinDepth (single min_depth key)
 
    contains
       procedure :: read_input => numerics_read_input
@@ -67,8 +64,7 @@ contains
       type(type_env) :: sub_env
       logical :: no_num, no_key
 
-      ! Set string defaults before possible early return so io.F always gets valid values
-      this%Time_Scheme = "Runge_Kutta"
+      ! Set string defaults before possible early return so consumers always get valid values
       this%construction = "HLLC"
       this%high_order = "FOURTH"
 
@@ -76,23 +72,32 @@ contains
       this%is_activated = .not. no_num
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read("Time_Scheme", val=this%Time_Scheme, default=DEF_NUMERICS_TIME_SCHEME)
-      call sub_env%yaml%read("CONSTRUCTION", val=this%construction, default=DEF_NUMERICS_CONSTRUCTION)
-      call sub_env%yaml%read("HIGH_ORDER", val=this%high_order, default=DEF_NUMERICS_HIGH_ORDER)
+      call sub_env%yaml%read("flux_solver", val=this%construction, default=DEF_NUMERICS_FLUX_SOLVER)
+      call sub_env%yaml%read("reconstruction", val=this%high_order, default=DEF_NUMERICS_RECONSTRUCTION)
+      ! kernel_fluxes dispatches on uppercase prefixes
+      this%construction = upcase(this%construction)
+      this%high_order = upcase(this%high_order)
 
-      call sub_env%yaml%read("CFL", silent=no_key, val=this%CFL, default=DEF_NUMERICS_CFL)
-      call sub_env%yaml%read("FroudeCap", silent=no_key, val=this%FroudeCap, default=DEF_NUMERICS_FROUDECAP)
-      call sub_env%yaml%read("MinDepth", silent=no_key, val=this%MinDepth, default=DEF_NUMERICS_MINDEPTH)
-      call sub_env%yaml%read("MinDepthFrc", silent=no_key, val=this%MinDepthFrc, default=DEF_NUMERICS_MINDEPTHFRC)
-      ! legacy io.F folds the pair to their minimum (both floors track
-      ! the smaller of the two; setting only MinDepth is the common case)
-      this%MinDepthFrc = min(this%MinDepthFrc, this%MinDepth)
-      this%MinDepth = this%MinDepthFrc
-
-      call sub_env%yaml%read("OUT_Time", val=this%OUT_Time, default=DEF_NUMERICS_OUT_TIME)
-      call sub_env%yaml%read("ArrTimeMinH", silent=no_key, val=this%ArrTimeMin, default=DEF_NUMERICS_ARRTIMEMINH)
+      call sub_env%yaml%read("cfl", silent=no_key, val=this%CFL, default=DEF_NUMERICS_CFL)
+      call sub_env%yaml%read("froude_cap", silent=no_key, val=this%FroudeCap, default=DEF_NUMERICS_FROUDE_CAP)
+      ! single wet/dry + friction floor; legacy folded the MinDepth/
+      ! MinDepthFrc pair to their minimum so they were one value in practice
+      call sub_env%yaml%read("min_depth", silent=no_key, val=this%MinDepth, default=DEF_NUMERICS_MIN_DEPTH)
+      this%MinDepthFrc = this%MinDepth
 
    end subroutine numerics_read_input
+
+   pure function upcase(s) result(u)
+      character(*), intent(in) :: s
+      character(len(s)) :: u
+      integer :: i, c
+
+      do i = 1, len(s)
+         c = iachar(s(i:i))
+         if (c >= iachar("a") .and. c <= iachar("z")) c = c - 32
+         u(i:i) = achar(c)
+      end do
+   end function upcase
 
    ! ----------------------------------------------------------------
    ! Adaptive CFL timestep (legacy ESTIMATE_DT, old/misc.F):

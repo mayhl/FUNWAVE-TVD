@@ -40,7 +40,10 @@ module model_output_mod
    use model_base_mod, only: type_model_base
    use mpi_f08
 
-   use model_config_defaults_mod, only: DEF_OUTPUT_DEPTH_OUT, &
+   use core_yaml_file_mod, only: type_yaml_reader
+
+   use model_config_defaults_mod, only: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT, &
+                                        DEF_OUTPUT_DEPTH_OUT, &
                                         DEF_OUTPUT_FIELD_IO_TYPE, &
                                         DEF_OUTPUT_NUMBER_STATIONS, DEF_OUTPUT_OUTPUT_RES, &
                                         DEF_OUTPUT_RESULT_FOLDER, DEF_OUTPUT_STEADY_TIME, &
@@ -97,6 +100,11 @@ module model_output_mod
       ! Depth output — static (no time component) unless sediment is active
       logical :: depth_out = .false.
 
+      ! First-arrival map (nee numerics OUT_Time/ArrTimeMin): block presence
+      ! enables the time-of-first-exceedance accumulator; no cadence
+      logical  :: out_arr_time = .false.
+      real(SP) :: arr_time_min_h = 0.001_SP
+
       ! Per-variable output flags; derived from variables: list
       logical :: OUT_U = .false.
       logical :: OUT_V = .false.
@@ -152,9 +160,10 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
+      type(type_yaml_reader) :: arr_yaml
       type(type_string), allocatable :: var_list(:)
       integer :: iv
-      logical :: is_empty, no_key, no_vars
+      logical :: is_empty, no_key, no_vars, no_arr
 
       ! Initialize string fields before possible early return so io.F always gets valid values
       this%result_folder = "./output/"
@@ -181,6 +190,15 @@ contains
       call sub_env%yaml%read("EtaBlowVal", silent=no_key, val=this%EtaBlowVal)
       this%has_blow_val = .not. no_key
       call sub_env%yaml%read("depth_out", val=this%depth_out, default=DEF_OUTPUT_DEPTH_OUT)
+
+      ! arrival_time: block presence enables the first-arrival map
+      arr_yaml = sub_env%yaml%cast_dictionary("arrival_time", no_arr)
+      if (.not. no_arr) then
+         this%out_arr_time = .true.
+         call arr_yaml%read("min_height", silent=no_key, val=this%arr_time_min_h, &
+                            default=DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT)
+      end if
+
       call sub_env%yaml%read("T_INTV_mean", silent=no_key, val=this%T_INTV_mean, default=DEF_OUTPUT_T_INTV_MEAN)
       call sub_env%yaml%read("STEADY_TIME", silent=no_key, val=this%STEADY_TIME, default=DEF_OUTPUT_STEADY_TIME)
 
