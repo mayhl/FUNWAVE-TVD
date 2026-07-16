@@ -575,11 +575,13 @@ parameters:
     default:      "fully_nonlinear"
     latex:        ~
 
+  # 0.8 adopted as the project standard 2026-07-16 (deliberate post-cut
+  # change; the legacy default was 0.7)
   - name:         dispersion_swe_eta_dep
     legacy_name:  SWE_ETA_DEP
     yaml_path:    "physics.dispersion.swe_eta_dep"
     units:        ~
-    default:      0.7
+    default:      0.8
     latex:        "$\\eta_{\\mathrm{SWE}}$"
 
   # ── simulation ─────────────────────────────────────────────────────────────

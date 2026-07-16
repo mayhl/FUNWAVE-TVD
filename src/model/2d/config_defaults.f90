@@ -83,7 +83,7 @@ module model_config_defaults_mod
    ! ── physics ──
    character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"
-   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.7"
+   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.8"
    ! ── precipitation ──
    character(*), parameter :: DEF_PRECIPITATION_OUT_PRECIPITATION = "YES"
    character(*), parameter :: DEF_PRECIPITATION_RAINWAVEINTERACTION = "NO"

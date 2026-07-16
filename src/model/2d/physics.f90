@@ -17,7 +17,9 @@
 !      gamma2:      <real>     nonlinearity coefficient (CART) — override
 !      gamma3:      <real>     linearity switch coefficient — override
 !      beta_ref:    <real>     reference level (CART/ZALPHA),  default -0.531
-!      swe_eta_dep: <real>     SWE transition depth fraction,  default 0.7
+!      swe_eta_dep: <real>     SWE transition depth fraction,  default 0.8
+!                              (project standard since 2026-07-16; legacy
+!                              default was 0.7)
 !
 !  Also read here as stop-gap adapters (final owners come later in the
 !  config reorg; see design notes):
@@ -65,7 +67,7 @@ module model_physics_mod
       real(SP) :: Beta_ref = -0.531_SP
       real(SP) :: Gamma3 = 1.0_SP
       logical  :: viscosity_breaking = .true.   ! set from breaking.model in model_setup
-      real(SP) :: SWE_ETA_DEP = 0.70_SP
+      real(SP) :: SWE_ETA_DEP = 0.80_SP
 
       ! f-plane Coriolis (legacy has the source term in the spherical
       ! branch only; [[design-grid-crs]] decouples f from the metric —
