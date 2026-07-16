@@ -1,0 +1,48 @@
+! Linear-dispersion validation — fundamental seiche in a closed flat basin.
+! One half wavelength across L = Mglob*DX = 20 m, so k = pi/L; kh is set by the
+! depth alone (kh = k*DEPTH_FLAT), swept a..f = 0.31/0.94/1.88/2.83/4.00/12.57.
+! e/f probe the short-wave edge of the Boussinesq range (f = 4*pi, the 2D upper
+! bound past which the highly dispersive 3D model takes over); the gate checks the
+! period against the model's OWN Nwogu relation, so it stays a correctness test
+! even where Nwogu departs from Airy.  Small amplitude keeps it linear; no
+! friction/breaking/sponge so only dispersion sets the oscillation period.
+
+TITLE = dispersion_2d_khe
+
+PX = 4
+PY = 1
+
+DEPTH_TYPE = FLAT
+DEPTH_FLAT = 25.5
+
+Mglob = 100
+Nglob = 3
+DX = 0.2
+DY = 0.2
+
+TOTAL_TIME = 50.0
+PLOT_INTV = 50.0
+SCREEN_INTV = 10.0
+
+WAVEMAKER = INI_SINE
+AMP = 0.01
+
+PERIODIC = F
+
+DIFFUSION_SPONGE = F
+FRICTION_SPONGE = F
+DIRECT_SPONGE = F
+
+Cd = 0.0
+VISCOSITY_BREAKING = F
+
+CFL = 0.5
+FroudeCap = 3.0
+MinDepth = 0.01
+
+NumberStations = 1
+STATIONS_FILE = stations.txt
+PLOT_INTV_STATION = 0.05
+
+DEPTH_OUT = T
+ETA = T

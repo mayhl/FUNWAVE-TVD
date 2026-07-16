@@ -1,0 +1,34 @@
+# Validation suite — physics oracles (analytic reference, physical tolerance).
+#
+# Ref-less by design: each executable declares no `ref:` key, so the runner
+# builds a single binary and each postproc compares the run against theory
+# instead of a reference build.  This is the "one repo + oracle" counterpart
+# to the regression suite's two-repo byte comparison.
+#
+# Run with:
+#   FUNWAVE_REGRESSION_CONFIG=test/validation/validation_config.yaml \
+#     uv run python -m test.framework.cli regression
+
+executables:
+  validation-2d:
+    cmake_flags: [ZERO_PHASE=ON]
+
+simulations:
+  # ── linear dispersion: fundamental seiche vs the Nwogu relation ──────────
+  # kh swept a..f = 0.31/0.94/1.88/2.83/4.00/12.57; e/f probe the short-wave edge
+  # of the Boussinesq range (f = 4*pi, the 2D upper bound), checked vs the model's
+  # own Nwogu relation so they stay correctness tests where Nwogu departs from Airy.
+  - name: dispersion_2d
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/dispersion_2d
+    input_files: [kh_a.txt, kh_b.txt, kh_c.txt, kh_d.txt, kh_e.txt, kh_f.txt]
+    preprocess:
+      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, dispersion]
+    postprocess:
+      dispersion: test.validation.oracles.dispersion
+    tolerances:
+      dispersion: { period_error_pct: 5.0 }
