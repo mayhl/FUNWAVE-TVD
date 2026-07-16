@@ -123,6 +123,7 @@ _WK_PARAMS: dict[str, list[str]] = {
     'INI_SOLITARY': ['AMP', 'DEP', 'XWAVEMAKER'],
     'INI_REC': ['Xc', 'Yc', 'WID', 'AMP'],
     'INI_Gau': ['AMP', 'Xc', 'Yc', 'WID', 'GauRadius'],
+    'INI_SINE': ['AMP', 'mode_x', 'mode_y'],
     'WK_REG': [
         'Xc_WK', 'Yc_WK', 'DEP_WK', 'Tperiod', 'AMP_WK',
         'Theta_WK', 'Time_ramp', 'Delta_WK', 'Ywidth_WK',
@@ -476,7 +477,7 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
 
     # ---- meteo (atmospheric forcing) ---------------------------------------
     # a: MeteoGausian, b: WindConstantField.  Legacy key names are preserved
-    # verbatim so both engines round-trip the same identifiers.
+    # verbatim so existing input decks round-trip the same identifiers.
     mt: dict = {}
     mg = pop_bool('MeteoGausian')
     if mg:
