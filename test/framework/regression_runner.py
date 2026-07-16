@@ -472,11 +472,14 @@ class RegressionRunner(BaseRunner):
         any_failed = any(r.status not in ("PASS", "XFAIL", "COMPLETED") for r in sim_results)
         # TODO: honour --no-auto-report: skip this block when any_failed but flag is set
         if report or pdf or any_failed:
-            unique_refs = sorted({exe_dirs[s["exe_type"]][2] for s in simulations})
+            # Oracle exes have no ref repo (ref_branch / ref_hash are None / absent);
+            # substitute "oracle" so a failing run renders a report instead of
+            # crashing on a None in the join.
+            unique_refs = sorted({exe_dirs[s["exe_type"]][2] or "oracle" for s in simulations})
             meta = ReportMeta(
                 ref_branch=", ".join(unique_refs),
                 dev_branch=current_branch,
-                ref_hash=", ".join(ref_hashes.get(t, "")[:8] for t in sorted(exe_dirs)),
+                ref_hash=", ".join((ref_hashes.get(t) or "oracle")[:8] for t in sorted(exe_dirs)),
                 dev_hash=curr_hash,
             )
             base = Path(self.repo_root) / "workspaces" / "regression_report"
