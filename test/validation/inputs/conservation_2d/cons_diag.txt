@@ -1,0 +1,48 @@
+! Mass/energy conservation validation — closed SQUARE basin, oblique standing mode.
+! A frictionless, breaking-free, sponge-free closed basin conserves total water
+! volume V = integral (eta + h) dA to machine precision (flux-form continuity with
+! wall BC) and total energy E = 1/2 g integral eta^2 dA + 1/2 integral H |u|^2 dA to
+! within the Boussinesq dispersive-energy exchange plus numerical dissipation.  The
+! oracle integrates the ETA/U/V field frames and checks the drift of both.  This
+! case is the diagonal mode (m_x, m_y) = (4, 3) so both x- and y-fluxes are exercised.
+! L = Mglob*DX = 20 m, h = 2 m -> kh ~ 1.57.
+
+TITLE = conservation_2d_diag
+
+PX = 4
+PY = 1
+
+DEPTH_TYPE = FLAT
+DEPTH_FLAT = 2.0
+
+Mglob = 100
+Nglob = 100
+DX = 0.2
+DY = 0.2
+
+TOTAL_TIME = 40.0
+PLOT_INTV = 1.0
+SCREEN_INTV = 10.0
+
+WAVEMAKER = INI_SINE
+AMP = 0.01
+mode_x = 4
+mode_y = 3
+
+PERIODIC = F
+
+DIFFUSION_SPONGE = F
+FRICTION_SPONGE = F
+DIRECT_SPONGE = F
+
+Cd = 0.0
+VISCOSITY_BREAKING = F
+
+CFL = 0.5
+FroudeCap = 3.0
+MinDepth = 0.01
+
+DEPTH_OUT = T
+ETA = T
+U = T
+V = T

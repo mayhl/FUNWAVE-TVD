@@ -33,6 +33,48 @@ simulations:
     tolerances:
       dispersion: { period_error_pct: 5.0 }
 
+  # ── mass conservation: closed frictionless basin, volume drift over the run ──
+  # No forcing/friction/breaking/sponge, so total volume (flux-form continuity +
+  # wall BC) conserves to ~machine precision.  diag (4,3) exercises both fluxes,
+  # axis (5,0) the x-flux alone (x/y-asymmetry probe).  Energy is reported as an
+  # ungated diagnostic here: at kh ~ 1.57 leading-order PE+KE is not the Boussinesq
+  # invariant (it exchanges with dispersive energy), so only mass is a gate.
+  - name: conservation_2d
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/conservation_2d
+    input_files: [cons_diag.txt, cons_axis.txt]
+    preprocess:
+      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, conservation]
+    postprocess:
+      conservation: test.validation.oracles.conservation
+    tolerances:
+      conservation: { mass_drift_pct: 0.01 }
+
+  # ── energy conservation: low-kh (weakly dispersive) closed basin ─────────
+  # kh ~ 0.16 (shallow h = 0.5 m, mode (2,0)) so leading-order PE+KE IS the true
+  # invariant to O((kh)^2) ~ 2.5% and the multi-period window mean averages that
+  # residual out; numerical dissipation then shows as a secular energy change.
+  # FUTURE: the full dispersive energy functional (A/B gradient terms) would gate
+  # energy at any kh -- an in-model metric, deferred.
+  - name: conservation_2d_lowkh
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/conservation_2d
+    input_files: [cons_lowkh.txt]
+    preprocess:
+      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, conservation]
+    postprocess:
+      conservation: test.validation.oracles.conservation
+    tolerances:
+      conservation: { mass_drift_pct: 0.01, energy_drift_pct: 3.0 }
+
   # ── dispersion isotropy: oblique modes at fixed |k| across angles ────────
   # Square-basin standing modes (m_x, m_y) sharing m_x^2+m_y^2 = 25 -> one |k| (kh
   # ~ 1.57) at theta = 0/36.9/53.1/90 deg; (5,0) vs (0,5) is the x<->y symmetry

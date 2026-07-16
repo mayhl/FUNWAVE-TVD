@@ -1,0 +1,46 @@
+! Mass/energy conservation validation — closed SQUARE basin, axis-aligned mode.
+! Companion to cons_diag: same closed frictionless/breaking-free/sponge-free basin,
+! but the (m_x, m_y) = (5, 0) mode excites only the x-flux, so a x/y asymmetry in the
+! continuity or energy bookkeeping shows up as a drift difference vs the diagonal case.
+! The oracle integrates the ETA/U/V frames and checks volume + energy drift.
+! L = Mglob*DX = 20 m, h = 2 m -> kh ~ 1.57.
+
+TITLE = conservation_2d_axis
+
+PX = 4
+PY = 1
+
+DEPTH_TYPE = FLAT
+DEPTH_FLAT = 2.0
+
+Mglob = 100
+Nglob = 100
+DX = 0.2
+DY = 0.2
+
+TOTAL_TIME = 40.0
+PLOT_INTV = 1.0
+SCREEN_INTV = 10.0
+
+WAVEMAKER = INI_SINE
+AMP = 0.01
+mode_x = 5
+mode_y = 0
+
+PERIODIC = F
+
+DIFFUSION_SPONGE = F
+FRICTION_SPONGE = F
+DIRECT_SPONGE = F
+
+Cd = 0.0
+VISCOSITY_BREAKING = F
+
+CFL = 0.5
+FroudeCap = 3.0
+MinDepth = 0.01
+
+DEPTH_OUT = T
+ETA = T
+U = T
+V = T

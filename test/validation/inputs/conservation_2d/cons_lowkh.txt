@@ -1,0 +1,48 @@
+! Energy conservation validation — low-kh (weakly dispersive) closed SQUARE basin.
+! Shallow water h = 0.5 m with the (m_x, m_y) = (2, 0) mode gives kh ~ 0.16, so the
+! model is near the non-dispersive shallow-water limit where leading-order PE+KE IS
+! the conserved energy (dispersive exchange ~ (kh)^2 ~ 2.5%, averaged out by the
+! multi-period window mean).  Numerical dissipation then shows as a secular energy
+! change -- the gated quantity.  ~9 periods (T ~ 9 s) fit the 80 s run.  Mass is
+! also checked (machine precision, as in the diag/axis cases).
+! L = Mglob*DX = 20 m, h = 0.5 m, wavelength = L = 20 m.
+
+TITLE = conservation_2d_lowkh
+
+PX = 4
+PY = 1
+
+DEPTH_TYPE = FLAT
+DEPTH_FLAT = 0.5
+
+Mglob = 100
+Nglob = 100
+DX = 0.2
+DY = 0.2
+
+TOTAL_TIME = 80.0
+PLOT_INTV = 1.0
+SCREEN_INTV = 20.0
+
+WAVEMAKER = INI_SINE
+AMP = 0.005
+mode_x = 2
+mode_y = 0
+
+PERIODIC = F
+
+DIFFUSION_SPONGE = F
+FRICTION_SPONGE = F
+DIRECT_SPONGE = F
+
+Cd = 0.0
+VISCOSITY_BREAKING = F
+
+CFL = 0.5
+FroudeCap = 3.0
+MinDepth = 0.01
+
+DEPTH_OUT = T
+ETA = T
+U = T
+V = T
