@@ -32,3 +32,22 @@ simulations:
       dispersion: test.validation.oracles.dispersion
     tolerances:
       dispersion: { period_error_pct: 5.0 }
+
+  # ── dispersion isotropy: oblique modes at fixed |k| across angles ────────
+  # Square-basin standing modes (m_x, m_y) sharing m_x^2+m_y^2 = 25 -> one |k| (kh
+  # ~ 1.57) at theta = 0/36.9/53.1/90 deg; (5,0) vs (0,5) is the x<->y symmetry
+  # probe.  Reuses the dispersion oracle (checks each angle's period vs Nwogu).
+  - name: isotropy_2d
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/isotropy_2d
+    input_files: [iso_50.txt, iso_43.txt, iso_34.txt, iso_05.txt]
+    preprocess:
+      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, dispersion, isotropy]
+    postprocess:
+      dispersion: test.validation.oracles.dispersion
+    tolerances:
+      dispersion: { period_error_pct: 5.0 }

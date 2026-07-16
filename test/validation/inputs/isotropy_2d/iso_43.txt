@@ -1,0 +1,49 @@
+! Dispersion-isotropy validation — oblique standing wave in a closed SQUARE basin.
+! The mode (m_x, m_y) is eta = A cos(m_x pi x/L) cos(m_y pi y/L), so
+! |k| = (pi/L) sqrt(m_x^2 + m_y^2) and theta = atan2(m_y, m_x).  The four cases
+! share m_x^2 + m_y^2 = 25 (Pythagorean 3-4-5), so |k| (hence kh) is IDENTICAL at
+! theta = 0/36.9/53.1/90 deg — an isotropic scheme returns the same period at every
+! angle.  Each case is also checked against Nwogu individually; (5,0) vs (0,5) is
+! the exact x<->y symmetry probe.  L = Mglob*DX = 20 m, h = 2 m -> kh ~ 1.57.
+
+TITLE = isotropy_2d_43
+
+PX = 4
+PY = 1
+
+DEPTH_TYPE = FLAT
+DEPTH_FLAT = 2.0
+
+Mglob = 100
+Nglob = 100
+DX = 0.2
+DY = 0.2
+
+TOTAL_TIME = 40.0
+PLOT_INTV = 40.0
+SCREEN_INTV = 10.0
+
+WAVEMAKER = INI_SINE
+AMP = 0.01
+mode_x = 4
+mode_y = 3
+
+PERIODIC = F
+
+DIFFUSION_SPONGE = F
+FRICTION_SPONGE = F
+DIRECT_SPONGE = F
+
+Cd = 0.0
+VISCOSITY_BREAKING = F
+
+CFL = 0.5
+FroudeCap = 3.0
+MinDepth = 0.01
+
+NumberStations = 1
+STATIONS_FILE = stations.txt
+PLOT_INTV_STATION = 0.04
+
+DEPTH_OUT = T
+ETA = T
