@@ -73,7 +73,7 @@
 !-------------------------------------------------
 
 module model_wavemaker_mod
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, PI, DEG2RAD
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
    use model_tide_mod, only: type_model_tide
@@ -104,17 +104,6 @@ module model_wavemaker_mod
                                         DEF_WAVEMAKER_YC_WK, DEF_WAVEMAKER_YWIDTH_WK
 
    implicit none
-
-   ! Legacy PARAM pi is an UNSUFFIXED single-precision literal promoted
-   ! to SP (old/mod_param.F:71), 2.8e-8 above true pi — every wavemaker
-   ! formula inherits the offset, so parity requires reproducing it
-   ! here.  Reverse to core_constants PI post-6e (parity ledger).
-   real(SP), parameter :: PI = 3.141592653
-
-   ! Legacy PARAM DEG2RAD is the coarse literal 0.0175 (old/mod_param.F:80),
-   ! not pi/180 (0.0174533) — the DATA2D direction conversions inherit
-   ! the 0.27% angle error.  Reverse post-6e (parity ledger).
-   real(SP), parameter :: DEG2RAD_LEGACY = 0.0175_SP
 
    private
    public :: type_model_wavemaker
@@ -1359,8 +1348,8 @@ contains
    ! (unused) / NumFreq frequencies / NumDir directions (degrees) /
    ! NumDir rows of NumFreq amplitudes / optional NumDir rows of
    ! NumFreq phases (degrees).  Frequencies invert to periods (legacy
-   ! bare STOP on zero); directions convert via the coarse legacy
-   ! DEG2RAD = 0.0175; input phases via the truncated-pi literal.
+   ! bare STOP on zero); directions convert via DEG2RAD; input
+   ! phases via the truncated-pi literal.
    ! Missing phases: zero for parity builds, RANDOM_NUMBER otherwise
    ! (legacy random2() is compiler-specific).  Overrides Nfreq from
    ! the file header.
@@ -1420,7 +1409,7 @@ contains
             error stop "wavemaker: zero frequency in WaveCompFile"
          per_ser(j) = 1.0_SP/per_ser(j)
       end do
-      theta_ser = theta_ser*DEG2RAD_LEGACY
+      theta_ser = theta_ser*DEG2RAD
 
       this%Nfreq = num_freq
 
@@ -1997,8 +1986,8 @@ contains
 
    ! ----------------------------------------------------------------
    ! Private: per-component solve for a measured 2D spectrum (legacy
-   ! WK_WAVEMAKER_2D_SPECTRAL_DATA).  Directions convert through the
-   ! coarse legacy DEG2RAD; under periodic-y each (freq, dir) pair
+   ! WK_WAVEMAKER_2D_SPECTRAL_DATA).  Directions convert through
+   ! DEG2RAD; under periodic-y each (freq, dir) pair
    ! snaps via the nearest-of-two-modes rule — identical arithmetic to
    ! calc_periodic_theta, whose |theta| >= 90 error stop is
    ! unreachable here (|dir| < 60 prefiltered).  rI keeps the
@@ -2026,7 +2015,7 @@ contains
       integer :: nfre, kdir
       character(96) :: msg
 
-      dire = dire_deg*DEG2RAD_LEGACY
+      dire = dire_deg*DEG2RAD
       alpha1 = alpha + 1.0_SP/3.0_SP
 
       if (periodic) then
@@ -2127,7 +2116,7 @@ contains
       integer :: nfre
       character(96) :: msg
 
-      dire = dire_deg(1:nfreq)*DEG2RAD_LEGACY
+      dire = dire_deg(1:nfreq)*DEG2RAD
       alpha1 = alpha + 1.0_SP/3.0_SP
 
       if (periodic) then
