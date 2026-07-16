@@ -197,7 +197,7 @@ class RegressionRunner(BaseRunner):
     def _run_postprocess(self, sim, ref_run_dir, curr_run_dir, ref_status, curr_status,
                          verbose: bool = False) -> SimResult:
         """Run configured post-processors after a simulation pair and return a SimResult."""
-        run_ok = ref_status in ("COMPLETED", "cached") and curr_status == "COMPLETED"
+        run_ok = ref_status in ("COMPLETED", "cached", "oracle") and curr_status == "COMPLETED"
         result = SimResult(
             name=sim["name"],
             status="SIM_FAILED" if not run_ok else "COMPLETED",
@@ -305,29 +305,34 @@ class RegressionRunner(BaseRunner):
         exe_dirs = {}    # exe_type -> (ref_build_dir, curr_build_dir, ref_branch)
         ref_hashes = {}
         curr_hash = ""
+        def _tag(branch, h, rebuilt):
+            label = f"{branch}@{h[:8]}"
+            status = "[green]built[/green]" if rebuilt else "[dim]cached[/dim]"
+            return f"{label}  {status}"
+
         for exe_type in {s["exe_type"] for s in simulations}:
             spec = self.executables[exe_type]
             cmake_flags = self._resolve_cmake_flags(spec["cmake_flags"])
             ref_branch  = spec["ref_branch"]
+            oracle_mode = ref_branch is None   # no ref repo — an analytic oracle stands in
 
-            ref_source     = self._ensure_worktree(ref_branch) if ref_branch else self.repo_root
-            ref_workspace  = ref_branch if ref_branch else "ref"
-            ref_build_dir  = self._exe_build_dir(ref_workspace, exe_type)
             curr_build_dir = self._exe_build_dir("dev", exe_type)
-            exe_dirs[exe_type] = (ref_build_dir, curr_build_dir, ref_branch or ref_workspace)
-
             first_sim = next(s for s in simulations if s["exe_type"] == exe_type)
-            ref_bin  = os.path.join(ref_build_dir,  first_sim["binary"])
-            curr_bin = os.path.join(curr_build_dir, first_sim["binary"])
-
-            ref_hash,  ref_rebuilt  = self._build(ref_build_dir,  ref_source,     cmake_flags=cmake_flags, binary_path=ref_bin,  force=force, label=f"ref/{exe_type}  ({ref_branch})")
+            curr_bin  = os.path.join(curr_build_dir, first_sim["binary"])
             curr_hash, curr_rebuilt = self._build(curr_build_dir, self.repo_root, cmake_flags=cmake_flags, binary_path=curr_bin, force=force, label=f"dev/{exe_type}  ({current_branch})")
-            ref_hashes[exe_type] = ref_hash
 
-            def _tag(branch, h, rebuilt):
-                label = f"{branch}@{h[:8]}"
-                status = "[green]built[/green]" if rebuilt else "[dim]cached[/dim]"
-                return f"{label}  {status}"
+            # validation exe — one build; the postproc compares against theory, not a ref run
+            if oracle_mode:
+                exe_dirs[exe_type] = (None, curr_build_dir, None)
+                self.reporter.info(f"build \\[{exe_type}]  ref: [dim]oracle (no ref)[/dim]  dev: {_tag(current_branch, curr_hash, curr_rebuilt)}")
+                continue
+
+            ref_source    = self._ensure_worktree(ref_branch)
+            ref_build_dir = self._exe_build_dir(ref_branch, exe_type)
+            ref_bin       = os.path.join(ref_build_dir, first_sim["binary"])
+            ref_hash, ref_rebuilt = self._build(ref_build_dir, ref_source, cmake_flags=cmake_flags, binary_path=ref_bin, force=force, label=f"ref/{exe_type}  ({ref_branch})")
+            ref_hashes[exe_type] = ref_hash
+            exe_dirs[exe_type] = (ref_build_dir, curr_build_dir, ref_branch)
             self.reporter.info(f"build \\[{exe_type}]  ref: {_tag(ref_branch, ref_hash, ref_rebuilt)}  dev: {_tag(current_branch, curr_hash, curr_rebuilt)}")
 
         def _run_with_spinner(job_id, description):
@@ -345,57 +350,60 @@ class RegressionRunner(BaseRunner):
             exe_type = sim["exe_type"]
             ref_build_dir, curr_build_dir, ref_branch = exe_dirs[exe_type]
             curr_input = sim.get("curr_input", sim["input_file"])
+            oracle_mode = ref_build_dir is None   # validation — no ref run, compare vs theory
 
-            ref_run_dir  = os.path.join(ref_build_dir,  "runs", sim["name"])
             curr_run_dir = os.path.join(curr_build_dir, "runs", sim["name"])
-            ref_out      = os.path.join(ref_run_dir, sim["output_dir"])
-            sim_stamp    = os.path.join(ref_out, ".sim_complete")
+            ref_run_dir  = os.path.join(ref_build_dir, "runs", sim["name"]) if not oracle_mode else None
+            ref_out      = os.path.join(ref_run_dir, sim["output_dir"])   if not oracle_mode else None
+            sim_stamp    = os.path.join(ref_out, ".sim_complete")         if not oracle_mode else None
 
             if force:
-                if os.path.exists(sim_stamp):
+                if sim_stamp and os.path.exists(sim_stamp):
                     os.remove(sim_stamp)
                 for d in (ref_run_dir, curr_run_dir):
-                    if os.path.exists(d):
+                    if d and os.path.exists(d):
                         shutil.rmtree(d, ignore_errors=True)
 
-            # --- ref ---
+            # --- ref (skipped in oracle mode: theory is the reference) ---
             # Stamp records the dt mode that generated the cached ref; a
             # mismatch (or a legacy empty stamp) invalidates it — adaptive
             # refs are not comparable against fixed-dt dev runs or vice versa
-            dt_mode = "fixed_dt" if fixed_dt else "adaptive"
-            stamp_mode = None
-            if os.path.exists(sim_stamp):
-                try:
-                    stamp_mode = open(sim_stamp).read().strip() or None
-                except OSError:
-                    pass
-            ref_stderr = ""
+            ref_status  = "oracle"
+            ref_stderr  = ""
             ref_elapsed = 0.0
-            if stamp_mode == dt_mode:
-                ref_status = "cached"
-            else:
-                for d in (ref_run_dir, curr_run_dir):
-                    if os.path.exists(d):
-                        shutil.rmtree(d, ignore_errors=True)
-                self._setup_run_dir(sim, ref_run_dir, fixed_dt=fixed_dt)
-                ref_input = sim["input_file"]
-                if "preprocess" in sim and sim.get("preprocess_ref", False):
-                    self._preprocess(sim, ref_run_dir)
-                    ref_input = curr_input
-                ref_id = self.provider.submit(
-                    os.path.join(ref_build_dir, sim["binary"]), ref_input, ref_run_dir,
-                    np=sim.get("np", 1))
-                ref_status, ref_elapsed = _run_with_spinner(ref_id, f"  \\[{sim['name']}]  ref  running  (np={sim.get('np', 1)})")
-                if ref_status == "COMPLETED":
+            if not oracle_mode:
+                dt_mode = "fixed_dt" if fixed_dt else "adaptive"
+                stamp_mode = None
+                if os.path.exists(sim_stamp):
                     try:
-                        os.makedirs(ref_out, exist_ok=True)
-                        with open(os.path.join(ref_out, ".sim_complete"), "w") as f:
-                            f.write(dt_mode + "\n")
-                    except Exception:
+                        stamp_mode = open(sim_stamp).read().strip() or None
+                    except OSError:
                         pass
+                if stamp_mode == dt_mode:
+                    ref_status = "cached"
                 else:
-                    all_passed = False
-                    _, ref_stderr = self.provider.get_output(ref_id)
+                    for d in (ref_run_dir, curr_run_dir):
+                        if os.path.exists(d):
+                            shutil.rmtree(d, ignore_errors=True)
+                    self._setup_run_dir(sim, ref_run_dir, fixed_dt=fixed_dt)
+                    ref_input = sim["input_file"]
+                    if "preprocess" in sim and sim.get("preprocess_ref", False):
+                        self._preprocess(sim, ref_run_dir)
+                        ref_input = curr_input
+                    ref_id = self.provider.submit(
+                        os.path.join(ref_build_dir, sim["binary"]), ref_input, ref_run_dir,
+                        np=sim.get("np", 1))
+                    ref_status, ref_elapsed = _run_with_spinner(ref_id, f"  \\[{sim['name']}]  ref  running  (np={sim.get('np', 1)})")
+                    if ref_status == "COMPLETED":
+                        try:
+                            os.makedirs(ref_out, exist_ok=True)
+                            with open(os.path.join(ref_out, ".sim_complete"), "w") as f:
+                                f.write(dt_mode + "\n")
+                        except Exception:
+                            pass
+                    else:
+                        all_passed = False
+                        _, ref_stderr = self.provider.get_output(ref_id)
 
             # --- dev ---
             self._setup_run_dir(sim, curr_run_dir, fixed_dt=fixed_dt)
@@ -413,6 +421,7 @@ class RegressionRunner(BaseRunner):
             # --- execution result line ---
             def _fmt_run(s, elapsed=0.0):
                 if s == "cached":    return "[dim]cached[/dim]"
+                if s == "oracle":    return "[dim]oracle[/dim]"
                 if s == "COMPLETED": return f"[green]ran {elapsed:.0f}s[/green]"
                 return f"[red]{s}[/red]"
             run_line = f"  \\[{sim['name']}]  ref: {_fmt_run(ref_status, ref_elapsed)}  dev: {_fmt_run(curr_status, curr_elapsed)}"
