@@ -30,6 +30,8 @@
 !    Ywidth_WK: <length>        default 999999 (= no limit)
 !    --- solitary / initial IC ---
 !    AMP: <length>              AMP_SOLI
+!    mode_x: <int>              MODE_X, default 1 (INI_SINE x basin mode)
+!    mode_y: <int>              MODE_Y, default 0 (INI_SINE y basin mode; 0 = 1D)
 !    DEP: <length>              DEP_SOLI
 !    LAGTIME: <time>            LAG_SOLI, default 0
 !    XWAVEMAKER: <length>
@@ -139,6 +141,12 @@ module model_wavemaker_mod
       real(SP) :: LAG_SOLI = 0.0_SP   ! YAML key: LAGTIME
       real(SP) :: XWAVEMAKER = 0.0_SP
       logical  :: SolitaryPositiveDirection = .true.
+
+      ! Standing wave — INI_SINE.  Basin-mode numbers along x and y; the
+      ! default (1, 0) is the 1D fundamental seiche, mode_y >= 1 gives an
+      ! oblique (diagonal) 2D standing wave for the isotropy check.
+      integer  :: MODE_X = 1   ! YAML key: mode_x
+      integer  :: MODE_Y = 0   ! YAML key: mode_y
 
       ! Initial condition wavemakers — INI_REC, INI_GAU, INI_DIP
       real(SP) :: Xc = 0.0_SP
@@ -268,6 +276,8 @@ contains
 
       ! Solitary
       call sub_env%yaml%read("AMP", silent=no_key, val=this%AMP_SOLI, default=DEF_WAVEMAKER_AMP)
+      call sub_env%yaml%read("mode_x", silent=no_key, val=this%MODE_X, default="1")
+      call sub_env%yaml%read("mode_y", silent=no_key, val=this%MODE_Y, default="0")
       call sub_env%yaml%read("DEP", silent=no_key, val=this%DEP_SOLI, default=DEF_WAVEMAKER_DEP)
       call sub_env%yaml%read("LAGTIME", silent=no_key, val=this%LAG_SOLI, default=DEF_WAVEMAKER_LAGTIME)
       call sub_env%yaml%read("XWAVEMAKER", silent=no_key, val=this%XWAVEMAKER, default=DEF_WAVEMAKER_XWAVEMAKER)
@@ -1605,9 +1615,27 @@ contains
 
    ! ----------------------------------------------------------------
    ! Initial-condition wavemakers: fill eta/u/v at t=0.
-   ! Currently INI_SOLITARY only (legacy INITIAL_SOLITARY_WAVE,
-   ! old/samples.F); INI_REC/INI_GAU/INI_DIP/N_WAVE to follow.
+   ! Currently INI_SOLITARY (legacy INITIAL_SOLITARY_WAVE, old/samples.F)
+   ! and INI_SINE; INI_REC/INI_GAU/INI_DIP/N_WAVE to follow.
    ! No-op (still water) for source/BC wavemaker types.
+   !
+   ! INI_SINE — standing wave of a closed flat basin, for the linear-
+   ! dispersion validation case.  With reflective walls on all sides (the
+   ! default when no wavemaker/sponge drives a face), the basin modes are
+   !   $$ \eta(x,y) = a\,\cos(k_x x)\,\cos(k_y y), \quad u = v = 0 $$
+   !   $$ k_x = n_x \pi/(M\,\Delta x), \quad k_y = n_y \pi/(N\,\Delta y) $$
+   ! with amplitude $a$ = AMP, mode numbers $(n_x, n_y)$ = (mode_x, mode_y),
+   ! and $x, y$ measured from the left/back walls so the antinodes sit at the
+   ! walls (zero normal velocity, matching no-flux).  The default $(1, 0)$ is
+   ! the 1D fundamental seiche ($k_y = 0$, a half wavelength across the domain);
+   ! $n_y \ge 1$ tilts it into an oblique diagonal mode with $|k| =
+   ! \sqrt{k_x^2 + k_y^2}$ at angle $\theta = \arctan(k_y/k_x)$, so a fixed-$|k|$
+   ! sweep of $(n_x, n_y)$ on one grid probes dispersion ISOTROPY.
+   ! A still-water start with this cosine surface oscillates at the model's
+   ! $\omega(|k|)$; the measured period, checked against the Nwogu linear
+   ! dispersion relation, probes the dispersive terms directly.  Periodic BCs
+   ! are deliberately avoided here — periodic-x is not yet implemented, and the
+   ! closed basin needs only the default walls.
    !
    ! WKN-B solitary solution (Wei & Kirby Boussinesq, Nwogu form):
    !   $$ \eta(\xi) = a_1\,\mathrm{sech}^2(B\xi) + a_2\,\mathrm{sech}^4(B\xi) $$
@@ -1626,12 +1654,30 @@ contains
       type(type_grid_2d), intent(in)  :: grid
       real(SP), intent(out) :: eta(:, :), u(:, :), v(:, :)
 
-      real(SP) :: c_ph, b, a1, a2, au, sc, usign
+      real(SP) :: c_ph, b, a1, a2, au, sc, usign, kx, ky, xloc, yloc
       integer  :: i, j
 
       eta = 0.0_SP
       u = 0.0_SP
       v = 0.0_SP
+
+      ! Closed-basin standing wave — half wavelengths across the reflective
+      ! walls; x, y run from the left/back walls so the cos() antinodes sit at
+      ! the ends (zero normal velocity, matching no-flux).  mode_y = 0 leaves
+      ! ky = 0 so cos(ky y) = 1 and this is the 1D fundamental seiche; mode_y
+      ! >= 1 makes it an oblique diagonal mode for the isotropy check.
+      if (this%wavemaker_type == "INI_SINE") then
+         kx = real(this%MODE_X, SP)*PI/(real(grid%M, SP)*grid%dx0)
+         ky = real(this%MODE_Y, SP)*PI/(real(grid%N, SP)*grid%dy0)
+         do j = 1, grid%lp%nloc
+            do i = 1, grid%lp%mloc
+               xloc = (real(grid%ibegin + i - grid%lp%ib, SP) - 0.5_SP)*grid%dx0
+               yloc = (real(grid%jbegin + j - grid%lp%jb, SP) - 0.5_SP)*grid%dy0
+               eta(i, j) = this%AMP_SOLI*cos(kx*xloc)*cos(ky*yloc)
+            end do
+         end do
+         return
+      end if
 
       if (this%wavemaker_type /= "INI_SOLITARY") return
 
