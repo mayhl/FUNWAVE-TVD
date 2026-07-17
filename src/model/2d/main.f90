@@ -133,7 +133,8 @@ contains
       call this%breaking%read_input(this%env)
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
-      call boundaries_read_input(this%env, this%sponge, this%tide, this%physics)
+      call boundaries_read_input(this%env, this%sponge, this%tide, this%physics, &
+                                 this%wavemaker)
       call this%coupling%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
@@ -180,7 +181,8 @@ contains
       call this%breaking%read_input(this%env)
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
-      call boundaries_read_input(this%env, this%sponge, this%tide, this%physics)
+      call boundaries_read_input(this%env, this%sponge, this%tide, this%physics, &
+                                 this%wavemaker)
       call this%coupling%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)

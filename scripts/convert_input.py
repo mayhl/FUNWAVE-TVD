@@ -251,18 +251,102 @@ def _put(dst: dict, block: str, key: str, val):
         dst.setdefault(block, {})[key] = val
 
 
+def _convert_abs(pop_val):
+    """Legacy ABS -> spectrum-only wavemaker entry + west face block (config
+    reorg rung 3b): the face owns the relaxation strip (nee WidthWaveMaker/
+    R_,A_sponge_wavemaker; required keys, no legacy defaults exist) and the
+    series depth (nee DepthWaveMaker, DEP_WK fallback); WAVE_DATA_TYPE keys
+    the spectrum model + directionality like legacy io.F."""
+    wdt = str(pop_val("WAVE_DATA_TYPE") or "").upper()
+    if wdt.startswith("DATA"):
+        spec: dict = {"type": "spectrum_2d"}
+        v = pop_val("WaveCompFile")
+        if v is not None:
+            spec["file"] = v
+        spec["format"] = wdt
+    else:
+        spec = {"type": "jonswap" if wdt.startswith("JON") else "tma"}
+        for k, yk in (("Hmo", "hm0"), ("GammaTMA", "gamma")):
+            v = pop_val(k)
+            if v is not None:
+                spec[yk] = v
+        for k, yk in (("FreqPeak", "peak"), ("FreqMin", "min"), ("FreqMax", "max")):
+            _put(spec, "freq", yk, pop_val(k))
+        if "1D" in wdt:
+            for k in ("ThetaPeak", "Sigma_Theta", "Ntheta"):
+                pop_val(k)  # legacy forces 1D (Ntheta = 1); consume silently
+        else:
+            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread"), ("Ntheta", "n_bins")):
+                _put(spec, "directional", yk, pop_val(k))
+            # legacy 2D defaults (io.F ABS block) differ from the reader's
+            d = spec.setdefault("directional", {})
+            d.setdefault("peak", 0.0)
+            d.setdefault("spread", 10.0)
+            d.setdefault("n_bins", 24)
+        _put(spec, "discretization", "freq_bins", pop_val("Nfreq"))
+        spec.setdefault("discretization", {}).setdefault("freq_bins", 45)
+        eq = pop_val("EqualEnergy")
+        if eq is not None:
+            _put(spec, "discretization", "equal_energy", eq)
+    wm = {"name": "absorbing", "spectrum": spec}
+
+    depth = pop_val("DepthWaveMaker")
+    if depth is None:
+        depth = pop_val("DEP_WK")
+    forcing: dict = {"wavemaker": "absorbing"}
+    if depth is not None:
+        forcing["depth"] = depth
+    west: dict = {"forcing": forcing}
+
+    # generating-absorbing (nee TIDAL_BC_GEN_ABS): west tide target rides the
+    # forcing block and the relaxation_cells tide profile absorbs — the strip
+    # keys stay unused (legacy reads them into an ignored sponge_maker)
+    gen_abs = pop_val("TIDAL_BC_GEN_ABS")
+    if gen_abs:
+        pop_val("TideBcType")  # file presence selects DATA like rung 2
+        tf = pop_val("TideWestFileName")
+        if tf is not None:
+            forcing["file"] = tf
+        te = pop_val("TideWest_ETA")
+        if te is not None:
+            forcing["eta"] = te
+        for k in ("WidthWaveMaker", "R_sponge_wavemaker", "A_sponge_wavemaker"):
+            pop_val(k)
+        return wm, west
+
+    sponge: dict = {}
+    v = pop_val("WidthWaveMaker")
+    if v is not None:
+        sponge["width"] = v
+    direct = {}
+    for k, yk in (("R_sponge_wavemaker", "r"), ("A_sponge_wavemaker", "a")):
+        v = pop_val(k)
+        if v is not None:
+            direct[yk] = v
+    if direct:
+        sponge["direct"] = direct
+    if sponge:
+        west["sponge"] = sponge
+    return wm, west
+
+
 def _convert_wavemaker(wm_type: str, pop_val):
     """Legacy WAVEMAKER type + flat keys -> spectrum/source/limiter entry
-    (config reorg rung 3a).  Boundary-consumer types (LEF_SOL, ABS_1D,
-    LEFT_BC_IRR) keep their legacy shape until rung 3b / the char-BC track.
+    (config reorg rung 3a), plus a boundaries.west block for ABS (rung 3b).
+    Returns (wavemaker_entry, west_face_or_None).  ABS_1D/LEFT_BC_IRR keep
+    their legacy shape until the char-BC track (the reader rejects them).
     freq stays frequency (exact); period {...} is hand-authoring only."""
+    if wm_type.startswith("ABS") and wm_type != "ABS_1D":
+        # legacy dispatch is the PREFIX WaveMaker(1:3)=='ABS' — real decks
+        # spell it ABSORBING_GENERATING
+        return _convert_abs(pop_val)
     if wm_type in ("LEF_SOL", "ABS_1D", "LEFT_BC_IRR"):
         wm = {"type": wm_type}
         for k in _WK_PARAMS.get(wm_type, []):
             v = pop_val(k)
             if v is not None:
                 wm[k] = v
-        return wm
+        return wm, None
 
     spec_map = {
         "WK_REG": ("regular", False, False),
@@ -333,7 +417,7 @@ def _convert_wavemaker(wm_type: str, pop_val):
         for k, yk in (("CrestLimit", "crest"), ("TroughLimit", "trough")):
             _put(wm, "limiter", yk, pop_val(k))
 
-    return wm
+    return wm, None
 
 
 # ---------------------------------------------------------------------------
@@ -544,9 +628,11 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             out.setdefault("initial", {})["hump"] = hp
         wm_type = "NONE"
     if wm_type.upper() not in ("NONE", "NOTHING"):
-        wm = _convert_wavemaker(wm_type, pop_val)
+        wm, west = _convert_wavemaker(wm_type, pop_val)
         if wm is not None:
             out["wavemaker"] = wm
+        if west is not None:
+            out.setdefault("boundaries", {})["west"] = west
 
     # ---- sponge -> boundaries face blocks (config reorg rung 2) -------------
     # Legacy global coefficients replicate onto every face with width > 0;
@@ -571,7 +657,11 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
                 sp["friction"] = {"cd": cd_sp or "0.0"}
             if ds:
                 sp["diffusion"] = {"nu": nu_sp or "0.1"}
-            out.setdefault("boundaries", {})[f] = {"sponge": sp}
+            bnd = out.setdefault("boundaries", {})
+            if f in bnd:
+                # ABS emitted a west block above; a face carries ONE sponge
+                raise SystemExit(f"convert_input: boundaries.{f} conflict — face already owned by the wavemaker conversion")
+            bnd[f] = {"sponge": sp}
 
     # ---- obstacle / breakwater ---------------------------------------------
     obs = pop_bool("OBSTACLE")

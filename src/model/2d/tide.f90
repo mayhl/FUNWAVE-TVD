@@ -10,8 +10,9 @@
 !  reorg (rung 2): per-face forcing {eta,u,v} constants or file series map
 !  onto the CONSTANT/DATA targets below, boundaries.relaxation_cells onto
 !  iwidth, and tidal_bc_abs derives from forcing + sponge.direct presence.
-!  GEN_ABS currently has no YAML path (pending the rung-3 forcing.wavemaker
-!  reference).
+!  GEN_ABS = a wavemaker-fed west face with an eta/file target
+!  (boundaries.west.forcing {wavemaker, eta|file}, reorg rung 3b): the
+!  west tide slot holds/streams the target without the TIDE_BC strip.
 !
 !  Legacy call shape: TIDE_DATA once per step after ESTIMATE_DT (so at the
 !  already-advanced TIME), TIDE_BC per RK stage between UPDATE_MASK and

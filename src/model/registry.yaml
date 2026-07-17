@@ -155,9 +155,12 @@ parameters:
   # freq {peak,min,max} = exact legacy path (converter emits this);
   # period {peak,min,max} = preferred hand-authoring alternative
   # (reciprocal fill, non-bitwise vs legacy inputs by design).
-  # Boundary-consumer types (ABS/LEF_SOL/LEFT_BC_IRR) + their keys
-  # (WidthWaveMaker, R/A_sponge_wavemaker, DepthWaveMaker, LAGTIME)
-  # land in rung 3b (boundaries.<face>.forcing.wavemaker).
+  # Boundary consumers (rung 3b): ABS = a spectrum-only entry (no source:)
+  # referenced by boundaries.west.forcing.wavemaker — its strip keys map to
+  # the face (WidthWaveMaker -> boundaries.west.sponge.width, R/A_sponge_
+  # wavemaker -> ...direct.r/a, DepthWaveMaker -> ...forcing.depth).
+  # LEF_SOL keeps its legacy type:/LAGTIME escape; ABS_1D/LEFT_BC_IRR are
+  # deprecated pending the characteristic BC track.
 
   - name:         wm_name
     legacy_name:  ~
@@ -396,9 +399,12 @@ parameters:
   #   sponge.direct + forcing -> wall + relaxation to signal (nee TIDAL_BC_ABS);
   #   forcing w/o direct -> characteristic (init-gated pending).
   # type: is an optional ASSERTION -- errors at init if it disagrees.
+  # forcing.wavemaker names a spectrum-only wavemaker entry as the face's
+  # relaxation signal (nee ABS; west only, others init-gated pending) with
+  # forcing.depth the series reference depth (nee DepthWaveMaker); + eta/file
+  # target = generating-absorbing (nee TIDAL_BC_GEN_ABS, derived).
   # Dropped without successor: DIRECT/FRICTION/DIFFUSION_SPONGE (presence),
-  # TIDAL_BC_ABS (derived), TideBcType (file presence = DATA),
-  # TIDAL_BC_GEN_ABS (pending rung-3 forcing.wavemaker reference).
+  # TIDAL_BC_ABS (derived), TideBcType (file presence = DATA).
 
   - name:         relaxation_cells
     legacy_name:  WaveMakerPointNum
@@ -477,6 +483,20 @@ parameters:
     default:      ~
     latex:        ~
 
+  - name:         west_forcing_wavemaker
+    legacy_name:  ~
+    yaml_path:    "boundaries.west.forcing.wavemaker"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         west_forcing_depth
+    legacy_name:  DepthWaveMaker
+    yaml_path:    "boundaries.west.forcing.depth"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
   - name:         east_type
     legacy_name:  ~
     yaml_path:    "boundaries.east.type"
@@ -544,6 +564,20 @@ parameters:
     legacy_name:  TideEastFileName
     yaml_path:    "boundaries.east.forcing.file"
     units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         east_forcing_wavemaker
+    legacy_name:  ~
+    yaml_path:    "boundaries.east.forcing.wavemaker"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         east_forcing_depth
+    legacy_name:  ~
+    yaml_path:    "boundaries.east.forcing.depth"
+    units:        "m"
     default:      ~
     latex:        ~
 
@@ -617,6 +651,20 @@ parameters:
     default:      ~
     latex:        ~
 
+  - name:         south_forcing_wavemaker
+    legacy_name:  ~
+    yaml_path:    "boundaries.south.forcing.wavemaker"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         south_forcing_depth
+    legacy_name:  ~
+    yaml_path:    "boundaries.south.forcing.depth"
+    units:        "m"
+    default:      ~
+    latex:        ~
+
   - name:         north_type
     legacy_name:  ~
     yaml_path:    "boundaries.north.type"
@@ -684,6 +732,20 @@ parameters:
     legacy_name:  TideNorthFileName
     yaml_path:    "boundaries.north.forcing.file"
     units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         north_forcing_wavemaker
+    legacy_name:  ~
+    yaml_path:    "boundaries.north.forcing.wavemaker"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         north_forcing_depth
+    legacy_name:  ~
+    yaml_path:    "boundaries.north.forcing.depth"
+    units:        "m"
     default:      ~
     latex:        ~
 

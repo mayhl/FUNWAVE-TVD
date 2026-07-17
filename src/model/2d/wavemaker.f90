@@ -16,9 +16,11 @@
 !      WK_NEW_* pending).
 !    * boundary types (ABS, LEFT_BC_IRR, LEF_SOL): own the west ghost
 !      strip each step — the BC service must skip the wall mirror there
-!      (fill_west=.false. in kernel_bc).  ABS/LEFT_BC_IRR with the TMA/
-!      JON spectrum live (apply_boundary per stage); the DATA
-!      (WaveCompFile) spectrum and LEF_SOL are pending.
+!      (fill_west=.false. in kernel_bc).  ABS = a spectrum-only entry
+!      referenced by boundaries.west.forcing.wavemaker (the face reader
+!      resolves the name and fills the strip/depth fields; config reorg
+!      rung 3b); LEFT_BC_IRR/ABS_1D are deprecated pending the
+!      characteristic BC track and LEF_SOL keeps its legacy type: escape.
 !
 !  YAML block: initial:         (initial-condition types, nee INI_*/N_WAVE;
 !                                block presence selects the type)
@@ -28,41 +30,29 @@
 !    hump:      pending (INI_REC/GAU/DIP not in apply_ic yet)
 !    n_wave:    pending
 !
-!  YAML block: wavemaker:       (top-level; omit for no wavemaker;
-!                                cannot combine with initial: yet)
-!    type: <string>             default 'nothing'
-!    --- shared position/ramp ---
-!    Xc_WK: <length>
-!    Yc_WK: <length>            default 0
-!    DEP_WK: <length>
-!    Time_ramp: <time>          default 0
-!    Delta_WK: <length>         default 0.5
-!    Ywidth_WK: <length>        default 999999 (= no limit)
-!    --- boundary solitary (LEF_SOL) ---
-!    LAGTIME: <time>            LAG_SOLI, default 0
-!    --- regular (WK_REG) ---
-!    Tperiod: <time>
-!    AMP_WK: <length>
-!    Theta_WK: <angle>          default 0
-!    --- multi-component (WK_TIME) ---
-!    NumWaveComp: <int>
-!    PeakPeriod: <time>
-!    WaveCompFile: <path>
-!    --- spectral ---
-!    FreqPeak, FreqMin, FreqMax, Hmo, GammaTMA (default 3.3),
-!    Nfreq (default 45), ThetaPeak, Ntheta (default 1),
-!    Sigma_Theta, alpha_c (WK_NEW_IRR)
-!    --- eta limiter (type-independent) ---
-!    ETA_LIMITER: <bool>        default NO
-!    CrestLimit, TroughLimit    required if ETA_LIMITER: YES
-!    --- absorbing-generating (ABS / LEFT_BC_IRR) ---
-!    WAVE_DATA_TYPE: <string>   default DATA_1D
-!    DepthWaveMaker: <length>   fallback: DEP_WK
-!    WidthWaveMaker: <length>
-!    R_sponge_wavemaker, A_sponge_wavemaker
-!    EqualEnergy: <bool>        default NO
+!  YAML block: wavemaker:       (mapping or 1-element sequence; omit for
+!                                no wavemaker; cannot combine with initial:
+!                                yet — config reorg rung 3a/3b shape)
+!    name: <string>             reference target for a boundaries face
+!    spectrum:                  (required)
+!      type: regular | jonswap | tma | spectrum_2d | components
+!      --- regular:      amplitude, period, direction (nee AMP_WK/Tperiod/
+!                        Theta_WK)
+!      --- jonswap/tma:  hm0, gamma, freq: {peak, min, max} XOR
+!                        period: {peak, min, max} (reciprocal, non-bitwise)
+!      --- spectrum_2d:  file, format (nee WaveCompFile/WAVE_DATA_TYPE)
+!      --- components:   n, period_peak, file
+!      directional: {peak, spread, n_bins}   presence = 2D spreading
+!      discretization: {freq_bins, equal_energy, method, coherence_percent}
+!    source:                    presence = Wei-Kirby internal source box
+!      x_center, y_center, depth, delta, y_width, time_ramp, current_cd
+!    limiter: {crest, trough}   presence = eta limiter (nee ETA_LIMITER)
 !
-!  All parameters are optional; the reader silently ignores absent keys.
+!  A spectrum-only entry (no source: block) is a boundary feed: legal only
+!  when a boundaries face references it by name (jonswap/tma/spectrum_2d
+!  spectra; nee ABS).  The relaxation strip and series depth live with the
+!  face (boundaries.west.sponge + forcing.depth), not here.
+!
 !  This is a flat bridge module — a redesigned wavemaker module will
 !  replace it once the wavemaker refactor is complete.
 !
@@ -121,8 +111,13 @@ module model_wavemaker_mod
    type, extends(type_model_base) :: type_model_wavemaker
 
       character(:), allocatable :: wavemaker_type   ! YAML key: type
+      character(:), allocatable :: name              ! YAML key: name (face reference target)
       character(:), allocatable :: WaveCompFile      ! YAML key: WaveCompFile
       character(:), allocatable :: WAVE_DATA_TYPE    ! YAML key: WAVE_DATA_TYPE
+
+      ! Spectrum-only entry awaiting a boundaries face reference; the face
+      ! reader resolves it to type ABS (unresolved = init_compute error)
+      logical  :: boundary_candidate = .false.
 
       ! Shared position / depth / ramp
       real(SP) :: Xc_WK = 0.0_SP
@@ -280,8 +275,11 @@ contains
                                     " pending the wavemaker refactor (single-slot engine)")
       wm = entries(1)
 
-      ! legacy-shaped escape hatch: boundary-consumer types keep (or await)
-      ! their old spelling until rung 3b / the characteristic BC track
+      call wm%read_string("name", silent=no_key, val=this%name)
+      if (no_key) this%name = ""
+
+      ! legacy-shaped escape hatch: LEF_SOL keeps its old spelling until
+      ! the characteristic BC track; the rest reject loudly
       call wm%read_string("type", silent=no_key, val=legacy_type)
       if (.not. no_key) then
          select case (trim(legacy_type))
@@ -289,9 +287,13 @@ contains
             this%wavemaker_type = "LEF_SOL"
             call wm%read("LAGTIME", silent=no_key, val=this%LAG_SOLI, default="0.0")
             return
-         case ("ABS", "ABS_1D", "LEFT_BC_IRR")
+         case ("ABS")
+            call env%log%exit_on_error("wavemaker/type: schema renamed — ABS is a"// &
+                                       " spectrum-only entry referenced by boundaries/west/"// &
+                                       "forcing/wavemaker (registry has the mapping)")
+         case ("ABS_1D", "LEFT_BC_IRR")
             call env%log%exit_on_error("wavemaker/type: "//trim(legacy_type)// &
-                                       " is pending rung 3b — boundary forcing.wavemaker reference")
+                                       " is deprecated — pending the characteristic BC track")
          case default
             call env%log%exit_on_error("wavemaker/type: schema renamed — use"// &
                                        " spectrum:/source:/limiter: blocks (registry has the mapping)")
@@ -398,27 +400,45 @@ contains
          this%wavemaker_type = "WK_DATA2D"
       end select
 
-      ! ── source — presence = Wei-Kirby internal source function ────
+      ! ── source — presence = Wei-Kirby internal source function;
+      !    absence = boundary feed (nee ABS): a boundaries face must
+      !    reference the entry by name, which resolves the type ────────
       blk = wm%cast_dictionary("source", no_blk)
-      if (no_blk) call env%log%exit_on_error("wavemaker: needs a source: block"// &
-                                             " (boundary-fed wavemakers land in rung 3b)")
-      call blk%read("x_center", silent=no_key, val=this%Xc_WK, &
-                    default=DEF_WAVEMAKER_SOURCE_X_CENTER)
-      call blk%read("y_center", silent=no_key, val=this%Yc_WK, &
-                    default=DEF_WAVEMAKER_SOURCE_Y_CENTER)
-      call blk%read("depth", silent=no_key, val=this%DEP_WK, &
-                    default=DEF_WAVEMAKER_SOURCE_DEPTH)
-      call blk%read("delta", silent=no_key, val=this%Delta_WK, &
-                    default=DEF_WAVEMAKER_SOURCE_DELTA)
-      call blk%read("y_width", silent=no_key, val=this%Ywidth_WK, &
-                    default=DEF_WAVEMAKER_SOURCE_Y_WIDTH)
-      call blk%read("time_ramp", silent=no_key, val=this%Time_ramp, &
-                    default=DEF_WAVEMAKER_SOURCE_TIME_RAMP)
-      ! current_cd presence enables the current-balance drag
-      call blk%read("current_cd", silent=no_key, val=this%WaveMakerCd)
-      this%WaveMakerCurrentBalance = .not. no_key
-      ! ABS relaxation depth defaulted to the source depth pre-3b
-      this%DepthWaveMaker = this%DEP_WK
+      if (no_blk) then
+         ! legacy keys the JONSWAP/DATA switch + directionality off
+         ! WAVE_DATA_TYPE (io.F ABS block); spectrum_2d read its format
+         ! into WAVE_DATA_TYPE above
+         select case (stype)
+         case ("jonswap")
+            this%WAVE_DATA_TYPE = merge("JON_2D", "JON_1D", has_dir)
+         case ("tma")
+            this%WAVE_DATA_TYPE = merge("TMA_2D", "TMA_1D", has_dir)
+         case ("spectrum_2d")
+            continue
+         case default
+            call env%log%exit_on_error("wavemaker: a "//stype//" spectrum cannot"// &
+                                       " feed a boundary — needs a source: block")
+         end select
+         this%boundary_candidate = .true.
+         this%wavemaker_type = "PENDING_BOUNDARY"
+      else
+         call blk%read("x_center", silent=no_key, val=this%Xc_WK, &
+                       default=DEF_WAVEMAKER_SOURCE_X_CENTER)
+         call blk%read("y_center", silent=no_key, val=this%Yc_WK, &
+                       default=DEF_WAVEMAKER_SOURCE_Y_CENTER)
+         call blk%read("depth", silent=no_key, val=this%DEP_WK, &
+                       default=DEF_WAVEMAKER_SOURCE_DEPTH)
+         call blk%read("delta", silent=no_key, val=this%Delta_WK, &
+                       default=DEF_WAVEMAKER_SOURCE_DELTA)
+         call blk%read("y_width", silent=no_key, val=this%Ywidth_WK, &
+                       default=DEF_WAVEMAKER_SOURCE_Y_WIDTH)
+         call blk%read("time_ramp", silent=no_key, val=this%Time_ramp, &
+                       default=DEF_WAVEMAKER_SOURCE_TIME_RAMP)
+         ! current_cd presence enables the current-balance drag
+         call blk%read("current_cd", silent=no_key, val=this%WaveMakerCd)
+         this%WaveMakerCurrentBalance = .not. no_key
+         this%DepthWaveMaker = this%DEP_WK
+      end if
 
       ! ── limiter — presence = eta limiter (nee ETA_LIMITER) ────────
       blk = wm%cast_dictionary("limiter", no_blk)
@@ -532,6 +552,12 @@ contains
       real(SP), intent(in) :: beta_ref
 
       integer :: i, j, mloc, nloc
+
+      ! spectrum-only entry nobody claimed (boundaries reader resolves the
+      ! reference to ABS) — a silent no-op here would drop the wavemaker
+      if (this%wavemaker_type == "PENDING_BOUNDARY") &
+         call env%log%exit_on_error("wavemaker: spectrum-only entry '"//this%name// &
+                                    "' is not referenced by a boundaries face forcing/wavemaker")
 
       select case (this%wavemaker_type)
       case ("WK_REG")
