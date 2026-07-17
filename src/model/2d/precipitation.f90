@@ -6,11 +6,15 @@
 !  Rainfall source (legacy mod_precipitation.F, PRECIPITATION_MODULE)
 !
 !  YAML block: precipitation:       (top-level; omit for no rainfall)
-!    RAINFALL_FILE:       <path>   index file: dims header + (time, frame
+!    file:                <path>   index file: dims header + (time, frame
 !                                  file) records; required when the block
-!                                  is present (legacy STOPs without it)
-!    RainWaveInteraction: <bool>   default NO  — DEAD in legacy (no consumer)
-!    OUT_PRECIPITATION:   <bool>   default YES — DEAD in legacy (no writer)
+!                                  is present (nee RAINFALL_FILE; legacy
+!                                  STOPs without it)
+!    OUT_PRECIPITATION:   <bool>   default YES — DEAD in legacy (no writer;
+!                                  legacy-spelled until rung 5)
+!
+!  RainWaveInteraction is dropped, not renamed: legacy reads it and consumes
+!  it nowhere, so there is nothing to port.
 !
 !  Legacy call shape: PRECIPITATION_DISTRIBUTION once per step before the
 !  RK loop (at the already-advanced TIME); the rate enters the eta RHS in
@@ -49,8 +53,7 @@ module model_precipitation_mod
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_PRECIPITATION_RAINWAVEINTERACTION, &
-                                        DEF_PRECIPITATION_OUT_PRECIPITATION
+   use model_config_defaults_mod, only: DEF_PRECIPITATION_OUT_PRECIPITATION
 
    implicit none
 
@@ -64,8 +67,7 @@ module model_precipitation_mod
 
    type, extends(type_model_base) :: type_model_precipitation
 
-      ! dead legacy knobs (read, bridged, never consumed — see header)
-      logical :: rain_wave_interaction = .false.
+      ! dead legacy knob (read, bridged, never consumed — see header)
       logical :: out_precipitation = .true.
 
       type(type_path) :: rainfall_file
@@ -109,18 +111,15 @@ contains
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      call sub_env%yaml%read("RainWaveInteraction", silent=no_key, &
-                             val=this%rain_wave_interaction, &
-                             default=DEF_PRECIPITATION_RAINWAVEINTERACTION)
       call sub_env%yaml%read("OUT_PRECIPITATION", silent=no_key, &
                              val=this%out_precipitation, &
                              default=DEF_PRECIPITATION_OUT_PRECIPITATION)
 
-      call sub_env%yaml%read_input_path("RAINFALL_FILE", silent=no_key, &
+      call sub_env%yaml%read_input_path("file", silent=no_key, &
                                         val=this%rainfall_file)
       if (no_key) then
          ! legacy PRECIPITATION builds refuse to run without the file
-         error stop "precipitation: RAINFALL_FILE is required"
+         call env%log%exit_on_error("precipitation: file is required")
       end if
 
    end subroutine prec_read_input

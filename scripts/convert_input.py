@@ -664,6 +664,8 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             bnd[f] = {"sponge": sp}
 
     # ---- obstacle / breakwater ---------------------------------------------
+    # file presence = obstacle mask; breakwater block presence = breakwater
+    # drag (nee the OBSTACLE/BREAKWATER dispatcher bools)
     obs = pop_bool("OBSTACLE")
     bw = pop_bool("BREAKWATER")
     if obs or bw:
@@ -671,13 +673,14 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         of = pop_str("OBSTACLE_FILE")
         bf = pop_str("BREAKWATER_FILE")
         ba = pop_val("BreakWaterAbsorbCoef")
-        if of:
-            ob["obstacle_file"] = of
-        if bf:
-            ob["breakwater_file"] = bf
-        if ba is not None:
-            ob["BreakWaterAbsorbCoef"] = ba
-        out["obstacle"] = ob
+        if obs and of:
+            ob["file"] = of
+        if bw and bf:
+            # always emit the coefficient (legacy io.F default as fallback) --
+            # a bare empty sub-block dumps as YAML null and reads as absent
+            ob["breakwater"] = {"file": bf, "absorb_coef": ba if ba is not None else 10.0}
+        if ob:
+            out["obstacle"] = ob
     else:
         for k in ("OBSTACLE_FILE", "BREAKWATER_FILE", "BreakWaterAbsorbCoef"):
             pop(k)
@@ -827,53 +830,118 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     # ---- coupling ----------------------------------------------------------
     cf = pop_str("COUPLING_FILE")
     if cf:
-        out["coupling"] = {"coupling_file": cf}
+        out["coupling"] = {"file": cf}
 
     # ---- meteo (atmospheric forcing) ---------------------------------------
-    # a: MeteoGausian, b: WindConstantField.  Legacy key names are preserved
-    # verbatim so existing input decks round-trip the same identifiers.
+    # Sub-model blocks: presence = model on (nee the MeteoGausian/
+    # WindConstantField/WindHollandModel/SlideModel dispatcher bools).
     mt: dict = {}
     mg = pop_bool("MeteoGausian")
-    if mg:
-        mt["MeteoGausian"] = True
-        gf = pop_str("METEO_GAUSIAN_FILE")
-        if gf:
-            mt["METEO_GAUSIAN_FILE"] = gf
     wcf = pop_bool("WindConstantField")
-    if wcf:
-        mt["WindConstantField"] = True
-        cwf = pop_str("CONSTANT_WIND_FILE")
-        if cwf:
-            mt["CONSTANT_WIND_FILE"] = cwf
     whm = pop_bool("WindHollandModel")
-    if whm:
-        mt["WindHollandModel"] = True
-        sf = pop_str("STORM_FILE")
-        if sf:
-            mt["STORM_FILE"] = sf
     sm = pop_bool("SlideModel")
-    if sm:
-        mt["SlideModel"] = True
-        slf = pop_str("SLIDE_FILE")
-        if slf:
-            mt["SLIDE_FILE"] = slf
-    if mg or wcf or whm:
-        # shared wind/pressure knobs (only meaningful when a model is on)
-        for key, caster in (
-            ("WindForce", _bool),
-            ("AirPressure", _bool),
-            ("WindWaveInteraction", _bool),
-            ("Cdw", _auto),
-            ("WindCrestPercent", _auto),
-        ):
-            v = pop(key)
-            if v is not None:
-                mt[key] = caster(v)
-    om = pop("OUT_METEO")
-    if om is not None:
-        mt["OUT_METEO"] = _bool(om)
+    if mg or wcf or whm or sm:
+        wf = pop("WindForce")
+        ap = pop("AirPressure")
+        wwi = pop_bool("WindWaveInteraction")
+        cdw = pop_val("Cdw")
+        wcp = pop_val("WindCrestPercent")
+
+        def wind_knobs() -> dict:
+            d: dict = {}
+            if cdw is not None:
+                d["cd"] = cdw
+            if wwi:
+                d["wave_interaction"] = True
+                if wcp is not None:
+                    d["crest_percent"] = wcp
+            # interaction off: legacy forced the crest mask inert (LARGE), so
+            # a lone WindCrestPercent is dropped rather than emitted
+            return d
+
+        if mg:
+            gf = pop_str("METEO_GAUSIAN_FILE")
+            if not gf:
+                raise SystemExit("convert_input: MeteoGausian requires METEO_GAUSIAN_FILE")
+            mt["gaussian"] = {"file": gf}
+        if wcf:
+            cwf = pop_str("CONSTANT_WIND_FILE")
+            if not cwf:
+                raise SystemExit("convert_input: WindConstantField requires CONSTANT_WIND_FILE")
+            if wf is not None and not _bool(wf):
+                # a no-force constant wind is inert in legacy -- dropped
+                unknown.append("WindConstantField with WindForce = F (inert in legacy) -- dropped")
+            else:
+                mt["wind"] = {"file": cwf, **wind_knobs()}
+        if whm:
+            sf = pop_str("STORM_FILE")
+            if not sf:
+                raise SystemExit("convert_input: WindHollandModel requires STORM_FILE")
+            h: dict = {"file": sf}
+            if ap is not None and _bool(ap):
+                h["air_pressure"] = True
+            # legacy WindForce default is WindConstantField's value
+            force = _bool(wf) if wf is not None else "wind" in mt
+            if force:
+                h["wind_force"] = True
+                h.update(wind_knobs())
+            mt["holland"] = h
+        if sm:
+            slf = pop_str("SLIDE_FILE")
+            if not slf:
+                raise SystemExit("convert_input: SlideModel requires SLIDE_FILE")
+            mt["slide"] = {"file": slf}
+        om = pop("OUT_METEO")
+        if om is not None:
+            mt["OUT_METEO"] = _bool(om)
     if mt:
         out["meteo"] = mt
+
+    # ---- subgrid -------------------------------------------------------------
+    sgf = pop_str("DEPTH_SUBGRID_FILE")
+    if sgf:
+        sg: dict = {"depth_file": sgf}
+        sgr = pop_val("SubMainGridRatio")
+        if sgr is not None:
+            sg["ratio"] = sgr
+        sgp = pop("Porosity")
+        if sgp is not None:
+            sg["write_porosity"] = _bool(sgp)
+        out["subgrid"] = sg
+
+    # ---- precipitation -------------------------------------------------------
+    # RainWaveInteraction is left unconsumed on purpose: it is dead in legacy
+    # (no consumer), so it lands in the unknown-key comment block.
+    rff = pop_str("RAINFALL_FILE")
+    if rff:
+        pr: dict = {"file": rff}
+        opr = pop("OUT_PRECIPITATION")
+        if opr is not None:
+            pr["OUT_PRECIPITATION"] = _bool(opr)
+        out["precipitation"] = pr
+
+    # ---- foam ----------------------------------------------------------------
+    # No legacy dispatcher bool: the keys exist when the deck drove a -DFOAM
+    # build, so any foam knob keys the block.
+    fo: dict = {}
+    for old_key, new_key in (
+        ("f_source", "source_coef"),
+        ("FoamTimeScale", "time_scale"),
+        ("BurstTimeNonBreaking", "burst_time_non_breaking"),
+        ("MinThick", "min_thickness"),
+        ("CdFoam", "cd"),
+        ("PLOT_INTV_FOAM", "PLOT_INTV_FOAM"),
+    ):
+        v = pop_val(old_key)
+        if v is not None:
+            fo[new_key] = v
+    if fo:
+        out["foam"] = fo
+
+    # ---- tracer ----------------------------------------------------------------
+    tf = pop_str("TRACER_FILE")
+    if tf:
+        out["tracer"] = {"file": tf}
 
     # ---- collect unknown keys ----------------------------------------------
     for k in params:

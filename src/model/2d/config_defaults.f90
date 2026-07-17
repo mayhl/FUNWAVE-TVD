@@ -46,11 +46,11 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_WAVEMAKER_VIS = "NO"
    character(*), parameter :: DEF_BREAKING_WAVEMAKER_VISBRK = "0.0"
    ! ── foam ──
-   character(*), parameter :: DEF_FOAM_BURSTTIMENONBREAKING = "1.0"
-   character(*), parameter :: DEF_FOAM_CDFOAM = "0.5"
-   character(*), parameter :: DEF_FOAM_FOAMTIMESCALE = "3.8"
-   character(*), parameter :: DEF_FOAM_MINTHICK = "0.01"
-   character(*), parameter :: DEF_FOAM_F_SOURCE = "0.05"
+   character(*), parameter :: DEF_FOAM_BURST_TIME_NON_BREAKING = "1.0"
+   character(*), parameter :: DEF_FOAM_CD = "0.5"
+   character(*), parameter :: DEF_FOAM_MIN_THICKNESS = "0.01"
+   character(*), parameter :: DEF_FOAM_SOURCE_COEF = "0.05"
+   character(*), parameter :: DEF_FOAM_TIME_SCALE = "3.8"
    ! ── friction ──
    character(*), parameter :: DEF_FRICTION_CD = "0.0"
    character(*), parameter :: DEF_FRICTION_FRICTION_MATRIX = "NO"
@@ -73,16 +73,13 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_INITIAL_SOLITARY_X_CENTER = "0.0"
    character(*), parameter :: DEF_INITIAL_WATER_LEVEL = "0.0"
    ! ── meteo ──
-   character(*), parameter :: DEF_METEO_AIRPRESSURE = "NO"
-   character(*), parameter :: DEF_METEO_CDW = "0.002"
-   character(*), parameter :: DEF_METEO_METEOGAUSIAN = "NO"
    character(*), parameter :: DEF_METEO_OUT_METEO = "YES"
-   character(*), parameter :: DEF_METEO_SLIDEMODEL = "NO"
-   character(*), parameter :: DEF_METEO_WINDCONSTANTFIELD = "NO"
-   character(*), parameter :: DEF_METEO_WINDCRESTPERCENT = "999999.0"
-   character(*), parameter :: DEF_METEO_WINDFORCE = "NO"
-   character(*), parameter :: DEF_METEO_WINDHOLLANDMODEL = "NO"
-   character(*), parameter :: DEF_METEO_WINDWAVEINTERACTION = "NO"
+   character(*), parameter :: DEF_METEO_HOLLAND_AIR_PRESSURE = "NO"
+   character(*), parameter :: DEF_METEO_HOLLAND_CD = "0.002"
+   character(*), parameter :: DEF_METEO_HOLLAND_WAVE_INTERACTION = "NO"
+   character(*), parameter :: DEF_METEO_HOLLAND_WIND_FORCE = "NO"
+   character(*), parameter :: DEF_METEO_WIND_CD = "0.002"
+   character(*), parameter :: DEF_METEO_WIND_WAVE_INTERACTION = "NO"
    ! ── numerics ──
    character(*), parameter :: DEF_NUMERICS_CFL = "0.5"
    character(*), parameter :: DEF_NUMERICS_FLUX_SOLVER = "hllc"
@@ -90,8 +87,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_NUMERICS_MIN_DEPTH = "0.1"
    character(*), parameter :: DEF_NUMERICS_RECONSTRUCTION = "fourth"
    ! ── obstacle ──
-   character(*), parameter :: DEF_OBSTACLE_BREAKWATERABSORBCOEF = "10.0"
-   character(*), parameter :: DEF_OBSTACLE_BREAKWATER_ABSORB_COEF = "0.0"
+   character(*), parameter :: DEF_OBSTACLE_BREAKWATER_ABSORB_COEF = "10.0"
    ! ── output ──
    character(*), parameter :: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT = "0.001"
    character(*), parameter :: DEF_OUTPUT_DEPTH_OUT = "NO"
@@ -108,7 +104,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.8"
    ! ── precipitation ──
    character(*), parameter :: DEF_PRECIPITATION_OUT_PRECIPITATION = "YES"
-   character(*), parameter :: DEF_PRECIPITATION_RAINWAVEINTERACTION = "NO"
    ! ── sediment ──
    character(*), parameter :: DEF_SEDIMENT_AVALANCHE = "NO"
    character(*), parameter :: DEF_SEDIMENT_BEDLOAD = "NO"
@@ -144,8 +139,8 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SIMULATION_T_START = "0.0"
    character(*), parameter :: DEF_SIMULATION_TIME_STEPPING_FIXED_DT = "NO"
    ! ── subgrid ──
-   character(*), parameter :: DEF_SUBGRID_POROSITY = "NO"
-   character(*), parameter :: DEF_SUBGRID_SUBMAINGRIDRATIO = "1"
+   character(*), parameter :: DEF_SUBGRID_RATIO = "1"
+   character(*), parameter :: DEF_SUBGRID_WRITE_POROSITY = "NO"
    ! ── vessel ──
    character(*), parameter :: DEF_VESSEL_CLEARANCE = "1.0"
    character(*), parameter :: DEF_VESSEL_CDDEEPDRAFT = "0.1"

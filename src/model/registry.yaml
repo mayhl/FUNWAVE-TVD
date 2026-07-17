@@ -1038,26 +1038,28 @@ parameters:
     latex:        ~
 
   # ── obstacle ───────────────────────────────────────────────────────────────
-  - name:         breakwater_absorb_coef
-    legacy_name:  BreakWaterAbsorbCoef
-    yaml_path:    "obstacle.breakwater_absorb_coef"
+  # file presence = obstacle mask on; breakwater block presence = breakwater on
+  # (nee the OBSTACLE/BREAKWATER dispatcher bools, derived and entry-less)
+  - name:         obstacle_file
+    legacy_name:  OBSTACLE_FILE
+    yaml_path:    "obstacle.file"
     units:        ~
-    default:      0.0
-    latex:        "$C_{\\mathrm{bw}}$"
+    default:      ~
+    latex:        ~
 
   - name:         breakwater_file
     legacy_name:  BREAKWATER_FILE
-    yaml_path:    "obstacle.breakwater_file"
+    yaml_path:    "obstacle.breakwater.file"
     units:        ~
     default:      ~
     latex:        ~
 
-  - name:         obstacle_file
-    legacy_name:  OBSTACLE_FILE
-    yaml_path:    "obstacle.obstacle_file"
+  - name:         breakwater_absorb_coef
+    legacy_name:  BreakWaterAbsorbCoef
+    yaml_path:    "obstacle.breakwater.absorb_coef"
     units:        ~
-    default:      ~
-    latex:        ~
+    default:      10.0
+    latex:        "$C_{\\mathrm{bw}}$"
 
   # ── output ─────────────────────────────────────────────────────────────────
   # arrival_time: block presence enables the first-arrival map (nee
@@ -1245,7 +1247,7 @@ parameters:
 
   - name:         coupling_file
     legacy_name:  COUPLING_FILE
-    yaml_path:    "coupling.coupling_file"
+    yaml_path:    "coupling.file"
     units:        ~
     default:      ~
     latex:        ~
@@ -1255,13 +1257,6 @@ parameters:
     yaml_path:    "friction.manning"
     units:        ~
     default:      false
-    latex:        ~
-
-  - name:         breakwater_absorb_coef
-    legacy_name:  BreakWaterAbsorbCoef
-    yaml_path:    "obstacle.BreakWaterAbsorbCoef"
-    units:        ~
-    default:      10.0
     latex:        ~
 
   # No static default: absent -> DERIVED as 100 * max|Depth| at init, exactly as
@@ -1289,18 +1284,13 @@ parameters:
     default:      1000
     latex:        ~
 
+  # RainWaveInteraction is dropped, not renamed: legacy reads it and consumes
+  # it nowhere (no consumer of the flag exists), so there is nothing to port.
   - name:         rainfall_file
     legacy_name:  RAINFALL_FILE
-    yaml_path:    "precipitation.RAINFALL_FILE"
+    yaml_path:    "precipitation.file"
     units:        ~
     default:      ~
-    latex:        ~
-
-  - name:         rainwaveinteraction
-    legacy_name:  RainWaveInteraction
-    yaml_path:    "precipitation.RainWaveInteraction"
-    units:        ~
-    default:      false
     latex:        ~
 
   - name:         out_precipitation
@@ -1457,16 +1447,94 @@ parameters:
     latex:        ~
 
   # ── meteo (legacy mod_meteo.F) ─────────────────────────────────────────────
-  - name:         meteo_gausian
-    legacy_name:  MeteoGausian
-    yaml_path:    "meteo.MeteoGausian"
+  # Sub-model blocks: presence = model on (nee the MeteoGausian/
+  # WindConstantField/WindHollandModel/SlideModel dispatcher bools, which are
+  # derived and carry no entries).  gaussian and slide force the pressure
+  # coupling on; wind's only job is the stress, so its presence derives
+  # wind_force; holland carries both couplings as explicit switches.  The wind
+  # knobs live inside the wind-capable blocks; crest_percent is rejected
+  # unless wave_interaction (legacy forced it inert to LARGE), and absent it
+  # derives LARGE (mask == 1).  OUT_METEO stays put until rung 5.
+  - name:         gaussian_file
+    legacy_name:  METEO_GAUSIAN_FILE
+    yaml_path:    "meteo.gaussian.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         wind_file
+    legacy_name:  CONSTANT_WIND_FILE
+    yaml_path:    "meteo.wind.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         wind_cd
+    legacy_name:  Cdw
+    yaml_path:    "meteo.wind.cd"
+    units:        ~
+    default:      0.002
+    latex:        "$C_{dw}$"
+
+  - name:         wind_wave_interaction
+    legacy_name:  WindWaveInteraction
+    yaml_path:    "meteo.wind.wave_interaction"
     units:        ~
     default:      false
     latex:        ~
 
-  - name:         meteo_gausian_file
-    legacy_name:  METEO_GAUSIAN_FILE
-    yaml_path:    "meteo.METEO_GAUSIAN_FILE"
+  - name:         wind_crest_percent
+    legacy_name:  WindCrestPercent
+    yaml_path:    "meteo.wind.crest_percent"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         holland_file
+    legacy_name:  STORM_FILE
+    yaml_path:    "meteo.holland.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         holland_air_pressure
+    legacy_name:  AirPressure
+    yaml_path:    "meteo.holland.air_pressure"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         holland_wind_force
+    legacy_name:  WindForce
+    yaml_path:    "meteo.holland.wind_force"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         holland_cd
+    legacy_name:  ~
+    yaml_path:    "meteo.holland.cd"
+    units:        ~
+    default:      0.002
+    latex:        "$C_{dw}$"
+
+  - name:         holland_wave_interaction
+    legacy_name:  ~
+    yaml_path:    "meteo.holland.wave_interaction"
+    units:        ~
+    default:      false
+    latex:        ~
+
+  - name:         holland_crest_percent
+    legacy_name:  ~
+    yaml_path:    "meteo.holland.crest_percent"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         slide_file
+    legacy_name:  SLIDE_FILE
+    yaml_path:    "meteo.slide.file"
     units:        ~
     default:      ~
     latex:        ~
@@ -1478,101 +1546,24 @@ parameters:
     default:      true
     latex:        ~
 
-  - name:         wind_constant_field
-    legacy_name:  WindConstantField
-    yaml_path:    "meteo.WindConstantField"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         constant_wind_file
-    legacy_name:  CONSTANT_WIND_FILE
-    yaml_path:    "meteo.CONSTANT_WIND_FILE"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         wind_holland_model
-    legacy_name:  WindHollandModel
-    yaml_path:    "meteo.WindHollandModel"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         storm_file
-    legacy_name:  STORM_FILE
-    yaml_path:    "meteo.STORM_FILE"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         slide_model
-    legacy_name:  SlideModel
-    yaml_path:    "meteo.SlideModel"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         slide_file
-    legacy_name:  SLIDE_FILE
-    yaml_path:    "meteo.SLIDE_FILE"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         wind_force
-    legacy_name:  WindForce
-    yaml_path:    "meteo.WindForce"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         air_pressure
-    legacy_name:  AirPressure
-    yaml_path:    "meteo.AirPressure"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         wind_wave_interaction
-    legacy_name:  WindWaveInteraction
-    yaml_path:    "meteo.WindWaveInteraction"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         cdw
-    legacy_name:  Cdw
-    yaml_path:    "meteo.Cdw"
-    units:        ~
-    default:      0.002
-    latex:        ~
-
-  - name:         wind_crest_percent
-    legacy_name:  WindCrestPercent
-    yaml_path:    "meteo.WindCrestPercent"
-    units:        ~
-    default:      999999.0
-    latex:        ~
-
   # ── subgrid (legacy mod_subgrid.F) ─────────────────────────────────────────
-  - name:         depth_subgrid_file
+  - name:         subgrid_depth_file
     legacy_name:  DEPTH_SUBGRID_FILE
-    yaml_path:    "subgrid.DEPTH_SUBGRID_FILE"
+    yaml_path:    "subgrid.depth_file"
     units:        ~
     default:      ~
     latex:        ~
 
-  - name:         out_porosity
+  - name:         subgrid_write_porosity
     legacy_name:  Porosity
-    yaml_path:    "subgrid.Porosity"
+    yaml_path:    "subgrid.write_porosity"
     units:        ~
     default:      false
     latex:        ~
 
-  - name:         submaingridratio
+  - name:         subgrid_ratio
     legacy_name:  SubMainGridRatio
-    yaml_path:    "subgrid.SubMainGridRatio"
+    yaml_path:    "subgrid.ratio"
     units:        ~
     default:      1
     latex:        ~
@@ -1587,37 +1578,37 @@ parameters:
     default:      ~
     latex:        ~
 
-  - name:         f_source
+  - name:         foam_source_coef
     legacy_name:  f_source
-    yaml_path:    "foam.f_source"
+    yaml_path:    "foam.source_coef"
     units:        ~
     default:      0.05
     latex:        "$f_{\\mathrm{source}}$"
 
-  - name:         foamtimescale
+  - name:         foam_time_scale
     legacy_name:  FoamTimeScale
-    yaml_path:    "foam.FoamTimeScale"
+    yaml_path:    "foam.time_scale"
     units:        "s"
     default:      3.8
     latex:        "$\\tau_f$"
 
-  - name:         bursttimenonbreaking
+  - name:         foam_burst_time_non_breaking
     legacy_name:  BurstTimeNonBreaking
-    yaml_path:    "foam.BurstTimeNonBreaking"
+    yaml_path:    "foam.burst_time_non_breaking"
     units:        "s"
     default:      1.0
     latex:        ~
 
-  - name:         minthick
+  - name:         foam_min_thickness
     legacy_name:  MinThick
-    yaml_path:    "foam.MinThick"
+    yaml_path:    "foam.min_thickness"
     units:        "m"
     default:      0.01
     latex:        ~
 
-  - name:         cdfoam
+  - name:         foam_cd
     legacy_name:  CdFoam
-    yaml_path:    "foam.CdFoam"
+    yaml_path:    "foam.cd"
     units:        ~
     default:      0.5
     latex:        "$C_{d,f}$"
@@ -1628,7 +1619,7 @@ parameters:
   # engines read that file, so it is the parity-shared input.
   - name:         tracer_file
     legacy_name:  TRACER_FILE
-    yaml_path:    "tracer.TRACER_FILE"
+    yaml_path:    "tracer.file"
     units:        ~
     default:      ~
     latex:        ~

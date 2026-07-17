@@ -9,8 +9,8 @@
 !  model_bc_mod once tidal boundary conditions are implemented.
 !  Sponge layers are handled separately in model_sponge_mod.
 !
-!  YAML block: coupling:          (# if defined COUPLING only)
-!    coupling_file: <path>        required when COUPLING is defined
+!  YAML block: coupling:          (top-level; omit for no coupling)
+!    file: <path>                 required (nee COUPLING_FILE)
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -46,7 +46,8 @@ contains
       this%is_activated = .not. is_empty
       if (is_empty) return
 
-      call sub_env%yaml%read_input_path("coupling_file", silent=no_key, val=this%coupling_file)
+      call sub_env%yaml%read_input_path("file", silent=no_key, val=this%coupling_file)
+      if (no_key) call env%log%exit_on_error("coupling: file is required")
 
    end subroutine coupling_read_input
 

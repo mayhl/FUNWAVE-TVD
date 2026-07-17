@@ -16,12 +16,18 @@
 !  build must reproduce a foam-free run BITWISE (the parity check below).
 !
 !  YAML block: foam:                 (top-level; omit for no foam)
-!    PLOT_INTV_FOAM: <real>  default = output interval  (dead, see NOTE 5)
-!    f_source:       <real>  default 0.05   whitecap injection coefficient
-!    FoamTimeScale:  <real>  default 3.8    burst/decay time scale   [s]
-!    BurstTimeNonBreaking: <real> default 1.0  age used off the breakers [s]
-!    MinThick:       <real>  default 0.01   drag thickness floor      [m]
-!    CdFoam:         <real>  default 0.5    foam-water drag coefficient
+!    source_coef:    <real>  default 0.05   whitecap injection coefficient
+!                                           (nee f_source)
+!    time_scale:     <real>  default 3.8    burst/decay time scale   [s]
+!                                           (nee FoamTimeScale)
+!    burst_time_non_breaking: <real> default 1.0  age used off the
+!                                           breakers [s] (nee BurstTimeNonBreaking)
+!    min_thickness:  <real>  default 0.01   drag thickness floor      [m]
+!                                           (nee MinThick)
+!    cd:             <real>  default 0.5    foam-water drag coefficient
+!                                           (nee CdFoam)
+!    PLOT_INTV_FOAM: <real>  default = output interval  (dead, see NOTE 5;
+!                                           legacy-spelled until rung 5)
 !
 !  Legacy call shape: ALLOCATE_FOAM + INITIALIZATION_FOAM from init;
 !  FOAM_FLUX -> FOAM_UPDATE -> FOAM_BC every RK stage, between
@@ -69,9 +75,9 @@ module model_foam_mod
    use model_base_mod, only: type_model_base
    use model_kernel_fluxes_mod, only: delx_fun, dely_fun, construct_x, construct_y
 
-   use model_config_defaults_mod, only: DEF_FOAM_F_SOURCE, DEF_FOAM_FOAMTIMESCALE, &
-                                        DEF_FOAM_BURSTTIMENONBREAKING, &
-                                        DEF_FOAM_MINTHICK, DEF_FOAM_CDFOAM
+   use model_config_defaults_mod, only: DEF_FOAM_SOURCE_COEF, DEF_FOAM_TIME_SCALE, &
+                                        DEF_FOAM_BURST_TIME_NON_BREAKING, &
+                                        DEF_FOAM_MIN_THICKNESS, DEF_FOAM_CD
 
    implicit none
 
@@ -123,17 +129,17 @@ contains
       call sub_env%yaml%read("PLOT_INTV_FOAM", silent=no_key, val=this%plot_intv)
       this%has_plot_intv = .not. no_key
 
-      call sub_env%yaml%read("f_source", silent=no_key, val=this%f_source, &
-                             default=DEF_FOAM_F_SOURCE)
-      call sub_env%yaml%read("FoamTimeScale", silent=no_key, val=this%time_scale, &
-                             default=DEF_FOAM_FOAMTIMESCALE)
-      call sub_env%yaml%read("BurstTimeNonBreaking", silent=no_key, &
+      call sub_env%yaml%read("source_coef", silent=no_key, val=this%f_source, &
+                             default=DEF_FOAM_SOURCE_COEF)
+      call sub_env%yaml%read("time_scale", silent=no_key, val=this%time_scale, &
+                             default=DEF_FOAM_TIME_SCALE)
+      call sub_env%yaml%read("burst_time_non_breaking", silent=no_key, &
                              val=this%burst_time_nb, &
-                             default=DEF_FOAM_BURSTTIMENONBREAKING)
-      call sub_env%yaml%read("MinThick", silent=no_key, val=this%min_thick, &
-                             default=DEF_FOAM_MINTHICK)
-      call sub_env%yaml%read("CdFoam", silent=no_key, val=this%cd_foam, &
-                             default=DEF_FOAM_CDFOAM)
+                             default=DEF_FOAM_BURST_TIME_NON_BREAKING)
+      call sub_env%yaml%read("min_thickness", silent=no_key, val=this%min_thick, &
+                             default=DEF_FOAM_MIN_THICKNESS)
+      call sub_env%yaml%read("cd", silent=no_key, val=this%cd_foam, &
+                             default=DEF_FOAM_CD)
 
    end subroutine foam_read_input
 

@@ -17,7 +17,7 @@
 !  Trackers are one-way: nothing in the hydrodynamics reads them back.
 !
 !  YAML block: tracer:            (top-level; omit to disable)
-!    TRACER_FILE: <path>          required
+!    file: <path>                 required (nee TRACER_FILE)
 !
 !  The tracker table itself stays in TRACER_FILE, in the legacy layout, so
 !  both engines eat the identical file:
@@ -133,10 +133,10 @@ contains
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      call sub_env%yaml%read("TRACER_FILE", val=this%tracer_file, default="")
+      call sub_env%yaml%read("file", val=this%tracer_file, default="")
       if (len_trim(this%tracer_file) == 0) then
          call env%log%exit_on_error( &
-            "tracer: the tracer: block requires TRACER_FILE")
+            "tracer: the tracer: block requires file")
       end if
 
    end subroutine tracer_read_input
@@ -161,7 +161,7 @@ contains
       inquire (file=trim(this%tracer_file), exist=file_exist)
       if (.not. file_exist) then
          call env%log%exit_on_error( &
-            "tracer: TRACER_FILE cannot be found: "//trim(this%tracer_file))
+            "tracer: file cannot be found: "//trim(this%tracer_file))
       end if
 
       open (newunit=funit, file=trim(this%tracer_file), action="read")
@@ -171,7 +171,7 @@ contains
 
       if (n <= 0) then
          close (funit)
-         call env%log%exit_on_error("tracer: TRACER_FILE declares no trackers")
+         call env%log%exit_on_error("tracer: the tracker file declares no trackers")
       end if
       this%n_tracker = n
 

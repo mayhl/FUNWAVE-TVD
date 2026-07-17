@@ -6,26 +6,35 @@
 !  Atmospheric forcing (legacy mod_meteo.F, METEO_MODULE)
 !
 !  Legacy METEO is four independent switched sub-models (dispatcher
-!  METEO_FORCING): MeteoGausian (a moving Gaussian air-pressure pulse),
-!  WindConstantField (a spatially uniform time-series wind), the Holland
-!  hurricane (pressure + gradient wind), and a Slide/landslide source.  This
-!  module ports them one at a time.
-!    RUNG a: MeteoGausian     -- the moving pressure pulse (simple_cases case)
-!    RUNG b: WindConstantField -- uniform wind stress from a time series
-!    RUNG c: WindHollandModel  -- (pending)
-!    RUNG d: SlideModel        -- (pending)
+!  METEO_FORCING): a moving Gaussian air-pressure pulse (nee MeteoGausian), a
+!  spatially uniform time-series wind (nee WindConstantField), the Holland
+!  hurricane (pressure + gradient wind), and a Slide/landslide source.
 !
-!  YAML block: meteo:                 (top-level; omit for no atmospheric forcing)
-!    MeteoGausian:        <bool>   default NO   -- the moving pressure pulse
-!    METEO_GAUSIAN_FILE:  <path>   storm track; required when MeteoGausian is on
-!    WindConstantField:   <bool>   default NO   -- uniform time-series wind
-!    CONSTANT_WIND_FILE:  <path>   wind series; required when WindConstantField
-!    WindForce:           <bool>   default = WindConstantField (legacy fallback)
-!    AirPressure:         <bool>   default NO   -- add the pressure gradient
-!    WindWaveInteraction: <bool>   default NO   -- adjust wind by wave celerity
-!    Cdw:                 <real>   default 0.002 -- wind drag coefficient
-!    WindCrestPercent:    <real>   default LARGE -- crest-only wind mask cutoff
-!    OUT_METEO:           <bool>   default YES  -- write the pressure field
+!  YAML block: meteo:            (top-level; omit for no atmospheric forcing)
+!    gaussian:                   presence = the moving pressure pulse
+!      file: <path>              storm track (time, x, y, dP, SigmaX, SigmaY,
+!                                Theta); required
+!    wind:                       presence = uniform time-series wind stress
+!      file: <path>              wind series (time, WU, WV); required
+!      cd:   <real>              default 0.002  wind drag (nee Cdw)
+!      wave_interaction: <bool>  default NO     adjust wind by wave celerity
+!      crest_percent:    <real>  crest-only wind mask cutoff; needs
+!                                wave_interaction, absent -> LARGE (mask == 1)
+!    holland:                    presence = Holland hurricane
+!      file: <path>              storm track; required
+!      air_pressure: <bool>      default NO  add the pressure gradient
+!      wind_force:   <bool>      default NO  add the wind stress
+!      cd / wave_interaction / crest_percent    as under wind:, read only
+!                                when wind_force (rejected otherwise)
+!    slide:                      presence = landslide source
+!      file: <path>              geometry + track; required
+!    OUT_METEO: <bool>           default YES  write the pressure field
+!                                (legacy-spelled until the rung-5 output move)
+!
+!  The dispatcher bools are presence-derived; gaussian and slide force the
+!  pressure coupling on (their whole output IS the pressure field), and a
+!  wind: block derives wind_force -- the stress is its only consumer, so a
+!  no-force wind series would be dead config.
 !
 !  Two coupling paths into the flow, both reproduced from sources.F:
 !    1. air-pressure gradient  S += -g H grad(P), a whole-array add AFTER the
@@ -96,15 +105,16 @@ module model_meteo_mod
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
+   use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_METEO_METEOGAUSIAN, &
-                                        DEF_METEO_OUT_METEO, &
-                                        DEF_METEO_WINDCONSTANTFIELD, &
-                                        DEF_METEO_WINDHOLLANDMODEL, &
-                                        DEF_METEO_SLIDEMODEL, &
-                                        DEF_METEO_WINDWAVEINTERACTION, &
-                                        DEF_METEO_CDW
+   use model_config_defaults_mod, only: DEF_METEO_OUT_METEO, &
+                                        DEF_METEO_WIND_CD, &
+                                        DEF_METEO_WIND_WAVE_INTERACTION, &
+                                        DEF_METEO_HOLLAND_AIR_PRESSURE, &
+                                        DEF_METEO_HOLLAND_WIND_FORCE, &
+                                        DEF_METEO_HOLLAND_CD, &
+                                        DEF_METEO_HOLLAND_WAVE_INTERACTION
 
    implicit none
 
@@ -188,86 +198,125 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_blk, no_key
+      type(type_yaml_reader) :: blk
+      logical :: no_blk, no_key, tmp_l
 
       sub_env = get_sub_env(env, "meteo", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      ! sub-model switches (legacy reads all four up front, defaults NO)
-      call sub_env%yaml%read("WindConstantField", silent=no_key, &
-                             val=this%wind_constant_field, &
-                             default=DEF_METEO_WINDCONSTANTFIELD)
-      call sub_env%yaml%read("WindHollandModel", silent=no_key, &
-                             val=this%wind_holland_model, &
-                             default=DEF_METEO_WINDHOLLANDMODEL)
-      call sub_env%yaml%read("MeteoGausian", silent=no_key, &
-                             val=this%meteo_gausian, &
-                             default=DEF_METEO_METEOGAUSIAN)
-      call sub_env%yaml%read("SlideModel", silent=no_key, &
-                             val=this%slide_model, &
-                             default=DEF_METEO_SLIDEMODEL)
+      ! sub-model blocks: presence = model on (nee the four dispatcher bools)
+      blk = sub_env%yaml%cast_dictionary("gaussian", no_key)
+      this%meteo_gausian = .not. no_key
+      if (this%meteo_gausian) then
+         ! the pulse IS a pressure field (legacy mod_meteo.F:206 forces it on)
+         this%air_pressure = .true.
+         call blk%read_input_path("file", silent=no_key, val=this%gausian_file)
+         if (no_key) call env%log%exit_on_error( &
+            "meteo: gaussian requires file (the storm track)")
+      end if
 
-      ! MeteoGausian and SlideModel force the pressure path on (mod_meteo.F:206,
-      ! and Slide_Model_Setup sets AirPressure = .TRUE.)
-      if (this%meteo_gausian) this%air_pressure = .true.
-      if (this%slide_model) this%air_pressure = .true.
+      blk = sub_env%yaml%cast_dictionary("wind", no_key)
+      this%wind_constant_field = .not. no_key
+      if (this%wind_constant_field) then
+         ! the stress is the block's only consumer, so presence derives the gate
+         this%wind_force = .true.
+         call blk%read_input_path("file", silent=no_key, val=this%constant_wind_file)
+         if (no_key) call env%log%exit_on_error( &
+            "meteo: wind requires file (the time series)")
+         call read_wind_knobs(this, blk, env, DEF_METEO_WIND_CD, &
+                              DEF_METEO_WIND_WAVE_INTERACTION)
+      end if
 
-      ! wind + pressure knobs, read only when a wind model is on (legacy gate)
-      if (this%wind_holland_model .or. this%wind_constant_field) then
-         call sub_env%yaml%read("WindWaveInteraction", silent=no_key, &
-                                val=this%wind_wave_interaction, &
-                                default=DEF_METEO_WINDWAVEINTERACTION)
-         ! AirPressure: user switch (default off); consumed silent so an absent
-         ! key leaves the initializer, matching the legacy ierr default
-         call sub_env%yaml%read("AirPressure", silent=no_key, &
-                                val=this%air_pressure)
-         if (no_key) this%air_pressure = .false.
-         ! WindForce: absent -> TRUE for a constant wind field, else FALSE
-         call sub_env%yaml%read("WindForce", silent=no_key, val=this%wind_force)
-         if (no_key) this%wind_force = this%wind_constant_field
-         if (this%wind_force) then
-            call sub_env%yaml%read("Cdw", silent=no_key, val=this%cdw, &
-                                   default=DEF_METEO_CDW)
-            ! WindCrestPercent: absent OR interaction-off -> LARGE (mask == 1)
-            call sub_env%yaml%read("WindCrestPercent", silent=no_key, &
-                                   val=this%wind_crest_percent)
-            if (no_key .or. .not. this%wind_wave_interaction) &
-               this%wind_crest_percent = LARGE
+      blk = sub_env%yaml%cast_dictionary("holland", no_key)
+      this%wind_holland_model = .not. no_key
+      if (this%wind_holland_model) then
+         ! one wind field; legacy lets the second writer clobber the first
+         if (this%wind_constant_field) call env%log%exit_on_error( &
+            "meteo: wind and holland both present -- they write the same wind field")
+         call blk%read_input_path("file", silent=no_key, val=this%storm_file)
+         if (no_key) call env%log%exit_on_error( &
+            "meteo: holland requires file (the storm track)")
+         ! or-ed, not assigned: a gaussian/slide block may have forced the
+         ! pressure path on already
+         call blk%read("air_pressure", silent=no_key, val=tmp_l, &
+                       default=DEF_METEO_HOLLAND_AIR_PRESSURE)
+         this%air_pressure = this%air_pressure .or. tmp_l
+         call blk%read("wind_force", silent=no_key, val=tmp_l, &
+                       default=DEF_METEO_HOLLAND_WIND_FORCE)
+         this%wind_force = this%wind_force .or. tmp_l
+         if (tmp_l) then
+            call read_wind_knobs(this, blk, env, DEF_METEO_HOLLAND_CD, &
+                                 DEF_METEO_HOLLAND_WAVE_INTERACTION)
+         else
+            call reject_wind_knobs(blk, env)
          end if
+      end if
+
+      blk = sub_env%yaml%cast_dictionary("slide", no_key)
+      this%slide_model = .not. no_key
+      if (this%slide_model) then
+         ! legacy Slide_Model_Setup sets AirPressure = .TRUE.
+         this%air_pressure = .true.
+         call blk%read_input_path("file", silent=no_key, val=this%slide_file)
+         if (no_key) call env%log%exit_on_error( &
+            "meteo: slide requires file (the geometry + track)")
+      end if
+
+      if (.not. (this%meteo_gausian .or. this%wind_constant_field .or. &
+                 this%wind_holland_model .or. this%slide_model)) then
+         call env%log%exit_on_error( &
+            "meteo: block present but no sub-model (gaussian/wind/holland/slide)")
       end if
 
       call sub_env%yaml%read("OUT_METEO", silent=no_key, &
                              val=this%out_meteo, &
                              default=DEF_METEO_OUT_METEO)
 
-      ! per-model input files
-      if (this%meteo_gausian) then
-         call sub_env%yaml%read_input_path("METEO_GAUSIAN_FILE", silent=no_key, &
-                                           val=this%gausian_file)
-         if (no_key) error stop &
-            "meteo: METEO_GAUSIAN_FILE is required when MeteoGausian is on"
-      end if
-      if (this%wind_constant_field) then
-         call sub_env%yaml%read_input_path("CONSTANT_WIND_FILE", silent=no_key, &
-                                           val=this%constant_wind_file)
-         if (no_key) error stop &
-            "meteo: CONSTANT_WIND_FILE is required when WindConstantField is on"
-      end if
-      if (this%wind_holland_model) then
-         call sub_env%yaml%read_input_path("STORM_FILE", silent=no_key, &
-                                           val=this%storm_file)
-         if (no_key) error stop &
-            "meteo: STORM_FILE is required when WindHollandModel is on"
-      end if
-      if (this%slide_model) then
-         call sub_env%yaml%read_input_path("SLIDE_FILE", silent=no_key, &
-                                           val=this%slide_file)
-         if (no_key) error stop &
-            "meteo: SLIDE_FILE is required when SlideModel is on"
+   end subroutine meteo_read_input
+
+   ! Shared wind-stress knobs of the wind-capable blocks.  crest_percent
+   ! without wave_interaction was forced inert (LARGE) by legacy -- rejected
+   ! here instead of silently ignored.
+   subroutine read_wind_knobs(this, blk, env, def_cd, def_wwi)
+      class(type_model_meteo), intent(inout) :: this
+      type(type_yaml_reader), intent(inout) :: blk
+      type(type_env), intent(inout) :: env
+      character(*), intent(in) :: def_cd, def_wwi
+
+      real(SP) :: tmp_r
+      logical :: no_key
+
+      call blk%read("cd", silent=no_key, val=this%cdw, default=def_cd)
+      call blk%read("wave_interaction", silent=no_key, &
+                    val=this%wind_wave_interaction, default=def_wwi)
+      call blk%read("crest_percent", silent=no_key, val=tmp_r)
+      if (no_key) then
+         this%wind_crest_percent = LARGE
+      else
+         if (.not. this%wind_wave_interaction) call env%log%exit_on_error( &
+            "meteo: crest_percent needs wave_interaction (the crest mask rides the wave envelope)")
+         this%wind_crest_percent = tmp_r
       end if
 
-   end subroutine meteo_read_input
+   end subroutine read_wind_knobs
+
+   ! holland with wind_force off: a present wind knob would be silently
+   ! ignored config -- reject it
+   subroutine reject_wind_knobs(blk, env)
+      type(type_yaml_reader), intent(inout) :: blk
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: tmp_r
+      logical :: no_key, tmp_l
+
+      call blk%read("cd", silent=no_key, val=tmp_r)
+      if (no_key) call blk%read("wave_interaction", silent=no_key, val=tmp_l)
+      if (no_key) call blk%read("crest_percent", silent=no_key, val=tmp_r)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "meteo: holland wind knobs (cd/wave_interaction/crest_percent) are unused without wind_force")
+
+   end subroutine reject_wind_knobs
 
    ! ----------------------------------------------------------------
    ! Legacy METEO_INITIAL: build the ghost-inclusive Xco/Yco lattice (any

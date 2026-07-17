@@ -12,9 +12,12 @@
 !  pixel-averaged water column replaces H.
 !
 !  YAML block: subgrid:            (top-level; omit for no subgrid)
-!    SubMainGridRatio:   <int>     default 1   pixels per main-cell side
-!    DEPTH_SUBGRID_FILE: <path>    sparse panel file (required in practice)
-!    Porosity:           <bool>    default NO  write porosity.ini at init
+!    ratio:          <int>     default 1   pixels per main-cell side
+!                                          (nee SubMainGridRatio)
+!    depth_file:     <path>    sparse panel file, required
+!                                          (nee DEPTH_SUBGRID_FILE)
+!    write_porosity: <bool>    default NO  write porosity.ini at init
+!                                          (nee Porosity)
 !
 !  Panel file: one record per subgrid main cell,
 !    Ix  Iy  d(1,1) d(2,1) ... d(r,r)      (column-major within the panel)
@@ -63,8 +66,8 @@ module model_subgrid_mod
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_SUBGRID_SUBMAINGRIDRATIO, &
-                                        DEF_SUBGRID_POROSITY
+   use model_config_defaults_mod, only: DEF_SUBGRID_RATIO, &
+                                        DEF_SUBGRID_WRITE_POROSITY
 
    implicit none
 
@@ -106,18 +109,18 @@ contains
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      call sub_env%yaml%read("SubMainGridRatio", silent=no_key, &
+      call sub_env%yaml%read("ratio", silent=no_key, &
                              val=this%ratio, &
-                             default=DEF_SUBGRID_SUBMAINGRIDRATIO)
-      call sub_env%yaml%read("Porosity", silent=no_key, &
+                             default=DEF_SUBGRID_RATIO)
+      call sub_env%yaml%read("write_porosity", silent=no_key, &
                              val=this%out_porosity, &
-                             default=DEF_SUBGRID_POROSITY)
+                             default=DEF_SUBGRID_WRITE_POROSITY)
 
-      call sub_env%yaml%read_input_path("DEPTH_SUBGRID_FILE", silent=no_key, &
+      call sub_env%yaml%read_input_path("depth_file", silent=no_key, &
                                         val=this%depth_subgrid_file)
       if (no_key) then
          call env%log%exit_on_error( &
-            "subgrid: DEPTH_SUBGRID_FILE is required")
+            "subgrid: depth_file is required")
       end if
 
       this%num_pixel = this%ratio*this%ratio
