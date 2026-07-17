@@ -18,6 +18,10 @@ ENV CMAKE_Fortran_COMPILER_LAUNCHER=ccache \
     CCACHE_DIR=/ccache
 # Allow MPI to run as root inside Docker containers
 ENV OMPI_ALLOW_RUN_AS_ROOT=1 OMPI_ALLOW_RUN_AS_ROOT_CONFIRM=1
+# Widest unit test wants 4 ranks; CI runners expose only 2 cores, so let
+# Open MPI oversubscribe (PRTE var covers Open MPI 5)
+ENV OMPI_MCA_rmaps_base_oversubscribe=1 \
+    PRTE_MCA_rmaps_default_mapping_policy=:oversubscribe
 
 WORKDIR /workspace
 
