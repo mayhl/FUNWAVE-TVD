@@ -1,3 +1,3 @@
 # Standing Wave
 
-*Coming soon.*
+_Coming soon._

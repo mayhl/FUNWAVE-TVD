@@ -25,9 +25,9 @@ cd mayhlFUNWAVE
 
 ## Documentation Structure
 
-| Section | Description |
-|---------|-------------|
-| [Model](model/overview.md) | Governing equations and numerical scheme |
-| [User Guide](guide/installation.md) | Installation, configuration, output |
-| [Examples](examples/standing_wave.md) | Step-by-step worked examples |
-| [API Reference](api/index.md) | Auto-generated source documentation |
+| Section                               | Description                              |
+| ------------------------------------- | ---------------------------------------- |
+| [Model](model/overview.md)            | Governing equations and numerical scheme |
+| [User Guide](guide/installation.md)   | Installation, configuration, output      |
+| [Examples](examples/standing_wave.md) | Step-by-step worked examples             |
+| [API Reference](api/index.md)         | Auto-generated source documentation      |

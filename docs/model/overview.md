@@ -1,3 +1,3 @@
 # Model Overview
 
-*Coming soon.*
+_Coming soon._

@@ -1,3 +1,3 @@
 # Output
 
-*Coming soon.*
+_Coming soon._

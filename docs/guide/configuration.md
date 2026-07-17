@@ -1,3 +1,3 @@
 # Configuration
 
-*Coming soon.*
+_Coming soon._

@@ -6,9 +6,9 @@ comments in the Fortran source.
 [Open Doxygen Reference](/doxygen/index.html){ .md-button .md-button--primary }
 
 !!! note "Building the API docs"
-    If the link above returns a 404, build the Doxygen docs first:
-    ```bash
+If the link above returns a 404, build the Doxygen docs first:
+`bash
     cmake -DENABLE_DOCS=ON -B build
     cmake --build build --target doc
     uv run mkdocs build
-    ```
+    `

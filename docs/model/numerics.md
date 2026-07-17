@@ -1,3 +1,3 @@
 # Numerical Scheme
 
-*Coming soon.*
+_Coming soon._

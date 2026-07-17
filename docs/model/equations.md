@@ -1,3 +1,3 @@
 # Governing Equations
 
-*Coming soon.*
+_Coming soon._
