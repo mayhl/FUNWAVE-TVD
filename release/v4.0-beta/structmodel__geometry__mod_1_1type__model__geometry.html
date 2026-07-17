@@ -129,6 +129,9 @@ procedure&#160;</td><td class="memItemRight" valign="bottom"><b>build_grid</b> (
 <tr class="memitem:a98f71d8304640207e1fe7f0edf17b91e" id="r_a98f71d8304640207e1fe7f0edf17b91e"><td class="memItemLeft" align="right" valign="top"><a id="a98f71d8304640207e1fe7f0edf17b91e" name="a98f71d8304640207e1fe7f0edf17b91e"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init_depth</b> (this, grid, depth, depth_x, depth_y)</td></tr>
 <tr class="separator:a98f71d8304640207e1fe7f0edf17b91e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a748ca6cca683b0f0515bb9c304825703" id="r_a748ca6cca683b0f0515bb9c304825703"><td class="memItemLeft" align="right" valign="top"><a id="a748ca6cca683b0f0515bb9c304825703" name="a748ca6cca683b0f0515bb9c304825703"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>correct_depth</b> (this, env, grid, min_depth_frc, depth, depth_org, gradx0, grady0, gradx, grady)</td></tr>
+<tr class="separator:a748ca6cca683b0f0515bb9c304825703"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_methods_structmodel__base__mod_1_1type__model__base"><td colspan="2" onclick="javascript:toggleInherit('pub_methods_structmodel__base__mod_1_1type__model__base')"><img src="closed.png" alt="-"/>&#160;Public Member Functions inherited from <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td></tr>
 <tr class="memitem:a6b1356cc2688b2fd2317acbeb2dd49f9 inherit pub_methods_structmodel__base__mod_1_1type__model__base" id="r_a6b1356cc2688b2fd2317acbeb2dd49f9"><td class="memItemLeft" align="right" valign="top">
 procedure(<a class="el" href="interfacemodel__base__mod_1_1model__read__input.html">model_read_input</a>), deferred&#160;</td><td class="memItemRight" valign="bottom"><b>read_input</b> (this, env)</td></tr>
@@ -187,6 +190,12 @@ real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>bathy_slope_x0</b
 <tr class="memitem:a77a88390267e34f12d808f8ec9f155bf" id="r_a77a88390267e34f12d808f8ec9f155bf"><td class="memItemLeft" align="right" valign="top"><a id="a77a88390267e34f12d808f8ec9f155bf" name="a77a88390267e34f12d808f8ec9f155bf"></a>
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>bathy_correction</b> = .false.</td></tr>
 <tr class="separator:a77a88390267e34f12d808f8ec9f155bf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae7280de4480ea267af2b6714b7357242" id="r_ae7280de4480ea267af2b6714b7357242"><td class="memItemLeft" align="right" valign="top"><a id="ae7280de4480ea267af2b6714b7357242" name="ae7280de4480ea267af2b6714b7357242"></a>
+real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>smooth_below_depth</b> = -LARGE</td></tr>
+<tr class="separator:ae7280de4480ea267af2b6714b7357242"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8b70979fbc37dc8f680d1ca0dc662bc4" id="r_a8b70979fbc37dc8f680d1ca0dc662bc4"><td class="memItemLeft" align="right" valign="top"><a id="a8b70979fbc37dc8f680d1ca0dc662bc4" name="a8b70979fbc37dc8f680d1ca0dc662bc4"></a>
+real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>slope_cap</b> = 1.0_SP</td></tr>
+<tr class="separator:a8b70979fbc37dc8f680d1ca0dc662bc4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aece08e67887ec9871eb4219bedee2862" id="r_aece08e67887ec9871eb4219bedee2862"><td class="memItemLeft" align="right" valign="top"><a id="aece08e67887ec9871eb4219bedee2862" name="aece08e67887ec9871eb4219bedee2862"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>bathy_nx</b> = 0</td></tr>
 <tr class="separator:aece08e67887ec9871eb4219bedee2862"><td class="memSeparator" colspan="2">&#160;</td></tr>

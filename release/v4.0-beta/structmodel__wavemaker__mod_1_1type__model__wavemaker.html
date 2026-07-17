@@ -190,6 +190,12 @@ real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>xwavemaker</b> = 
 <tr class="memitem:a8d25175756389bc13f8b95d92d1d5181" id="r_a8d25175756389bc13f8b95d92d1d5181"><td class="memItemLeft" align="right" valign="top"><a id="a8d25175756389bc13f8b95d92d1d5181" name="a8d25175756389bc13f8b95d92d1d5181"></a>
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>solitarypositivedirection</b> = .true.</td></tr>
 <tr class="separator:a8d25175756389bc13f8b95d92d1d5181"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a23d43e1d687dc4a10baa9d28f206c379" id="r_a23d43e1d687dc4a10baa9d28f206c379"><td class="memItemLeft" align="right" valign="top"><a id="a23d43e1d687dc4a10baa9d28f206c379" name="a23d43e1d687dc4a10baa9d28f206c379"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>mode_x</b> = 1</td></tr>
+<tr class="separator:a23d43e1d687dc4a10baa9d28f206c379"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a132eb41bfb9c91a2f47a287dd7adfacc" id="r_a132eb41bfb9c91a2f47a287dd7adfacc"><td class="memItemLeft" align="right" valign="top"><a id="a132eb41bfb9c91a2f47a287dd7adfacc" name="a132eb41bfb9c91a2f47a287dd7adfacc"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>mode_y</b> = 0</td></tr>
+<tr class="separator:a132eb41bfb9c91a2f47a287dd7adfacc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a890cfc66a76df32109d1d8e96ffa95ed" id="r_a890cfc66a76df32109d1d8e96ffa95ed"><td class="memItemLeft" align="right" valign="top"><a id="a890cfc66a76df32109d1d8e96ffa95ed" name="a890cfc66a76df32109d1d8e96ffa95ed"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>xc</b> = 0.0_SP</td></tr>
 <tr class="separator:a890cfc66a76df32109d1d8e96ffa95ed"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -289,6 +295,9 @@ logical&#160;</td><td class="memItemRight" valign="bottom"><b>wavemakercurrentba
 <tr class="memitem:a4a00cd2a49a9d015d98c4f8779bd3d44" id="r_a4a00cd2a49a9d015d98c4f8779bd3d44"><td class="memItemLeft" align="right" valign="top"><a id="a4a00cd2a49a9d015d98c4f8779bd3d44" name="a4a00cd2a49a9d015d98c4f8779bd3d44"></a>
 real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>wavemakercd</b> = 0.0_SP</td></tr>
 <tr class="separator:a4a00cd2a49a9d015d98c4f8779bd3d44"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac286224598dca6e358461e694dcb1e17" id="r_ac286224598dca6e358461e694dcb1e17"><td class="memItemLeft" align="right" valign="top"><a id="ac286224598dca6e358461e694dcb1e17" name="ac286224598dca6e358461e694dcb1e17"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>cd_current</b></td></tr>
+<tr class="separator:ac286224598dca6e358461e694dcb1e17"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af36101a323f09297603cbd4c04f46cb1" id="r_af36101a323f09297603cbd4c04f46cb1"><td class="memItemLeft" align="right" valign="top"><a id="af36101a323f09297603cbd4c04f46cb1" name="af36101a323f09297603cbd4c04f46cb1"></a>
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>has_mass_source</b> = .false.</td></tr>
 <tr class="separator:af36101a323f09297603cbd4c04f46cb1"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -385,6 +394,9 @@ real(sp), dimension(:), allocatable&#160;</td><td class="memItemRight" valign="b
 <tr class="memitem:a492309f5212623f5ed8c807a3e04be98" id="r_a492309f5212623f5ed8c807a3e04be98"><td class="memItemLeft" align="right" valign="top"><a id="a492309f5212623f5ed8c807a3e04be98" name="a492309f5212623f5ed8c807a3e04be98"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>sponge_maker</b></td></tr>
 <tr class="separator:a492309f5212623f5ed8c807a3e04be98"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa34233e0b61be0886dcb32a7334a76d4" id="r_aa34233e0b61be0886dcb32a7334a76d4"><td class="memItemLeft" align="right" valign="top"><a id="aa34233e0b61be0886dcb32a7334a76d4" name="aa34233e0b61be0886dcb32a7334a76d4"></a>
+type(<a class="el" href="structmodel__tide__mod_1_1type__model__tide.html">type_model_tide</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>tide</b> =&gt; null()</td></tr>
+<tr class="separator:aa34233e0b61be0886dcb32a7334a76d4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_structmodel__base__mod_1_1type__model__base"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_structmodel__base__mod_1_1type__model__base')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td></tr>
 <tr class="memitem:a201e9827a8f300136e2f6a1a777a4bd4 inherit pub_attribs_structmodel__base__mod_1_1type__model__base" id="r_a201e9827a8f300136e2f6a1a777a4bd4"><td class="memItemLeft" align="right" valign="top">
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_activated</b> = .false.</td></tr>

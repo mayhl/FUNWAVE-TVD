@@ -35,4 +35,13 @@ digraph "model_main_mod::type_output_monitor"
   Node5 -> Node14 [id="edge14_Node000014_Node000005",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" trigger",fontcolor="grey" ];
   Node15 -> Node14 [id="edge15_Node000014_Node000015",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" fields",fontcolor="grey" ];
   Node15 [id="Node000015",label="model_fields_2d_mod\l::type_fields_2d",height=0.2,width=0.4,color="gray40", fillcolor="white", style="filled",URL="$structmodel__fields__2d__mod_1_1type__fields__2d.html",tooltip="Primary field arrays for the 2D Boussinesq model."];
+  Node16 -> Node1 [id="edge16_Node000001_Node000016",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" tracer",fontcolor="grey" ];
+  Node16 [id="Node000016",label="model_tracer_mod::type\l_model_tracer",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__tracer__mod_1_1type__model__tracer.html",tooltip=" "];
+  Node17 -> Node16 [id="edge17_Node000016_Node000017",dir="back",color="steelblue1",style="solid",tooltip=" "];
+  Node17 [id="Node000017",label="model_base_mod::type\l_model_base",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__base__mod_1_1type__model__base.html",tooltip=" "];
+  Node5 -> Node16 [id="edge18_Node000016_Node000005",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" trigger",fontcolor="grey" ];
+  Node18 -> Node1 [id="edge19_Node000001_Node000018",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" vessel",fontcolor="grey" ];
+  Node18 [id="Node000018",label="model_vessel_mod::type\l_model_vessel",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__vessel__mod_1_1type__model__vessel.html",tooltip=" "];
+  Node17 -> Node18 [id="edge20_Node000018_Node000017",dir="back",color="steelblue1",style="solid",tooltip=" "];
+  Node5 -> Node18 [id="edge21_Node000018_Node000005",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" trigger",fontcolor="grey" ];
 }

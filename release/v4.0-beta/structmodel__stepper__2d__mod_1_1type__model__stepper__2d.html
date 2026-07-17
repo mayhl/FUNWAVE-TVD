@@ -120,9 +120,9 @@ Collaboration diagram for model_stepper_2d_mod::type_model_stepper_2d:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a0d96f4465dbe8cd59e40f54812ab903d" id="r_a0d96f4465dbe8cd59e40f54812ab903d"><td class="memItemLeft" align="right" valign="top"><a id="a0d96f4465dbe8cd59e40f54812ab903d" name="a0d96f4465dbe8cd59e40f54812ab903d"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, env, grid, fields, physics, numerics, breaking, friction, simulation, output, wavemaker, sponge, means)</td></tr>
-<tr class="separator:a0d96f4465dbe8cd59e40f54812ab903d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1c13800ff6eeafac048dbda752b15d71" id="r_a1c13800ff6eeafac048dbda752b15d71"><td class="memItemLeft" align="right" valign="top"><a id="a1c13800ff6eeafac048dbda752b15d71" name="a1c13800ff6eeafac048dbda752b15d71"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, env, grid, fields, physics, numerics, breaking, friction, simulation, output, wavemaker, sponge, obstacle, means, tide, precipitation, subgrid, foam, tracer, vessel, sediment, meteo)</td></tr>
+<tr class="separator:a1c13800ff6eeafac048dbda752b15d71"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a069811d990fe5ef9739cd2bee70705e6" id="r_a069811d990fe5ef9739cd2bee70705e6"><td class="memItemLeft" align="right" valign="top"><a id="a069811d990fe5ef9739cd2bee70705e6" name="a069811d990fe5ef9739cd2bee70705e6"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>register_output</b> (this, registry)</td></tr>
 <tr class="separator:a069811d990fe5ef9739cd2bee70705e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -190,9 +190,36 @@ type(<a class="el" href="structmodel__wavemaker__mod_1_1type__model__wavemaker.h
 <tr class="memitem:ae9207a11a8236ac6a7639bc124d5523f" id="r_ae9207a11a8236ac6a7639bc124d5523f"><td class="memItemLeft" align="right" valign="top"><a id="ae9207a11a8236ac6a7639bc124d5523f" name="ae9207a11a8236ac6a7639bc124d5523f"></a>
 type(<a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html">type_model_sponge</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>sponge</b> =&gt; null()</td></tr>
 <tr class="separator:ae9207a11a8236ac6a7639bc124d5523f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af54927a38a9e0a08d249d4f092e55431" id="r_af54927a38a9e0a08d249d4f092e55431"><td class="memItemLeft" align="right" valign="top"><a id="af54927a38a9e0a08d249d4f092e55431" name="af54927a38a9e0a08d249d4f092e55431"></a>
+type(<a class="el" href="structmodel__obstacle__mod_1_1type__model__obstacle.html">type_model_obstacle</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>obstacle</b> =&gt; null()</td></tr>
+<tr class="separator:af54927a38a9e0a08d249d4f092e55431"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a616e3062409717351841292ee1a24b56" id="r_a616e3062409717351841292ee1a24b56"><td class="memItemLeft" align="right" valign="top"><a id="a616e3062409717351841292ee1a24b56" name="a616e3062409717351841292ee1a24b56"></a>
 type(<a class="el" href="structmodel__means__mod_1_1type__model__means.html">type_model_means</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>means</b> =&gt; null()</td></tr>
 <tr class="separator:a616e3062409717351841292ee1a24b56"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a00381e98822d33e9ef753675d0f5961b" id="r_a00381e98822d33e9ef753675d0f5961b"><td class="memItemLeft" align="right" valign="top"><a id="a00381e98822d33e9ef753675d0f5961b" name="a00381e98822d33e9ef753675d0f5961b"></a>
+type(<a class="el" href="structmodel__tide__mod_1_1type__model__tide.html">type_model_tide</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>tide</b> =&gt; null()</td></tr>
+<tr class="separator:a00381e98822d33e9ef753675d0f5961b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adfe4a7ae980f7746b429135c5d799380" id="r_adfe4a7ae980f7746b429135c5d799380"><td class="memItemLeft" align="right" valign="top"><a id="adfe4a7ae980f7746b429135c5d799380" name="adfe4a7ae980f7746b429135c5d799380"></a>
+type(<a class="el" href="structmodel__precipitation__mod_1_1type__model__precipitation.html">type_model_precipitation</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>precipitation</b> =&gt; null()</td></tr>
+<tr class="separator:adfe4a7ae980f7746b429135c5d799380"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a575207994bb615ab6381e3ac189774cf" id="r_a575207994bb615ab6381e3ac189774cf"><td class="memItemLeft" align="right" valign="top"><a id="a575207994bb615ab6381e3ac189774cf" name="a575207994bb615ab6381e3ac189774cf"></a>
+type(<a class="el" href="structmodel__subgrid__mod_1_1type__model__subgrid.html">type_model_subgrid</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>subgrid</b> =&gt; null()</td></tr>
+<tr class="separator:a575207994bb615ab6381e3ac189774cf"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a522e918e2ee531f81d40355da328a50d" id="r_a522e918e2ee531f81d40355da328a50d"><td class="memItemLeft" align="right" valign="top"><a id="a522e918e2ee531f81d40355da328a50d" name="a522e918e2ee531f81d40355da328a50d"></a>
+type(<a class="el" href="structmodel__foam__mod_1_1type__model__foam.html">type_model_foam</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>foam</b> =&gt; null()</td></tr>
+<tr class="separator:a522e918e2ee531f81d40355da328a50d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a44c552a21d39313162233ef7310badee" id="r_a44c552a21d39313162233ef7310badee"><td class="memItemLeft" align="right" valign="top"><a id="a44c552a21d39313162233ef7310badee" name="a44c552a21d39313162233ef7310badee"></a>
+type(<a class="el" href="structmodel__tracer__mod_1_1type__model__tracer.html">type_model_tracer</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>tracer</b> =&gt; null()</td></tr>
+<tr class="separator:a44c552a21d39313162233ef7310badee"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adb888d3407ea9a98c7ec80eeaf714c3c" id="r_adb888d3407ea9a98c7ec80eeaf714c3c"><td class="memItemLeft" align="right" valign="top"><a id="adb888d3407ea9a98c7ec80eeaf714c3c" name="adb888d3407ea9a98c7ec80eeaf714c3c"></a>
+type(<a class="el" href="structmodel__vessel__mod_1_1type__model__vessel.html">type_model_vessel</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>vessel</b> =&gt; null()</td></tr>
+<tr class="separator:adb888d3407ea9a98c7ec80eeaf714c3c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2af248d8d99524c673064bbf25f53873" id="r_a2af248d8d99524c673064bbf25f53873"><td class="memItemLeft" align="right" valign="top"><a id="a2af248d8d99524c673064bbf25f53873" name="a2af248d8d99524c673064bbf25f53873"></a>
+type(<a class="el" href="structmodel__sediment__mod_1_1type__model__sediment.html">type_model_sediment</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>sediment</b> =&gt; null()</td></tr>
+<tr class="separator:a2af248d8d99524c673064bbf25f53873"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5ab932923cbd42a10fe263262d087f09" id="r_a5ab932923cbd42a10fe263262d087f09"><td class="memItemLeft" align="right" valign="top"><a id="a5ab932923cbd42a10fe263262d087f09" name="a5ab932923cbd42a10fe263262d087f09"></a>
+type(<a class="el" href="structmodel__meteo__mod_1_1type__model__meteo.html">type_model_meteo</a>), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>meteo</b> =&gt; null()</td></tr>
+<tr class="separator:a5ab932923cbd42a10fe263262d087f09"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0db441285b7e7be1ce83790b02becb02" id="r_a0db441285b7e7be1ce83790b02becb02"><td class="memItemLeft" align="right" valign="top"><a id="a0db441285b7e7be1ce83790b02becb02" name="a0db441285b7e7be1ce83790b02becb02"></a>
 type(<a class="el" href="structmodel__bc__mod_1_1type__model__bc.html">type_model_bc</a>)&#160;</td><td class="memItemRight" valign="bottom"><b>bc</b></td></tr>
 <tr class="separator:a0db441285b7e7be1ce83790b02becb02"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -307,6 +334,9 @@ real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign
 <tr class="memitem:ac87ed45e968644cbe41930275aa5287f" id="r_ac87ed45e968644cbe41930275aa5287f"><td class="memItemLeft" align="right" valign="top"><a id="ac87ed45e968644cbe41930275aa5287f" name="ac87ed45e968644cbe41930275aa5287f"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>zeros</b></td></tr>
 <tr class="separator:ac87ed45e968644cbe41930275aa5287f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a1be2dab0d51c01d3e6cfb0e1f1250fdc" id="r_a1be2dab0d51c01d3e6cfb0e1f1250fdc"><td class="memItemLeft" align="right" valign="top"><a id="a1be2dab0d51c01d3e6cfb0e1f1250fdc" name="a1be2dab0d51c01d3e6cfb0e1f1250fdc"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>coriolis</b></td></tr>
+<tr class="separator:a1be2dab0d51c01d3e6cfb0e1f1250fdc"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab8709955b997634e4e14fc7317f669a3" id="r_ab8709955b997634e4e14fc7317f669a3"><td class="memItemLeft" align="right" valign="top"><a id="ab8709955b997634e4e14fc7317f669a3" name="ab8709955b997634e4e14fc7317f669a3"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>roller_flux</b></td></tr>
 <tr class="separator:ab8709955b997634e4e14fc7317f669a3"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -319,6 +349,9 @@ real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign
 <tr class="memitem:a3fb3d2ad8a2d423f0d2f2bae547914fa" id="r_a3fb3d2ad8a2d423f0d2f2bae547914fa"><td class="memItemLeft" align="right" valign="top"><a id="a3fb3d2ad8a2d423f0d2f2bae547914fa" name="a3fb3d2ad8a2d423f0d2f2bae547914fa"></a>
 logical, dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>in_wm_zone</b></td></tr>
 <tr class="separator:a3fb3d2ad8a2d423f0d2f2bae547914fa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab2c706d2945c5d6406988324c5397c19" id="r_ab2c706d2945c5d6406988324c5397c19"><td class="memItemLeft" align="right" valign="top"><a id="ab2c706d2945c5d6406988324c5397c19" name="ab2c706d2945c5d6406988324c5397c19"></a>
+logical&#160;</td><td class="memItemRight" valign="bottom"><b>run_breaker</b> = .false.</td></tr>
+<tr class="separator:ab2c706d2945c5d6406988324c5397c19"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a412b36a45394da297f654246d299b269" id="r_a412b36a45394da297f654246d299b269"><td class="memItemLeft" align="right" valign="top"><a id="a412b36a45394da297f654246d299b269" name="a412b36a45394da297f654246d299b269"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>nu_vis</b></td></tr>
 <tr class="separator:a412b36a45394da297f654246d299b269"><td class="memSeparator" colspan="2">&#160;</td></tr>

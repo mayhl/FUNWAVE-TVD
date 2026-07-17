@@ -125,6 +125,9 @@ var annotated_dup =
     [ "model_fields_2d_mod", null, [
       [ "type_fields_2d", "structmodel__fields__2d__mod_1_1type__fields__2d.html", "structmodel__fields__2d__mod_1_1type__fields__2d" ]
     ] ],
+    [ "model_foam_mod", null, [
+      [ "type_model_foam", "structmodel__foam__mod_1_1type__model__foam.html", null ]
+    ] ],
     [ "model_friction_mod", null, [
       [ "type_model_friction", "structmodel__friction__mod_1_1type__model__friction.html", null ]
     ] ],
@@ -150,6 +153,9 @@ var annotated_dup =
     [ "model_means_mod", null, [
       [ "type_model_means", "structmodel__means__mod_1_1type__model__means.html", null ]
     ] ],
+    [ "model_meteo_mod", null, [
+      [ "type_model_meteo", "structmodel__meteo__mod_1_1type__model__meteo.html", null ]
+    ] ],
     [ "model_numerics_mod", null, [
       [ "type_model_numerics", "structmodel__numerics__mod_1_1type__model__numerics.html", null ]
     ] ],
@@ -163,9 +169,15 @@ var annotated_dup =
     [ "model_physics_mod", null, [
       [ "type_model_physics", "structmodel__physics__mod_1_1type__model__physics.html", null ]
     ] ],
+    [ "model_precipitation_mod", null, [
+      [ "type_model_precipitation", "structmodel__precipitation__mod_1_1type__model__precipitation.html", null ]
+    ] ],
     [ "model_scratch_mod", null, [
       [ "type_model_scratch", "structmodel__scratch__mod_1_1type__model__scratch.html", null ],
       [ "type_scratch_pool", "structmodel__scratch__mod_1_1type__scratch__pool.html", "structmodel__scratch__mod_1_1type__scratch__pool" ]
+    ] ],
+    [ "model_sediment_mod", null, [
+      [ "type_model_sediment", "structmodel__sediment__mod_1_1type__model__sediment.html", "structmodel__sediment__mod_1_1type__model__sediment" ]
     ] ],
     [ "model_simulation_mod", null, [
       [ "type_model_simulation", "structmodel__simulation__mod_1_1type__model__simulation.html", null ]
@@ -178,6 +190,18 @@ var annotated_dup =
     ] ],
     [ "model_stepper_2d_mod", null, [
       [ "type_model_stepper_2d", "structmodel__stepper__2d__mod_1_1type__model__stepper__2d.html", null ]
+    ] ],
+    [ "model_subgrid_mod", null, [
+      [ "type_model_subgrid", "structmodel__subgrid__mod_1_1type__model__subgrid.html", null ]
+    ] ],
+    [ "model_tide_mod", null, [
+      [ "type_model_tide", "structmodel__tide__mod_1_1type__model__tide.html", null ]
+    ] ],
+    [ "model_tracer_mod", null, [
+      [ "type_model_tracer", "structmodel__tracer__mod_1_1type__model__tracer.html", null ]
+    ] ],
+    [ "model_vessel_mod", null, [
+      [ "type_model_vessel", "structmodel__vessel__mod_1_1type__model__vessel.html", null ]
     ] ],
     [ "model_wavemaker_mod", null, [
       [ "type_model_wavemaker", "structmodel__wavemaker__mod_1_1type__model__wavemaker.html", null ]
