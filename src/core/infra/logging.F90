@@ -36,7 +36,8 @@ module core_log_io_mod
 
 contains
 
-  function type_log_writer_initialize(label, is_io_node, path, std_err_threshold, std_out_threshold, logfile_threshold) result(this)
+   function type_log_writer_initialize(label, is_io_node, path, std_err_threshold, &
+                                       std_out_threshold, logfile_threshold) result(this)
       character(*), intent(in) :: label
       logical, intent(in) :: is_io_node
       character(*), intent(in), optional :: path
