@@ -34,18 +34,22 @@
 !  `#if defined (CARTESIAN)`.  See NOTE 6.
 !
 !  YAML block: vessel:                 (top-level; omit for no vessel)
-!    VESSEL_FOLDER:    <path>  required; holds vessel_00001, vessel_00002, ...
-!    NumVessel:        <int>   default 1
+!    folder:    <path>  required; holds vessel_00001, ... (nee VESSEL_FOLDER)
+!    count:     <int>   default 1  (nee NumVessel)
+!    propeller: <bool>  default F  (nee PROPELLER; per-hull jet specs stay in
+!                       the vessel_NNNNN files)
+!    deep_draft:        presence = near-bed hull handling (nee DEEP_DRAFT)
+!      clearance: <real>  draft-to-bed gap threshold [m], required
+!                         (nee CLEARANCE; anchors the block)
+!      mask:      <bool>  default T  blank mask9 (nee MaskMethod)
+!      cd:        <real>  presence = hull drag (nee FrictionMethod +
+!                         CdDeepDraft; NOTE: legacy defaulted the drag ON at
+!                         0.1 — a block without cd runs drag-free)
+!      nu:        <real>  presence = hull eddy viscosity [m^2/s]
+!                         (nee ViscosityMethod + VisDeepDraft)
 !    OUT_VESSEL:       <bool>  default T     write the resistance time series
 !    PLOT_INTV_VESSEL: <real>  default SMALL resistance output interval  [s]
-!    PROPELLER:        <bool>  default F
-!    DEEP_DRAFT:       <bool>  default F
-!    MaskMethod:       <bool>  default T     deep draft: blank mask9
-!    FrictionMethod:   <bool>  default T     deep draft: hull drag
-!    ViscosityMethod:  <bool>  default F     deep draft: hull eddy viscosity
-!    CLEARANCE:        <real>  default 1.0   draft-to-bed gap threshold  [m]
-!    CdDeepDraft:      <real>  default 0.1
-!    VisDeepDraft:     <real>  default 0.1                            [m^2/s]
+!                      (both legacy-spelled until the rung-5 output move)
 !
 !  Legacy call shape: VESSEL_INITIAL from init; VESSEL_FORCING once per step,
 !  after ESTIMATE_DT (so TIME is already advanced) and BEFORE the RK loop.
@@ -100,13 +104,12 @@ module model_vessel_mod
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d
    use core_time_utils_mod, only: type_timing_control
+   use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
    use model_bc_mod, only: type_model_bc
-   use model_config_defaults_mod, only: DEF_VESSEL_NUMVESSEL, DEF_VESSEL_OUT_VESSEL, &
-                                        DEF_VESSEL_PROPELLER, DEF_VESSEL_DEEP_DRAFT, &
-                                        DEF_VESSEL_MASKMETHOD, DEF_VESSEL_FRICTIONMETHOD, &
-                                        DEF_VESSEL_VISCOSITYMETHOD, DEF_VESSEL_CLEARANCE, &
-                                        DEF_VESSEL_CDDEEPDRAFT, DEF_VESSEL_VISDEEPDRAFT
+   use model_config_defaults_mod, only: DEF_VESSEL_COUNT, DEF_VESSEL_OUT_VESSEL, &
+                                        DEF_VESSEL_PROPELLER, &
+                                        DEF_VESSEL_DEEP_DRAFT_MASK
    use mpi_f08
 
    implicit none
@@ -197,18 +200,20 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
+      type(type_yaml_reader) :: blk
       logical :: no_blk, no_key
+      real(SP) :: tmp_r
 
       sub_env = get_sub_env(env, "vessel", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      call sub_env%yaml%read("VESSEL_FOLDER", silent=no_key, val=this%vessel_folder)
+      call sub_env%yaml%read("folder", silent=no_key, val=this%vessel_folder)
       if (no_key) call env%log%exit_on_error( &
-         "vessel: VESSEL_FOLDER is required (it holds vessel_00001, ...)")
+         "vessel: folder is required (it holds vessel_00001, ...)")
 
-      call sub_env%yaml%read("NumVessel", silent=no_key, val=this%n_vessel, &
-                             default=DEF_VESSEL_NUMVESSEL)
+      call sub_env%yaml%read("count", silent=no_key, val=this%n_vessel, &
+                             default=DEF_VESSEL_COUNT)
       call sub_env%yaml%read("OUT_VESSEL", silent=no_key, val=this%out_vessel, &
                              default=DEF_VESSEL_OUT_VESSEL)
       ! legacy "PLOT_INTV_VESSEL not specified, use SMALL" -- SMALL, not the
@@ -216,23 +221,29 @@ contains
       call sub_env%yaml%read("PLOT_INTV_VESSEL", silent=no_key, val=this%plot_intv)
       if (no_key) this%plot_intv = SMALL
 
-      call sub_env%yaml%read("PROPELLER", silent=no_key, val=this%propeller, &
+      call sub_env%yaml%read("propeller", silent=no_key, val=this%propeller, &
                              default=DEF_VESSEL_PROPELLER)
-      call sub_env%yaml%read("DEEP_DRAFT", silent=no_key, val=this%deep_draft, &
-                             default=DEF_VESSEL_DEEP_DRAFT)
 
-      call sub_env%yaml%read("MaskMethod", silent=no_key, val=this%mask_method, &
-                             default=DEF_VESSEL_MASKMETHOD)
-      call sub_env%yaml%read("FrictionMethod", silent=no_key, val=this%friction_method, &
-                             default=DEF_VESSEL_FRICTIONMETHOD)
-      call sub_env%yaml%read("ViscosityMethod", silent=no_key, val=this%viscosity_method, &
-                             default=DEF_VESSEL_VISCOSITYMETHOD)
-      call sub_env%yaml%read("CLEARANCE", silent=no_key, val=this%clearance, &
-                             default=DEF_VESSEL_CLEARANCE)
-      call sub_env%yaml%read("CdDeepDraft", silent=no_key, val=this%cd_deep_draft, &
-                             default=DEF_VESSEL_CDDEEPDRAFT)
-      call sub_env%yaml%read("VisDeepDraft", silent=no_key, val=this%vis_deep_draft, &
-                             default=DEF_VESSEL_VISDEEPDRAFT)
+      ! deep_draft block presence = near-bed hull handling (nee the DEEP_DRAFT
+      ! bool + the three Method bools)
+      blk = sub_env%yaml%cast_dictionary("deep_draft", no_key)
+      this%deep_draft = .not. no_key
+      if (this%deep_draft) then
+         ! clearance anchors the block (an empty block reads as absent)
+         call blk%read("clearance", silent=no_key, val=tmp_r)
+         if (no_key) call env%log%exit_on_error( &
+            "vessel: deep_draft requires clearance (the draft-to-bed gap threshold)")
+         this%clearance = tmp_r
+         call blk%read("mask", silent=no_key, val=this%mask_method, &
+                       default=DEF_VESSEL_DEEP_DRAFT_MASK)
+         ! cd/nu presence derives the drag and eddy-viscosity switches
+         call blk%read("cd", silent=no_key, val=tmp_r)
+         this%friction_method = .not. no_key
+         if (this%friction_method) this%cd_deep_draft = tmp_r
+         call blk%read("nu", silent=no_key, val=tmp_r)
+         this%viscosity_method = .not. no_key
+         if (this%viscosity_method) this%vis_deep_draft = tmp_r
+      end if
 
    end subroutine vessel_read_input
 

@@ -5,16 +5,17 @@
 !
 !  Bottom friction parameters YAML reader and physics compute.
 !
-!  YAML block: friction:       (top-level; omit for no friction)
-!    friction_matrix: <bool>   use spatially varying Cd file, default NO
-!    friction_file:   <path>   required when friction_matrix: YES
-!    manning:         <bool>   Manning roughness formula, default NO
-!    Cd:              <real>   constant drag coefficient (or Manning n), default 0.0
+!  YAML block: friction:       (top-level; omit for zero drag)
+!    cd:      <real>   constant drag coefficient
+!    manning: <real>   Manning n itself; Cd = g*n²/H^(1/3) each timestep
+!    file:    <path>   spatially varying Cd map (nee IN_Cd + CD_FILE);
+!                      init-gated PENDING -- the map read was never implemented
 !
-!  When manning: YES, Cd holds Manning n.  Call update_cd(h, min_depth_frc)
-!  each timestep to overwrite Cd with g*n²/H^(1/3) before cal_sources.
-!  cal_sources always uses Cd as a plain linear drag; Manning formula is
-!  invisible to the kernel.
+!  Exactly one of cd | manning | file (exclusive value keys; kills the old
+!  dual-use Cd and the manning/friction_matrix bools).  With manning, call
+!  update_cd(h, min_depth_frc) each timestep before cal_sources; cal_sources
+!  always uses Cd as a plain linear drag, so the Manning formula is invisible
+!  to the kernel.
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam  (read_input)
@@ -29,9 +30,6 @@ module model_friction_mod
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
-
-   use model_config_defaults_mod, only: DEF_FRICTION_CD, DEF_FRICTION_FRICTION_MATRIX, &
-                                        DEF_FRICTION_MANNING
 
    implicit none
 
@@ -67,16 +65,30 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_fr, no_key
+      logical :: no_fr, no_cd, no_mn, no_file
+      real(SP) :: tmp_r
+      integer :: n_keys
 
       sub_env = get_sub_env(env, "friction", is_empty=no_fr)
       this%is_activated = .not. no_fr
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read("friction_matrix", val=this%friction_matrix, default=DEF_FRICTION_FRICTION_MATRIX)
-      call sub_env%yaml%read_input_path("friction_file", silent=this%no_cd_file, val=this%cd_file)
-      call sub_env%yaml%read("manning", silent=no_key, val=this%manning, default=DEF_FRICTION_MANNING)
-      call sub_env%yaml%read("Cd", silent=no_key, val=this%Cd_fixed, default=DEF_FRICTION_CD)
+      call sub_env%yaml%read("cd", silent=no_cd, val=tmp_r)
+      if (.not. no_cd) this%Cd_fixed = tmp_r
+      call sub_env%yaml%read("manning", silent=no_mn, val=tmp_r)
+      if (.not. no_mn) then
+         this%Cd_fixed = tmp_r
+         this%manning = .true.
+      end if
+      call sub_env%yaml%read_input_path("file", silent=no_file, val=this%cd_file)
+      this%no_cd_file = no_file
+      this%friction_matrix = .not. no_file
+
+      n_keys = count([.not. no_cd,.not. no_mn,.not. no_file])
+      if (n_keys /= 1) then
+         call env%log%exit_on_error( &
+            "friction: exactly one of cd | manning | file is required")
+      end if
 
    end subroutine friction_read_input
 
@@ -88,6 +100,11 @@ contains
 
       call this%free()
 
+      ! FUTURE: read the spatially varying map from cd_file; gated until wired
+      if (this%friction_matrix) then
+         error stop "friction: file (spatially varying Cd) is pending -- the map read is not implemented"
+      end if
+
       ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
@@ -95,9 +112,6 @@ contains
       ! No friction: block => zero drag; Cd is always allocated so
       ! cal_sources can take it unconditionally (Cd_fixed defaults 0).
       allocate (this%Cd(mloc_g, nloc_g), source=this%Cd_fixed)
-
-      ! TODO: overwrite with spatially varying values read from this%cd_file
-      ! when this%friction_matrix is true.
 
    end subroutine friction_init_compute
 

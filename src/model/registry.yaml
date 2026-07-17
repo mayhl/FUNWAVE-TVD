@@ -824,25 +824,29 @@ parameters:
     latex:        "$\\nu_{\\mathrm{brk,wm}}$"
 
   # ── friction ───────────────────────────────────────────────────────────────
-  - name:         cd_file
-    legacy_name:  CD_FILE
-    yaml_path:    "friction.friction_file"
+  # Exactly one of cd | manning | file (exclusive value keys; section absent =
+  # zero drag).  manning holds Manning n itself (kills the dual-use Cd + the
+  # manning/friction_matrix bools); file is the spatially varying Cd map,
+  # init-gated pending (the map read was never implemented).
+  - name:         friction_cd
+    legacy_name:  Cd
+    yaml_path:    "friction.cd"
     units:        ~
     default:      ~
-    latex:        ~
-
-  - name:         cd_fixed
-    legacy_name:  Cd_fixed
-    yaml_path:    "friction.Cd"
-    units:        ~
-    default:      0.0
     latex:        "$C_d$"
 
-  - name:         friction_matrix
-    legacy_name:  IN_Cd
-    yaml_path:    "friction.friction_matrix"
+  - name:         friction_manning
+    legacy_name:  ~
+    yaml_path:    "friction.manning"
+    units:        "s m^{-1/3}"
+    default:      ~
+    latex:        "$n$"
+
+  - name:         friction_file
+    legacy_name:  CD_FILE
+    yaml_path:    "friction.file"
     units:        ~
-    default:      false
+    default:      ~
     latex:        ~
 
   # ── grid (nee geometry; 3-D keeps geometry:) ────────────────────────────────
@@ -1252,13 +1256,6 @@ parameters:
     default:      ~
     latex:        ~
 
-  - name:         manning
-    legacy_name:  ~
-    yaml_path:    "friction.manning"
-    units:        ~
-    default:      false
-    latex:        ~
-
   # No static default: absent -> DERIVED as 100 * max|Depth| at init, exactly as
   # legacy (init.F:850, which overwrites its own input key).  An explicit value
   # overrides; legacy has no such escape hatch.  A fixed threshold cannot work --
@@ -1635,16 +1632,23 @@ parameters:
   # them against the legacy build flags and stops on a mismatch, so a modern
   # `propeller: true` against a binary built without -DPROPELLER cannot silently
   # score as parity.
+  # deep_draft is a presence block (nee the DEEP_DRAFT bool): clearance is its
+  # required key (an empty block dumps as YAML null and reads as absent); cd
+  # presence = hull drag (nee FrictionMethod + CdDeepDraft), nu presence = hull
+  # eddy viscosity (nee ViscosityMethod + VisDeepDraft).  NOTE: legacy defaults
+  # FrictionMethod on, so the converter emits cd explicitly; a hand-authored
+  # block without cd runs drag-free.  OUT_VESSEL/PLOT_INTV_VESSEL stay
+  # legacy-spelled until the rung-5 output move.
   - name:         vessel_folder
     legacy_name:  VESSEL_FOLDER
-    yaml_path:    "vessel.VESSEL_FOLDER"
+    yaml_path:    "vessel.folder"
     units:        ~
     default:      ~
     latex:        ~
 
-  - name:         numvessel
+  - name:         vessel_count
     legacy_name:  NumVessel
-    yaml_path:    "vessel.NumVessel"
+    yaml_path:    "vessel.count"
     units:        ~
     default:      1
     latex:        ~
@@ -1665,58 +1669,37 @@ parameters:
 
   - name:         propeller
     legacy_name:  PROPELLER
-    yaml_path:    "vessel.PROPELLER"
+    yaml_path:    "vessel.propeller"
     units:        ~
     default:      false
     latex:        ~
 
-  - name:         deep_draft
-    legacy_name:  DEEP_DRAFT_VESSEL
-    yaml_path:    "vessel.DEEP_DRAFT"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         maskmethod
-    legacy_name:  MaskMethod
-    yaml_path:    "vessel.MaskMethod"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  - name:         frictionmethod
-    legacy_name:  FrictionMethod
-    yaml_path:    "vessel.FrictionMethod"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  - name:         viscositymethod
-    legacy_name:  ViscosityMethod
-    yaml_path:    "vessel.ViscosityMethod"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         clearance
+  - name:         deep_draft_clearance
     legacy_name:  CLEARANCE
-    yaml_path:    "vessel.CLEARANCE"
+    yaml_path:    "vessel.deep_draft.clearance"
     units:        "m"
-    default:      1.0
+    default:      ~
     latex:        ~
 
-  - name:         cddeepdraft
-    legacy_name:  CdDeepDraft
-    yaml_path:    "vessel.CdDeepDraft"
+  - name:         deep_draft_mask
+    legacy_name:  MaskMethod
+    yaml_path:    "vessel.deep_draft.mask"
     units:        ~
-    default:      0.1
+    default:      true
+    latex:        ~
+
+  - name:         deep_draft_cd
+    legacy_name:  CdDeepDraft
+    yaml_path:    "vessel.deep_draft.cd"
+    units:        ~
+    default:      ~
     latex:        "$C_{d,v}$"
 
-  - name:         visdeepdraft
+  - name:         deep_draft_nu
     legacy_name:  VisDeepDraft
-    yaml_path:    "vessel.VisDeepDraft"
+    yaml_path:    "vessel.deep_draft.nu"
     units:        "m^2/s"
-    default:      0.1
+    default:      ~
     latex:        ~
 
   # ── sediment (legacy mod_sediment.F) ───────────────────────────────────────
@@ -1728,9 +1711,9 @@ parameters:
   # Both therefore carry no default (a default would make them always "present").
   - name:         sed_scheme
     legacy_name:  Sed_Scheme
-    yaml_path:    "sediment.Sed_Scheme"
+    yaml_path:    "sediment.scheme"
     units:        ~
-    default:      Upwinding
+    default:      upwinding
     latex:        ~
 
   # D50 is presence-tested because its fallback depends on CohesiveSediment:
@@ -1738,70 +1721,70 @@ parameters:
   # sit as parameters in sediment.f90.
   - name:         d50
     legacy_name:  D50
-    yaml_path:    "sediment.D50"
+    yaml_path:    "sediment.d50"
     units:        "m"
     default:      ~
     latex:        "$D_{50}$"
 
-  - name:         sdensity
+  - name:         specific_gravity
     legacy_name:  Sdensity
-    yaml_path:    "sediment.Sdensity"
+    yaml_path:    "sediment.specific_gravity"
     units:        ~
     default:      2.68
     latex:        "$s$"
 
-  - name:         n_porosity
+  - name:         sediment_porosity
     legacy_name:  n_porosity
-    yaml_path:    "sediment.n_porosity"
+    yaml_path:    "sediment.porosity"
     units:        ~
     default:      0.47
     latex:        "$n$"
 
-  - name:         ws
+  - name:         settling_velocity
     legacy_name:  WS
-    yaml_path:    "sediment.WS"
+    yaml_path:    "sediment.settling_velocity"
     units:        "m/s"
     default:      ~
     latex:        "$w_s$"
 
   - name:         shields_cr
     legacy_name:  Shields_cr
-    yaml_path:    "sediment.Shields_cr"
+    yaml_path:    "sediment.shields_cr"
     units:        ~
     default:      0.055
     latex:        "$\\theta_{cr}$"
 
-  - name:         mindepthpickup
+  - name:         min_depth_pickup
     legacy_name:  MinDepthPickup
-    yaml_path:    "sediment.MinDepthPickup"
+    yaml_path:    "sediment.min_depth_pickup"
     units:        "m"
     default:      0.1
     latex:        ~
 
-  - name:         pickupreduction
+  - name:         pickup_reduction
     legacy_name:  PickupReduction
-    yaml_path:    "sediment.PickupReduction"
+    yaml_path:    "sediment.pickup_reduction"
     units:        ~
     default:      true
     latex:        ~
 
-  - name:         reductionparameter
+  - name:         reduction_parameter
     legacy_name:  ReductionParameter
-    yaml_path:    "sediment.ReductionParameter"
+    yaml_path:    "sediment.reduction_parameter"
     units:        ~
     default:      0.65
     latex:        ~
 
   - name:         c_limiter
     legacy_name:  C_limiter
-    yaml_path:    "sediment.C_limiter"
+    yaml_path:    "sediment.c_limiter"
     units:        ~
     default:      ~
     latex:        ~
 
   - name:         morph_interval
     legacy_name:  Morph_interval
-    yaml_path:    "sediment.Morph_interval"
+    yaml_path:    "sediment.morph_interval"
     units:        "s"
     default:      ~
     latex:        ~
@@ -1810,167 +1793,145 @@ parameters:
   # falls back to Shields_cr, so it carries no default of its own.
   - name:         bed_change
     legacy_name:  Bed_Change
-    yaml_path:    "sediment.Bed_Change"
+    yaml_path:    "sediment.bed_change"
     units:        ~
     default:      false
     latex:        ~
 
   - name:         bedload
     legacy_name:  BedLoad
-    yaml_path:    "sediment.BedLoad"
+    yaml_path:    "sediment.bedload"
     units:        ~
     default:      false
     latex:        ~
 
   - name:         shields_cr_bedload
     legacy_name:  Shields_cr_bedload
-    yaml_path:    "sediment.Shields_cr_bedload"
+    yaml_path:    "sediment.shields_cr_bedload"
     units:        ~
     default:      ~
     latex:        "$\\theta_{cr,b}$"
 
   - name:         morph_factor
     legacy_name:  Morph_factor
-    yaml_path:    "sediment.Morph_factor"
+    yaml_path:    "sediment.morph_factor"
     units:        ~
     default:      1
     latex:        ~
 
-  - name:         hard_bottom
-    legacy_name:  IN_Mask_s
-    yaml_path:    "sediment.Hard_bottom"
-    units:        ~
-    default:      false
-    latex:        ~
-
+  # hard_bottom is a presence block (nee the Hard_bottom bool): file required
   - name:         hard_bottom_file
     legacy_name:  Mask_s_File
-    yaml_path:    "sediment.Hard_bottom_file"
+    yaml_path:    "sediment.hard_bottom.file"
     units:        ~
     default:      ~
     latex:        ~
 
-  # Avalanching.  Aval_interval is presence-tested: absent, it falls back to
-  # SMALL, i.e. the slope is relaxed every step.
-  - name:         avalanche
-    legacy_name:  Avalanche
-    yaml_path:    "sediment.Avalanche"
-    units:        ~
-    default:      false
-    latex:        ~
-
+  # Avalanching: presence block (nee the Avalanche bool).  tan_phi is its
+  # required key (an empty block dumps as YAML null and reads as absent;
+  # converter emits the legacy 0.7 fallback).  interval is presence-tested:
+  # absent, the slope is relaxed every step.
   - name:         tan_phi
     legacy_name:  tan_phi
-    yaml_path:    "sediment.Tan_phi"
+    yaml_path:    "sediment.avalanche.tan_phi"
     units:        ~
-    default:      0.7
+    default:      ~
     latex:        "$\\tan\\phi$"
 
   - name:         aval_interval
     legacy_name:  Aval_interval
-    yaml_path:    "sediment.Aval_interval"
+    yaml_path:    "sediment.avalanche.interval"
     units:        "s"
     default:      ~
     latex:        ~
 
-  # Cohesive sediment.  Switching it on replaces the pickup law and the settling
-  # velocity wholesale, and silently retires the bedload.
-  - name:         cohesive_sediment
-    legacy_name:  CohesiveSediment
-    yaml_path:    "sediment.CohesiveSediment"
-    units:        ~
-    default:      false
-    latex:        ~
-
+  # Cohesive sediment: presence block (nee the CohesiveSediment bool).
+  # Switching it on replaces the pickup law and the settling velocity
+  # wholesale, and silently retires the bedload.  tau_cr is its required key
+  # (converter emits the legacy 0.001 fallback).  k_coh is dropped, not
+  # renamed: legacy assigns it to the molecular viscosity, whose only two
+  # consumers (Dstar, the WS formula) are non-cohesive-only -- inert.
   - name:         soft_bed
     legacy_name:  SoftBed
-    yaml_path:    "sediment.SoftBed"
+    yaml_path:    "sediment.cohesive.soft_bed"
     units:        ~
     default:      true
     latex:        ~
 
   - name:         tau_cr_coh
     legacy_name:  Tau_cr_coh
-    yaml_path:    "sediment.Tau_cr_coh"
+    yaml_path:    "sediment.cohesive.tau_cr"
     units:        "m2/s2"
-    default:      0.001
+    default:      ~
     latex:        "$\\tau_{cr}$"
 
   - name:         tau_crd_coh
     legacy_name:  Tau_crd_coh
-    yaml_path:    "sediment.Tau_crd_coh"
+    yaml_path:    "sediment.cohesive.tau_crd"
     units:        "m2/s2"
     default:      0.001
     latex:        "$\\tau_{cr,d}$"
 
   - name:         e_coh
     legacy_name:  E_coh
-    yaml_path:    "sediment.E_coh"
+    yaml_path:    "sediment.cohesive.e"
     units:        "m/s"
     default:      0.0001
     latex:        "$E$"
 
   - name:         alpha_coh
     legacy_name:  alpha_coh
-    yaml_path:    "sediment.alpha_coh"
+    yaml_path:    "sediment.cohesive.alpha"
     units:        ~
     default:      1.0
     latex:        "$\\alpha$"
 
   - name:         a_coh
     legacy_name:  a_coh
-    yaml_path:    "sediment.a_coh"
+    yaml_path:    "sediment.cohesive.a"
     units:        ~
     default:      0.1
     latex:        "$a$"
 
   - name:         b_coh
     legacy_name:  b_coh
-    yaml_path:    "sediment.b_coh"
+    yaml_path:    "sediment.cohesive.b"
     units:        ~
     default:      2.0
     latex:        "$b$"
 
   - name:         n_coh
     legacy_name:  n_coh
-    yaml_path:    "sediment.n_coh"
+    yaml_path:    "sediment.cohesive.n"
     units:        ~
     default:      0.5
     latex:        "$n$"
 
   - name:         m_coh
     legacy_name:  m_coh
-    yaml_path:    "sediment.m_coh"
+    yaml_path:    "sediment.cohesive.m"
     units:        ~
     default:      1.5
     latex:        "$m$"
 
-  # inert: legacy assigns it to the molecular viscosity, whose only two consumers
-  # (Dstar, the WS formula) are non-cohesive-only.  Ported for fidelity.
-  - name:         k_coh
-    legacy_name:  k_coh
-    yaml_path:    "sediment.k_coh"
-    units:        "m2/s"
-    default:      0.000001
-    latex:        "$k$"
-
+  # Feedback into the flow: presence block for the three switch bools
   - name:         sediment_mass_source
     legacy_name:  SedimentMassSource
-    yaml_path:    "sediment.SedimentMassSource"
+    yaml_path:    "sediment.feedback.mass_source"
     units:        ~
     default:      false
     latex:        ~
 
   - name:         sediment_moment_dc
     legacy_name:  SedimentMomentDC
-    yaml_path:    "sediment.SedimentMomentDC"
+    yaml_path:    "sediment.feedback.moment_dc"
     units:        ~
     default:      false
     latex:        ~
 
   - name:         sediment_moment_exg
     legacy_name:  SedimentMomentEXG
-    yaml_path:    "sediment.SedimentMomentEXG"
+    yaml_path:    "sediment.feedback.moment_exg"
     units:        ~
     default:      false
     latex:        ~

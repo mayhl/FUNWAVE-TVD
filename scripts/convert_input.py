@@ -686,18 +686,17 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             pop(k)
 
     # ---- friction ----------------------------------------------------------
+    # exactly one of cd | manning | file; there is no legacy Manning key.
+    # IN_Cd selects the map, under which legacy ignores the scalar Cd.
     in_cd = pop_bool("IN_Cd")
     cd = pop_val("Cd")
     cd_file = pop_str("CD_FILE")
-    if in_cd or cd not in (None, 0, 0.0) or cd_file:
-        fr: dict = {}
-        if in_cd:
-            fr["friction_matrix"] = True
-        if cd is not None:
-            fr["Cd_fixed"] = cd
-        if cd_file:
-            fr["cd_file"] = cd_file
-        out["friction"] = fr
+    if in_cd and cd_file:
+        out["friction"] = {"file": cd_file}
+        if cd not in (None, 0, 0.0):
+            unknown.append(f"Cd = {cd} superseded by CD_FILE (IN_Cd) -- dropped")
+    elif cd not in (None, 0, 0.0):
+        out["friction"] = {"cd": cd}
 
     # ---- physics / boundaries / initial --------------------------------------
     # C_smg intentionally not consumed (Smagorinsky was amputated upstream);
@@ -942,6 +941,137 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     tf = pop_str("TRACER_FILE")
     if tf:
         out["tracer"] = {"file": tf}
+
+    # ---- vessel ----------------------------------------------------------------
+    vfold = pop_str("VESSEL_FOLDER")
+    if vfold:
+        vs: dict = {"folder": vfold}
+        nv = pop_val("NumVessel")
+        if nv is not None:
+            vs["count"] = nv
+        if pop_bool("PROPELLER"):
+            vs["propeller"] = True
+        if pop_bool("DEEP_DRAFT"):
+            # clearance anchors the block; legacy defaults FrictionMethod ON,
+            # so cd is emitted explicitly whenever the drag is active
+            cl = pop_val("CLEARANCE")
+            dd: dict = {"clearance": cl if cl is not None else 1.0}
+            mm = pop("MaskMethod")
+            if mm is not None:
+                dd["mask"] = _bool(mm)
+            fm = pop("FrictionMethod")
+            if fm is None or _bool(fm):
+                cdd = pop_val("CdDeepDraft")
+                dd["cd"] = cdd if cdd is not None else 0.1
+            else:
+                pop("CdDeepDraft")
+            vm = pop("ViscosityMethod")
+            if vm is not None and _bool(vm):
+                vdd = pop_val("VisDeepDraft")
+                dd["nu"] = vdd if vdd is not None else 0.1
+            else:
+                pop("VisDeepDraft")
+            vs["deep_draft"] = dd
+        else:
+            for k in ("MaskMethod", "FrictionMethod", "ViscosityMethod", "CLEARANCE", "CdDeepDraft", "VisDeepDraft"):
+                pop(k)
+        for k in ("OUT_VESSEL", "PLOT_INTV_VESSEL"):
+            v = pop(k)
+            if v is not None:
+                vs[k] = _bool(v) if k == "OUT_VESSEL" else _auto(v)
+        out["vessel"] = vs
+
+    # ---- sediment --------------------------------------------------------------
+    # No legacy dispatcher bool: the keys exist when the deck drove a
+    # -DSEDIMENT build, so any primary sediment key opens the block.
+    # Kappa1/Kappa2 (read + echoed, never used) and k_coh (inert, NOTE 16)
+    # fall to the unknown-comment block.
+    sed_keys = ("Sed_Scheme", "D50", "Bed_Change", "CohesiveSediment", "Sdensity", "WS", "Shields_cr")
+    if any(params.get(k) is not None for k in sed_keys):
+        sd: dict = {}
+        ssch = pop_str("Sed_Scheme")
+        if ssch is not None:
+            # legacy prefix dispatch: anything not Upw* selects the weighted upwind
+            sd["scheme"] = "upwinding" if ssch[:3] == "Upw" else "tvd"
+        for old_key, new_key in (
+            ("D50", "d50"),
+            ("Sdensity", "specific_gravity"),
+            ("n_porosity", "porosity"),
+            ("WS", "settling_velocity"),
+            ("Shields_cr", "shields_cr"),
+            ("MinDepthPickup", "min_depth_pickup"),
+            ("ReductionParameter", "reduction_parameter"),
+            ("C_limiter", "c_limiter"),
+            ("Morph_interval", "morph_interval"),
+            ("Shields_cr_bedload", "shields_cr_bedload"),
+            ("Morph_factor", "morph_factor"),
+        ):
+            v = pop_val(old_key)
+            if v is not None:
+                sd[new_key] = v
+        pr = pop("PickupReduction")
+        if pr is not None:
+            if _bool(pr):
+                sd["pickup_reduction"] = True
+            else:
+                # reader rejects a dead reduction_parameter under reduction-off
+                sd["pickup_reduction"] = False
+                sd.pop("reduction_parameter", None)
+        for old_key, new_key in (("Bed_Change", "bed_change"), ("BedLoad", "bedload")):
+            v = pop(old_key)
+            if v is not None:
+                sd[new_key] = _bool(v)
+        if pop_bool("Hard_bottom"):
+            hbf = pop_str("Hard_bottom_file")
+            if not hbf:
+                raise SystemExit("convert_input: Hard_bottom requires Hard_bottom_file")
+            sd["hard_bottom"] = {"file": hbf}
+        else:
+            pop("Hard_bottom_file")
+        if pop_bool("Avalanche"):
+            tp = pop_val("Tan_phi")
+            av: dict = {"tan_phi": tp if tp is not None else 0.7}
+            ai = pop_val("Aval_interval")
+            if ai is not None:
+                av["interval"] = ai
+            sd["avalanche"] = av
+        else:
+            for k in ("Tan_phi", "Aval_interval"):
+                pop(k)
+        if pop_bool("CohesiveSediment"):
+            tc = pop_val("Tau_cr_coh")
+            co: dict = {"tau_cr": tc if tc is not None else 0.001}
+            sb = pop("SoftBed")
+            if sb is not None:
+                co["soft_bed"] = _bool(sb)
+            for old_key, new_key in (
+                ("Tau_crd_coh", "tau_crd"),
+                ("E_coh", "e"),
+                ("alpha_coh", "alpha"),
+                ("a_coh", "a"),
+                ("b_coh", "b"),
+                ("n_coh", "n"),
+                ("m_coh", "m"),
+            ):
+                v = pop_val(old_key)
+                if v is not None:
+                    co[new_key] = v
+            sd["cohesive"] = co
+        else:
+            for k in ("SoftBed", "Tau_cr_coh", "Tau_crd_coh", "E_coh", "alpha_coh", "a_coh", "b_coh", "n_coh", "m_coh"):
+                pop(k)
+        fb: dict = {}
+        for old_key, new_key in (
+            ("SedimentMassSource", "mass_source"),
+            ("SedimentMomentDC", "moment_dc"),
+            ("SedimentMomentEXG", "moment_exg"),
+        ):
+            v = pop(old_key)
+            if v is not None and _bool(v):
+                fb[new_key] = True
+        if fb:
+            sd["feedback"] = fb
+        out["sediment"] = sd
 
     # ---- collect unknown keys ----------------------------------------------
     for k in params:
