@@ -166,6 +166,91 @@ _WK_COMMON = [
     'WAVEMAKER_Cbrk',
 ]
 
+
+def _put(dst: dict, block: str, key: str, val):
+    if val is not None:
+        dst.setdefault(block, {})[key] = val
+
+
+def _convert_wavemaker(wm_type: str, pop_val):
+    """Legacy WAVEMAKER type + flat keys -> spectrum/source/limiter entry
+    (config reorg rung 3a).  Boundary-consumer types (LEF_SOL, ABS_1D,
+    LEFT_BC_IRR) keep their legacy shape until rung 3b / the char-BC track.
+    freq stays frequency (exact); period {...} is hand-authoring only."""
+    if wm_type in ('LEF_SOL', 'ABS_1D', 'LEFT_BC_IRR'):
+        wm = {'type': wm_type}
+        for k in _WK_PARAMS.get(wm_type, []):
+            v = pop_val(k)
+            if v is not None: wm[k] = v
+        return wm
+
+    spec_map = {
+        'WK_REG':         ('regular', False, False),
+        'WK_IRR':         ('tma',     True,  False),
+        'TMA_1D':         ('tma',     False, False),
+        'JON_1D':         ('jonswap', False, False),
+        'JON_2D':         ('jonswap', True,  False),
+        'WK_NEW_IRR':     ('tma',     True,  True),
+        'WK_TIME_SERIES': ('components', False, False),
+    }
+    if wm_type not in spec_map:
+        raise SystemExit(f'convert_input: unsupported WAVEMAKER type {wm_type}')
+    stype, directional, single_dir = spec_map[wm_type]
+
+    wm: dict = {}
+    spec: dict = {'type': stype}
+    if stype == 'regular':
+        for k, yk in (('AMP_WK', 'amplitude'), ('Tperiod', 'period'),
+                      ('Theta_WK', 'direction')):
+            v = pop_val(k)
+            if v is not None: spec[yk] = v
+    elif stype == 'components':
+        for k, yk in (('NumWaveComp', 'n'), ('PeakPeriod', 'period_peak'),
+                      ('WaveCompFile', 'file')):
+            v = pop_val(k)
+            if v is not None: spec[yk] = v
+    else:
+        for k, yk in (('Hmo', 'hm0'), ('GammaTMA', 'gamma')):
+            v = pop_val(k)
+            if v is not None: spec[yk] = v
+        for k, yk in (('FreqPeak', 'peak'), ('FreqMin', 'min'),
+                      ('FreqMax', 'max')):
+            _put(spec, 'freq', yk, pop_val(k))
+        if directional:
+            for k, yk in (('ThetaPeak', 'peak'), ('Sigma_Theta', 'spread'),
+                          ('Ntheta', 'n_bins')):
+                _put(spec, 'directional', yk, pop_val(k))
+            # legacy directional default (io.F) differs from the reader default
+            spec.setdefault('directional', {}).setdefault('n_bins', 24)
+        else:
+            pop_val('Ntheta')  # consume a stray 1D Ntheta silently, like before
+        _put(spec, 'discretization', 'freq_bins', pop_val('Nfreq'))
+        spec.setdefault('discretization', {}).setdefault('freq_bins', 45)
+        if single_dir:
+            spec['discretization']['method'] = 'single_dir_per_freq'
+        v = pop_val('alpha_c')
+        if v is not None:
+            _put(spec, 'discretization', 'coherence_percent', v)
+        eq = pop_val('EqualEnergy')
+        if eq is not None:
+            _put(spec, 'discretization', 'equal_energy', eq)
+        if wm_type == 'WK_NEW_IRR':
+            _put(spec, 'discretization', 'file', pop_val('WaveCompFile'))
+    wm['spectrum'] = spec
+
+    for k, yk in (('Xc_WK', 'x_center'), ('Yc_WK', 'y_center'),
+                  ('DEP_WK', 'depth'), ('Delta_WK', 'delta'),
+                  ('Ywidth_WK', 'y_width'), ('Time_ramp', 'time_ramp'),
+                  ('WaveMakerCd', 'current_cd')):
+        _put(wm, 'source', yk, pop_val(k))
+    pop_val('WaveMakerCurrentBalance')   # presence of current_cd carries it
+
+    if pop_val('ETA_LIMITER'):
+        for k, yk in (('CrestLimit', 'crest'), ('TroughLimit', 'trough')):
+            _put(wm, 'limiter', yk, pop_val(k))
+
+    return wm
+
 # ---------------------------------------------------------------------------
 # Main converter
 # ---------------------------------------------------------------------------
@@ -339,23 +424,10 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
                 if v is not None: hp[yk] = v
             out.setdefault('initial', {})['hump'] = hp
         wm_type = 'NONE'
-    if wm_type.upper() != 'NONE':
-        wm: dict = {'type': wm_type}
-        wm_keys = _WK_PARAMS.get(wm_type, []) + _WK_COMMON
-        for k in wm_keys:
-            v = pop_val(k)
-            if v is not None:
-                wm[k] = v
-        # Apply legacy defaults that differ from the model-layer defaults.
-        # Legacy default for all spectral types is Nfreq=45.
-        # Ntheta=1 for 1D types, 24 for 2D types.
-        if wm_type in ('TMA_1D', 'JON_1D'):
-            wm.setdefault('Ntheta', 1)
-            wm.setdefault('Nfreq', 45)
-        elif wm_type in ('WK_IRR', 'JON_2D', 'WK_NEW_IRR'):
-            wm.setdefault('Ntheta', 24)
-            wm.setdefault('Nfreq', 45)
-        out['wavemaker'] = wm
+    if wm_type.upper() not in ('NONE', 'NOTHING'):
+        wm = _convert_wavemaker(wm_type, pop_val)
+        if wm is not None:
+            out['wavemaker'] = wm
 
     # ---- sponge -> boundaries face blocks (config reorg rung 2) -------------
     # Legacy global coefficients replicate onto every face with width > 0;

@@ -41,6 +41,7 @@ module core_yaml_file_mod
       procedure :: sanitize_path
 
       procedure, public :: cast_dictionary
+      procedure, public :: cast_dictionary_list
       procedure, public :: is_dictionary
       procedure, public :: is_dictionary_node
       procedure, public :: read_time
@@ -216,6 +217,53 @@ contains
       end if
 
    end function cast_dictionary
+
+   !> Cast key to a list of dictionary readers: a mapping yields one child,
+   !> a sequence of mappings one child per item — list-shaped sections
+   !> (e.g. wavemaker:) accept both spellings transparently.
+   function cast_dictionary_list(this, key, is_empty) result(children)
+      class(type_yaml_reader), intent(in) :: this
+      character(*), intent(in) :: key
+      logical, intent(out) :: is_empty
+      type(type_yaml_reader), allocatable :: children(:)
+
+      class(type_node), pointer :: node
+      class(type_list), pointer :: list_node
+      type(type_list_item), pointer :: item
+      integer :: i
+
+      node => this%root%get(key)
+      is_empty = .not. associated(node)
+      if (is_empty) then
+         allocate (children(0))
+         return
+      end if
+
+      select type (node)
+      class is (type_dictionary)
+         allocate (children(1))
+         children(1) = this%clone(node)
+      class is (type_list)
+         list_node => node
+         allocate (children(list_node%size()))
+         i = 1
+         item => list_node%first
+         do while (associated(item))
+            select type (node_item => item%node)
+            class is (type_dictionary)
+               children(i) = this%clone(node_item)
+            class default
+               call this%log%exit_on_error('Key "'//trim(key)// &
+                                           '" list items must be mappings.')
+            end select
+            i = i + 1
+            item => item%next
+         end do
+      class default
+         call this%log%exit_on_error('Key "'//trim(key)// &
+                                     '" must be a mapping or a sequence of mappings.')
+      end select
+   end function cast_dictionary_list
 
    ! ... (rest of the file unchanged)
 #include "core/prep.inc"

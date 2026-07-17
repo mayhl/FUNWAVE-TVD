@@ -86,26 +86,30 @@ module model_wavemaker_mod
                                         DEF_INITIAL_SOLITARY_DIRECTION, &
                                         DEF_INITIAL_SOLITARY_X_CENTER, &
                                         DEF_INITIAL_WATER_LEVEL, &
-                                        DEF_WAVEMAKER_ALPHA_C, &
-                                        DEF_WAVEMAKER_AMP_WK, &
-                                        DEF_WAVEMAKER_A_SPONGE_WAVEMAKER, &
-                                        DEF_WAVEMAKER_DELTA_WK, DEF_WAVEMAKER_DEP_WK, &
-                                        DEF_WAVEMAKER_EQUALENERGY, &
-                                        DEF_WAVEMAKER_ETA_LIMITER, DEF_WAVEMAKER_FREQMAX, &
-                                        DEF_WAVEMAKER_FREQMIN, DEF_WAVEMAKER_FREQPEAK, &
-                                        DEF_WAVEMAKER_GAMMATMA, &
-                                        DEF_WAVEMAKER_HMO, DEF_WAVEMAKER_LAGTIME, &
-                                        DEF_WAVEMAKER_NFREQ, DEF_WAVEMAKER_NTHETA, &
-                                        DEF_WAVEMAKER_NUMWAVECOMP, DEF_WAVEMAKER_PEAKPERIOD, &
-                                        DEF_WAVEMAKER_R_SPONGE_WAVEMAKER, &
-                                        DEF_WAVEMAKER_SIGMA_THETA, &
-                                        DEF_WAVEMAKER_THETAPEAK, DEF_WAVEMAKER_THETA_WK, &
-                                        DEF_WAVEMAKER_TIME_RAMP, DEF_WAVEMAKER_TPERIOD, &
-                                        DEF_WAVEMAKER_TYPE, &
-                                        DEF_WAVEMAKER_WAVE_DATA_TYPE, &
-                                        DEF_WAVEMAKER_WIDTHWAVEMAKER, &
-                                        DEF_WAVEMAKER_XC_WK, &
-                                        DEF_WAVEMAKER_YC_WK, DEF_WAVEMAKER_YWIDTH_WK
+                                        DEF_WAVEMAKER_SOURCE_DELTA, &
+                                        DEF_WAVEMAKER_SOURCE_DEPTH, &
+                                        DEF_WAVEMAKER_SOURCE_TIME_RAMP, &
+                                        DEF_WAVEMAKER_SOURCE_X_CENTER, &
+                                        DEF_WAVEMAKER_SOURCE_Y_CENTER, &
+                                        DEF_WAVEMAKER_SOURCE_Y_WIDTH, &
+                                        DEF_WAVEMAKER_SPECTRUM_AMPLITUDE, &
+                                        DEF_WAVEMAKER_SPECTRUM_DIRECTION, &
+                                        DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_N_BINS, &
+                                        DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK, &
+                                        DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_SPREAD, &
+                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT, &
+                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY, &
+                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS, &
+                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD, &
+                                        DEF_WAVEMAKER_SPECTRUM_FORMAT, &
+                                        DEF_WAVEMAKER_SPECTRUM_FREQ_MAX, &
+                                        DEF_WAVEMAKER_SPECTRUM_FREQ_MIN, &
+                                        DEF_WAVEMAKER_SPECTRUM_FREQ_PEAK, &
+                                        DEF_WAVEMAKER_SPECTRUM_GAMMA, &
+                                        DEF_WAVEMAKER_SPECTRUM_HM0, &
+                                        DEF_WAVEMAKER_SPECTRUM_N, &
+                                        DEF_WAVEMAKER_SPECTRUM_PERIOD, &
+                                        DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK
 
    implicit none
 
@@ -246,16 +250,22 @@ module model_wavemaker_mod
 contains
 
    subroutine wavemaker_read_input(this, env)
+      use core_yaml_file_mod, only: type_yaml_reader
       class(type_model_wavemaker), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
-      type(type_env) :: sub_env
-      logical :: no_wm, no_key, has_initial
+      type(type_yaml_reader), allocatable :: entries(:)
+      type(type_yaml_reader) :: wm, spec_yaml, blk
+      character(:), allocatable :: stype, method, legacy_type
+      logical :: no_wm, no_key, has_initial, has_dir
+      logical :: no_spec, no_blk, no_freq, no_per
+      real(SP) :: p_tmp
 
       this%wavemaker_type = "nothing"
       call wavemaker_read_initial(this, env, has_initial)
 
-      sub_env = get_sub_env(env, "wavemaker", is_empty=no_wm)
+      ! mapping or sequence — single-slot engine accepts one entry either way
+      entries = env%yaml%cast_dictionary_list("wavemaker", no_wm)
       this%is_activated = has_initial .or. .not. no_wm
       if (no_wm) return
 
@@ -265,71 +275,158 @@ contains
          call env%log%exit_on_error( &
             "wavemaker: cannot combine with an initial: condition yet")
       end if
+      if (size(entries) > 1) &
+         call env%log%exit_on_error("wavemaker: multiple wavemakers are"// &
+                                    " pending the wavemaker refactor (single-slot engine)")
+      wm = entries(1)
 
-      call sub_env%yaml%read("type", val=this%wavemaker_type, default=DEF_WAVEMAKER_TYPE)
-      select case (trim(this%wavemaker_type))
-      case ("INI_SOLITARY", "INI_SOL", "INI_SINE", "INI_REC", "INI_GAU", &
-            "INI_DIP", "N_WAVE")
-         call env%log%exit_on_error("wavemaker/type: initial-condition types"// &
-                                    " moved to the initial: section")
-      end select
-
-      ! Shared position / depth / ramp
-      call sub_env%yaml%read("Xc_WK", silent=no_key, val=this%Xc_WK, default=DEF_WAVEMAKER_XC_WK)
-      call sub_env%yaml%read("Yc_WK", silent=no_key, val=this%Yc_WK, default=DEF_WAVEMAKER_YC_WK)
-      call sub_env%yaml%read("DEP_WK", silent=no_key, val=this%DEP_WK, default=DEF_WAVEMAKER_DEP_WK)
-      call sub_env%yaml%read("Time_ramp", silent=no_key, val=this%Time_ramp, default=DEF_WAVEMAKER_TIME_RAMP)
-      call sub_env%yaml%read("Delta_WK", silent=no_key, val=this%Delta_WK, default=DEF_WAVEMAKER_DELTA_WK)
-      call sub_env%yaml%read("Ywidth_WK", silent=no_key, val=this%Ywidth_WK, default=DEF_WAVEMAKER_YWIDTH_WK)
-
-      ! Boundary-solitary lag (LEF_SOL)
-      call sub_env%yaml%read("LAGTIME", silent=no_key, val=this%LAG_SOLI, default=DEF_WAVEMAKER_LAGTIME)
-
-      ! Regular wave
-      call sub_env%yaml%read("Tperiod", silent=no_key, val=this%Tperiod, default=DEF_WAVEMAKER_TPERIOD)
-      call sub_env%yaml%read("AMP_WK", silent=no_key, val=this%AMP_WK, default=DEF_WAVEMAKER_AMP_WK)
-      call sub_env%yaml%read("Theta_WK", silent=no_key, val=this%Theta_WK, default=DEF_WAVEMAKER_THETA_WK)
-
-      ! Multi-component time series
-      call sub_env%yaml%read("NumWaveComp", silent=no_key, val=this%NumWaveComp, default=DEF_WAVEMAKER_NUMWAVECOMP)
-      call sub_env%yaml%read("PeakPeriod", silent=no_key, val=this%PeakPeriod, default=DEF_WAVEMAKER_PEAKPERIOD)
-      call sub_env%yaml%read("WaveCompFile", silent=no_key, val=this%WaveCompFile)
-
-      ! Spectral
-      call sub_env%yaml%read("FreqPeak", silent=no_key, val=this%FreqPeak, default=DEF_WAVEMAKER_FREQPEAK)
-      call sub_env%yaml%read("FreqMin", silent=no_key, val=this%FreqMin, default=DEF_WAVEMAKER_FREQMIN)
-      call sub_env%yaml%read("FreqMax", silent=no_key, val=this%FreqMax, default=DEF_WAVEMAKER_FREQMAX)
-      call sub_env%yaml%read("Hmo", silent=no_key, val=this%Hmo, default=DEF_WAVEMAKER_HMO)
-      call sub_env%yaml%read("GammaTMA", silent=no_key, val=this%GammaTMA, default=DEF_WAVEMAKER_GAMMATMA)
-      call sub_env%yaml%read("Nfreq", silent=no_key, val=this%Nfreq, default=DEF_WAVEMAKER_NFREQ)
-      call sub_env%yaml%read("ThetaPeak", silent=no_key, val=this%ThetaPeak, default=DEF_WAVEMAKER_THETAPEAK)
-      call sub_env%yaml%read("Ntheta", silent=no_key, val=this%Ntheta, default=DEF_WAVEMAKER_NTHETA)
-      call sub_env%yaml%read("Sigma_Theta", silent=no_key, val=this%Sigma_Theta, default=DEF_WAVEMAKER_SIGMA_THETA)
-      call sub_env%yaml%read("alpha_c", silent=no_key, val=this%alpha_c, default=DEF_WAVEMAKER_ALPHA_C)
-
-      ! Eta limiter
-      call sub_env%yaml%read("ETA_LIMITER", val=this%ETA_LIMITER, default=DEF_WAVEMAKER_ETA_LIMITER)
-      if (this%ETA_LIMITER) then
-         call sub_env%yaml%read("CrestLimit", val=this%CrestLimit)
-         call sub_env%yaml%read("TroughLimit", val=this%TroughLimit)
+      ! legacy-shaped escape hatch: boundary-consumer types keep (or await)
+      ! their old spelling until rung 3b / the characteristic BC track
+      call wm%read_string("type", silent=no_key, val=legacy_type)
+      if (.not. no_key) then
+         select case (trim(legacy_type))
+         case ("LEF_SOL")
+            this%wavemaker_type = "LEF_SOL"
+            call wm%read("LAGTIME", silent=no_key, val=this%LAG_SOLI, default="0.0")
+            return
+         case ("ABS", "ABS_1D", "LEFT_BC_IRR")
+            call env%log%exit_on_error("wavemaker/type: "//trim(legacy_type)// &
+                                       " is pending rung 3b — boundary forcing.wavemaker reference")
+         case default
+            call env%log%exit_on_error("wavemaker/type: schema renamed — use"// &
+                                       " spectrum:/source:/limiter: blocks (registry has the mapping)")
+         end select
       end if
 
-      ! Absorbing-generating
-      call sub_env%yaml%read("WAVE_DATA_TYPE", val=this%WAVE_DATA_TYPE, default=DEF_WAVEMAKER_WAVE_DATA_TYPE)
-      ! no `default=` on either presence-tested read below: yaml%read only
-      ! assigns `silent` when `default` is ABSENT, so asking for both hands
-      ! back an unwritten flag.  Absent key -> the component initialiser
-      ! stands and the fallback resolves it.
-      call sub_env%yaml%read("DepthWaveMaker", silent=no_key, val=this%DepthWaveMaker)
-      if (no_key) this%DepthWaveMaker = this%DEP_WK
-      call sub_env%yaml%read("WidthWaveMaker", silent=no_key, val=this%WidthWaveMaker, default=DEF_WAVEMAKER_WIDTHWAVEMAKER)
-  call sub_env%yaml%read("R_sponge_wavemaker", silent=no_key, val=this%R_sponge_wavemaker, default=DEF_WAVEMAKER_R_SPONGE_WAVEMAKER)
-  call sub_env%yaml%read("A_sponge_wavemaker", silent=no_key, val=this%A_sponge_wavemaker, default=DEF_WAVEMAKER_A_SPONGE_WAVEMAKER)
-      call sub_env%yaml%read("EqualEnergy", val=this%EqualEnergy, default=DEF_WAVEMAKER_EQUALENERGY)
+      ! ── spectrum ──────────────────────────────────────────────────
+      spec_yaml = wm%cast_dictionary("spectrum", no_spec)
+      if (no_spec) call env%log%exit_on_error("wavemaker: needs a spectrum: block")
+      call spec_yaml%read_enum("type", [character(11) :: "regular", "jonswap", &
+                                        "tma", "spectrum_2d", "components"], val=stype)
 
-      ! WaveMakerCd presence enables WaveMakerCurrentBalance
-      call sub_env%yaml%read("WaveMakerCd", silent=no_key, val=this%WaveMakerCd)
+      ! directional: presence = 2D spreading (kills Ntheta/Sigma_Theta
+      ! leaking into 1D configs)
+      blk = spec_yaml%cast_dictionary("directional", no_blk)
+      has_dir = .not. no_blk
+      if (has_dir) then
+         call blk%read("peak", silent=no_key, val=this%ThetaPeak, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK)
+         call blk%read("spread", silent=no_key, val=this%Sigma_Theta, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_SPREAD)
+         call blk%read("n_bins", silent=no_key, val=this%Ntheta, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_N_BINS)
+      end if
+
+      blk = spec_yaml%cast_dictionary("discretization", no_blk)
+      if (.not. no_blk) then
+         call blk%read("freq_bins", silent=no_key, val=this%Nfreq, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS)
+         call blk%read("equal_energy", val=this%EqualEnergy, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY)
+         call blk%read_enum("method", [character(19) :: "grid", "single_dir_per_freq"], &
+                            val=method, default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD)
+         call blk%read("coherence_percent", silent=no_key, val=this%alpha_c, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT)
+         if (method == "single_dir_per_freq") &
+            call env%log%exit_on_error("wavemaker/discretization: single_dir_per_freq"// &
+                                       " (nee WK_NEW_*) is pending the wavemaker refactor")
+      end if
+
+      select case (stype)
+      case ("regular")
+         if (has_dir) call env%log%exit_on_error( &
+            "wavemaker/spectrum: regular has no directional: block")
+         call spec_yaml%read("amplitude", silent=no_key, val=this%AMP_WK, &
+                             default=DEF_WAVEMAKER_SPECTRUM_AMPLITUDE)
+         call spec_yaml%read("period", silent=no_key, val=this%Tperiod, &
+                             default=DEF_WAVEMAKER_SPECTRUM_PERIOD)
+         call spec_yaml%read("direction", silent=no_key, val=this%Theta_WK, &
+                             default=DEF_WAVEMAKER_SPECTRUM_DIRECTION)
+         this%wavemaker_type = "WK_REG"
+
+      case ("jonswap", "tma")
+         call spec_yaml%read("hm0", silent=no_key, val=this%Hmo, &
+                             default=DEF_WAVEMAKER_SPECTRUM_HM0)
+         call spec_yaml%read("gamma", silent=no_key, val=this%GammaTMA, &
+                             default=DEF_WAVEMAKER_SPECTRUM_GAMMA)
+         ! freq {peak,min,max} = exact legacy path; period {peak,min,max} =
+         ! hand-authoring alternative (reciprocal fill — 1/(1/x) is NOT
+         ! bitwise x, acceptable off the legacy-parity path by design)
+         blk = spec_yaml%cast_dictionary("freq", no_freq)
+         if (.not. no_freq) then
+            call blk%read("peak", silent=no_key, val=this%FreqPeak, &
+                          default=DEF_WAVEMAKER_SPECTRUM_FREQ_PEAK)
+            call blk%read("min", silent=no_key, val=this%FreqMin, &
+                          default=DEF_WAVEMAKER_SPECTRUM_FREQ_MIN)
+            call blk%read("max", silent=no_key, val=this%FreqMax, &
+                          default=DEF_WAVEMAKER_SPECTRUM_FREQ_MAX)
+         end if
+         blk = spec_yaml%cast_dictionary("period", no_per)
+         if (.not. no_freq .and. .not. no_per) &
+            call env%log%exit_on_error("wavemaker/spectrum: freq: and period:"// &
+                                       " are mutually exclusive")
+         if (no_freq .and. no_per) &
+            call env%log%exit_on_error("wavemaker/spectrum: "//stype// &
+                                       " needs freq: {peak, min, max} or period: {peak, min, max}")
+         if (.not. no_per) then
+            ! period min <-> freq MAX (and vice versa)
+            call blk%read("peak", val=p_tmp)
+            this%FreqPeak = 1.0_SP/p_tmp
+            call blk%read("min", val=p_tmp)
+            this%FreqMax = 1.0_SP/p_tmp
+            call blk%read("max", val=p_tmp)
+            this%FreqMin = 1.0_SP/p_tmp
+         end if
+         if (stype == "tma") then
+            this%wavemaker_type = merge("WK_IRR", "TMA_1D", has_dir)
+         else
+            this%wavemaker_type = merge("JON_2D", "JON_1D", has_dir)
+         end if
+
+      case ("components")
+         call spec_yaml%read("n", silent=no_key, val=this%NumWaveComp, &
+                             default=DEF_WAVEMAKER_SPECTRUM_N)
+         call spec_yaml%read("period_peak", silent=no_key, val=this%PeakPeriod, &
+                             default=DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK)
+         call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
+         this%wavemaker_type = "WK_TIME_SERIES"
+
+      case ("spectrum_2d")
+         call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
+         call spec_yaml%read("format", val=this%WAVE_DATA_TYPE, &
+                             default=DEF_WAVEMAKER_SPECTRUM_FORMAT)
+         this%wavemaker_type = "WK_DATA2D"
+      end select
+
+      ! ── source — presence = Wei-Kirby internal source function ────
+      blk = wm%cast_dictionary("source", no_blk)
+      if (no_blk) call env%log%exit_on_error("wavemaker: needs a source: block"// &
+                                             " (boundary-fed wavemakers land in rung 3b)")
+      call blk%read("x_center", silent=no_key, val=this%Xc_WK, &
+                    default=DEF_WAVEMAKER_SOURCE_X_CENTER)
+      call blk%read("y_center", silent=no_key, val=this%Yc_WK, &
+                    default=DEF_WAVEMAKER_SOURCE_Y_CENTER)
+      call blk%read("depth", silent=no_key, val=this%DEP_WK, &
+                    default=DEF_WAVEMAKER_SOURCE_DEPTH)
+      call blk%read("delta", silent=no_key, val=this%Delta_WK, &
+                    default=DEF_WAVEMAKER_SOURCE_DELTA)
+      call blk%read("y_width", silent=no_key, val=this%Ywidth_WK, &
+                    default=DEF_WAVEMAKER_SOURCE_Y_WIDTH)
+      call blk%read("time_ramp", silent=no_key, val=this%Time_ramp, &
+                    default=DEF_WAVEMAKER_SOURCE_TIME_RAMP)
+      ! current_cd presence enables the current-balance drag
+      call blk%read("current_cd", silent=no_key, val=this%WaveMakerCd)
       this%WaveMakerCurrentBalance = .not. no_key
+      ! ABS relaxation depth defaulted to the source depth pre-3b
+      this%DepthWaveMaker = this%DEP_WK
+
+      ! ── limiter — presence = eta limiter (nee ETA_LIMITER) ────────
+      blk = wm%cast_dictionary("limiter", no_blk)
+      this%ETA_LIMITER = .not. no_blk
+      if (this%ETA_LIMITER) then
+         call blk%read("crest", val=this%CrestLimit)
+         call blk%read("trough", val=this%TroughLimit)
+      end if
 
    end subroutine wavemaker_read_input
 
