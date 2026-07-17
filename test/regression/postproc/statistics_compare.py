@@ -28,6 +28,7 @@ _console = Console()
 # Public entry point
 # ---------------------------------------------------------------------------
 
+
 def run(
     ref_dir: str | Path,
     dev_dir: str | Path,
@@ -46,7 +47,7 @@ def run(
 
     ref_map = {v.prefix: v for v in ref_vars}
     dev_map = {v.prefix: v for v in dev_vars}
-    common  = sorted(ref_map.keys() & dev_map.keys())
+    common = sorted(ref_map.keys() & dev_map.keys())
     missing = sorted((ref_map.keys() | dev_map.keys()) - ref_map.keys() & dev_map.keys())
 
     all_output = ref_map.keys() | dev_map.keys()
@@ -68,36 +69,37 @@ def run(
 
         # Compare over shared index range
         idx_first = max(rv.first, dv.first)
-        idx_last  = min(rv.last,  dv.last)
+        idx_last = min(rv.last, dv.last)
         if idx_first > idx_last:
             rows.append(_Row(prefix, rv, dv, l2_mean=None, l2_max=None, note="no overlap"))
             continue
 
-        metric_series = compute_metric_series(
-            ref_meta, dev_meta, prefix, idx_first, idx_last
-        )
+        metric_series = compute_metric_series(ref_meta, dev_meta, prefix, idx_first, idx_last)
 
         err_mean = float(np.mean(metric_series))
-        err_max  = float(np.max(metric_series))
-        tol      = tolerances.get(prefix, tolerances.get("default", np.inf))
-        passed   = err_mean < tol
+        err_max = float(np.max(metric_series))
+        tol = tolerances.get(prefix, tolerances.get("default", np.inf))
+        passed = err_mean < tol
 
-        metrics.append(MetricResult(
-            variable=prefix,
-            stat=metric_stat_name(prefix, "mean"),
-            value=err_mean,
-            passed=passed,
-            tolerance=tol,
-        ))
-        metrics.append(MetricResult(
-            variable=prefix,
-            stat=metric_stat_name(prefix, "max"),
-            value=err_max,
-            passed=True,
-            tolerance=float("inf"),
-        ))
-        rows.append(_Row(prefix, rv, dv, l2_mean=err_mean, l2_max=err_max,
-                         tol=tol, passed=passed))
+        metrics.append(
+            MetricResult(
+                variable=prefix,
+                stat=metric_stat_name(prefix, "mean"),
+                value=err_mean,
+                passed=passed,
+                tolerance=tol,
+            )
+        )
+        metrics.append(
+            MetricResult(
+                variable=prefix,
+                stat=metric_stat_name(prefix, "max"),
+                value=err_max,
+                passed=True,
+                tolerance=float("inf"),
+            )
+        )
+        rows.append(_Row(prefix, rv, dv, l2_mean=err_mean, l2_max=err_max, tol=tol, passed=passed))
         series_data.append((prefix, metric_series, idx_first, idx_last, tol, passed))
 
     for prefix in missing:
@@ -114,11 +116,7 @@ def run(
     if fig is not None:
         result.figures.append(fig)
 
-    failing = [
-        (pfx, l2, i0, il, tol, p)
-        for pfx, l2, i0, il, tol, p in series_data
-        if np.isfinite(tol) and not p
-    ]
+    failing = [(pfx, l2, i0, il, tol, p) for pfx, l2, i0, il, tol, p in series_data if np.isfinite(tol) and not p]
     if failing:
         with Progress(
             SpinnerColumn(),
@@ -132,9 +130,7 @@ def run(
             task = progress.add_task("  Generating subreport", total=len(failing))
             for prefix, l2_per_step, idx_first, idx_last, tol, passed in failing:
                 progress.update(task, description=f"  Generating subreport  [dim]{prefix}[/dim]")
-                result.figures.extend(
-                    _make_failure_figures(ref_meta, dev_meta, prefix, l2_per_step, idx_first, tol, plots_dir)
-                )
+                result.figures.extend(_make_failure_figures(ref_meta, dev_meta, prefix, l2_per_step, idx_first, tol, plots_dir))
                 progress.advance(task)
 
     return result
@@ -144,17 +140,17 @@ def run(
 # Figure generation
 # ---------------------------------------------------------------------------
 
-_DARK_PASS  = "#4ade80"
-_DARK_FAIL  = "#f87171"
+_DARK_PASS = "#4ade80"
+_DARK_FAIL = "#f87171"
 _DARK_NOTOL = "#94a3b8"
-_LITE_PASS  = "#16a34a"
-_LITE_FAIL  = "#dc2626"
+_LITE_PASS = "#16a34a"
+_LITE_FAIL = "#dc2626"
 _LITE_NOTOL = "#64748b"
 
 
 def _build_fig(series_data: list[tuple], dark: bool) -> go.Figure:
-    pass_c  = _DARK_PASS  if dark else _LITE_PASS
-    fail_c  = _DARK_FAIL  if dark else _LITE_FAIL
+    pass_c = _DARK_PASS if dark else _LITE_PASS
+    fail_c = _DARK_FAIL if dark else _LITE_FAIL
     notol_c = _DARK_NOTOL if dark else _LITE_NOTOL
 
     fig = go.Figure()
@@ -163,15 +159,21 @@ def _build_fig(series_data: list[tuple], dark: bool) -> go.Figure:
         finite_tol = np.isfinite(tol)
         color = (pass_c if passed else fail_c) if finite_tol else notol_c
 
-        fig.add_trace(go.Scatter(
-            x=xs, y=l2_series.tolist(),
-            mode="lines",
-            name=prefix,
-            line=dict(color=color, width=1.5),
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=xs,
+                y=l2_series.tolist(),
+                mode="lines",
+                name=prefix,
+                line=dict(color=color, width=1.5),
+            )
+        )
         if finite_tol:
             fig.add_hline(
-                y=tol, line_dash="dot", line_color=color, opacity=0.5,
+                y=tol,
+                line_dash="dot",
+                line_color=color,
+                opacity=0.5,
                 annotation_text=f"{prefix} tol",
                 annotation_font_size=11,
                 annotation_font_color=color,
@@ -201,8 +203,7 @@ def _build_fig(series_data: list[tuple], dark: bool) -> go.Figure:
         xaxis_title="Output step",
         yaxis_title="L2 error",
         yaxis_type="log",
-        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1,
-                    font=dict(size=12)),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1, font=dict(size=12)),
         height=320,
     )
     return fig
@@ -213,7 +214,7 @@ def _make_figure(series_data: list[tuple], plots_dir: Path) -> FigureSpec | None
     tolerated = [s for s in series_data if np.isfinite(s[4])]  # s[4] = tol
     if not tolerated:
         return None
-    fig_dark  = _build_fig(tolerated, dark=True)
+    fig_dark = _build_fig(tolerated, dark=True)
     fig_light = _build_fig(tolerated, dark=False)
 
     png_path = plots_dir / "statistics_l2.png"
@@ -234,6 +235,7 @@ def _make_figure(series_data: list[tuple], plots_dir: Path) -> FigureSpec | None
 # Failure diagnostic figures
 # ---------------------------------------------------------------------------
 
+
 def _select_timesteps(l2_per_step: np.ndarray, idx_first: int, tol: float) -> list[int]:
     """Return up to 7 deduplicated sorted step indices for failure diagnostics."""
     n = len(l2_per_step)
@@ -250,7 +252,6 @@ def _select_timesteps(l2_per_step: np.ndarray, idx_first: int, tol: float) -> li
 
 def _is_1d_mode(ref_meta: RunMetadata) -> bool:
     return ref_meta.ny <= max(5, ref_meta.nx // 20)
-
 
 
 def _load_mask(meta: RunMetadata, idx: int) -> np.ndarray | None:
@@ -328,7 +329,7 @@ def _order_steps(
 
 
 def _step_title(step: int, time_map: dict[int, float], cats: dict[int, list[str]]) -> str:
-    t_str   = f"T={time_map[step]:.1f}s" if step in time_map else f"step {step}"
+    t_str = f"T={time_map[step]:.1f}s" if step in time_map else f"step {step}"
     cat_str = "  |  ".join(cats.get(step, []))
     return f"{t_str}  —  {cat_str}" if cat_str else t_str
 
@@ -349,7 +350,6 @@ def _theme_base(dark: bool) -> dict:
     )
 
 
-
 def _make_1d_step_fig(
     ref_meta: RunMetadata,
     ref_arr: np.ndarray,
@@ -362,25 +362,36 @@ def _make_1d_step_fig(
 
     ref_arr / dev_arr must be pre-masked float arrays (NaN = dry).
     """
-    mid  = ref_arr.shape[0] // 2
-    xs   = (np.arange(ref_arr.shape[1]) * ref_meta.dx).tolist()
+    mid = ref_arr.shape[0] // 2
+    xs = (np.arange(ref_arr.shape[1]) * ref_meta.dx).tolist()
     diff = (dev_arr[mid, :] - ref_arr[mid, :]).tolist()
 
-    ref_c  = "#60a5fa" if dark else "#2563eb"
-    dev_c  = "#fb923c" if dark else "#ea580c"
+    ref_c = "#60a5fa" if dark else "#2563eb"
+    dev_c = "#fb923c" if dark else "#ea580c"
     diff_c = "#f87171" if dark else "#dc2626"
 
     fig = make_subplots(rows=1, cols=1, specs=[[{"secondary_y": True}]])
-    fig.add_trace(go.Scatter(x=xs, y=ref_arr[mid, :].tolist(), mode="lines", name="ref",
-        line=dict(color=ref_c, width=1.5)), row=1, col=1, secondary_y=False)
-    fig.add_trace(go.Scatter(x=xs, y=dev_arr[mid, :].tolist(), mode="lines", name="dev",
-        line=dict(color=dev_c, width=1.5)), row=1, col=1, secondary_y=False)
-    fig.add_trace(go.Scatter(x=xs, y=diff, mode="lines", name="dev−ref",
-        line=dict(color=diff_c, width=1.0, dash="dash")),
-        row=1, col=1, secondary_y=True)
+    fig.add_trace(
+        go.Scatter(x=xs, y=ref_arr[mid, :].tolist(), mode="lines", name="ref", line=dict(color=ref_c, width=1.5)),
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+    fig.add_trace(
+        go.Scatter(x=xs, y=dev_arr[mid, :].tolist(), mode="lines", name="dev", line=dict(color=dev_c, width=1.5)),
+        row=1,
+        col=1,
+        secondary_y=False,
+    )
+    fig.add_trace(
+        go.Scatter(x=xs, y=diff, mode="lines", name="dev−ref", line=dict(color=diff_c, width=1.0, dash="dash")),
+        row=1,
+        col=1,
+        secondary_y=True,
+    )
     fig.update_yaxes(zeroline=False)
-    fig.update_yaxes(title_text=prefix,          title_font_size=11, secondary_y=False)
-    fig.update_yaxes(title_text="dev−ref",  title_font_size=11, secondary_y=True)
+    fig.update_yaxes(title_text=prefix, title_font_size=11, secondary_y=False)
+    fig.update_yaxes(title_text="dev−ref", title_font_size=11, secondary_y=True)
     fig.update_layout(
         **_theme_base(dark),
         title=dict(text=title, font=dict(size=13), x=0.5, xanchor="center"),
@@ -408,15 +419,16 @@ def _make_2d_step_fig(
     """
     diff_arr = dev_arr - ref_arr
     fig = make_subplots(
-        rows=3, cols=1,
+        rows=3,
+        cols=1,
         specs=[[{"type": "heatmap"}]] * 3,
         row_titles=["ref", "dev", "dev−ref"],
         shared_xaxes=True,
         shared_yaxes=True,
         vertical_spacing=0.05,
     )
-    fig.add_trace(go.Heatmap(z=ref_arr.tolist(),  coloraxis="coloraxis"),  row=1, col=1)
-    fig.add_trace(go.Heatmap(z=dev_arr.tolist(),  coloraxis="coloraxis"),  row=2, col=1)
+    fig.add_trace(go.Heatmap(z=ref_arr.tolist(), coloraxis="coloraxis"), row=1, col=1)
+    fig.add_trace(go.Heatmap(z=dev_arr.tolist(), coloraxis="coloraxis"), row=2, col=1)
     fig.add_trace(go.Heatmap(z=diff_arr.tolist(), coloraxis="coloraxis2"), row=3, col=1)
     fig.update_layout(
         **_theme_base(dark),
@@ -425,15 +437,16 @@ def _make_2d_step_fig(
         margin=dict(l=60, r=120, t=60, b=50),
         coloraxis=dict(
             colorscale="Viridis",
-            cmin=vmin, cmax=vmax,
-            colorbar=dict(x=1.02, y=0.67, len=0.60, yanchor="middle", thickness=12,
-                          title=dict(text=prefix, font=dict(size=10))),
+            cmin=vmin,
+            cmax=vmax,
+            colorbar=dict(x=1.02, y=0.67, len=0.60, yanchor="middle", thickness=12, title=dict(text=prefix, font=dict(size=10))),
         ),
         coloraxis2=dict(
             colorscale="RdBu",
-            cmid=0, cmin=-amax, cmax=amax,
-            colorbar=dict(x=1.02, y=0.17, len=0.28, yanchor="middle", thickness=12,
-                          title=dict(text="dev−ref", font=dict(size=10))),
+            cmid=0,
+            cmin=-amax,
+            cmax=amax,
+            colorbar=dict(x=1.02, y=0.17, len=0.28, yanchor="middle", thickness=12, title=dict(text="dev−ref", font=dict(size=10))),
         ),
     )
     return fig
@@ -449,11 +462,11 @@ def _make_failure_figures(
     plots_dir: Path,
 ) -> list[FigureSpec]:
     """Return one FigureSpec per selected timestep for a failing variable."""
-    steps    = _select_timesteps(l2_per_step, idx_first, tol)
-    steps    = _order_steps(steps, l2_per_step, idx_first, tol)
-    cats     = _categorize_steps(l2_per_step, idx_first, tol)
+    steps = _select_timesteps(l2_per_step, idx_first, tol)
+    steps = _order_steps(steps, l2_per_step, idx_first, tol)
+    cats = _categorize_steps(l2_per_step, idx_first, tol)
     time_map = _build_time_map(ref_meta.output_dir, ref_meta.run_dir)
-    mode_1d  = _is_1d_mode(ref_meta)
+    mode_1d = _is_1d_mode(ref_meta)
 
     # Read and pre-mask all selected steps
     pairs: list[tuple[np.ndarray, np.ndarray]] = []
@@ -478,27 +491,29 @@ def _make_failure_figures(
 
     result: list[FigureSpec] = []
     for step, (ref_arr, dev_arr) in zip(steps, pairs):
-        title    = _step_title(step, time_map, cats)
+        title = _step_title(step, time_map, cats)
         png_path = plots_dir / f"diag_{prefix}_{step:05d}.png"
 
         if mode_1d:
-            fig_dark  = _make_1d_step_fig(ref_meta, ref_arr, dev_arr, prefix, title, dark=True)
+            fig_dark = _make_1d_step_fig(ref_meta, ref_arr, dev_arr, prefix, title, dark=True)
             fig_light = _make_1d_step_fig(ref_meta, ref_arr, dev_arr, prefix, title, dark=False)
             fig_light.write_image(str(png_path), width=900, height=360, scale=2)
         else:
-            fig_dark  = _make_2d_step_fig(ref_arr, dev_arr, prefix, title, vmin, vmax, amax, dark=True)
+            fig_dark = _make_2d_step_fig(ref_arr, dev_arr, prefix, title, vmin, vmax, amax, dark=True)
             fig_light = _make_2d_step_fig(ref_arr, dev_arr, prefix, title, vmin, vmax, amax, dark=False)
             fig_light.write_image(str(png_path), width=900, height=560, scale=2)
 
-        result.append(FigureSpec(
-            title=f"{prefix}  —  {title}",
-            png_path=png_path,
-            interactive=InteractiveFigure(
-                kind="plotly",
-                json_str=fig_dark.to_json(),
-                alt_json_str=fig_light.to_json(),
-            ),
-        ))
+        result.append(
+            FigureSpec(
+                title=f"{prefix}  —  {title}",
+                png_path=png_path,
+                interactive=InteractiveFigure(
+                    kind="plotly",
+                    json_str=fig_dark.to_json(),
+                    alt_json_str=fig_light.to_json(),
+                ),
+            )
+        )
     return result
 
 
@@ -506,20 +521,21 @@ def _make_failure_figures(
 # Rich display
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class _Row:
-    prefix:  str
+    prefix: str
     ref_var: VariableInfo | None
     dev_var: VariableInfo | None
     l2_mean: float | None
-    l2_max:  float | None
-    tol:     float = np.inf
-    passed:  bool  = True
-    note:    str   = ""
+    l2_max: float | None
+    tol: float = np.inf
+    passed: bool = True
+    note: str = ""
 
 
 def _print_table(ref_meta: RunMetadata, dev_meta: RunMetadata, rows: list[_Row]) -> None:
-    fmt  = "binary" if ref_meta.binary else "ASCII"
+    fmt = "binary" if ref_meta.binary else "ASCII"
     meta = f"[dim]{ref_meta.nx}×{ref_meta.ny}[/dim]  [dim]{fmt}[/dim]"
     table = Table(
         box=box.SIMPLE_HEAD,
@@ -530,33 +546,37 @@ def _print_table(ref_meta: RunMetadata, dev_meta: RunMetadata, rows: list[_Row])
         title_justify="left",
     )
     table.add_column("Variable", min_width=10)
-    table.add_column("Steps",    justify="right", min_width=6)
+    table.add_column("Steps", justify="right", min_width=6)
     table.add_column("Mean err", justify="right", min_width=12)
-    table.add_column("Max err",  justify="right", min_width=12)
-    table.add_column("Tol",      justify="right", min_width=10)
-    table.add_column("",         min_width=8)
+    table.add_column("Max err", justify="right", min_width=12)
+    table.add_column("Tol", justify="right", min_width=10)
+    table.add_column("", min_width=8)
 
     for r in rows:
         if r.note:
             table.add_row(
-                f"[dim]{r.prefix}[/dim]", "—", "—", "—", "—",
+                f"[dim]{r.prefix}[/dim]",
+                "—",
+                "—",
+                "—",
+                "—",
                 f"[yellow]{r.note}[/yellow]",
             )
             continue
 
         steps = str(r.ref_var.count) if r.ref_var else "—"
-        l2m   = f"{r.l2_mean:.3e}" if r.l2_mean is not None else "—"
-        l2x   = f"{r.l2_max:.3e}"  if r.l2_max  is not None else "—"
-        tol   = f"{r.tol:.1e}"     if np.isfinite(r.tol)    else "—"
+        l2m = f"{r.l2_mean:.3e}" if r.l2_mean is not None else "—"
+        l2x = f"{r.l2_max:.3e}" if r.l2_max is not None else "—"
+        tol = f"{r.tol:.1e}" if np.isfinite(r.tol) else "—"
 
         if np.isinf(r.tol):
             status = "[dim]○[/dim]"
             l2m_fmt = f"[dim]{l2m}[/dim]"
         elif r.passed:
-            status  = "[bold green]✓ PASS[/bold green]"
+            status = "[bold green]✓ PASS[/bold green]"
             l2m_fmt = f"[green]{l2m}[/green]"
         else:
-            status  = "[bold red]✗ FAIL[/bold red]"
+            status = "[bold red]✗ FAIL[/bold red]"
             l2m_fmt = f"[red]{l2m}[/red]"
 
         table.add_row(r.prefix, steps, l2m_fmt, l2x, tol, status)

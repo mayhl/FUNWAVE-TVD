@@ -34,9 +34,10 @@ CONVERT = REPO_ROOT / "scripts" / "convert_input.py"
 # Dispersion curves (C / sqrt(g h) as a function of kh)
 # ---------------------------------------------------------------------------
 
+
 def _cg_nwogu(kh):
     """Nwogu C/sqrt(gh) as a function of kh (scalar or array)."""
-    alpha = 0.5 * BETA_REF_DEFAULT ** 2 + BETA_REF_DEFAULT
+    alpha = 0.5 * BETA_REF_DEFAULT**2 + BETA_REF_DEFAULT
     return np.sqrt((1.0 - (alpha + 1.0 / 3.0) * kh**2) / (1.0 - alpha * kh**2))
 
 
@@ -101,10 +102,22 @@ def run_length(h: float, k: float) -> tuple[float, float]:
     return max(40.0, 12.0 * t_nwogu), t_nwogu / 60.0
 
 
-def run_seiche(run_dir: Path, *, title: str, h: float, mglob: int, nglob: int,
-               dx: float, dy: float, mode_x: int, mode_y: int,
-               total_time: float, dt_sta: float, station: str = "2 2",
-               verbose: bool = False) -> float | None:
+def run_seiche(
+    run_dir: Path,
+    *,
+    title: str,
+    h: float,
+    mglob: int,
+    nglob: int,
+    dx: float,
+    dy: float,
+    mode_x: int,
+    mode_y: int,
+    total_time: float,
+    dt_sta: float,
+    station: str = "2 2",
+    verbose: bool = False,
+) -> float | None:
     """Write the deck, convert, run (1 rank), read station 1; return its period (s).
 
     Returns None on convert/run failure or an unmeasurable series.
@@ -115,14 +128,26 @@ def run_seiche(run_dir: Path, *, title: str, h: float, mglob: int, nglob: int,
     out_dir.mkdir(parents=True)
 
     (run_dir / "input.txt").write_text(
-        _DECK.format(title=title, h=h, mglob=mglob, nglob=nglob, dx=dx, dy=dy,
-                     mode_x=mode_x, mode_y=mode_y, total_time=total_time, dt_sta=dt_sta)
+        _DECK.format(
+            title=title,
+            h=h,
+            mglob=mglob,
+            nglob=nglob,
+            dx=dx,
+            dy=dy,
+            mode_x=mode_x,
+            mode_y=mode_y,
+            total_time=total_time,
+            dt_sta=dt_sta,
+        )
     )
     (run_dir / "stations.txt").write_text(station + "\n")
 
     conv = subprocess.run(
         ["uv", "run", "python", str(CONVERT), "input.txt", "input.yaml"],
-        cwd=run_dir, capture_output=True, text=True,
+        cwd=run_dir,
+        capture_output=True,
+        text=True,
     )
     if conv.returncode != 0:
         if verbose:
@@ -131,13 +156,14 @@ def run_seiche(run_dir: Path, *, title: str, h: float, mglob: int, nglob: int,
 
     run = subprocess.run(
         ["mpirun", "-np", "1", str(BINARY), "input.yaml"],
-        cwd=run_dir, capture_output=True, text=True,
+        cwd=run_dir,
+        capture_output=True,
+        text=True,
     )
     sta = out_dir / "sta_0001"
     if run.returncode != 0 or not sta.exists():
         if verbose:
-            print(f"  [{title}] run failed (rc={run.returncode}):\n"
-                  f"{run.stdout[-400:]}\n{run.stderr[-400:]}", file=sys.stderr)
+            print(f"  [{title}] run failed (rc={run.returncode}):\n{run.stdout[-400:]}\n{run.stderr[-400:]}", file=sys.stderr)
         return None
 
     arr = np.loadtxt(sta)

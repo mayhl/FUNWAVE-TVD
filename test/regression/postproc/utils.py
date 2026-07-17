@@ -20,29 +20,76 @@ if TYPE_CHECKING:
 # Prefixes written at each PLOT_INTV (time-evolving field snapshots).
 # 2D prefixes: sourced from src/model/2d/old/io.F  (_%05d naming)
 # 3D prefixes: sourced from src/model/3d/old/io.F  (_%04d naming)
-FIELD_PREFIXES: frozenset[str] = frozenset([
-    # 2D model outputs
-    "eta", "etasrn",
-    "u", "v",
-    "mask", "mask9",
-    "hmax", "hmin", "umax", "MFmax", "VORmax",
-    "p", "q",
-    "age",
-    "roller", "U_undertow", "V_undertow", "nubrk",
-    "FrcInsX", "FrcInsY", "BrkSrcX", "BrkSrcY",
-    "time",
-    "Pstorm", "Ustorm", "Vstorm",
-    "Fves", "Pves", "VesUp", "VesVp",
-    "tmp",
-    "Ax", "Ay", "Bx", "By",
-    "dep",
-    "C", "Pick", "Depo", "Pavg", "Davg",
-    "DchgS", "DchgB", "BedFx", "BedFy", "BedStr",
-    "Aval", "AvalAc", "Cb", "Ca", "Redu", "TauEx", "Hpo",
-    "FoamEta",
-    # 3D model outputs (volumetric — see putfile3D in src/model/3d/old/io.F)
-    "w", "tke", "eps", "prod", "mu", "upwp", "sali", "temp", "rho", "b",
-])
+FIELD_PREFIXES: frozenset[str] = frozenset(
+    [
+        # 2D model outputs
+        "eta",
+        "etasrn",
+        "u",
+        "v",
+        "mask",
+        "mask9",
+        "hmax",
+        "hmin",
+        "umax",
+        "MFmax",
+        "VORmax",
+        "p",
+        "q",
+        "age",
+        "roller",
+        "U_undertow",
+        "V_undertow",
+        "nubrk",
+        "FrcInsX",
+        "FrcInsY",
+        "BrkSrcX",
+        "BrkSrcY",
+        "time",
+        "Pstorm",
+        "Ustorm",
+        "Vstorm",
+        "Fves",
+        "Pves",
+        "VesUp",
+        "VesVp",
+        "tmp",
+        "Ax",
+        "Ay",
+        "Bx",
+        "By",
+        "dep",
+        "C",
+        "Pick",
+        "Depo",
+        "Pavg",
+        "Davg",
+        "DchgS",
+        "DchgB",
+        "BedFx",
+        "BedFy",
+        "BedStr",
+        "Aval",
+        "AvalAc",
+        "Cb",
+        "Ca",
+        "Redu",
+        "TauEx",
+        "Hpo",
+        "FoamEta",
+        # 3D model outputs (volumetric — see putfile3D in src/model/3d/old/io.F)
+        "w",
+        "tke",
+        "eps",
+        "prod",
+        "mu",
+        "upwp",
+        "sali",
+        "temp",
+        "rho",
+        "b",
+    ]
+)
 
 # Binary mask fields — use mismatch fraction instead of normalized L2.
 MASK_PREFIXES: frozenset[str] = frozenset({"mask", "mask9"})
@@ -54,39 +101,57 @@ MASK_PREFIXES: frozenset[str] = frozenset({"mask", "mask9"})
 DEFAULT_FLOOR: float = 1e-4
 
 # Prefixes written at T_INTV_mean after STEADY_TIME (wave-averaged statistics).
-STATS_PREFIXES: frozenset[str] = frozenset([
-    "umean", "vmean", "etamean",
-    "ulagm", "vlagm",
-    "Hrms", "Havg", "Hsig",
-    "Sxx", "Sxy", "Syy",
-    "DxSxx", "DySxy", "DySyy", "DxSxy",
-    "PgrdX", "PgrdY",
-    "DxUUH", "DyUVH", "DyVVH", "DxUVH",
-    "FRCX", "FRCY",
-    "BrkDissX", "BrkDissY",
-])
+STATS_PREFIXES: frozenset[str] = frozenset(
+    [
+        "umean",
+        "vmean",
+        "etamean",
+        "ulagm",
+        "vlagm",
+        "Hrms",
+        "Havg",
+        "Hsig",
+        "Sxx",
+        "Sxy",
+        "Syy",
+        "DxSxx",
+        "DySxy",
+        "DySyy",
+        "DxSxy",
+        "PgrdX",
+        "PgrdY",
+        "DxUUH",
+        "DyUVH",
+        "DyVVH",
+        "DxUVH",
+        "FRCX",
+        "FRCY",
+        "BrkDissX",
+        "BrkDissY",
+    ]
+)
 
 # Canonical variable name (from input flags) → primary output file prefix.
 # WaveHeight produces three files (Hrms, Havg, Hsig); Hrms is listed as primary.
 # DEPTH_OUT → dep.out (static, not a %05d series).
 VAR_TO_PREFIX: dict[str, str] = {
-    "ETA":        "eta",
-    "ETAscreen":  "etasrn",
-    "U":          "u",
-    "V":          "v",
-    "Umean":      "umean",
-    "Vmean":      "vmean",
-    "ETAmean":    "etamean",
-    "MASK":       "mask",
-    "MASK9":      "mask9",
-    "Hmax":       "hmax",
-    "Hmin":       "hmin",
-    "MFmax":      "MFmax",
-    "Umax":       "umax",
-    "VORmax":     "VORmax",
-    "WaveHeight": "Hrms",    # also produces Havg, Hsig
-    "P":          "p",
-    "Q":          "q",
+    "ETA": "eta",
+    "ETAscreen": "etasrn",
+    "U": "u",
+    "V": "v",
+    "Umean": "umean",
+    "Vmean": "vmean",
+    "ETAmean": "etamean",
+    "MASK": "mask",
+    "MASK9": "mask9",
+    "Hmax": "hmax",
+    "Hmin": "hmin",
+    "MFmax": "MFmax",
+    "Umax": "umax",
+    "VORmax": "VORmax",
+    "WaveHeight": "Hrms",  # also produces Havg, Hsig
+    "P": "p",
+    "Q": "q",
 }
 
 # Variables that produce a static file rather than a %05d series.
@@ -96,14 +161,36 @@ STATIC_FILES: dict[str, str] = {
 
 # All txt input flag names recognised as output variables.
 _TXT_VAR_FLAGS = [
-    "DEPTH_OUT", "U", "V", "ETA", "ETAscreen",
-    "Hmax", "Hmin", "MFmax", "Umax", "VORmax",
-    "Umean", "Vmean", "ETAmean",
-    "MASK", "MASK9",
-    "SXL", "SXR", "SYL", "SYR",
-    "SourceX", "SourceY",
-    "P", "Q", "Fx", "Fy", "Gx", "Gy",
-    "AGE", "TMP", "WaveHeight",
+    "DEPTH_OUT",
+    "U",
+    "V",
+    "ETA",
+    "ETAscreen",
+    "Hmax",
+    "Hmin",
+    "MFmax",
+    "Umax",
+    "VORmax",
+    "Umean",
+    "Vmean",
+    "ETAmean",
+    "MASK",
+    "MASK9",
+    "SXL",
+    "SXR",
+    "SYL",
+    "SYR",
+    "SourceX",
+    "SourceY",
+    "P",
+    "Q",
+    "Fx",
+    "Fy",
+    "Gx",
+    "Gy",
+    "AGE",
+    "TMP",
+    "WaveHeight",
 ]
 
 _TSERIES_RE = re.compile(r"^(.+)_(\d{4,5})$")  # 5-digit (2D) or 4-digit (3D)
@@ -114,12 +201,13 @@ _STATION_RE = re.compile(r"^sta_(\d{4})$")
 # VariableInfo — prefix + timestep range discovered from output directory
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class VariableInfo:
     prefix: str
-    first: int        # first valid timestep index
-    last: int         # last valid timestep index (99999 excluded)
-    unstable: bool    # True if a prefix_99999 file exists (blow-up sentinel)
+    first: int  # first valid timestep index
+    last: int  # last valid timestep index (99999 excluded)
+    unstable: bool  # True if a prefix_99999 file exists (blow-up sentinel)
 
     @property
     def count(self) -> int:
@@ -131,18 +219,19 @@ class VariableInfo:
 # RunMetadata
 # ---------------------------------------------------------------------------
 
+
 @dataclass
 class RunMetadata:
     run_dir: Path
     output_dir: Path
-    nx: int           # Mglob / grid_size[0]
-    ny: int           # Nglob / grid_size[1]
+    nx: int  # Mglob / grid_size[0]
+    ny: int  # Nglob / grid_size[1]
     dx: float
     dy: float
-    binary: bool = False      # True if FIELD_IO_TYPE = BINARY; default is ASCII
-    output_res: int = 1       # OUTPUT_RES stride (ASCII only; binary is always full res)
+    binary: bool = False  # True if FIELD_IO_TYPE = BINARY; default is ASCII
+    output_res: int = 1  # OUTPUT_RES stride (ASCII only; binary is always full res)
     variables: list[str] = field(default_factory=list)  # canonical names from input
-    nz: int = 0               # Kglob for 3D runs; 0 for 2D runs
+    nz: int = 0  # Kglob for 3D runs; 0 for 2D runs
 
     @property
     def is_3d(self) -> bool:
@@ -183,14 +272,11 @@ class RunMetadata:
           putfile3D — Kglob*Nglob rows, Mglob values each → reshaped to (nz, ny, nx)
         """
         import numpy as np
+
         if self.binary:
             n = self.nx * self.ny
             dtype = np.float64 if path.stat().st_size == n * 8 else np.float32
-            return (
-                np.fromfile(path, dtype=dtype, count=n)
-                .reshape((self.nx, self.ny), order="F")
-                .T
-            )
+            return np.fromfile(path, dtype=dtype, count=n).reshape((self.nx, self.ny), order="F").T
         arr = np.loadtxt(path, dtype=np.float32)
         if self.nz > 1 and arr.ndim == 2 and arr.shape[0] == self.nz * self.ny:
             arr = arr.reshape(self.nz, self.ny, self.nx)
@@ -225,17 +311,13 @@ def get_output_variables(
     output_dir = Path(output_dir)
 
     if kind == "station":
-        suffixes = [
-            int(m.group(1))
-            for f in output_dir.iterdir()
-            if (m := _STATION_RE.match(f.name))
-        ]
+        suffixes = [int(m.group(1)) for f in output_dir.iterdir() if (m := _STATION_RE.match(f.name))]
         if not suffixes:
             return []
         return [VariableInfo("sta", min(suffixes), max(suffixes))]
 
     _KIND_MAP: dict[str, frozenset[str]] = {
-        "field":      FIELD_PREFIXES,
+        "field": FIELD_PREFIXES,
         "statistics": STATS_PREFIXES,
     }
     allowed = _KIND_MAP.get(kind) if kind else None
@@ -265,12 +347,13 @@ def get_output_variables(
 # Input file parsers
 # ---------------------------------------------------------------------------
 
+
 def read_run_metadata(run_dir: str | Path) -> RunMetadata:
     """Parse run metadata from the first yaml or txt input file found in run_dir."""
     run_dir = Path(run_dir)
 
     yaml_files = sorted(run_dir.glob("*.yaml"))
-    txt_files  = sorted(p for p in run_dir.glob("*.txt") if p.name != "LOG.txt")
+    txt_files = sorted(p for p in run_dir.glob("*.txt") if p.name != "LOG.txt")
 
     if yaml_files:
         return _from_yaml(run_dir, yaml_files[0])
@@ -288,8 +371,8 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     geo = cfg.get("grid", cfg.get("geometry", {}))
     out = cfg.get("output", {})
 
-    grid_size = geo.get("grid_size", [0, 0])    # [nx, ny] or [nx, ny, nz]
-    cell_size = geo.get("cell_size", [1.0, 1.0]) # [dx, dy]
+    grid_size = geo.get("grid_size", [0, 0])  # [nx, ny] or [nx, ny, nz]
+    cell_size = geo.get("cell_size", [1.0, 1.0])  # [dx, dy]
 
     result_folder = out.get("result_folder", "output").rstrip("/")
     output_dir = (run_dir / result_folder).resolve()
@@ -298,7 +381,7 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     if out.get("depth_out", False):
         variables = ["DEPTH_OUT"] + variables
 
-    binary     = out.get("field_io_type", "ASCII").upper() == "BINARY"
+    binary = out.get("field_io_type", "ASCII").upper() == "BINARY"
     output_res = int(out.get("output_res", 1))
 
     return RunMetadata(
@@ -321,12 +404,9 @@ def _from_txt(run_dir: Path, path: Path) -> RunMetadata:
     result_folder = kv.get("RESULT_FOLDER", "output").rstrip("/")
     output_dir = (run_dir / result_folder).resolve()
 
-    variables = [
-        v for v in _TXT_VAR_FLAGS
-        if kv.get(v, "F").upper() in ("T", ".TRUE.", "TRUE")
-    ]
+    variables = [v for v in _TXT_VAR_FLAGS if kv.get(v, "F").upper() in ("T", ".TRUE.", "TRUE")]
 
-    binary     = kv.get("FIELD_IO_TYPE", "ASCII").upper() == "BINARY"
+    binary = kv.get("FIELD_IO_TYPE", "ASCII").upper() == "BINARY"
     output_res = int(kv.get("OUTPUT_RES", 1))
 
     return RunMetadata(
@@ -350,6 +430,7 @@ _KV_RE = re.compile(r"(\w+)\s*=\s*([^\s!,:;]+)")
 # Per-step error metric computation
 # ---------------------------------------------------------------------------
 
+
 def compute_metric_series(
     ref_meta: RunMetadata,
     dev_meta: RunMetadata,
@@ -368,6 +449,7 @@ def compute_metric_series(
     start near zero (e.g. hmax before waves arrive).
     """
     import numpy as np
+
     is_mask = prefix in MASK_PREFIXES
     indices = list(range(idx_first, idx_last + 1))
 
@@ -389,7 +471,7 @@ def compute_metric_series(
     max_norm_ref = 0.0
     for idx in indices:
         ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, idx)).astype(float)
-        max_norm_ref = max(max_norm_ref, float(np.sqrt(np.sum(ref_arr ** 2))))
+        max_norm_ref = max(max_norm_ref, float(np.sqrt(np.sum(ref_arr**2))))
     denom = max(max_norm_ref, floor)
 
     # Pass 2: compute per-step normalised L2.
@@ -398,7 +480,7 @@ def compute_metric_series(
         ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, idx)).astype(float)
         dev_arr = dev_meta.read_field(dev_meta.field_path(prefix, idx)).astype(float)
         diff = dev_arr - ref_arr
-        vals.append(float(np.sqrt(np.sum(diff ** 2))) / denom)
+        vals.append(float(np.sqrt(np.sum(diff**2))) / denom)
     return np.array(vals)
 
 

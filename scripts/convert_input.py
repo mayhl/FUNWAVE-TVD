@@ -23,15 +23,16 @@ from pathlib import Path
 # Parser
 # ---------------------------------------------------------------------------
 
+
 def parse_input_txt(path: Path) -> dict[str, str]:
     """Return {KEY: raw_value_string} from a legacy input.txt file."""
     params: dict[str, str] = {}
     with open(path) as f:
         for line in f:
-            line = re.sub(r'[!#].*', '', line).strip()
+            line = re.sub(r"[!#].*", "", line).strip()
             if not line:
                 continue
-            m = re.match(r'(\w+)\s*[=:]\s*(.*)', line)
+            m = re.match(r"(\w+)\s*[=:]\s*(.*)", line)
             if m:
                 key = m.group(1).strip()
                 val = m.group(2).strip()
@@ -43,11 +44,13 @@ def parse_input_txt(path: Path) -> dict[str, str]:
 # Value coercion
 # ---------------------------------------------------------------------------
 
-_BOOL_TRUE  = {'T', 'TRUE', 'YES'}
-_BOOL_FALSE = {'F', 'FALSE', 'NO'}
+_BOOL_TRUE = {"T", "TRUE", "YES"}
+_BOOL_FALSE = {"F", "FALSE", "NO"}
+
 
 def _bool(s: str) -> bool:
     return s.upper() in _BOOL_TRUE
+
 
 def _auto(s: str):
     """Coerce to bool > int > float > str."""
@@ -74,43 +77,43 @@ def _auto(s: str):
 # ---------------------------------------------------------------------------
 
 _VAR_FLAGS: dict[str, str] = {
-    'U':         'U',
-    'V':         'V',
-    'ETA':       'ETA',
-    'ETAscreen': 'ETAscreen',
-    'Hmax':      'Hmax',
-    'Hmin':      'Hmin',
-    'Umax':      'Umax',
-    'MFmax':     'MFmax',
-    'VORmax':    'VORmax',
-    'MASK':      'MASK',
-    'MASK9':     'MASK9',
-    'Umean':     'Umean',
-    'Vmean':     'Vmean',
-    'ETAmean':   'ETAmean',
-    'WaveHeight':'WaveHeight',
-    'SXL':       'SXL',
-    'SXR':       'SXR',
-    'SYL':       'SYL',
-    'SYR':       'SYR',
-    'SourceX':   'SourceX',
-    'SourceY':   'SourceY',
-    'FrcX':      'FrcX',
-    'FrcY':      'FrcY',
-    'BrkdisX':   'BrkdisX',
-    'BrkdisY':   'BrkdisY',
-    'P':         'P',
-    'Q':         'Q',
-    'Fx':        'Fx',
-    'Fy':        'Fy',
-    'Gx':        'Gx',
-    'Gy':        'Gy',
-    'AGE':       'AGE',
-    'ROLLER':    'ROLLER',   # also a breaking physics flag — see convert()
-    'UNDERTOW':  'UNDERTOW',
-    'OUT_NU':    'NU',       # renamed: OUT_NU → NU
-    'TMP':       'TMP',
-    'Radiation': 'Radiation',
+    "U": "U",
+    "V": "V",
+    "ETA": "ETA",
+    "ETAscreen": "ETAscreen",
+    "Hmax": "Hmax",
+    "Hmin": "Hmin",
+    "Umax": "Umax",
+    "MFmax": "MFmax",
+    "VORmax": "VORmax",
+    "MASK": "MASK",
+    "MASK9": "MASK9",
+    "Umean": "Umean",
+    "Vmean": "Vmean",
+    "ETAmean": "ETAmean",
+    "WaveHeight": "WaveHeight",
+    "SXL": "SXL",
+    "SXR": "SXR",
+    "SYL": "SYL",
+    "SYR": "SYR",
+    "SourceX": "SourceX",
+    "SourceY": "SourceY",
+    "FrcX": "FrcX",
+    "FrcY": "FrcY",
+    "BrkdisX": "BrkdisX",
+    "BrkdisY": "BrkdisY",
+    "P": "P",
+    "Q": "Q",
+    "Fx": "Fx",
+    "Fy": "Fy",
+    "Gx": "Gx",
+    "Gy": "Gy",
+    "AGE": "AGE",
+    "ROLLER": "ROLLER",  # also a breaking physics flag — see convert()
+    "UNDERTOW": "UNDERTOW",
+    "OUT_NU": "NU",  # renamed: OUT_NU → NU
+    "TMP": "TMP",
+    "Radiation": "Radiation",
 }
 
 # ---------------------------------------------------------------------------
@@ -118,52 +121,128 @@ _VAR_FLAGS: dict[str, str] = {
 # ---------------------------------------------------------------------------
 
 _WK_PARAMS: dict[str, list[str]] = {
-    'LEF_SOL':      ['AMP', 'DEP', 'LAGTIME'],
-    'WK_REG': [
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'Tperiod', 'AMP_WK',
-        'Theta_WK', 'Time_ramp', 'Delta_WK', 'Ywidth_WK',
+    "LEF_SOL": ["AMP", "DEP", "LAGTIME"],
+    "WK_REG": [
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "Tperiod",
+        "AMP_WK",
+        "Theta_WK",
+        "Time_ramp",
+        "Delta_WK",
+        "Ywidth_WK",
     ],
-    'WK_IRR': [
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta', 'Nfreq', 'Ntheta',
-        'Time_ramp', 'Delta_WK', 'Ywidth_WK',
+    "WK_IRR": [
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "FreqPeak",
+        "FreqMin",
+        "FreqMax",
+        "Hmo",
+        "GammaTMA",
+        "ThetaPeak",
+        "Sigma_Theta",
+        "Nfreq",
+        "Ntheta",
+        "Time_ramp",
+        "Delta_WK",
+        "Ywidth_WK",
     ],
-    'WK_TIME_SERIES': [
-        'NumWaveComp', 'PeakPeriod', 'WaveCompFile',
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'Time_ramp', 'Delta_WK', 'Ywidth_WK',
+    "WK_TIME_SERIES": [
+        "NumWaveComp",
+        "PeakPeriod",
+        "WaveCompFile",
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "Time_ramp",
+        "Delta_WK",
+        "Ywidth_WK",
     ],
-    'WK_NEW_IRR': [
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta',
-        'Time_ramp', 'Delta_WK', 'Ywidth_WK', 'WaveCompFile',
+    "WK_NEW_IRR": [
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "FreqPeak",
+        "FreqMin",
+        "FreqMax",
+        "Hmo",
+        "GammaTMA",
+        "ThetaPeak",
+        "Sigma_Theta",
+        "Time_ramp",
+        "Delta_WK",
+        "Ywidth_WK",
+        "WaveCompFile",
     ],
-    'LEFT_BC_IRR': [
-        'NumWaveComp', 'PeakPeriod', 'WaveCompFile', 'DEP_WK',
-        'Time_ramp', 'Delta_WK',
+    "LEFT_BC_IRR": [
+        "NumWaveComp",
+        "PeakPeriod",
+        "WaveCompFile",
+        "DEP_WK",
+        "Time_ramp",
+        "Delta_WK",
     ],
-    'ABS_1D': [
-        'NumWaveComp', 'PeakPeriod', 'WaveCompFile', 'DEP_WK',
-        'Time_ramp', 'Delta_WK',
+    "ABS_1D": [
+        "NumWaveComp",
+        "PeakPeriod",
+        "WaveCompFile",
+        "DEP_WK",
+        "Time_ramp",
+        "Delta_WK",
     ],
-    'JON_2D': [
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'ThetaPeak', 'Sigma_Theta', 'Nfreq', 'Ntheta',
-        'Time_ramp', 'Delta_WK', 'Ywidth_WK',
+    "JON_2D": [
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "FreqPeak",
+        "FreqMin",
+        "FreqMax",
+        "Hmo",
+        "GammaTMA",
+        "ThetaPeak",
+        "Sigma_Theta",
+        "Nfreq",
+        "Ntheta",
+        "Time_ramp",
+        "Delta_WK",
+        "Ywidth_WK",
     ],
-    'JON_1D': [
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'Nfreq', 'Time_ramp', 'Delta_WK',
+    "JON_1D": [
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "FreqPeak",
+        "FreqMin",
+        "FreqMax",
+        "Hmo",
+        "GammaTMA",
+        "Nfreq",
+        "Time_ramp",
+        "Delta_WK",
     ],
-    'TMA_1D': [
-        'Xc_WK', 'Yc_WK', 'DEP_WK', 'FreqPeak', 'FreqMin', 'FreqMax',
-        'Hmo', 'GammaTMA', 'Nfreq', 'Time_ramp', 'Delta_WK',
+    "TMA_1D": [
+        "Xc_WK",
+        "Yc_WK",
+        "DEP_WK",
+        "FreqPeak",
+        "FreqMin",
+        "FreqMax",
+        "Hmo",
+        "GammaTMA",
+        "Nfreq",
+        "Time_ramp",
+        "Delta_WK",
     ],
 }
 
 # Common optional wavemaker keys not in any type-specific list
 _WK_COMMON = [
-    'WaveMakerCurrentBalance', 'WaveMakerCd',
-    'WAVEMAKER_Cbrk',
+    "WaveMakerCurrentBalance",
+    "WaveMakerCd",
+    "WAVEMAKER_Cbrk",
 ]
 
 
@@ -177,83 +256,90 @@ def _convert_wavemaker(wm_type: str, pop_val):
     (config reorg rung 3a).  Boundary-consumer types (LEF_SOL, ABS_1D,
     LEFT_BC_IRR) keep their legacy shape until rung 3b / the char-BC track.
     freq stays frequency (exact); period {...} is hand-authoring only."""
-    if wm_type in ('LEF_SOL', 'ABS_1D', 'LEFT_BC_IRR'):
-        wm = {'type': wm_type}
+    if wm_type in ("LEF_SOL", "ABS_1D", "LEFT_BC_IRR"):
+        wm = {"type": wm_type}
         for k in _WK_PARAMS.get(wm_type, []):
             v = pop_val(k)
-            if v is not None: wm[k] = v
+            if v is not None:
+                wm[k] = v
         return wm
 
     spec_map = {
-        'WK_REG':         ('regular', False, False),
-        'WK_IRR':         ('tma',     True,  False),
-        'TMA_1D':         ('tma',     False, False),
-        'JON_1D':         ('jonswap', False, False),
-        'JON_2D':         ('jonswap', True,  False),
-        'WK_NEW_IRR':     ('tma',     True,  True),
-        'WK_TIME_SERIES': ('components', False, False),
+        "WK_REG": ("regular", False, False),
+        "WK_IRR": ("tma", True, False),
+        "TMA_1D": ("tma", False, False),
+        "JON_1D": ("jonswap", False, False),
+        "JON_2D": ("jonswap", True, False),
+        "WK_NEW_IRR": ("tma", True, True),
+        "WK_TIME_SERIES": ("components", False, False),
     }
     if wm_type not in spec_map:
-        raise SystemExit(f'convert_input: unsupported WAVEMAKER type {wm_type}')
+        raise SystemExit(f"convert_input: unsupported WAVEMAKER type {wm_type}")
     stype, directional, single_dir = spec_map[wm_type]
 
     wm: dict = {}
-    spec: dict = {'type': stype}
-    if stype == 'regular':
-        for k, yk in (('AMP_WK', 'amplitude'), ('Tperiod', 'period'),
-                      ('Theta_WK', 'direction')):
+    spec: dict = {"type": stype}
+    if stype == "regular":
+        for k, yk in (("AMP_WK", "amplitude"), ("Tperiod", "period"), ("Theta_WK", "direction")):
             v = pop_val(k)
-            if v is not None: spec[yk] = v
-    elif stype == 'components':
-        for k, yk in (('NumWaveComp', 'n'), ('PeakPeriod', 'period_peak'),
-                      ('WaveCompFile', 'file')):
+            if v is not None:
+                spec[yk] = v
+    elif stype == "components":
+        for k, yk in (("NumWaveComp", "n"), ("PeakPeriod", "period_peak"), ("WaveCompFile", "file")):
             v = pop_val(k)
-            if v is not None: spec[yk] = v
+            if v is not None:
+                spec[yk] = v
     else:
-        for k, yk in (('Hmo', 'hm0'), ('GammaTMA', 'gamma')):
+        for k, yk in (("Hmo", "hm0"), ("GammaTMA", "gamma")):
             v = pop_val(k)
-            if v is not None: spec[yk] = v
-        for k, yk in (('FreqPeak', 'peak'), ('FreqMin', 'min'),
-                      ('FreqMax', 'max')):
-            _put(spec, 'freq', yk, pop_val(k))
+            if v is not None:
+                spec[yk] = v
+        for k, yk in (("FreqPeak", "peak"), ("FreqMin", "min"), ("FreqMax", "max")):
+            _put(spec, "freq", yk, pop_val(k))
         if directional:
-            for k, yk in (('ThetaPeak', 'peak'), ('Sigma_Theta', 'spread'),
-                          ('Ntheta', 'n_bins')):
-                _put(spec, 'directional', yk, pop_val(k))
+            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread"), ("Ntheta", "n_bins")):
+                _put(spec, "directional", yk, pop_val(k))
             # legacy directional default (io.F) differs from the reader default
-            spec.setdefault('directional', {}).setdefault('n_bins', 24)
+            spec.setdefault("directional", {}).setdefault("n_bins", 24)
         else:
-            pop_val('Ntheta')  # consume a stray 1D Ntheta silently, like before
-        _put(spec, 'discretization', 'freq_bins', pop_val('Nfreq'))
-        spec.setdefault('discretization', {}).setdefault('freq_bins', 45)
+            pop_val("Ntheta")  # consume a stray 1D Ntheta silently, like before
+        _put(spec, "discretization", "freq_bins", pop_val("Nfreq"))
+        spec.setdefault("discretization", {}).setdefault("freq_bins", 45)
         if single_dir:
-            spec['discretization']['method'] = 'single_dir_per_freq'
-        v = pop_val('alpha_c')
+            spec["discretization"]["method"] = "single_dir_per_freq"
+        v = pop_val("alpha_c")
         if v is not None:
-            _put(spec, 'discretization', 'coherence_percent', v)
-        eq = pop_val('EqualEnergy')
+            _put(spec, "discretization", "coherence_percent", v)
+        eq = pop_val("EqualEnergy")
         if eq is not None:
-            _put(spec, 'discretization', 'equal_energy', eq)
-        if wm_type == 'WK_NEW_IRR':
-            _put(spec, 'discretization', 'file', pop_val('WaveCompFile'))
-    wm['spectrum'] = spec
+            _put(spec, "discretization", "equal_energy", eq)
+        if wm_type == "WK_NEW_IRR":
+            _put(spec, "discretization", "file", pop_val("WaveCompFile"))
+    wm["spectrum"] = spec
 
-    for k, yk in (('Xc_WK', 'x_center'), ('Yc_WK', 'y_center'),
-                  ('DEP_WK', 'depth'), ('Delta_WK', 'delta'),
-                  ('Ywidth_WK', 'y_width'), ('Time_ramp', 'time_ramp'),
-                  ('WaveMakerCd', 'current_cd')):
-        _put(wm, 'source', yk, pop_val(k))
-    pop_val('WaveMakerCurrentBalance')   # presence of current_cd carries it
+    for k, yk in (
+        ("Xc_WK", "x_center"),
+        ("Yc_WK", "y_center"),
+        ("DEP_WK", "depth"),
+        ("Delta_WK", "delta"),
+        ("Ywidth_WK", "y_width"),
+        ("Time_ramp", "time_ramp"),
+        ("WaveMakerCd", "current_cd"),
+    ):
+        _put(wm, "source", yk, pop_val(k))
+    pop_val("WaveMakerCurrentBalance")  # presence of current_cd carries it
 
-    if pop_val('ETA_LIMITER'):
-        for k, yk in (('CrestLimit', 'crest'), ('TroughLimit', 'trough')):
-            _put(wm, 'limiter', yk, pop_val(k))
+    if pop_val("ETA_LIMITER"):
+        for k, yk in (("CrestLimit", "crest"), ("TroughLimit", "trough")):
+            _put(wm, "limiter", yk, pop_val(k))
 
     return wm
+
 
 # ---------------------------------------------------------------------------
 # Main converter
 # ---------------------------------------------------------------------------
+
 
 def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     """
@@ -284,292 +370,355 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     # ---- geometry ----------------------------------------------------------
     geo: dict = {}
 
-    dx = pop_val('DX'); dy = pop_val('DY')
+    dx = pop_val("DX")
+    dy = pop_val("DY")
     if dx is not None and dy is not None:
-        geo['cell_size'] = [dx, dy]
+        geo["cell_size"] = [dx, dy]
     elif dx is not None:
-        geo['cell_size'] = [dx, dx]
+        geo["cell_size"] = [dx, dx]
     elif dy is not None:
-        geo['cell_size'] = [dy, dy]
+        geo["cell_size"] = [dy, dy]
 
-    depth_type = pop_str('DEPTH_TYPE', 'flat').lower()
-    if depth_type == 'data':
-        depth_type = 'file'
+    depth_type = pop_str("DEPTH_TYPE", "flat").lower()
+    if depth_type == "data":
+        depth_type = "file"
 
-    mg = pop_val('Mglob'); ng = pop_val('Nglob')
+    mg = pop_val("Mglob")
+    ng = pop_val("Nglob")
     if mg is not None and ng is not None:
-        geo['grid_size'] = [mg, ng]
+        geo["grid_size"] = [mg, ng]
 
-    px = pop_val('PX');  py = pop_val('PY')
+    px = pop_val("PX")
+    py = pop_val("PY")
     if px is not None or py is not None:
         decomp: dict = {}
-        if px is not None: decomp['nx_proc'] = px
-        if py is not None: decomp['ny_proc'] = py
-        geo['decomposition'] = decomp
+        if px is not None:
+            decomp["nx_proc"] = px
+        if py is not None:
+            decomp["ny_proc"] = py
+        geo["decomposition"] = decomp
 
-    bathy: dict = {'type': depth_type}
-    if depth_type == 'file':
-        df2 = pop_str('DEPTH_FILE')
-        if df2 is not None: bathy['file'] = df2
-        ftype = pop_str('DEPTH_FTYPE')
-        if ftype is not None: bathy['file_type'] = ftype.lower()
-        bc = pop_bool('BATHY_CORRECTION')
-        if 'BATHY_CORRECTION' in params: bathy['correction'] = bc
-        sbd = pop_val('SmoothBelowDepth')
-        if sbd is not None: bathy['smooth_below_depth'] = sbd
-        scap = pop_val('SlopeCap')
-        if scap is not None: bathy['slope_cap'] = scap
-        if mg is not None: bathy['nx'] = mg
-        if ng is not None: bathy['ny'] = ng
+    bathy: dict = {"type": depth_type}
+    if depth_type == "file":
+        df2 = pop_str("DEPTH_FILE")
+        if df2 is not None:
+            bathy["file"] = df2
+        ftype = pop_str("DEPTH_FTYPE")
+        if ftype is not None:
+            bathy["file_type"] = ftype.lower()
+        bc = pop_bool("BATHY_CORRECTION")
+        if "BATHY_CORRECTION" in params:
+            bathy["correction"] = bc
+        sbd = pop_val("SmoothBelowDepth")
+        if sbd is not None:
+            bathy["smooth_below_depth"] = sbd
+        scap = pop_val("SlopeCap")
+        if scap is not None:
+            bathy["slope_cap"] = scap
+        if mg is not None:
+            bathy["nx"] = mg
+        if ng is not None:
+            bathy["ny"] = ng
     else:
-        pop('DEPTH_FILE'); pop('DEPTH_FTYPE'); pop('BATHY_CORRECTION')
-        pop('SmoothBelowDepth'); pop('SlopeCap')
-        df = pop_val('DEPTH_FLAT')
-        if df is not None: bathy['depth'] = df
-        if depth_type == 'slope':
-            slp = pop_val('SLP')
-            if slp is not None: bathy['slope'] = slp
-            xslp = pop_val('Xslp')
-            if xslp is not None: bathy['x0'] = xslp
+        pop("DEPTH_FILE")
+        pop("DEPTH_FTYPE")
+        pop("BATHY_CORRECTION")
+        pop("SmoothBelowDepth")
+        pop("SlopeCap")
+        df = pop_val("DEPTH_FLAT")
+        if df is not None:
+            bathy["depth"] = df
+        if depth_type == "slope":
+            slp = pop_val("SLP")
+            if slp is not None:
+                bathy["slope"] = slp
+            xslp = pop_val("Xslp")
+            if xslp is not None:
+                bathy["x0"] = xslp
         else:
-            pop('SLP'); pop('Xslp')
+            pop("SLP")
+            pop("Xslp")
 
-    geo['bathymetry'] = bathy
-    out['grid'] = geo
+    geo["bathymetry"] = bathy
+    out["grid"] = geo
 
     # ---- simulation --------------------------------------------------------
     sim: dict = {}
-    title = pop_str('TITLE')
-    if title is not None: sim['title'] = title
-    tt = pop_val('TOTAL_TIME')
-    if tt is not None: sim['total_time'] = tt
-    ts = pop_val('PLOT_START_TIME')
-    if ts is not None: sim['t_start'] = ts
-    pi = pop_val('PLOT_INTV')
-    if pi is not None: sim['output_interval'] = pi
-    si = pop_val('SCREEN_INTV')
-    if si is not None: sim['screen_interval'] = si
-    pis = pop_val('PLOT_INTV_STATION')
-    if pis is not None: sim['plot_intv_station'] = pis
-    sob = pop_val('StationOutputBuffer')
-    if sob is not None: sim['station_output_buffer'] = sob
+    title = pop_str("TITLE")
+    if title is not None:
+        sim["title"] = title
+    tt = pop_val("TOTAL_TIME")
+    if tt is not None:
+        sim["total_time"] = tt
+    ts = pop_val("PLOT_START_TIME")
+    if ts is not None:
+        sim["t_start"] = ts
+    pi = pop_val("PLOT_INTV")
+    if pi is not None:
+        sim["output_interval"] = pi
+    si = pop_val("SCREEN_INTV")
+    if si is not None:
+        sim["screen_interval"] = si
+    pis = pop_val("PLOT_INTV_STATION")
+    if pis is not None:
+        sim["plot_intv_station"] = pis
+    sob = pop_val("StationOutputBuffer")
+    if sob is not None:
+        sim["station_output_buffer"] = sob
 
-    dt_fixed = pop_val('DT_fixed')  # legacy key: non-zero value implies fixed dt
+    dt_fixed = pop_val("DT_fixed")  # legacy key: non-zero value implies fixed dt
     if dt_fixed is not None and dt_fixed != 0.0:
-        sim['time_stepping'] = {'fixed_dt': True, 'dt': dt_fixed}
+        sim["time_stepping"] = {"fixed_dt": True, "dt": dt_fixed}
 
-    out['simulation'] = sim
+    out["simulation"] = sim
 
     # ---- hot_start ---------------------------------------------------------
-    ini = pop_bool('INI_UVZ')
+    ini = pop_bool("INI_UVZ")
     if ini:
         hs: dict = {}
-        hs['eta_file']   = pop_str('ETA_FILE',  '')
-        hs['u_file']     = pop_str('U_FILE',    '')
-        hs['v_file']     = pop_str('V_FILE',    '')
-        mf = pop_str('MASK_FILE')
-        if mf: hs['mask_file'] = mf
-        hst = pop_val('HotStartTime')
-        if hst is not None: hs['time'] = hst
-        bd = pop_bool('BED_DEFORMATION')
-        if 'BED_DEFORMATION' in params: hs['bed_deformation'] = bd
-        rn = pop_val('HOT_START_RES_NUM')
-        if rn is not None: hs['output_start_number'] = rn
-        out['hot_start'] = hs
+        hs["eta_file"] = pop_str("ETA_FILE", "")
+        hs["u_file"] = pop_str("U_FILE", "")
+        hs["v_file"] = pop_str("V_FILE", "")
+        mf = pop_str("MASK_FILE")
+        if mf:
+            hs["mask_file"] = mf
+        hst = pop_val("HotStartTime")
+        if hst is not None:
+            hs["time"] = hst
+        bd = pop_bool("BED_DEFORMATION")
+        if "BED_DEFORMATION" in params:
+            hs["bed_deformation"] = bd
+        rn = pop_val("HOT_START_RES_NUM")
+        if rn is not None:
+            hs["output_start_number"] = rn
+        out["hot_start"] = hs
     else:
-        for k in ('ETA_FILE', 'U_FILE', 'V_FILE', 'MASK_FILE',
-                  'HotStartTime', 'BED_DEFORMATION', 'HOT_START_RES_NUM'):
+        for k in ("ETA_FILE", "U_FILE", "V_FILE", "MASK_FILE", "HotStartTime", "BED_DEFORMATION", "HOT_START_RES_NUM"):
             pop(k)
 
     # ---- wavemaker / initial -------------------------------------------------
     # Initial-condition types (INI_*/N_WAVE) moved to the initial: section.
-    wm_type = pop_str('WAVEMAKER', 'NONE')
-    if wm_type in ('INI_SOL', 'INI_SOLITARY'):
+    wm_type = pop_str("WAVEMAKER", "NONE")
+    if wm_type in ("INI_SOL", "INI_SOLITARY"):
         sol: dict = {}
-        for k, yk in (('AMP', 'amplitude'), ('DEP', 'depth'),
-                      ('XWAVEMAKER', 'x_center')):
+        for k, yk in (("AMP", "amplitude"), ("DEP", "depth"), ("XWAVEMAKER", "x_center")):
             v = pop_val(k)
-            if v is not None: sol[yk] = v
-        if not pop_bool('SolitaryPositiveDirection', True):
-            sol['direction'] = '-x'
-        out.setdefault('initial', {})['solitary'] = sol
-        wm_type = 'NONE'
-    elif wm_type == 'INI_SINE':
+            if v is not None:
+                sol[yk] = v
+        if not pop_bool("SolitaryPositiveDirection", True):
+            sol["direction"] = "-x"
+        out.setdefault("initial", {})["solitary"] = sol
+        wm_type = "NONE"
+    elif wm_type == "INI_SINE":
         sine: dict = {}
-        for k, yk in (('AMP', 'amplitude'), ('DEP', 'depth'),
-                      ('mode_x', 'mode_x'), ('mode_y', 'mode_y')):
+        for k, yk in (("AMP", "amplitude"), ("DEP", "depth"), ("mode_x", "mode_x"), ("mode_y", "mode_y")):
             v = pop_val(k)
-            if v is not None: sine[yk] = v
-        out.setdefault('initial', {})['sine_mode'] = sine
-        wm_type = 'NONE'
-    elif wm_type in ('INI_REC', 'INI_Gau', 'INI_GAU', 'INI_DIP', 'N_WAVE'):
+            if v is not None:
+                sine[yk] = v
+        out.setdefault("initial", {})["sine_mode"] = sine
+        wm_type = "NONE"
+    elif wm_type in ("INI_REC", "INI_Gau", "INI_GAU", "INI_DIP", "N_WAVE"):
         # pending in the modern engine (hump/n_wave blocks gate at init);
         # emit the block anyway so the gate fires loudly instead of the
         # keys vanishing into the unknown-key comment block
-        shape = {'INI_REC': 'rect', 'INI_DIP': 'dipole'}.get(wm_type, 'gaussian')
-        if wm_type == 'N_WAVE':
+        shape = {"INI_REC": "rect", "INI_DIP": "dipole"}.get(wm_type, "gaussian")
+        if wm_type == "N_WAVE":
             nw: dict = {}
-            for k, yk in (('x1_Nwave', 'x1'), ('x2_Nwave', 'x2'),
-                          ('a0_Nwave', 'a0'), ('gamma_Nwave', 'gamma'),
-                          ('dep_Nwave', 'depth')):
+            for k, yk in (
+                ("x1_Nwave", "x1"),
+                ("x2_Nwave", "x2"),
+                ("a0_Nwave", "a0"),
+                ("gamma_Nwave", "gamma"),
+                ("dep_Nwave", "depth"),
+            ):
                 v = pop_val(k)
-                if v is not None: nw[yk] = v
-            out.setdefault('initial', {})['n_wave'] = nw
+                if v is not None:
+                    nw[yk] = v
+            out.setdefault("initial", {})["n_wave"] = nw
         else:
-            hp: dict = {'shape': shape}
-            for k, yk in (('AMP', 'amplitude'), ('Xc', 'x_center'),
-                          ('Yc', 'y_center'), ('WID', 'width'),
-                          ('GauRadius', 'radius')):
+            hp: dict = {"shape": shape}
+            for k, yk in (("AMP", "amplitude"), ("Xc", "x_center"), ("Yc", "y_center"), ("WID", "width"), ("GauRadius", "radius")):
                 v = pop_val(k)
-                if v is not None: hp[yk] = v
-            out.setdefault('initial', {})['hump'] = hp
-        wm_type = 'NONE'
-    if wm_type.upper() not in ('NONE', 'NOTHING'):
+                if v is not None:
+                    hp[yk] = v
+            out.setdefault("initial", {})["hump"] = hp
+        wm_type = "NONE"
+    if wm_type.upper() not in ("NONE", "NOTHING"):
         wm = _convert_wavemaker(wm_type, pop_val)
         if wm is not None:
-            out['wavemaker'] = wm
+            out["wavemaker"] = wm
 
     # ---- sponge -> boundaries face blocks (config reorg rung 2) -------------
     # Legacy global coefficients replicate onto every face with width > 0;
     # a type sub-block is present iff its legacy flag was T.
-    ds = pop_bool('DIFFUSION_SPONGE')
-    di = pop_bool('DIRECT_SPONGE')
-    fs = pop_bool('FRICTION_SPONGE')
-    widths = {f: pop_val(f'Sponge_{f}_width')
-              for f in ('west', 'east', 'south', 'north')}
-    r_sp, a_sp = pop_val('R_sponge'), pop_val('A_sponge')
-    cd_sp, nu_sp = pop_val('CDsponge'), pop_val('Csp')
+    ds = pop_bool("DIFFUSION_SPONGE")
+    di = pop_bool("DIRECT_SPONGE")
+    fs = pop_bool("FRICTION_SPONGE")
+    widths = {f: pop_val(f"Sponge_{f}_width") for f in ("west", "east", "south", "north")}
+    r_sp, a_sp = pop_val("R_sponge"), pop_val("A_sponge")
+    cd_sp, nu_sp = pop_val("CDsponge"), pop_val("Csp")
     if ds or di or fs:
         for f, w in widths.items():
-            if w is None or str(w) in ('0', '0.0'): continue
+            if w is None or str(w) in ("0", "0.0"):
+                continue
             # always emit the coefficients (legacy io.F defaults as fallback)
             # -- a bare empty sub-block dumps as YAML null and would read as
             # absent, silently dropping the sponge type
-            sp: dict = {'width': w}
+            sp: dict = {"width": w}
             if di:
-                sp['direct'] = {'r': r_sp or '0.85', 'a': a_sp or '5.0'}
+                sp["direct"] = {"r": r_sp or "0.85", "a": a_sp or "5.0"}
             if fs:
-                sp['friction'] = {'cd': cd_sp or '0.0'}
+                sp["friction"] = {"cd": cd_sp or "0.0"}
             if ds:
-                sp['diffusion'] = {'nu': nu_sp or '0.1'}
-            out.setdefault('boundaries', {})[f] = {'sponge': sp}
+                sp["diffusion"] = {"nu": nu_sp or "0.1"}
+            out.setdefault("boundaries", {})[f] = {"sponge": sp}
 
     # ---- obstacle / breakwater ---------------------------------------------
-    obs = pop_bool('OBSTACLE')
-    bw  = pop_bool('BREAKWATER')
+    obs = pop_bool("OBSTACLE")
+    bw = pop_bool("BREAKWATER")
     if obs or bw:
         ob: dict = {}
-        of = pop_str('OBSTACLE_FILE')
-        bf = pop_str('BREAKWATER_FILE')
-        ba = pop_val('BreakWaterAbsorbCoef')
-        if of: ob['obstacle_file'] = of
-        if bf: ob['breakwater_file'] = bf
-        if ba is not None: ob['BreakWaterAbsorbCoef'] = ba
-        out['obstacle'] = ob
+        of = pop_str("OBSTACLE_FILE")
+        bf = pop_str("BREAKWATER_FILE")
+        ba = pop_val("BreakWaterAbsorbCoef")
+        if of:
+            ob["obstacle_file"] = of
+        if bf:
+            ob["breakwater_file"] = bf
+        if ba is not None:
+            ob["BreakWaterAbsorbCoef"] = ba
+        out["obstacle"] = ob
     else:
-        for k in ('OBSTACLE_FILE', 'BREAKWATER_FILE', 'BreakWaterAbsorbCoef'):
+        for k in ("OBSTACLE_FILE", "BREAKWATER_FILE", "BreakWaterAbsorbCoef"):
             pop(k)
 
     # ---- friction ----------------------------------------------------------
-    in_cd = pop_bool('IN_Cd')
-    cd    = pop_val('Cd')
-    cd_file = pop_str('CD_FILE')
+    in_cd = pop_bool("IN_Cd")
+    cd = pop_val("Cd")
+    cd_file = pop_str("CD_FILE")
     if in_cd or cd not in (None, 0, 0.0) or cd_file:
         fr: dict = {}
-        if in_cd:               fr['friction_matrix'] = True
-        if cd   is not None:    fr['Cd_fixed'] = cd
-        if cd_file:             fr['cd_file']  = cd_file
-        out['friction'] = fr
+        if in_cd:
+            fr["friction_matrix"] = True
+        if cd is not None:
+            fr["Cd_fixed"] = cd
+        if cd_file:
+            fr["cd_file"] = cd_file
+        out["friction"] = fr
 
     # ---- physics / boundaries / initial --------------------------------------
     # C_smg intentionally not consumed (Smagorinsky was amputated upstream);
     # it falls through to the unknown-key comment block.
-    if pop_bool('PERIODIC'):
-        out.setdefault('boundaries', {})['periodic'] = ['y']
-    wl = pop_val('WATER_LEVEL')
+    if pop_bool("PERIODIC"):
+        out.setdefault("boundaries", {})["periodic"] = ["y"]
+    wl = pop_val("WATER_LEVEL")
     if wl is not None:
-        out['initial'] = {'water_level': wl}
+        out["initial"] = {"water_level": wl}
 
     disp: dict = {}
-    if not pop_bool('DISPERSION', True):
-        disp['scheme'] = 'nswe'
-    for k, yk in (('Gamma1', 'gamma1'), ('Gamma2', 'gamma2'),
-                  ('Gamma3', 'gamma3'), ('Beta_ref', 'beta_ref'),
-                  ('SWE_ETA_DEP', 'swe_eta_dep')):
+    if not pop_bool("DISPERSION", True):
+        disp["scheme"] = "nswe"
+    for k, yk in (
+        ("Gamma1", "gamma1"),
+        ("Gamma2", "gamma2"),
+        ("Gamma3", "gamma3"),
+        ("Beta_ref", "beta_ref"),
+        ("SWE_ETA_DEP", "swe_eta_dep"),
+    ):
         v = pop_val(k)
-        if v is not None: disp[yk] = v
+        if v is not None:
+            disp[yk] = v
     if disp:
-        out['physics'] = {'dispersion': disp}
+        out["physics"] = {"dispersion": disp}
 
     # ---- numerics ----------------------------------------------------------
     # Time_Scheme dropped: the modern stepper is RK3-only (falls through to
     # the unknown-key comment block if present).
     nu: dict = {}
-    for k, yk in (('CONSTRUCTION', 'flux_solver'),
-                  ('HIGH_ORDER', 'reconstruction')):
+    for k, yk in (("CONSTRUCTION", "flux_solver"), ("HIGH_ORDER", "reconstruction")):
         v = pop_str(k)
-        if v is not None: nu[yk] = v.lower()
-    for k, yk in (('CFL', 'cfl'), ('FroudeCap', 'froude_cap')):
+        if v is not None:
+            nu[yk] = v.lower()
+    for k, yk in (("CFL", "cfl"), ("FroudeCap", "froude_cap")):
         v = pop_val(k)
-        if v is not None: nu[yk] = v
+        if v is not None:
+            nu[yk] = v
     # legacy folded the MinDepth/MinDepthFrc pair to their minimum (old io.F)
-    md = pop_val('MinDepth'); mdf = pop_val('MinDepthFrc')
+    md = pop_val("MinDepth")
+    mdf = pop_val("MinDepthFrc")
     floors = [v for v in (md, mdf) if v is not None]
-    if floors: nu['min_depth'] = min(floors)
+    if floors:
+        nu["min_depth"] = min(floors)
     if nu:
-        out['numerics'] = nu
+        out["numerics"] = nu
 
     # ---- breaking ----------------------------------------------------------
     br: dict = {}
     # nee VISCOSITY_BREAKING (T -> eddy_viscosity, default; F -> shock_capturing)
-    if not pop_bool('VISCOSITY_BREAKING', True):
-        br['model'] = 'shock_capturing'
-    roller = pop_bool('ROLLER')
-    if roller: br['roller'] = True
-    sb = pop_bool('SHOW_BREAKING', True)
-    if not sb: br['show_breaking'] = False
-    for k, yk in (('Cbrk1', 'Cbrk1'), ('Cbrk2', 'Cbrk2'),
-                  ('WAVEMAKER_Cbrk', 'WAVEMAKER_Cbrk'),
-                  ('visbrk', 'visbrk'), ('WAVEMAKER_visbrk', 'WAVEMAKER_visbrk'),
-                  ('nu_bkg', 'nu_bkg')):
+    if not pop_bool("VISCOSITY_BREAKING", True):
+        br["model"] = "shock_capturing"
+    roller = pop_bool("ROLLER")
+    if roller:
+        br["roller"] = True
+    sb = pop_bool("SHOW_BREAKING", True)
+    if not sb:
+        br["show_breaking"] = False
+    for k, yk in (
+        ("Cbrk1", "Cbrk1"),
+        ("Cbrk2", "Cbrk2"),
+        ("WAVEMAKER_Cbrk", "WAVEMAKER_Cbrk"),
+        ("visbrk", "visbrk"),
+        ("WAVEMAKER_visbrk", "WAVEMAKER_visbrk"),
+        ("nu_bkg", "nu_bkg"),
+    ):
         v = pop_val(k)
-        if v is not None: br[yk] = v
-    wvis = pop_bool('WAVEMAKER_VIS')
-    if wvis: br['WAVEMAKER_VIS'] = True
+        if v is not None:
+            br[yk] = v
+    wvis = pop_bool("WAVEMAKER_VIS")
+    if wvis:
+        br["WAVEMAKER_VIS"] = True
     if br:
-        out['breaking'] = br
+        out["breaking"] = br
 
     # ---- output ------------------------------------------------------------
     op: dict = {}
-    rf = pop_str('RESULT_FOLDER')
-    if rf: op['result_folder'] = rf
-    fio = pop_str('FIELD_IO_TYPE')
-    if fio: op['field_io_type'] = fio
-    ns = pop_val('NumberStations')
-    if ns is not None: op['number_stations'] = ns
-    sf = pop_str('STATIONS_FILE')
-    if sf: op['stations_file'] = sf
-    ores = pop_val('OUTPUT_RES')
-    if ores is not None: op['output_res'] = ores
-    ebv = pop_val('EtaBlowVal')
-    if ebv is not None: op['EtaBlowVal'] = ebv
-    ti = pop_val('T_INTV_mean')
-    if ti is not None: op['T_INTV_mean'] = ti
-    st = pop_val('STEADY_TIME')
-    if st is not None: op['STEADY_TIME'] = st
+    rf = pop_str("RESULT_FOLDER")
+    if rf:
+        op["result_folder"] = rf
+    fio = pop_str("FIELD_IO_TYPE")
+    if fio:
+        op["field_io_type"] = fio
+    ns = pop_val("NumberStations")
+    if ns is not None:
+        op["number_stations"] = ns
+    sf = pop_str("STATIONS_FILE")
+    if sf:
+        op["stations_file"] = sf
+    ores = pop_val("OUTPUT_RES")
+    if ores is not None:
+        op["output_res"] = ores
+    ebv = pop_val("EtaBlowVal")
+    if ebv is not None:
+        op["EtaBlowVal"] = ebv
+    ti = pop_val("T_INTV_mean")
+    if ti is not None:
+        op["T_INTV_mean"] = ti
+    st = pop_val("STEADY_TIME")
+    if st is not None:
+        op["STEADY_TIME"] = st
 
     # first-arrival map (nee numerics OUT_Time/ArrTimeMin); min_height is
     # always written so the block never serialises as a bare null key
-    if _bool(pop('OUT_Time') or 'F'):
-        atm = pop_val('ArrTimeMin')
-        op['arrival_time'] = {'min_height': atm if atm is not None else 0.001}
+    if _bool(pop("OUT_Time") or "F"):
+        atm = pop_val("ArrTimeMin")
+        op["arrival_time"] = {"min_height": atm if atm is not None else 0.001}
     else:
-        pop('ArrTimeMin')
+        pop("ArrTimeMin")
 
     # depth_out — static field, separate from variables list
-    depth_out = pop_bool('DEPTH_OUT')
+    depth_out = pop_bool("DEPTH_OUT")
     if depth_out:
-        op['depth_out'] = True
+        op["depth_out"] = True
 
     # OUT_* flags → variables list
     variables: list[str] = []
@@ -580,58 +729,66 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             # here we only add to variables if the output flag is true.
             variables.append(new_name)
     if variables:
-        op['variables'] = variables
+        op["variables"] = variables
 
     if op:
-        out['output'] = op
+        out["output"] = op
 
     # ---- coupling ----------------------------------------------------------
-    cf = pop_str('COUPLING_FILE')
+    cf = pop_str("COUPLING_FILE")
     if cf:
-        out['coupling'] = {'coupling_file': cf}
+        out["coupling"] = {"coupling_file": cf}
 
     # ---- meteo (atmospheric forcing) ---------------------------------------
     # a: MeteoGausian, b: WindConstantField.  Legacy key names are preserved
     # verbatim so existing input decks round-trip the same identifiers.
     mt: dict = {}
-    mg = pop_bool('MeteoGausian')
+    mg = pop_bool("MeteoGausian")
     if mg:
-        mt['MeteoGausian'] = True
-        gf = pop_str('METEO_GAUSIAN_FILE')
-        if gf: mt['METEO_GAUSIAN_FILE'] = gf
-    wcf = pop_bool('WindConstantField')
+        mt["MeteoGausian"] = True
+        gf = pop_str("METEO_GAUSIAN_FILE")
+        if gf:
+            mt["METEO_GAUSIAN_FILE"] = gf
+    wcf = pop_bool("WindConstantField")
     if wcf:
-        mt['WindConstantField'] = True
-        cwf = pop_str('CONSTANT_WIND_FILE')
-        if cwf: mt['CONSTANT_WIND_FILE'] = cwf
-    whm = pop_bool('WindHollandModel')
+        mt["WindConstantField"] = True
+        cwf = pop_str("CONSTANT_WIND_FILE")
+        if cwf:
+            mt["CONSTANT_WIND_FILE"] = cwf
+    whm = pop_bool("WindHollandModel")
     if whm:
-        mt['WindHollandModel'] = True
-        sf = pop_str('STORM_FILE')
-        if sf: mt['STORM_FILE'] = sf
-    sm = pop_bool('SlideModel')
+        mt["WindHollandModel"] = True
+        sf = pop_str("STORM_FILE")
+        if sf:
+            mt["STORM_FILE"] = sf
+    sm = pop_bool("SlideModel")
     if sm:
-        mt['SlideModel'] = True
-        slf = pop_str('SLIDE_FILE')
-        if slf: mt['SLIDE_FILE'] = slf
+        mt["SlideModel"] = True
+        slf = pop_str("SLIDE_FILE")
+        if slf:
+            mt["SLIDE_FILE"] = slf
     if mg or wcf or whm:
         # shared wind/pressure knobs (only meaningful when a model is on)
-        for key, caster in (('WindForce', _bool), ('AirPressure', _bool),
-                            ('WindWaveInteraction', _bool), ('Cdw', _auto),
-                            ('WindCrestPercent', _auto)):
+        for key, caster in (
+            ("WindForce", _bool),
+            ("AirPressure", _bool),
+            ("WindWaveInteraction", _bool),
+            ("Cdw", _auto),
+            ("WindCrestPercent", _auto),
+        ):
             v = pop(key)
             if v is not None:
                 mt[key] = caster(v)
-    om = pop('OUT_METEO')
+    om = pop("OUT_METEO")
     if om is not None:
-        mt['OUT_METEO'] = _bool(om)
+        mt["OUT_METEO"] = _bool(om)
     if mt:
-        out['meteo'] = mt
+        out["meteo"] = mt
 
     # ---- collect unknown keys ----------------------------------------------
     for k in params:
         if k not in consumed:
-            unknown.append(f'{k} = {params[k]}')
+            unknown.append(f"{k} = {params[k]}")
 
     return out, unknown
 
@@ -640,24 +797,26 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
 # YAML serialiser (no external ruamel dependency — hand-rolled for readability)
 # ---------------------------------------------------------------------------
 
+
 def _yaml_value(v) -> str:
     if isinstance(v, bool):
-        return 'true' if v else 'false'
+        return "true" if v else "false"
     if isinstance(v, list):
-        return '[' + ', '.join(str(i) for i in v) + ']'
-    if isinstance(v, str) and (' ' in v or ':' in v or not v):
+        return "[" + ", ".join(str(i) for i in v) + "]"
+    if isinstance(v, str) and (" " in v or ":" in v or not v):
         return f'"{v}"'
     return str(v)
 
+
 def _dump_yaml(d: dict, indent: int = 0) -> list[str]:
     lines: list[str] = []
-    pad = '  ' * indent
+    pad = "  " * indent
     for k, v in d.items():
         if isinstance(v, dict):
-            lines.append(f'{pad}{k}:')
+            lines.append(f"{pad}{k}:")
             lines.extend(_dump_yaml(v, indent + 1))
         else:
-            lines.append(f'{pad}{k}: {_yaml_value(v)}')
+            lines.append(f"{pad}{k}: {_yaml_value(v)}")
     return lines
 
 
@@ -665,13 +824,14 @@ def _dump_yaml(d: dict, indent: int = 0) -> list[str]:
 # CLI
 # ---------------------------------------------------------------------------
 
+
 def _convert_3d(src: Path, dst_yaml: Path) -> None:
     """Full 3-D conversion: map legacy input.txt keys to 3D YAML schema.
 
     Copies src → input.txt so the legacy ref binary (vendor/3d-fd) can still
     find it when preprocess_ref: true.  The dev binary reads only the YAML.
     """
-    shutil.copy2(src, 'input.txt')
+    shutil.copy2(src, "input.txt")
     params = parse_input_txt(src)
 
     def pop(key, default=None):
@@ -691,262 +851,343 @@ def _convert_3d(src: Path, dst_yaml: Path) -> None:
     out: dict = {}
 
     # ---- geometry ------------------------------------------------------------
-    nx = pop_val('Mglob', 0)
-    ny = pop_val('Nglob', 0)
-    nz = pop_val('Kglob', 0)
-    dx = pop_val('DX', 1.0)
-    dy = pop_val('DY', 1.0)
+    nx = pop_val("Mglob", 0)
+    ny = pop_val("Nglob", 0)
+    nz = pop_val("Kglob", 0)
+    dx = pop_val("DX", 1.0)
+    dy = pop_val("DY", 1.0)
 
     geo: dict = {
-        'grid_size': [nx, ny, nz],
-        'cell_size': [dx, dy],
+        "grid_size": [nx, ny, nz],
+        "cell_size": [dx, dy],
     }
-    ivgrd = pop_val('IVGRD', 1)
+    ivgrd = pop_val("IVGRD", 1)
     if ivgrd != 1:
-        geo['ivgrd'] = ivgrd
-    grd_r = pop_val('GRD_R')
+        geo["ivgrd"] = ivgrd
+    grd_r = pop_val("GRD_R")
     if grd_r is not None:
-        geo['grd_r'] = grd_r
+        geo["grd_r"] = grd_r
 
-    px = pop_val('PX'); py = pop_val('PY')
+    px = pop_val("PX")
+    py = pop_val("PY")
     if px is not None or py is not None:
         decomp: dict = {}
-        if px is not None: decomp['nx_proc'] = px
-        if py is not None: decomp['ny_proc'] = py
-        geo['decomposition'] = decomp
+        if px is not None:
+            decomp["nx_proc"] = px
+        if py is not None:
+            decomp["ny_proc"] = py
+        geo["decomposition"] = decomp
 
-    depth_type = pop_str('DEPTH_TYPE', 'CELL_CENTER')
-    ana_bathy  = pop_bool('ANA_BATHY', False)
-    depth_file = pop_str('DEPTH_FILE')
-    bathy: dict = {'type': depth_type, 'analytic': ana_bathy}
+    depth_type = pop_str("DEPTH_TYPE", "CELL_CENTER")
+    ana_bathy = pop_bool("ANA_BATHY", False)
+    depth_file = pop_str("DEPTH_FILE")
+    bathy: dict = {"type": depth_type, "analytic": ana_bathy}
     if depth_file:
-        bathy['file'] = depth_file
-    geo['bathymetry'] = bathy
+        bathy["file"] = depth_file
+    geo["bathymetry"] = bathy
 
-    ibot = pop_val('Ibot'); cd0 = pop_val('Cd0'); zob = pop_val('Zob')
-    min_dep = pop_val('MinDep')
+    ibot = pop_val("Ibot")
+    cd0 = pop_val("Cd0")
+    zob = pop_val("Zob")
+    min_dep = pop_val("MinDep")
     bot: dict = {}
-    if ibot is not None: bot['roughness_type'] = ibot
-    if cd0  is not None: bot['cd']             = cd0
-    if zob  is not None: bot['zob']            = zob
-    if min_dep is not None: bot['min_depth']   = min_dep
+    if ibot is not None:
+        bot["roughness_type"] = ibot
+    if cd0 is not None:
+        bot["cd"] = cd0
+    if zob is not None:
+        bot["zob"] = zob
+    if min_dep is not None:
+        bot["min_depth"] = min_dep
     if bot:
-        geo['bottom'] = bot
+        geo["bottom"] = bot
 
-    out['geometry'] = geo
+    out["geometry"] = geo
 
     # ---- simulation ----------------------------------------------------------
     sim: dict = {}
-    total_time  = pop_val('TOTAL_TIME')
-    sim_steps   = pop_val('SIM_STEPS')
-    plot_start  = pop_val('PLOT_START')
-    plot_intv   = pop_val('PLOT_INTV')
-    screen_intv = pop_val('SCREEN_INTV')
-    cfl         = pop_val('CFL')
-    if total_time  is not None: sim['total_time']  = total_time
-    if sim_steps   is not None: sim['sim_steps']   = sim_steps
-    if plot_start  is not None: sim['plot_start']  = plot_start
-    if plot_intv   is not None: sim['plot_intv']   = plot_intv
-    if screen_intv is not None: sim['screen_intv'] = screen_intv
-    if cfl         is not None: sim['cfl']         = cfl
+    total_time = pop_val("TOTAL_TIME")
+    sim_steps = pop_val("SIM_STEPS")
+    plot_start = pop_val("PLOT_START")
+    plot_intv = pop_val("PLOT_INTV")
+    screen_intv = pop_val("SCREEN_INTV")
+    cfl = pop_val("CFL")
+    if total_time is not None:
+        sim["total_time"] = total_time
+    if sim_steps is not None:
+        sim["sim_steps"] = sim_steps
+    if plot_start is not None:
+        sim["plot_start"] = plot_start
+    if plot_intv is not None:
+        sim["plot_intv"] = plot_intv
+    if screen_intv is not None:
+        sim["screen_intv"] = screen_intv
+    if cfl is not None:
+        sim["cfl"] = cfl
 
-    dt_ini = pop_val('DT_INI'); dt_min = pop_val('DT_MIN'); dt_max = pop_val('DT_MAX')
+    dt_ini = pop_val("DT_INI")
+    dt_min = pop_val("DT_MIN")
+    dt_max = pop_val("DT_MAX")
     if any(v is not None for v in (dt_ini, dt_min, dt_max)):
         ts: dict = {}
-        if dt_ini is not None: ts['dt_ini'] = dt_ini
-        if dt_min is not None: ts['dt_min'] = dt_min
-        if dt_max is not None: ts['dt_max'] = dt_max
-        sim['time_stepping'] = ts
+        if dt_ini is not None:
+            ts["dt_ini"] = dt_ini
+        if dt_min is not None:
+            ts["dt_min"] = dt_min
+        if dt_max is not None:
+            ts["dt_max"] = dt_max
+        sim["time_stepping"] = ts
 
-    nstat         = pop_val('NSTAT', 0)
-    plot_intv_stat = pop_val('PLOT_INTV_STAT')
-    stations_file = pop_str('STATIONS_FILE')
+    nstat = pop_val("NSTAT", 0)
+    plot_intv_stat = pop_val("PLOT_INTV_STAT")
+    stations_file = pop_str("STATIONS_FILE")
     if nstat or plot_intv_stat or stations_file:
-        stat: dict = {'count': nstat or 0}
-        if plot_intv_stat is not None: stat['interval'] = plot_intv_stat
-        if stations_file:              stat['file']     = stations_file
-        sim['stations'] = stat
+        stat: dict = {"count": nstat or 0}
+        if plot_intv_stat is not None:
+            stat["interval"] = plot_intv_stat
+        if stations_file:
+            stat["file"] = stations_file
+        sim["stations"] = stat
 
     if sim:
-        out['simulation'] = sim
+        out["simulation"] = sim
 
     # ---- physics -------------------------------------------------------------
     phys: dict = {}
-    barotropic = pop_bool('BAROTROPIC', True)
-    non_hydro  = pop_bool('NON_HYDRO',  False)
-    high_order = pop_str('HIGH_ORDER')
-    time_order = pop_str('TIME_ORDER')
-    convection = pop_str('CONVECTION')
-    adv_hllc   = pop_bool('HLLC', False)
-    tramp      = pop_val('TRAMP')
-    periodic_x = pop_bool('PERIODIC_X', False)
-    periodic_y = pop_bool('PERIODIC_Y', False)
-    ext_force  = pop_bool('EXTERNAL_FORCING', False)
-    froude_cap = pop_val('FROUDE_CAP')
+    barotropic = pop_bool("BAROTROPIC", True)
+    non_hydro = pop_bool("NON_HYDRO", False)
+    high_order = pop_str("HIGH_ORDER")
+    time_order = pop_str("TIME_ORDER")
+    convection = pop_str("CONVECTION")
+    adv_hllc = pop_bool("HLLC", False)
+    tramp = pop_val("TRAMP")
+    periodic_x = pop_bool("PERIODIC_X", False)
+    periodic_y = pop_bool("PERIODIC_Y", False)
+    ext_force = pop_bool("EXTERNAL_FORCING", False)
+    froude_cap = pop_val("FROUDE_CAP")
 
-    phys['barotropic'] = barotropic
-    phys['non_hydro']  = non_hydro
-    if high_order: phys['high_order'] = high_order
-    if time_order: phys['time_order'] = time_order
-    if convection: phys['convection'] = convection
-    if adv_hllc:   phys['adv_hllc']  = adv_hllc
-    if tramp:      phys['tramp']     = tramp
-    if periodic_x: phys['periodic_x'] = periodic_x
-    if periodic_y: phys['periodic_y'] = periodic_y
-    if ext_force:  phys['external_forcing'] = ext_force
-    if froude_cap is not None: phys['froude_cap'] = froude_cap
+    phys["barotropic"] = barotropic
+    phys["non_hydro"] = non_hydro
+    if high_order:
+        phys["high_order"] = high_order
+    if time_order:
+        phys["time_order"] = time_order
+    if convection:
+        phys["convection"] = convection
+    if adv_hllc:
+        phys["adv_hllc"] = adv_hllc
+    if tramp:
+        phys["tramp"] = tramp
+    if periodic_x:
+        phys["periodic_x"] = periodic_x
+    if periodic_y:
+        phys["periodic_y"] = periodic_y
+    if ext_force:
+        phys["external_forcing"] = ext_force
+    if froude_cap is not None:
+        phys["froude_cap"] = froude_cap
 
-    wave_avg_on    = pop_bool('WAVE_AVERAGE_ON', False)
-    wave_avg_start = pop_val('WAVE_AVERAGE_START')
-    wave_avg_end   = pop_val('WAVE_AVERAGE_END')
-    waveheight_id  = pop_val('WaveheightID')
+    wave_avg_on = pop_bool("WAVE_AVERAGE_ON", False)
+    wave_avg_start = pop_val("WAVE_AVERAGE_START")
+    wave_avg_end = pop_val("WAVE_AVERAGE_END")
+    waveheight_id = pop_val("WaveheightID")
     if wave_avg_on or wave_avg_start or wave_avg_end or waveheight_id:
-        wa: dict = {'active': wave_avg_on}
-        if wave_avg_start is not None: wa['t_start']   = wave_avg_start
-        if wave_avg_end   is not None: wa['t_end']     = wave_avg_end
-        if waveheight_id  is not None: wa['height_id'] = waveheight_id
-        phys['wave_average'] = wa
+        wa: dict = {"active": wave_avg_on}
+        if wave_avg_start is not None:
+            wa["t_start"] = wave_avg_start
+        if wave_avg_end is not None:
+            wa["t_end"] = wave_avg_end
+        if waveheight_id is not None:
+            wa["height_id"] = waveheight_id
+        phys["wave_average"] = wa
 
     if phys:
-        out['physics'] = phys
+        out["physics"] = phys
 
     # ---- turbulence ----------------------------------------------------------
     turb: dict = {}
-    viscous_flow   = pop_bool('VISCOUS_FLOW', False)
-    ivturb         = pop_val('IVTURB')
-    ihturb         = pop_val('IHTURB')
-    viscosity      = pop_val('VISCOSITY')
-    schmidt        = pop_val('Schmidt')
-    cvs            = pop_val('Cvs')
-    chs            = pop_val('Chs')
-    viscous_number = pop_val('VISCOUS_NUMBER')
-    if viscous_flow:   turb['viscous_flow']   = viscous_flow
-    if ivturb is not None: turb['ivturb']    = ivturb
-    if ihturb is not None: turb['ihturb']    = ihturb
-    if viscosity  is not None: turb['visc']          = viscosity
-    if schmidt    is not None: turb['schmidt']        = schmidt
-    if cvs        is not None: turb['cvs']            = cvs
-    if chs        is not None: turb['chs']            = chs
-    if viscous_number is not None: turb['viscous_number'] = viscous_number
+    viscous_flow = pop_bool("VISCOUS_FLOW", False)
+    ivturb = pop_val("IVTURB")
+    ihturb = pop_val("IHTURB")
+    viscosity = pop_val("VISCOSITY")
+    schmidt = pop_val("Schmidt")
+    cvs = pop_val("Cvs")
+    chs = pop_val("Chs")
+    viscous_number = pop_val("VISCOUS_NUMBER")
+    if viscous_flow:
+        turb["viscous_flow"] = viscous_flow
+    if ivturb is not None:
+        turb["ivturb"] = ivturb
+    if ihturb is not None:
+        turb["ihturb"] = ihturb
+    if viscosity is not None:
+        turb["visc"] = viscosity
+    if schmidt is not None:
+        turb["schmidt"] = schmidt
+    if cvs is not None:
+        turb["cvs"] = cvs
+    if chs is not None:
+        turb["chs"] = chs
+    if viscous_number is not None:
+        turb["viscous_number"] = viscous_number
     if turb:
-        out['turbulence'] = turb
+        out["turbulence"] = turb
 
     # ---- solver --------------------------------------------------------------
-    isolver = pop_val('ISOLVER'); itmax = pop_val('ITMAX'); tol = pop_val('TOL')
+    isolver = pop_val("ISOLVER")
+    itmax = pop_val("ITMAX")
+    tol = pop_val("TOL")
     slv: dict = {}
-    if isolver is not None: slv['solver_type'] = isolver
-    if itmax   is not None: slv['max_iter']    = itmax
-    if tol     is not None: slv['tolerance']   = tol
+    if isolver is not None:
+        slv["solver_type"] = isolver
+    if itmax is not None:
+        slv["max_iter"] = itmax
+    if tol is not None:
+        slv["tolerance"] = tol
     if slv:
-        out['solver'] = slv
+        out["solver"] = slv
 
     # ---- wavemaker -----------------------------------------------------------
-    wm_type = pop_str('WAVEMAKER', 'nothing')
-    if wm_type and wm_type.lower() != 'nothing':
-        wm: dict = {'type': wm_type}
+    wm_type = pop_str("WAVEMAKER", "nothing")
+    if wm_type and wm_type.lower() != "nothing":
+        wm: dict = {"type": wm_type}
         for k3d, yml in [
-            ('Wave_Comp_File',     'wave_comp_file'),
-            ('Dep_Ser',            'dep_ser'),
-            ('U_FLOW_LEFT',        'u_flow_left'),
-            ('U_FLOW_RIGHT',       'u_flow_right'),
-            ('AMP',   'amp'), ('PER',   'per'),
-            ('DEP',   'dep'), ('THETA', 'theta'),
-            ('Xsource_West', 'xsource_west'), ('Xsource_East', 'xsource_east'),
-            ('Ysource_Suth', 'ysource_suth'), ('Ysource_Nrth', 'ysource_nrth'),
-            ('Hm0', 'hm0'), ('Tp', 'tp'),
-            ('Freq_Min', 'freq_min'), ('Freq_Max', 'freq_max'),
-            ('NumFreq', 'num_freq'),
+            ("Wave_Comp_File", "wave_comp_file"),
+            ("Dep_Ser", "dep_ser"),
+            ("U_FLOW_LEFT", "u_flow_left"),
+            ("U_FLOW_RIGHT", "u_flow_right"),
+            ("AMP", "amp"),
+            ("PER", "per"),
+            ("DEP", "dep"),
+            ("THETA", "theta"),
+            ("Xsource_West", "xsource_west"),
+            ("Xsource_East", "xsource_east"),
+            ("Ysource_Suth", "ysource_suth"),
+            ("Ysource_Nrth", "ysource_nrth"),
+            ("Hm0", "hm0"),
+            ("Tp", "tp"),
+            ("Freq_Min", "freq_min"),
+            ("Freq_Max", "freq_max"),
+            ("NumFreq", "num_freq"),
         ]:
-            v = pop_val(k3d) if k3d not in ('Wave_Comp_File',) else pop_str(k3d)
+            v = pop_val(k3d) if k3d not in ("Wave_Comp_File",) else pop_str(k3d)
             if v is not None:
                 wm[yml] = v
-        out['wavemaker'] = wm
+        out["wavemaker"] = wm
 
     # ---- boundary conditions -------------------------------------------------
     bc: dict = {}
-    bc_x0 = pop_val('BC_X0'); bc_xn = pop_val('BC_Xn')
-    bc_y0 = pop_val('BC_Y0'); bc_yn = pop_val('BC_Yn')
-    bc_z0 = pop_val('BC_Z0'); bc_zn = pop_val('BC_Zn')
-    if bc_x0 is not None: bc['bc_x0'] = bc_x0
-    if bc_xn is not None: bc['bc_xn'] = bc_xn
-    if bc_y0 is not None: bc['bc_y0'] = bc_y0
-    if bc_yn is not None: bc['bc_yn'] = bc_yn
-    if bc_z0 is not None: bc['bc_z0'] = bc_z0
-    if bc_zn is not None: bc['bc_zn'] = bc_zn
-    boundary_type = pop_str('BOUNDARY')
-    boundary_file = pop_str('BOUNDARY_FILE')
-    if boundary_type: bc['boundary_type'] = boundary_type
-    if boundary_file: bc['boundary_file'] = boundary_file
+    bc_x0 = pop_val("BC_X0")
+    bc_xn = pop_val("BC_Xn")
+    bc_y0 = pop_val("BC_Y0")
+    bc_yn = pop_val("BC_Yn")
+    bc_z0 = pop_val("BC_Z0")
+    bc_zn = pop_val("BC_Zn")
+    if bc_x0 is not None:
+        bc["bc_x0"] = bc_x0
+    if bc_xn is not None:
+        bc["bc_xn"] = bc_xn
+    if bc_y0 is not None:
+        bc["bc_y0"] = bc_y0
+    if bc_yn is not None:
+        bc["bc_yn"] = bc_yn
+    if bc_z0 is not None:
+        bc["bc_z0"] = bc_z0
+    if bc_zn is not None:
+        bc["bc_zn"] = bc_zn
+    boundary_type = pop_str("BOUNDARY")
+    boundary_file = pop_str("BOUNDARY_FILE")
+    if boundary_type:
+        bc["boundary_type"] = boundary_type
+    if boundary_file:
+        bc["boundary_file"] = boundary_file
     if bc:
-        out['boundary_conditions'] = bc
+        out["boundary_conditions"] = bc
 
     # ---- sponge --------------------------------------------------------------
-    sponge_on = pop_bool('SPONGE_ON', False)
+    sponge_on = pop_bool("SPONGE_ON", False)
     if sponge_on:
         sp: dict = {}
         for k3d, yml in [
-            ('Sponge_West_Width',  'west_width'),
-            ('Sponge_East_Width',  'east_width'),
-            ('Sponge_South_Width', 'south_width'),
-            ('Sponge_North_Width', 'north_width'),
-            ('R_Sponge', 'r_sponge'), ('A_Sponge', 'a_sponge'),
+            ("Sponge_West_Width", "west_width"),
+            ("Sponge_East_Width", "east_width"),
+            ("Sponge_South_Width", "south_width"),
+            ("Sponge_North_Width", "north_width"),
+            ("R_Sponge", "r_sponge"),
+            ("A_Sponge", "a_sponge"),
         ]:
             v = pop_val(k3d)
-            if v is not None: sp[yml] = v
-        out['sponge'] = sp
+            if v is not None:
+                sp[yml] = v
+        out["sponge"] = sp
 
     # ---- hot start -----------------------------------------------------------
-    hotstart = pop_bool('HOTSTART', False)
+    hotstart = pop_bool("HOTSTART", False)
     if hotstart:
         hs: dict = {}
         for k3d, yml in [
-            ('Eta_HotStart_File', 'eta_file'),
-            ('U_HotStart_File',   'u_file'),
-            ('V_HotStart_File',   'v_file'),
-            ('W_HotStart_File',   'w_file'),
-            ('P_HotStart_File',   'p_file'),
-            ('Sali_HotStart_File','sali_file'),
-            ('Temp_HotStart_File','temp_file'),
-            ('Rho_HotStart_File', 'rho_file'),
-            ('TKE_HotStart_File', 'tke_file'),
-            ('EPS_HotStart_File', 'eps_file'),
+            ("Eta_HotStart_File", "eta_file"),
+            ("U_HotStart_File", "u_file"),
+            ("V_HotStart_File", "v_file"),
+            ("W_HotStart_File", "w_file"),
+            ("P_HotStart_File", "p_file"),
+            ("Sali_HotStart_File", "sali_file"),
+            ("Temp_HotStart_File", "temp_file"),
+            ("Rho_HotStart_File", "rho_file"),
+            ("TKE_HotStart_File", "tke_file"),
+            ("EPS_HotStart_File", "eps_file"),
         ]:
             v = pop_str(k3d)
-            if v: hs[yml] = v
+            if v:
+                hs[yml] = v
         if hs:
-            out['hot_start'] = hs
+            out["hot_start"] = hs
 
     # ---- output --------------------------------------------------------------
-    result_folder = pop_str('RESULT_FOLDER', './output/')
-    field_io_type = pop_str('FIELD_IO_TYPE', 'ASCII')
+    result_folder = pop_str("RESULT_FOLDER", "./output/")
+    field_io_type = pop_str("FIELD_IO_TYPE", "ASCII")
     _3d_var_map = {
-        'OUT_DEP': 'DEP', 'OUT_ETA': 'ETA', 'OUT_U': 'U',   'OUT_V': 'V',
-        'OUT_W': 'W',     'OUT_P': 'P',     'OUT_K': 'TKE', 'OUT_D': 'EPS',
-        'OUT_S': 'S',     'OUT_C': 'MU',    'OUT_B': 'BUB', 'OUT_A': 'A',
-        'OUT_T': 'T',     'OUT_F': 'F',     'OUT_G': 'G',
-        'OUT_I': 'SALI',  'OUT_Z': 'TEMP',  'OUT_M': 'RHO',
+        "OUT_DEP": "DEP",
+        "OUT_ETA": "ETA",
+        "OUT_U": "U",
+        "OUT_V": "V",
+        "OUT_W": "W",
+        "OUT_P": "P",
+        "OUT_K": "TKE",
+        "OUT_D": "EPS",
+        "OUT_S": "S",
+        "OUT_C": "MU",
+        "OUT_B": "BUB",
+        "OUT_A": "A",
+        "OUT_T": "T",
+        "OUT_F": "F",
+        "OUT_G": "G",
+        "OUT_I": "SALI",
+        "OUT_Z": "TEMP",
+        "OUT_M": "RHO",
     }
     vars_on = [yml for k3d, yml in _3d_var_map.items() if pop_bool(k3d, False)]
-    op: dict = {'result_folder': result_folder}
-    if field_io_type != 'ASCII': op['field_io_type'] = field_io_type
-    if vars_on: op['variables'] = vars_on
-    out['output'] = op
+    op: dict = {"result_folder": result_folder}
+    if field_io_type != "ASCII":
+        op["field_io_type"] = field_io_type
+    if vars_on:
+        op["variables"] = vars_on
+    out["output"] = op
 
     # ---- write YAML ----------------------------------------------------------
     header = [
-        '# FUNWAVE-TVD 3D input — converted from legacy input.txt',
-        f'# Source: {src}',
-        '',
+        "# FUNWAVE-TVD 3D input — converted from legacy input.txt",
+        f"# Source: {src}",
+        "",
     ]
-    body = '\n'.join(header + _dump_yaml(out)) + '\n'
+    body = "\n".join(header + _dump_yaml(out)) + "\n"
     dst_yaml.write_text(body)
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description='Convert a legacy FUNWAVE input.txt to the new YAML format.')
-    parser.add_argument('input',  type=Path, help='Path to legacy input.txt')
-    parser.add_argument('output', type=Path, nargs='?', help='Output YAML path (default: stdout)')
+    parser = argparse.ArgumentParser(description="Convert a legacy FUNWAVE input.txt to the new YAML format.")
+    parser.add_argument("input", type=Path, help="Path to legacy input.txt")
+    parser.add_argument("output", type=Path, nargs="?", help="Output YAML path (default: stdout)")
     args = parser.parse_args()
 
     params = parse_input_txt(args.input)
@@ -954,39 +1195,38 @@ def main():
     # 3-D inputs (Kglob present) get a minimal geometry stub so the unified
     # funwave launcher can detect dimensionality; full conversion is deferred
     # until READ_INPUT is replaced by a YAML reader in the 3D path.
-    if 'Kglob' in params:
+    if "Kglob" in params:
         if args.output is None:
-            raise SystemExit('convert_input: output path required for 3-D inputs')
+            raise SystemExit("convert_input: output path required for 3-D inputs")
         _convert_3d(args.input, args.output)
         return
 
     yaml_dict, unknown = convert(params)
 
     header_lines: list[str] = [
-        '# FUNWAVE-TVD input — converted from legacy input.txt',
-        f'# Source: {args.input}',
-        '#',
+        "# FUNWAVE-TVD input — converted from legacy input.txt",
+        f"# Source: {args.input}",
+        "#",
     ]
     if unknown:
         header_lines += [
-            '# WARNING: the following keys were not recognised and have been dropped.',
-            '# Review and add them manually if needed:',
-        ] + [f'#   {u}' for u in unknown]
+            "# WARNING: the following keys were not recognised and have been dropped.",
+            "# Review and add them manually if needed:",
+        ] + [f"#   {u}" for u in unknown]
     else:
-        header_lines.append('# No unrecognised keys.')
-    header_lines.append('')
+        header_lines.append("# No unrecognised keys.")
+    header_lines.append("")
 
-    body = '\n'.join(header_lines + _dump_yaml(yaml_dict)) + '\n'
+    body = "\n".join(header_lines + _dump_yaml(yaml_dict)) + "\n"
 
     if args.output:
         args.output.write_text(body)
-        print(f'Written to {args.output}', file=sys.stderr)
+        print(f"Written to {args.output}", file=sys.stderr)
         if unknown:
-            print(f'WARNING: {len(unknown)} unrecognised key(s) — see comment block in output.',
-                  file=sys.stderr)
+            print(f"WARNING: {len(unknown)} unrecognised key(s) — see comment block in output.", file=sys.stderr)
     else:
         sys.stdout.write(body)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

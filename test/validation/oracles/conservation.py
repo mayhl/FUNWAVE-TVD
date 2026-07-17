@@ -58,6 +58,7 @@ G = 9.81  # m s-2
 # Integrals
 # ---------------------------------------------------------------------------
 
+
 def _integrate(meta, h: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     """Return (volume[nt], energy[nt]) integrated over each ETA/U/V frame.
 
@@ -73,7 +74,7 @@ def _integrate(meta, h: np.ndarray) -> tuple[np.ndarray, np.ndarray]:
     engs: list[float] = []
     for i, ep in enumerate(eta_files):
         eta = meta.read_field(ep).astype(float)
-        hh = eta + h                     # total water column H = eta + h
+        hh = eta + h  # total water column H = eta + h
         u = meta.read_field(u_files[i]).astype(float) if i < len(u_files) else np.zeros_like(eta)
         v = meta.read_field(v_files[i]).astype(float) if i < len(v_files) else np.zeros_like(eta)
 
@@ -111,6 +112,7 @@ def _windowed_decay_pct(y: np.ndarray) -> float:
 # Entry point
 # ---------------------------------------------------------------------------
 
+
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
     meta = read_run_metadata(dev_dir)
@@ -124,7 +126,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     h = meta.read_field(dep_files[0]).astype(float)
     vols, engs = _integrate(meta, h)
 
-    v_still = float(np.sum(h)) * meta.dx * meta.dy      # total still-water volume (normaliser)
+    v_still = float(np.sum(h)) * meta.dx * meta.dy  # total still-water volume (normaliser)
     mass_drift = float(np.max(np.abs(vols - vols[0]))) / v_still * 100.0 if v_still > 0 else float("nan")
     energy_drift = _windowed_decay_pct(engs)
 
@@ -145,15 +147,20 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
 
     if verbose or not (mass_ok and energy_ok):
-        _print_table(len(eta_files), v_still, mass_drift, tol_mass, mass_ok,
-                     energy_drift, tol_energy, energy_ok, energy_gated)
+        _print_table(len(eta_files), v_still, mass_drift, tol_mass, mass_ok, energy_drift, tol_energy, energy_ok, energy_gated)
 
     return SubsectionResult(kind="statistics", label="Conservation", metrics=metrics)
 
 
 def _print_table(n, v_still, mass_drift, tol_mass, mass_ok, energy_drift, tol_energy, energy_ok, energy_gated) -> None:
-    table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", show_edge=False,
-                  pad_edge=True, title="[bold]Mass / Energy Conservation[/bold]", title_justify="left")
+    table = Table(
+        box=box.SIMPLE_HEAD,
+        header_style="bold cyan",
+        show_edge=False,
+        pad_edge=True,
+        title="[bold]Mass / Energy Conservation[/bold]",
+        title_justify="left",
+    )
     table.add_column("Metric", min_width=22)
     table.add_column("Value", justify="right", min_width=14)
     table.add_column("Tolerance", justify="right", min_width=12)

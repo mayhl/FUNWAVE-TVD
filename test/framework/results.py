@@ -8,7 +8,7 @@ from typing import Literal
 @dataclass
 class MetricResult:
     variable: str
-    stat: str          # "L2_mean", "L2_max", "rmse", "max_abs"
+    stat: str  # "L2_mean", "L2_max", "rmse", "max_abs"
     value: float
     passed: bool
     tolerance: float
@@ -20,14 +20,14 @@ class InteractiveFigure:
     # plotly: fig.to_json()
     # bokeh:  json.dumps(bokeh.embed.json_item(plot.state))  — also covers HoloViews/Bokeh backend
     kind: Literal["plotly", "bokeh"]
-    json_str: str           # default (dark) theme JSON
+    json_str: str  # default (dark) theme JSON
     alt_json_str: str = ""  # light theme JSON; enables theme switching when set
 
 
 @dataclass
 class FigureSpec:
     title: str = ""
-    png_path: Path | None = None          # PDF path (matplotlib or kaleido raster)
+    png_path: Path | None = None  # PDF path (matplotlib or kaleido raster)
     interactive: InteractiveFigure | None = None  # HTML embed
 
 

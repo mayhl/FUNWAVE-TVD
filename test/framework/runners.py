@@ -45,10 +45,16 @@ class UnitTestRunner(BaseRunner):
             self.reporter.info("CI Mode: Performing full build...")
             build_type = os.environ.get("BUILD_TYPE", "RelWithDebInfo")
             import platform
+
             testing = "OFF" if self.compile_only else "ON"
             cmake_args = [
-                "cmake", "-S", ".", "-B", self.build_dir,
-                f"-DENABLE_TESTING={testing}", "-DENABLE_DEV_MODE=ON",
+                "cmake",
+                "-S",
+                ".",
+                "-B",
+                self.build_dir,
+                f"-DENABLE_TESTING={testing}",
+                "-DENABLE_DEV_MODE=ON",
                 f"-DCMAKE_BUILD_TYPE={build_type}",
             ]
             if platform.system() == "Darwin":
@@ -69,14 +75,12 @@ class UnitTestRunner(BaseRunner):
             config = yaml.safe_load(f)
             groups_from_yaml = {g["name"]: g["tests"] for g in config["groups"]}
             all_defined_tests = [t for tests in groups_from_yaml.values() for t in tests]
-        
+
         # Discover all available tests from ctest
-        ctest_list_proc = subprocess.run(
-            ["ctest", "-N"], cwd=self.build_dir, capture_output=True, text=True
-        )
+        ctest_list_proc = subprocess.run(["ctest", "-N"], cwd=self.build_dir, capture_output=True, text=True)
         available_tests = [line.strip() for line in ctest_list_proc.stdout.splitlines() if "Test #" in line]
         available_test_names = [line.split(":", 1)[1].split()[0].strip() for line in available_tests if ":" in line]
-        
+
         # Check for orphans: any test in ctest not in test_config.yaml
         for test in available_test_names:
             if test not in all_defined_tests:
@@ -117,7 +121,9 @@ class UnitTestRunner(BaseRunner):
                     duration = time.time() - start
                     passed = proc.returncode == 0
                     log = proc.stdout if not passed else ""
-                    results.append({"name": test_name, "status": "Pass" if passed else "Fail", "time": f"{duration:.2f}s", "log": log})
+                    results.append(
+                        {"name": test_name, "status": "Pass" if passed else "Fail", "time": f"{duration:.2f}s", "log": log}
+                    )
 
                     task_id = tasks[group]
                     progress.update(

@@ -10,17 +10,19 @@ ID written to ECX by rdtscp is unused in Intel MPI's timing code.
   rdtsc:    0f 31     (2 bytes)
   nop:      90        (1 byte)
 """
+
 import ctypes
 import glob
 import sys
 
-pattern = bytes([0x0f, 0x01, 0xf9])
-replacement = bytes([0x0f, 0x31, 0x90])
+pattern = bytes([0x0F, 0x01, 0xF9])
+replacement = bytes([0x0F, 0x31, 0x90])
 
 
 def rdtscp_works() -> bool:
     """Return True if rdtscp executes without SIGILL (fork-probe)."""
     import ctypes.util, os
+
     src = b"\x0f\x01\xf9\xc3"  # rdtscp; ret
     pid = os.fork()
     if pid == 0:
@@ -41,9 +43,7 @@ if rdtscp_works():
 
 print("rdtscp causes SIGILL — patching Intel MPI")
 
-paths = sys.argv[1:] or glob.glob(
-    "/opt/intel/oneapi/mpi/latest/lib/release/libmpi.so*"
-)
+paths = sys.argv[1:] or glob.glob("/opt/intel/oneapi/mpi/latest/lib/release/libmpi.so*")
 
 for path in paths:
     with open(path, "rb") as f:

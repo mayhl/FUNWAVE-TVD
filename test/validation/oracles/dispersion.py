@@ -52,6 +52,7 @@ BETA_REF_DEFAULT = -0.531  # Nwogu reference level z_alpha/h (registry default)
 # Physics
 # ---------------------------------------------------------------------------
 
+
 def _boussinesq_period(h: float, lam: float, beta_ref: float) -> tuple[float, float]:
     """Return (kh, T) from the Nwogu linear dispersion relation.
 
@@ -102,6 +103,7 @@ def _extract_period(sta: np.ndarray, t_start: float) -> float:
 # I/O
 # ---------------------------------------------------------------------------
 
+
 def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, int]:
     """Parse (h, Lx, Ly, beta_ref, m_x, m_y) from the run YAML (Lx = Mglob*dx).
 
@@ -139,6 +141,7 @@ def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, i
 
 def _find_station_files(output_dir: Path) -> list[Path]:
     import re
+
     sta_re = re.compile(r"^sta_\d{4}$")
     return sorted(p for p in output_dir.iterdir() if sta_re.match(p.name))
 
@@ -146,6 +149,7 @@ def _find_station_files(output_dir: Path) -> list[Path]:
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
+
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
@@ -195,8 +199,14 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
 
 
 def _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, passed) -> None:
-    table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", show_edge=False,
-                  pad_edge=True, title="[bold]Linear Dispersion (Nwogu)[/bold]", title_justify="left")
+    table = Table(
+        box=box.SIMPLE_HEAD,
+        header_style="bold cyan",
+        show_edge=False,
+        pad_edge=True,
+        title="[bold]Linear Dispersion (Nwogu)[/bold]",
+        title_justify="left",
+    )
     table.add_column("Metric", min_width=22)
     table.add_column("Value", justify="right", min_width=14)
     table.add_column("Tolerance", justify="right", min_width=12)

@@ -46,11 +46,12 @@ G = 9.81  # m s⁻²
 # Physics
 # ---------------------------------------------------------------------------
 
+
 def _wave_number(omega: float, h: float, tol: float = 1e-10) -> float:
     """Newton-Raphson solver: ω² = g k tanh(kh) for k."""
-    k = (omega ** 2 / G) / max(np.sqrt(np.tanh(omega ** 2 * h / G)), 1e-12)
+    k = (omega**2 / G) / max(np.sqrt(np.tanh(omega**2 * h / G)), 1e-12)
     for _ in range(300):
-        f  = omega ** 2 - G * k * np.tanh(k * h)
+        f = omega**2 - G * k * np.tanh(k * h)
         fp = -G * (np.tanh(k * h) + k * h / np.cosh(k * h) ** 2)
         dk = -f / fp
         k += dk
@@ -61,7 +62,7 @@ def _wave_number(omega: float, h: float, tol: float = 1e-10) -> float:
 
 def _theory(h: float, lam: float) -> tuple[float, float]:
     """Return (kh, T_theory) for depth h and wavelength lam."""
-    k  = 2.0 * math.pi / lam
+    k = 2.0 * math.pi / lam
     kh = k * h
     sig = math.sqrt(G * k * math.tanh(kh))
     return kh, 2.0 * math.pi / sig
@@ -72,12 +73,12 @@ def _extract_period(sta: np.ndarray, t_start: float = 2.0) -> float:
 
     Falls back to FFT if fewer than 2 crossings are found (e.g. very short run).
     """
-    t   = sta[:, 0]
+    t = sta[:, 0]
     eta = sta[:, 1]
     mask = t >= t_start
     if mask.sum() < 4:
         mask = np.ones(len(t), dtype=bool)
-    t_s   = t[mask]
+    t_s = t[mask]
     eta_s = eta[mask]
 
     # Remove DC offset so crossings are around the mean
@@ -93,9 +94,9 @@ def _extract_period(sta: np.ndarray, t_start: float = 2.0) -> float:
         return float(np.median(np.diff(crossings)))
 
     # FFT fallback
-    dt   = float(np.median(np.diff(t_s)))
+    dt = float(np.median(np.diff(t_s)))
     freq = np.fft.rfftfreq(len(eta_s), d=dt)
-    psd  = np.abs(np.fft.rfft(eta_s)) ** 2
+    psd = np.abs(np.fft.rfft(eta_s)) ** 2
     psd[0] = 0.0
     peak = int(np.argmax(psd))
     if freq[peak] == 0:
@@ -106,6 +107,7 @@ def _extract_period(sta: np.ndarray, t_start: float = 2.0) -> float:
 # ---------------------------------------------------------------------------
 # I/O helpers
 # ---------------------------------------------------------------------------
+
 
 def _read_station(path: Path) -> np.ndarray:
     """Load station file, averaging duplicate rows (parallel artifact)."""
@@ -126,6 +128,7 @@ def _read_uniform_depth(depth_file: Path) -> float:
 
 def _find_station_files(output_dir: Path) -> list[Path]:
     import re
+
     sta_re = re.compile(r"^sta_\d{4}$")
     return sorted(p for p in output_dir.iterdir() if sta_re.match(p.name))
 
@@ -144,8 +147,8 @@ def _get_depth_and_lambda(run_dir: Path) -> tuple[float | None, float]:
         cfg = yaml.safe_load(fh)
 
     geo = cfg.get("geometry", {})
-    gs  = geo.get("grid_size", [1, 1])
-    cs  = geo.get("cell_size", [1.0, 1.0])
+    gs = geo.get("grid_size", [1, 1])
+    cs = geo.get("cell_size", [1.0, 1.0])
     lam = float(gs[0]) * float(cs[0])
 
     bathy = geo.get("bathymetry", {})
@@ -163,6 +166,7 @@ def _get_depth_and_lambda(run_dir: Path) -> tuple[float | None, float]:
 # Public entry point
 # ---------------------------------------------------------------------------
 
+
 def run(
     ref_dir: str | Path,
     dev_dir: str | Path,
@@ -170,11 +174,11 @@ def run(
     plots_dir: Path,
     verbose: bool = False,
 ) -> SubsectionResult:
-    dev_dir  = Path(dev_dir)
+    dev_dir = Path(dev_dir)
     dev_meta = read_run_metadata(dev_dir)
 
     output_dir = dev_meta.output_dir
-    sta_files  = _find_station_files(output_dir)
+    sta_files = _find_station_files(output_dir)
 
     if not sta_files:
         _console.print("[yellow]standing_wave:[/yellow] no station files found — skipping")
@@ -194,15 +198,15 @@ def run(
     kh, T_theo = _theory(h, lam)
 
     t_start = max(0.0, float(sta1[-1, 0]) * 0.4)  # skip first 40% as ramp
-    T_meas  = _extract_period(sta1, t_start=t_start)
+    T_meas = _extract_period(sta1, t_start=t_start)
     err_pct = abs(T_meas - T_theo) / T_theo * 100.0 if math.isfinite(T_meas) else float("nan")
     tol_pct = float(tolerances.get("period_error_pct", 15.0))
-    passed  = math.isfinite(err_pct) and err_pct < tol_pct
+    passed = math.isfinite(err_pct) and err_pct < tol_pct
 
     metrics = [
-        MetricResult("wave_period", "T_measured_s",   T_meas,  True,   math.inf),
-        MetricResult("wave_period", "T_theory_s",     T_theo,  True,   math.inf),
-        MetricResult("wave_period", "kh",             kh,      True,   math.inf),
+        MetricResult("wave_period", "T_measured_s", T_meas, True, math.inf),
+        MetricResult("wave_period", "T_theory_s", T_theo, True, math.inf),
+        MetricResult("wave_period", "kh", kh, True, math.inf),
         MetricResult("wave_period", "period_err_pct", err_pct, passed, tol_pct),
     ]
 
@@ -226,10 +230,16 @@ def run(
 # Rich table
 # ---------------------------------------------------------------------------
 
+
 def _print_table(
-    h: float, lam: float, kh: float,
-    T_theo: float, T_meas: float,
-    err_pct: float, tol_pct: float, passed: bool,
+    h: float,
+    lam: float,
+    kh: float,
+    T_theo: float,
+    T_meas: float,
+    err_pct: float,
+    tol_pct: float,
+    passed: bool,
 ) -> None:
     table = Table(
         box=box.SIMPLE_HEAD,
@@ -239,27 +249,24 @@ def _print_table(
         title="[bold]Standing Wave Physics[/bold]",
         title_justify="left",
     )
-    table.add_column("Metric",        min_width=22)
-    table.add_column("Value",         justify="right", min_width=14)
-    table.add_column("Tolerance",     justify="right", min_width=12)
-    table.add_column("",              min_width=10)
+    table.add_column("Metric", min_width=22)
+    table.add_column("Value", justify="right", min_width=14)
+    table.add_column("Tolerance", justify="right", min_width=12)
+    table.add_column("", min_width=10)
 
     def _row(label: str, value: str, tol: str = "—", status: str = "") -> None:
         table.add_row(label, value, tol, status)
 
-    _row("Depth  h",           f"{h:.1f} m")
-    _row("Wavelength  λ",      f"{lam:.1f} m")
-    _row("kh  (k = 2π/λ)",    f"{kh:.4f}")
-    _row("T  (theory)",        f"{T_theo:.4f} s")
-    _row("T  (measured)",       f"{T_meas:.4f} s")
+    _row("Depth  h", f"{h:.1f} m")
+    _row("Wavelength  λ", f"{lam:.1f} m")
+    _row("kh  (k = 2π/λ)", f"{kh:.4f}")
+    _row("T  (theory)", f"{T_theo:.4f} s")
+    _row("T  (measured)", f"{T_meas:.4f} s")
 
     if math.isfinite(err_pct):
         status = "[bold green]✓ PASS[/bold green]" if passed else "[bold red]✗ FAIL[/bold red]"
-        err_c  = "green" if passed else "red"
-        _row("Period error",
-             f"[{err_c}]{err_pct:.2f} %[/{err_c}]",
-             f"{tol_pct:.1f} %",
-             status)
+        err_c = "green" if passed else "red"
+        _row("Period error", f"[{err_c}]{err_pct:.2f} %[/{err_c}]", f"{tol_pct:.1f} %", status)
 
     _console.print()
     _console.print(table)
@@ -270,10 +277,18 @@ def _print_table(
 # Figure helpers
 # ---------------------------------------------------------------------------
 
-_DARK  = dict(template="plotly_dark",  paper_bgcolor="#161b27", plot_bgcolor="#0f1117",
-              font=dict(family="SF Mono, Menlo, Consolas, monospace", size=12, color="#94a3b8"))
-_LITE  = dict(template="plotly_white", paper_bgcolor="#ffffff",  plot_bgcolor="#f8fafc",
-              font=dict(family="SF Mono, Menlo, Consolas, monospace", size=12, color="#334155"))
+_DARK = dict(
+    template="plotly_dark",
+    paper_bgcolor="#161b27",
+    plot_bgcolor="#0f1117",
+    font=dict(family="SF Mono, Menlo, Consolas, monospace", size=12, color="#94a3b8"),
+)
+_LITE = dict(
+    template="plotly_white",
+    paper_bgcolor="#ffffff",
+    plot_bgcolor="#f8fafc",
+    font=dict(family="SF Mono, Menlo, Consolas, monospace", size=12, color="#334155"),
+)
 
 
 def _make_timeseries_figure(
@@ -289,25 +304,27 @@ def _make_timeseries_figure(
         c1 = "#60a5fa" if dark else "#2563eb"
         c2 = "#fb923c" if dark else "#ea580c"
         fig = go.Figure()
-        fig.add_trace(go.Scatter(x=sta1[:, 0].tolist(), y=sta1[:, 1].tolist(),
-                                 mode="lines", name=label1,
-                                 line=dict(color=c1, width=1.5)))
-        fig.add_trace(go.Scatter(x=sta2[:, 0].tolist(), y=sta2[:, 1].tolist(),
-                                 mode="lines", name=label2,
-                                 line=dict(color=c2, width=1.5, dash="dash")))
+        fig.add_trace(
+            go.Scatter(x=sta1[:, 0].tolist(), y=sta1[:, 1].tolist(), mode="lines", name=label1, line=dict(color=c1, width=1.5))
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=sta2[:, 0].tolist(), y=sta2[:, 1].tolist(), mode="lines", name=label2, line=dict(color=c2, width=1.5, dash="dash")
+            )
+        )
         theme = _DARK if dark else _LITE
         grid_c = "#1e293b" if dark else "#e2e8f0"
         fig.update_layout(
             **theme,
             xaxis=dict(title="Time (s)", gridcolor=grid_c, zerolinecolor=grid_c),
-            yaxis=dict(title="η (m)",    gridcolor=grid_c, zerolinecolor=grid_c),
+            yaxis=dict(title="η (m)", gridcolor=grid_c, zerolinecolor=grid_c),
             legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1),
             margin=dict(l=60, r=20, t=40, b=50),
             height=320,
         )
         return fig
 
-    fig_dark  = _build(dark=True)
+    fig_dark = _build(dark=True)
     fig_light = _build(dark=False)
 
     png_path = plots_dir / "sw_timeseries.png"
@@ -325,45 +342,65 @@ def _make_timeseries_figure(
 
 
 def _make_dispersion_figure(
-    h: float, lam: float,
-    kh_meas: float, T_theo: float, T_meas: float,
+    h: float,
+    lam: float,
+    kh_meas: float,
+    T_theo: float,
+    T_meas: float,
     plots_dir: Path,
 ) -> FigureSpec:
     # Exact theory curve
-    h_arr  = np.linspace(max(h * 0.05, 0.5), h * 4.0, 400)
-    k      = 2.0 * math.pi / lam
+    h_arr = np.linspace(max(h * 0.05, 0.5), h * 4.0, 400)
+    k = 2.0 * math.pi / lam
     kh_arr = k * h_arr
     sig_arr = np.sqrt(G * k * np.tanh(kh_arr))
-    T_arr   = 2.0 * math.pi / sig_arr
+    T_arr = 2.0 * math.pi / sig_arr
 
     def _build(dark: bool) -> go.Figure:
-        th_c  = "#94a3b8" if dark else "#475569"
-        pt_c  = "#4ade80" if dark else "#16a34a"
-        me_c  = "#fb923c" if dark else "#ea580c"
+        th_c = "#94a3b8" if dark else "#475569"
+        pt_c = "#4ade80" if dark else "#16a34a"
+        me_c = "#fb923c" if dark else "#ea580c"
         grid_c = "#1e293b" if dark else "#e2e8f0"
 
         fig = go.Figure()
-        fig.add_trace(go.Scatter(
-            x=kh_arr.tolist(), y=T_arr.tolist(),
-            mode="lines", name="Linear theory",
-            line=dict(color=th_c, width=2),
-        ))
-        fig.add_trace(go.Scatter(
-            x=[kh_meas], y=[T_theo],
-            mode="markers", name=f"Theory  T={T_theo:.3f}s",
-            marker=dict(color=pt_c, size=10, symbol="circle"),
-        ))
+        fig.add_trace(
+            go.Scatter(
+                x=kh_arr.tolist(),
+                y=T_arr.tolist(),
+                mode="lines",
+                name="Linear theory",
+                line=dict(color=th_c, width=2),
+            )
+        )
+        fig.add_trace(
+            go.Scatter(
+                x=[kh_meas],
+                y=[T_theo],
+                mode="markers",
+                name=f"Theory  T={T_theo:.3f}s",
+                marker=dict(color=pt_c, size=10, symbol="circle"),
+            )
+        )
         if math.isfinite(T_meas):
-            fig.add_trace(go.Scatter(
-                x=[kh_meas], y=[T_meas],
-                mode="markers", name=f"Measured  T={T_meas:.3f}s",
-                marker=dict(color=me_c, size=10, symbol="x"),
-            ))
+            fig.add_trace(
+                go.Scatter(
+                    x=[kh_meas],
+                    y=[T_meas],
+                    mode="markers",
+                    name=f"Measured  T={T_meas:.3f}s",
+                    marker=dict(color=me_c, size=10, symbol="x"),
+                )
+            )
         # kh = π reference line
-        fig.add_vline(x=math.pi, line_dash="dot",
-                      line_color=th_c, opacity=0.5,
-                      annotation_text="kh=π", annotation_font_size=11,
-                      annotation_font_color=th_c)
+        fig.add_vline(
+            x=math.pi,
+            line_dash="dot",
+            line_color=th_c,
+            opacity=0.5,
+            annotation_text="kh=π",
+            annotation_font_size=11,
+            annotation_font_color=th_c,
+        )
 
         theme = _DARK if dark else _LITE
         fig.update_layout(
@@ -376,7 +413,7 @@ def _make_dispersion_figure(
         )
         return fig
 
-    fig_dark  = _build(dark=True)
+    fig_dark = _build(dark=True)
     fig_light = _build(dark=False)
 
     png_path = plots_dir / "sw_dispersion.png"

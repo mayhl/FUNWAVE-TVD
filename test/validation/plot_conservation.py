@@ -48,8 +48,8 @@ OUT_PNG = REPO_ROOT / "workspaces" / "dev" / "validation-2d" / "conservation_dia
 
 # (run-dir name, short label, kh, whether energy is the gated quantity)
 _CASES = [
-    ("conservation_2d_cons_diag",        "diag (4,3)",  1.57, False),
-    ("conservation_2d_cons_axis",        "axis (5,0)",  1.57, False),
+    ("conservation_2d_cons_diag", "diag (4,3)", 1.57, False),
+    ("conservation_2d_cons_axis", "axis (5,0)", 1.57, False),
     ("conservation_2d_lowkh_cons_lowkh", "lowkh (2,0)", 0.16, True),
 ]
 
@@ -60,7 +60,7 @@ class Series:
     kh: float
     gated: bool
     t: np.ndarray
-    v_drift_pct: np.ndarray   # |V(t) - V0| / V_still * 100
+    v_drift_pct: np.ndarray  # |V(t) - V0| / V_still * 100
     pe: np.ndarray
     ke: np.ndarray
 
@@ -117,18 +117,15 @@ def _plot(series: list[Series], out_png: Path) -> None:
     # Rows 1..N: per-case PE / KE / E, so the PE<->KE exchange and (low-kh) the flat
     # energy envelope with its windowed-mean decay are each legible.
     n = len(series)
-    fig, axes = plt.subplots(1 + n, 1, figsize=(9.0, 2.6 * (1 + n)),
-                             gridspec_kw={"height_ratios": [1.15] + [1.0] * n})
+    fig, axes = plt.subplots(1 + n, 1, figsize=(9.0, 2.6 * (1 + n)), gridspec_kw={"height_ratios": [1.15] + [1.0] * n})
     ax_mass = axes[0]
     cmap = plt.get_cmap("viridis")
     shades = np.linspace(0.0, 0.75, n)
 
     for s, sh in zip(series, shades):
-        ax_mass.semilogy(s.t, s.v_drift_pct, lw=1.4, color=cmap(sh),
-                         label=f"{s.label}  kh={s.kh:.2f}")
+        ax_mass.semilogy(s.t, s.v_drift_pct, lw=1.4, color=cmap(sh), label=f"{s.label}  kh={s.kh:.2f}")
     ax_mass.set_ylabel("mass drift\n|ΔV|/V₀  [%]")
-    ax_mass.set_title("Mass conservation — flux-form + wall BC pins volume at machine precision",
-                      fontsize=10, loc="left")
+    ax_mass.set_title("Mass conservation — flux-form + wall BC pins volume at machine precision", fontsize=10, loc="left")
     ax_mass.legend(fontsize=8, ncol=n, loc="upper left", framealpha=0.9)
     ax_mass.grid(True, which="both", alpha=0.25)
 
@@ -141,11 +138,9 @@ def _plot(series: list[Series], out_png: Path) -> None:
         half = len(s.energy) // 2
         m1 = float(np.mean(s.energy[:half]))
         m2 = float(np.mean(s.energy[half:]))
-        ax.hlines([m1, m2], [s.t[0], s.t[half]], [s.t[half], s.t[-1]],
-                  color="tab:green", lw=1.6, ls="--", alpha=0.9)
+        ax.hlines([m1, m2], [s.t[0], s.t[half]], [s.t[half], s.t[-1]], color="tab:green", lw=1.6, ls="--", alpha=0.9)
         gate = "gated" if s.gated else "diagnostic"
-        ax.set_title(f"{s.label}  kh={s.kh:.2f}   energy windowed-mean drift "
-                     f"{drift:+.2f} %  ({gate})", fontsize=10, loc="left")
+        ax.set_title(f"{s.label}  kh={s.kh:.2f}   energy windowed-mean drift {drift:+.2f} %  ({gate})", fontsize=10, loc="left")
         ax.set_ylabel("energy  [m³·(m/s²)]")
         ax.grid(True, alpha=0.25)
         ax.legend(fontsize=8, ncol=3, loc="upper right", framealpha=0.9)
@@ -158,10 +153,8 @@ def _plot(series: list[Series], out_png: Path) -> None:
 
 
 def main() -> int:
-    ap = argparse.ArgumentParser(description=__doc__,
-                                 formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--runs-root", type=Path, default=RUNS_ROOT,
-                    help="directory holding the conservation_2d_* run folders")
+    ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
+    ap.add_argument("--runs-root", type=Path, default=RUNS_ROOT, help="directory holding the conservation_2d_* run folders")
     ap.add_argument("--out", type=Path, default=OUT_PNG, help="output PNG path")
     args = ap.parse_args()
 
@@ -171,9 +164,11 @@ def main() -> int:
         if s is None:
             print(f"skip {name}: run output not found under {args.runs_root}")
             continue
-        print(f"{label:14s} kh={kh:.2f}  frames={len(s.t)}  "
-              f"max mass drift={s.v_drift_pct.max():.2e} %  "
-              f"energy drift={_windowed_decay_pct(s.energy):+.2f} %")
+        print(
+            f"{label:14s} kh={kh:.2f}  frames={len(s.t)}  "
+            f"max mass drift={s.v_drift_pct.max():.2e} %  "
+            f"energy drift={_windowed_decay_pct(s.energy):+.2f} %"
+        )
         series.append(s)
 
     if not series:

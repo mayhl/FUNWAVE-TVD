@@ -1,5 +1,6 @@
 from rich.console import Console
 
+
 class ConsoleReporter:
     def __init__(self):
         self.console = Console()

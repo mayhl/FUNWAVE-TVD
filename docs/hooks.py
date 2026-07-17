@@ -11,5 +11,7 @@ def on_post_build(config, **kwargs):
     else:
         os.makedirs(dst, exist_ok=True)
         with open(os.path.join(dst, "index.html"), "w") as f:
-            f.write("<html><body><p>Doxygen docs not built yet. "
-                    "Run <code>cmake --build build --target doc</code> first.</p></body></html>")
+            f.write(
+                "<html><body><p>Doxygen docs not built yet. "
+                "Run <code>cmake --build build --target doc</code> first.</p></body></html>"
+            )

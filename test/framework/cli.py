@@ -12,21 +12,22 @@ from test.framework.workspace_utils import get_build_path, setup_workspace
 
 PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-app = typer.Typer(
-    help="FUNWAVE Test Orchestration Engine.",
-    context_settings={"help_option_names": ["-h", "--help"]}
-)
+app = typer.Typer(help="FUNWAVE Test Orchestration Engine.", context_settings={"help_option_names": ["-h", "--help"]})
+
 
 @app.callback()
 def main():
     """Unified CLI for FUNWAVE build and test lifecycle."""
     pass
 
+
 @app.command()
 def unit(
     mode: str = typer.Option("dev", "--mode", "-m", help="Execution mode (ci/dev)"),
     build_dir: str = typer.Option(None, "--build-dir", "-b", help="Override FUNWAVE_BUILD_DIR"),
-    compile_only: bool = typer.Option(False, "--compile-only", help="Build without pFUnit and skip test execution (compile coverage only)")
+    compile_only: bool = typer.Option(
+        False, "--compile-only", help="Build without pFUnit and skip test execution (compile coverage only)"
+    ),
 ):
     """Run Unit Tests (pFUnit) with a live dashboard."""
     reporter = ConsoleReporter()
@@ -34,6 +35,7 @@ def unit(
     passed = runner.run()
     if not passed:
         raise typer.Exit(1)
+
 
 @app.command()
 def regression(
@@ -43,19 +45,34 @@ def regression(
     pdf: bool = typer.Option(False, "--pdf", help="Generate PDF report after run (implies --report)"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Show detail tables for all tests (default: only on failure)"),
     stop_on_pass: bool = typer.Option(False, "--stop-on-pass", "-1", help="Stop after the first passing test"),
-    fixed_dt: bool = typer.Option(False, "--fixed-dt", "--strict", "-s", help="Keep DT_fixed from input files for deterministic frame times (default strips it; --strict is a deprecated alias)"),
+    fixed_dt: bool = typer.Option(
+        False,
+        "--fixed-dt",
+        "--strict",
+        "-s",
+        help="Keep DT_fixed from input files for deterministic frame times (default strips it; --strict is a deprecated alias)",
+    ),
 ):
     """Run Regression Tests."""
     reporter = ConsoleReporter()
     provider = LocalProvider()
     runner = RegressionRunner(reporter, provider)
-    runner.run(filter_tags=tags or None, force=force, report=report, pdf=pdf, verbose=verbose,
-               stop_on_pass=stop_on_pass, fixed_dt=fixed_dt)
+    runner.run(
+        filter_tags=tags or None, force=force, report=report, pdf=pdf, verbose=verbose, stop_on_pass=stop_on_pass, fixed_dt=fixed_dt
+    )
+
 
 @app.command()
 def suite(
-    filter_names: list[str] = typer.Option(None, "--filter", "-f", help="Compiler names to run (repeat for multiple; use 'local' to run in host environment instead of Docker)"),
-    build_types:  list[str] = typer.Option(None, "--build-type", "-b", help="CMake build types to test (repeat for multiple; default: RelWithDebInfo)"),
+    filter_names: list[str] = typer.Option(
+        None,
+        "--filter",
+        "-f",
+        help="Compiler names to run (repeat for multiple; use 'local' to run in host environment instead of Docker)",
+    ),
+    build_types: list[str] = typer.Option(
+        None, "--build-type", "-b", help="CMake build types to test (repeat for multiple; default: RelWithDebInfo)"
+    ),
     no_build: bool = typer.Option(False, "--no-build", help="Skip image build, run existing images"),
     no_cache: bool = typer.Option(False, "--no-cache", help="Force fresh build, ignoring Docker layer cache"),
     verbose: bool = typer.Option(False, "--verbose", "-v", help="Stream full build/test output"),
@@ -86,7 +103,7 @@ def install():
     subprocess.run(["uv", "sync", "-q"], cwd=PROJ_ROOT, check=True)
 
     pfunit_done = bool(glob.glob(os.path.join(PROJ_ROOT, "extern", "pfunit", "installed", "PFUNIT-*")))
-    hypre_done  = os.path.isdir(os.path.join(PROJ_ROOT, "extern", "hypre", "installed", "lib"))
+    hypre_done = os.path.isdir(os.path.join(PROJ_ROOT, "extern", "hypre", "installed", "lib"))
 
     if pfunit_done and hypre_done:
         typer.echo("pFUnit and HYPRE already installed — skipping.")
@@ -100,18 +117,20 @@ def install():
 
     typer.echo("All dependencies ready.")
 
+
 @app.command()
 def setup(workspace: str = typer.Argument("dev", help="Workspace name to initialize")):
     """Initialize a workspace directory structure."""
     path = setup_workspace(workspace)
     typer.echo(f"Workspace '{workspace}' initialized at: {path}")
 
+
 @app.command()
-def registry(check: bool = typer.Option(True, "--check/--regen",
-                                        help="verify (default) or regenerate config_defaults.f90")):
+def registry(check: bool = typer.Option(True, "--check/--regen", help="verify (default) or regenerate config_defaults.f90")):
     """Registry sync: config_defaults.f90 vs registry.yaml (scripts/gen_registry.py)."""
     cmd = ["uv", "run", "scripts/gen_registry.py"] + (["--check"] if check else [])
     raise typer.Exit(subprocess.run(cmd, cwd=PROJ_ROOT).returncode)
+
 
 if __name__ == "__main__":
     app()

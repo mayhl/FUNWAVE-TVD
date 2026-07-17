@@ -1,4 +1,5 @@
 """Generate a self-contained HTML regression report from SimResult objects."""
+
 from __future__ import annotations
 
 import itertools
@@ -200,13 +201,16 @@ table { border-collapse: collapse; width: 100%; }
 
 _PLOTLY_CONFIG = "{responsive: true, displayModeBar: 'hover', displaylogo: false, modeBarButtonsToRemove: ['sendDataToCloud', 'lasso2d', 'select2d'], toImageButtonOptions: {format: 'png', filename: 'funwave_l2', width: 1200, height: 400, scale: 2}}"
 
-_TOGGLE_JS = """
+_TOGGLE_JS = (
+    """
 function _applyPlotlyTheme(theme) {
     document.querySelectorAll('.plotly-switchable').forEach(function(el) {
         var jsonEl = document.getElementById(el.id + '-' + theme);
         if (!jsonEl) return;
         var spec = JSON.parse(jsonEl.textContent);
-        Plotly.react(el.id, spec.data, spec.layout, """ + _PLOTLY_CONFIG + """);
+        Plotly.react(el.id, spec.data, spec.layout, """
+    + _PLOTLY_CONFIG
+    + """);
     });
 }
 
@@ -236,21 +240,23 @@ function toggleTheme() {
     }
 })();
 """
+)
 
 
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _status_badge(status: str) -> str:
     mapping = {
-        "PASS":              '<span class="badge badge-pass">✓ PASS</span>',
-        "FAIL":              '<span class="badge badge-fail">✗ FAIL</span>',
-        "XFAIL":             '<span class="badge badge-warn">⚠ XFAIL</span>',
-        "XPASS":             '<span class="badge badge-fail">✗ XPASS</span>',
-        "SIM_FAILED":        '<span class="badge badge-fail">✗ SIM FAILED</span>',
+        "PASS": '<span class="badge badge-pass">✓ PASS</span>',
+        "FAIL": '<span class="badge badge-fail">✗ FAIL</span>',
+        "XFAIL": '<span class="badge badge-warn">⚠ XFAIL</span>',
+        "XPASS": '<span class="badge badge-fail">✗ XPASS</span>',
+        "SIM_FAILED": '<span class="badge badge-fail">✗ SIM FAILED</span>',
         "POSTPROCESS_ERROR": '<span class="badge badge-warn">⚠ ERROR</span>',
-        "COMPLETED":         '<span class="badge badge-dim">COMPLETED</span>',
+        "COMPLETED": '<span class="badge badge-dim">COMPLETED</span>',
     }
     return mapping.get(status, f'<span class="badge badge-dim">{status}</span>')
 
@@ -285,9 +291,9 @@ _fig_counter = itertools.count()
 def _render_figure(spec: FigureSpec) -> str:
     parts = []
     if spec.interactive and spec.interactive.kind == "plotly":
-        uid       = f"plotly-fig-{next(_fig_counter)}"
-        has_alt   = bool(spec.interactive.alt_json_str)
-        switchable = ' plotly-switchable' if has_alt else ''
+        uid = f"plotly-fig-{next(_fig_counter)}"
+        has_alt = bool(spec.interactive.alt_json_str)
+        switchable = " plotly-switchable" if has_alt else ""
 
         parts.append('    <div class="fig-wrap">')
 
@@ -308,7 +314,7 @@ def _render_figure(spec: FigureSpec) -> str:
         if spec.png_path and Path(spec.png_path).exists():
             parts.append(f'      <img class="fig-print" src="{spec.png_path}" alt="{spec.title}">')
 
-        parts.append('    </div>')
+        parts.append("    </div>")
 
     elif spec.png_path and Path(spec.png_path).exists():
         parts.append(f'    <div class="fig-wrap"><img style="max-width:100%" src="{spec.png_path}" alt="{spec.title}"></div>')
@@ -325,14 +331,14 @@ def _render_field_section(sub: SubsectionResult) -> str:
     rows_html = ""
     for var, stats in by_var.items():
         mean_m = next((v for k, v in stats.items() if k.endswith("_mean")), None)
-        max_m  = next((v for k, v in stats.items() if k.endswith("_max")),  None)
+        max_m = next((v for k, v in stats.items() if k.endswith("_max")), None)
         if mean_m is None:
             continue
 
         tol_finite = math.isfinite(mean_m.tolerance)
-        mean_cell  = _metric_cell(mean_m.value, mean_m.passed, mean_m.tolerance)
-        max_cell   = f'<span class="dim">{max_m.value:.3e}</span>' if max_m else "—"
-        tol_fmt    = f"{mean_m.tolerance:.1e}" if tol_finite else "—"
+        mean_cell = _metric_cell(mean_m.value, mean_m.passed, mean_m.tolerance)
+        max_cell = f'<span class="dim">{max_m.value:.3e}</span>' if max_m else "—"
+        tol_fmt = f"{mean_m.tolerance:.1e}" if tol_finite else "—"
 
         if not tol_finite:
             status_cell = '<span class="dim">○</span>'
@@ -375,18 +381,18 @@ def _render_statistics_section(sub: SubsectionResult) -> str:
     rows_html = ""
     for m in sub.metrics:
         tol_finite = math.isfinite(m.tolerance)
-        val_str  = f"{m.value:.4f}" if math.isfinite(m.value) else "—"
-        tol_str  = f"{m.tolerance:.2g}" if tol_finite else "—"
+        val_str = f"{m.value:.4f}" if math.isfinite(m.value) else "—"
+        tol_str = f"{m.tolerance:.2g}" if tol_finite else "—"
 
         if not tol_finite:
             status_cell = '<span class="dim">○</span>'
-            val_cell    = f'<span class="dim">{val_str}</span>'
+            val_cell = f'<span class="dim">{val_str}</span>'
         elif m.passed:
             status_cell = '<span class="pass">✓ PASS</span>'
-            val_cell    = f'<span class="pass">{val_str}</span>'
+            val_cell = f'<span class="pass">{val_str}</span>'
         else:
             status_cell = '<span class="fail">✗ FAIL</span>'
-            val_cell    = f'<span class="fail">{val_str}</span>'
+            val_cell = f'<span class="fail">{val_str}</span>'
 
         rows_html += f"""
         <tr>
@@ -442,18 +448,15 @@ def _render_sim_card(result: SimResult) -> str:
 # Summary table
 # ---------------------------------------------------------------------------
 
+
 def _render_summary(results: list[SimResult]) -> str:
-    kinds = [k for k in ("field", "station", "statistics")
-             if any(r.subsection(k) for r in results)]
+    kinds = [k for k in ("field", "station", "statistics") if any(r.subsection(k) for r in results)]
     kind_labels = {"field": "Field", "station": "Station", "statistics": "Statistics"}
 
     extra_headers = "".join(f"<th>{kind_labels[k]}</th>" for k in kinds)
     rows_html = ""
     for r in results:
-        extra_cells = "".join(
-            f'<td class="center">{_subsection_summary(r.subsection(k))}</td>'
-            for k in kinds
-        )
+        extra_cells = "".join(f'<td class="center">{_subsection_summary(r.subsection(k))}</td>' for k in kinds)
         rows_html += f"""
         <tr>
           <td class="mono">{r.name}</td>
@@ -479,6 +482,7 @@ def _render_summary(results: list[SimResult]) -> str:
 # ---------------------------------------------------------------------------
 # Public entry points
 # ---------------------------------------------------------------------------
+
 
 def generate(results: list[SimResult], meta: ReportMeta, output_path: Path) -> Path:
     """Write a self-contained HTML report and return the path."""
@@ -527,7 +531,7 @@ def generate_pdf(results: list[SimResult], meta: ReportMeta, output_path: Path) 
     import weasyprint
 
     html_path = generate(results, meta, Path(output_path).with_suffix(".html"))
-    pdf_path  = Path(output_path)
+    pdf_path = Path(output_path)
     pdf_path.parent.mkdir(parents=True, exist_ok=True)
     weasyprint.HTML(filename=str(html_path)).write_pdf(str(pdf_path))
     return pdf_path
