@@ -8,8 +8,12 @@ groups:
   - name: Numerics
     tests: [test_grid, test_interpolation, test_crs, test_accumulators, test_solver_tridiag]
   - name: Output
-    tests: [test_field_registry, test_gatherer]
+    tests: [test_field_registry, test_gatherer, test_output_channel]
   - name: Model2D
-    tests: [test_fields, test_scratch_pool, test_sponge, test_kernel_derivatives,
-            test_kernel_fluxes, test_kernel_masks, test_kernel_dispersion,
-            test_kernel_breaker, test_kernel_etauv, test_kernel_sources]
+    tests: [test_fields, test_scratch_pool, test_geometry, test_numerics,
+            test_model_setup, test_sponge, test_bc, test_wavemaker,
+            test_kernel_derivatives, test_kernel_fluxes, test_kernel_masks,
+            test_kernel_bc, test_kernel_dispersion, test_kernel_breaker,
+            test_kernel_etauv, test_kernel_sources]
+  - name: Model2D Modules
+    tests: [test_subgrid, test_foam, test_tracer, test_vessel]
