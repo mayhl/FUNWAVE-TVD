@@ -19,7 +19,8 @@ class LocalProvider(BaseProvider):
         self.jobs = {}
 
     def submit(self, binary_path, input_file, work_dir, np=1) -> str:
-        cmd = ["mpirun", "-np", str(np), binary_path, input_file]
+        # nice -n 19: suite sims yield to interactive work on the laptop
+        cmd = ["nice", "-n", "19", "mpirun", "-np", str(np), binary_path, input_file]
         stdout_path = os.path.join(work_dir, ".mpi_stdout")
         stderr_path = os.path.join(work_dir, ".mpi_stderr")
         stdout_f = open(stdout_path, "w")
