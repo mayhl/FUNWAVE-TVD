@@ -21,10 +21,8 @@
 !                              (project standard since 2026-07-16; legacy
 !                              default was 0.7)
 !
-!  Also read here as stop-gap adapters (final owners come later in the
+!  Also read here as a stop-gap adapter (final owner comes later in the
 !  config reorg; see design notes):
-!    boundaries: > periodic: [y]   axis-level periodic list (x pending
-!                                  trid_x_periodic; owner = rung-2 module)
 !    grid: > coriolis:             f-plane rotation for non-georeferenced
 !      f: <real>                   Coriolis parameter (1/s); wins over latitude
 !      latitude: <real>            centre latitude (deg), f = pi*sin(lat)/21600
@@ -37,7 +35,7 @@
 !-------------------------------------------------
 
 module model_physics_mod
-   use core_constants_mod, only: SP, PI, type_string
+   use core_constants_mod, only: SP, PI
    use core_env_mod, only: type_env, get_sub_env
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
@@ -85,35 +83,15 @@ contains
       class(type_model_physics), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
-      type(type_env) :: sub_env, bnd_env, grid_env
+      type(type_env) :: sub_env, grid_env
       type(type_yaml_reader) :: disp_yaml, cor_yaml
-      type(type_string), allocatable :: axes(:)
       character(:), allocatable :: scheme
-      logical :: is_empty, no_key, no_bnd, no_grid, no_disp, no_cor, no_f, no_lat
+      logical :: is_empty, no_key, no_grid, no_disp, no_cor, no_f, no_lat
       real(SP) :: lat, g_tmp
-      integer :: i
 
-      ! boundaries.periodic — axis-level list (a face is never "periodic";
-      ! the axis identifies the pair).  Stop-gap adapter until the
-      ! boundaries module owns the section.
-      bnd_env = get_sub_env(env, "boundaries", no_bnd)
-      if (.not. no_bnd) then
-         call bnd_env%yaml%read_string_array("periodic", silent=no_key, val=axes)
-         if (.not. no_key) then
-            do i = 1, size(axes)
-               select case (trim(axes(i)%s))
-               case ("y")
-                  this%periodic = .true.
-               case ("x")
-                  call env%log%exit_on_error( &
-                     "boundaries/periodic: x is pending trid_x_periodic")
-               case default
-                  call env%log%exit_on_error( &
-                     "boundaries/periodic: expected axis labels x and/or y")
-               end select
-            end do
-         end if
-      end if
+      ! boundaries.periodic is read by model_boundaries_mod, which writes
+      ! this%periodic AFTER this reader runs — keep this the storage slot
+      ! only (stepper/geometry consume it)
 
       ! grid.coriolis — f-plane escape hatch for non-georeferenced grids:
       !   $$ f = \frac{\pi \sin\varphi}{21600} = 2\Omega\sin\varphi,

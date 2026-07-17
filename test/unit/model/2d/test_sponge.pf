@@ -6,7 +6,7 @@ module test_sponge
    use core_comm_mod,       only: type_comm, new_comm
    use core_grid_mod,       only: type_grid_2d
    use core_constants_mod,  only: SP, N_GHOST
-   use model_sponge_mod,    only: type_model_sponge
+   use model_sponge_mod,    only: type_model_sponge, FACE_W
    use model_fields_2d_mod, only: type_fields_2d
 
    implicit none
@@ -79,8 +79,8 @@ contains
 
       call open_grid(this, grid, comm)
       sponge%is_activated  = .true.
-      sponge%direct_sponge = .true.
-      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+      sponge%direct_on(FACE_W) = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
 
       call sponge%init_compute(grid)
 
@@ -110,10 +110,10 @@ contains
 
       call open_grid(this, grid, comm)
       sponge%is_activated     = .true.
-      sponge%direct_sponge    = .true.
-      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
-      sponge%R_sponge = R_SP
-      sponge%A_sponge = A_SP
+      sponge%direct_on(FACE_W)    = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%r_direct(FACE_W) = R_SP
+      sponge%a_direct(FACE_W) = A_SP
 
       call sponge%init_compute(grid)
 
@@ -145,10 +145,10 @@ contains
       call open_grid(this, grid, comm)
 
       sponge%is_activated     = .true.
-      sponge%direct_sponge    = .true.
-      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
-      sponge%R_sponge = R_SP
-      sponge%A_sponge = A_SP
+      sponge%direct_on(FACE_W)    = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%r_direct(FACE_W) = R_SP
+      sponge%a_direct(FACE_W) = A_SP
 
       call sponge%init_compute(grid)
 
@@ -176,10 +176,10 @@ contains
       call open_grid(this, grid, comm)
 
       sponge%is_activated     = .true.
-      sponge%direct_sponge    = .true.
-      sponge%Sponge_west_width = TEST_DX * TWO_SP   ! only 2 cells wide
-      sponge%R_sponge = R_SP
-      sponge%A_sponge = A_SP
+      sponge%direct_on(FACE_W)    = .true.
+      sponge%width(FACE_W) = TEST_DX * TWO_SP   ! only 2 cells wide
+      sponge%r_direct(FACE_W) = R_SP
+      sponge%a_direct(FACE_W) = A_SP
 
       call sponge%init_compute(grid)
 
@@ -215,10 +215,10 @@ contains
       ng = N_GHOST
 
       sponge%is_activated  = .true.
-      sponge%direct_sponge = .true.
-      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
-      sponge%R_sponge = R_SP
-      sponge%A_sponge = A_SP
+      sponge%direct_on(FACE_W) = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%r_direct(FACE_W) = R_SP
+      sponge%a_direct(FACE_W) = A_SP
 
       call sponge%init_compute(grid)
 
@@ -264,9 +264,9 @@ contains
 
       call open_grid(this, grid, comm)
       sponge%is_activated    = .true.
-      sponge%friction_sponge = .true.
-      sponge%CDsponge        = A_SP
-      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+      sponge%friction_on(FACE_W) = .true.
+      sponge%cd_fric(FACE_W)        = A_SP
+      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
 
       call sponge%init_compute(grid)
 
@@ -296,10 +296,10 @@ contains
 
       call open_grid(this, grid, comm)
       sponge%is_activated     = .true.
-      sponge%direct_sponge    = .true.
-      sponge%friction_sponge  = .true.
-      sponge%diffusion_sponge = .true.
-      sponge%Sponge_west_width = real(TEST_M/4, SP) * TEST_DX
+      sponge%direct_on(FACE_W)    = .true.
+      sponge%friction_on(FACE_W)  = .true.
+      sponge%diffusion_on(FACE_W) = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
 
       call sponge%init_compute(grid)
       call sponge%free()

@@ -147,6 +147,303 @@ parameters:
     default:      ~
     latex:        ~
 
+  # ── boundaries — per-face blocks (config reorg rung 2) ─────────────────────
+  # Face BC is DERIVED from block presence (design-config-reorg):
+  #   nothing -> wall; sponge only -> wall + absorbing strip;
+  #   sponge.direct + forcing -> wall + relaxation to signal (nee TIDAL_BC_ABS);
+  #   forcing w/o direct -> characteristic (init-gated pending).
+  # type: is an optional ASSERTION -- errors at init if it disagrees.
+  # Dropped without successor: DIRECT/FRICTION/DIFFUSION_SPONGE (presence),
+  # TIDAL_BC_ABS (derived), TideBcType (file presence = DATA),
+  # TIDAL_BC_GEN_ABS (pending rung-3 forcing.wavemaker reference).
+
+  - name:         relaxation_cells
+    legacy_name:  WaveMakerPointNum
+    yaml_path:    "boundaries.relaxation_cells"
+    units:        ~
+    default:      30
+    latex:        ~
+
+  - name:         west_type
+    legacy_name:  ~
+    yaml_path:    "boundaries.west.type"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         west_sponge_width
+    legacy_name:  Sponge_west_width
+    yaml_path:    "boundaries.west.sponge.width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,W}$"
+
+  - name:         west_sponge_direct_r
+    legacy_name:  R_sponge
+    yaml_path:    "boundaries.west.sponge.direct.r"
+    units:        ~
+    default:      0.85
+    latex:        "$R_s$"
+
+  - name:         west_sponge_direct_a
+    legacy_name:  A_sponge
+    yaml_path:    "boundaries.west.sponge.direct.a"
+    units:        ~
+    default:      5.0
+    latex:        "$A_s$"
+
+  - name:         west_sponge_friction_cd
+    legacy_name:  CDsponge
+    yaml_path:    "boundaries.west.sponge.friction.cd"
+    units:        ~
+    default:      0.0
+    latex:        "$C_{d,s}$"
+
+  - name:         west_sponge_diffusion_nu
+    legacy_name:  Csp
+    yaml_path:    "boundaries.west.sponge.diffusion.nu"
+    units:        ~
+    default:      0.1
+    latex:        "$C_{\\mathrm{sp}}$"
+
+  - name:         west_forcing_eta
+    legacy_name:  TideWest_ETA
+    yaml_path:    "boundaries.west.forcing.eta"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         west_forcing_u
+    legacy_name:  TideWest_U
+    yaml_path:    "boundaries.west.forcing.u"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         west_forcing_v
+    legacy_name:  TideWest_V
+    yaml_path:    "boundaries.west.forcing.v"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         west_forcing_file
+    legacy_name:  TideWestFileName
+    yaml_path:    "boundaries.west.forcing.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         east_type
+    legacy_name:  ~
+    yaml_path:    "boundaries.east.type"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         east_sponge_width
+    legacy_name:  Sponge_east_width
+    yaml_path:    "boundaries.east.sponge.width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,E}$"
+
+  - name:         east_sponge_direct_r
+    legacy_name:  R_sponge
+    yaml_path:    "boundaries.east.sponge.direct.r"
+    units:        ~
+    default:      0.85
+    latex:        "$R_s$"
+
+  - name:         east_sponge_direct_a
+    legacy_name:  A_sponge
+    yaml_path:    "boundaries.east.sponge.direct.a"
+    units:        ~
+    default:      5.0
+    latex:        "$A_s$"
+
+  - name:         east_sponge_friction_cd
+    legacy_name:  CDsponge
+    yaml_path:    "boundaries.east.sponge.friction.cd"
+    units:        ~
+    default:      0.0
+    latex:        "$C_{d,s}$"
+
+  - name:         east_sponge_diffusion_nu
+    legacy_name:  Csp
+    yaml_path:    "boundaries.east.sponge.diffusion.nu"
+    units:        ~
+    default:      0.1
+    latex:        "$C_{\\mathrm{sp}}$"
+
+  - name:         east_forcing_eta
+    legacy_name:  TideEast_ETA
+    yaml_path:    "boundaries.east.forcing.eta"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         east_forcing_u
+    legacy_name:  TideEast_U
+    yaml_path:    "boundaries.east.forcing.u"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         east_forcing_v
+    legacy_name:  TideEast_V
+    yaml_path:    "boundaries.east.forcing.v"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         east_forcing_file
+    legacy_name:  TideEastFileName
+    yaml_path:    "boundaries.east.forcing.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         south_type
+    legacy_name:  ~
+    yaml_path:    "boundaries.south.type"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         south_sponge_width
+    legacy_name:  Sponge_south_width
+    yaml_path:    "boundaries.south.sponge.width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,S}$"
+
+  - name:         south_sponge_direct_r
+    legacy_name:  R_sponge
+    yaml_path:    "boundaries.south.sponge.direct.r"
+    units:        ~
+    default:      0.85
+    latex:        "$R_s$"
+
+  - name:         south_sponge_direct_a
+    legacy_name:  A_sponge
+    yaml_path:    "boundaries.south.sponge.direct.a"
+    units:        ~
+    default:      5.0
+    latex:        "$A_s$"
+
+  - name:         south_sponge_friction_cd
+    legacy_name:  CDsponge
+    yaml_path:    "boundaries.south.sponge.friction.cd"
+    units:        ~
+    default:      0.0
+    latex:        "$C_{d,s}$"
+
+  - name:         south_sponge_diffusion_nu
+    legacy_name:  Csp
+    yaml_path:    "boundaries.south.sponge.diffusion.nu"
+    units:        ~
+    default:      0.1
+    latex:        "$C_{\\mathrm{sp}}$"
+
+  - name:         south_forcing_eta
+    legacy_name:  TideSouth_ETA
+    yaml_path:    "boundaries.south.forcing.eta"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         south_forcing_u
+    legacy_name:  TideSouth_U
+    yaml_path:    "boundaries.south.forcing.u"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         south_forcing_v
+    legacy_name:  TideSouth_V
+    yaml_path:    "boundaries.south.forcing.v"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         south_forcing_file
+    legacy_name:  TideSouthFileName
+    yaml_path:    "boundaries.south.forcing.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         north_type
+    legacy_name:  ~
+    yaml_path:    "boundaries.north.type"
+    units:        ~
+    default:      ~
+    latex:        ~
+
+  - name:         north_sponge_width
+    legacy_name:  Sponge_north_width
+    yaml_path:    "boundaries.north.sponge.width"
+    units:        "m"
+    default:      0.0
+    latex:        "$W_{s,N}$"
+
+  - name:         north_sponge_direct_r
+    legacy_name:  R_sponge
+    yaml_path:    "boundaries.north.sponge.direct.r"
+    units:        ~
+    default:      0.85
+    latex:        "$R_s$"
+
+  - name:         north_sponge_direct_a
+    legacy_name:  A_sponge
+    yaml_path:    "boundaries.north.sponge.direct.a"
+    units:        ~
+    default:      5.0
+    latex:        "$A_s$"
+
+  - name:         north_sponge_friction_cd
+    legacy_name:  CDsponge
+    yaml_path:    "boundaries.north.sponge.friction.cd"
+    units:        ~
+    default:      0.0
+    latex:        "$C_{d,s}$"
+
+  - name:         north_sponge_diffusion_nu
+    legacy_name:  Csp
+    yaml_path:    "boundaries.north.sponge.diffusion.nu"
+    units:        ~
+    default:      0.1
+    latex:        "$C_{\\mathrm{sp}}$"
+
+  - name:         north_forcing_eta
+    legacy_name:  TideNorth_ETA
+    yaml_path:    "boundaries.north.forcing.eta"
+    units:        m
+    default:      ~
+    latex:        ~
+
+  - name:         north_forcing_u
+    legacy_name:  TideNorth_U
+    yaml_path:    "boundaries.north.forcing.u"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         north_forcing_v
+    legacy_name:  TideNorth_V
+    yaml_path:    "boundaries.north.forcing.v"
+    units:        m/s
+    default:      ~
+    latex:        ~
+
+  - name:         north_forcing_file
+    legacy_name:  TideNorthFileName
+    yaml_path:    "boundaries.north.forcing.file"
+    units:        ~
+    default:      ~
+    latex:        ~
+
   # ── breaking ───────────────────────────────────────────────────────────────
   - name:         cbrk1
     legacy_name:  Cbrk1
@@ -634,85 +931,6 @@ parameters:
     default:      false
     latex:        ~
 
-  # ── sponge ─────────────────────────────────────────────────────────────────
-  - name:         a_sponge
-    legacy_name:  A_sponge
-    yaml_path:    "sponge.a_sponge"
-    units:        ~
-    default:      5.0
-    latex:        "$A_s$"
-
-  - name:         cd_sponge
-    legacy_name:  CDsponge
-    yaml_path:    "sponge.cd_sponge"
-    units:        ~
-    default:      0.0
-    latex:        "$C_{d,s}$"
-
-  - name:         csp
-    legacy_name:  Csp
-    yaml_path:    "sponge.csp"
-    units:        ~
-    default:      0.1
-    latex:        "$C_{\\mathrm{sp}}$"
-
-  - name:         diffusion_sponge
-    legacy_name:  DIFFUSION_SPONGE
-    yaml_path:    "sponge.diffusion_sponge"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         direct_sponge
-    legacy_name:  DIRECT_SPONGE
-    yaml_path:    "sponge.direct_sponge"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         friction_sponge
-    legacy_name:  FRICTION_SPONGE
-    yaml_path:    "sponge.friction_sponge"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         r_sponge
-    legacy_name:  R_sponge
-    yaml_path:    "sponge.r_sponge"
-    units:        ~
-    default:      0.85
-    latex:        "$R_s$"
-
-  - name:         sponge_east_width
-    legacy_name:  Sponge_east_width
-    yaml_path:    "sponge.sponge_east_width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,E}$"
-
-  - name:         sponge_north_width
-    legacy_name:  Sponge_north_width
-    yaml_path:    "sponge.sponge_north_width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,N}$"
-
-  - name:         sponge_south_width
-    legacy_name:  Sponge_south_width
-    yaml_path:    "sponge.sponge_south_width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,S}$"
-
-  - name:         sponge_west_width
-    legacy_name:  Sponge_west_width
-    yaml_path:    "sponge.sponge_west_width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,W}$"
-
-  # ── entries added 2026-07-08 from reader inventory (defaults = reader/io.F) ──
   - name:         roller_effect
     legacy_name:  ROLLER_EFFECT
     yaml_path:    "breaking.roller_effect"
@@ -766,155 +984,6 @@ parameters:
     default:      1000
     latex:        ~
 
-  - name:         cdsponge
-    legacy_name:  CDsponge
-    yaml_path:    "sponge.CDsponge"
-    units:        ~
-    default:      5.0
-    latex:        ~
-
-  # ── tide (legacy mod_tide.F) ───────────────────────────────────────────────
-  - name:         tidal_bc_abs
-    legacy_name:  TIDAL_BC_ABS
-    yaml_path:    "tide.TIDAL_BC_ABS"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         tidal_bc_gen_abs
-    legacy_name:  TIDAL_BC_GEN_ABS
-    yaml_path:    "tide.TIDAL_BC_GEN_ABS"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         tide_bc_type
-    legacy_name:  TideBcType
-    yaml_path:    "tide.TideBcType"
-    units:        ~
-    default:      "CONSTANT"
-    latex:        ~
-
-  - name:         wavemakerpointnum
-    legacy_name:  WaveMakerPointNum
-    yaml_path:    "tide.WaveMakerPointNum"
-    units:        ~
-    default:      30
-    latex:        ~
-
-  - name:         tidewest_eta
-    legacy_name:  TideWest_ETA
-    yaml_path:    "tide.TideWest_ETA"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         tidewest_u
-    legacy_name:  TideWest_U
-    yaml_path:    "tide.TideWest_U"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tidewest_v
-    legacy_name:  TideWest_V
-    yaml_path:    "tide.TideWest_V"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tideeast_eta
-    legacy_name:  TideEast_ETA
-    yaml_path:    "tide.TideEast_ETA"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         tideeast_u
-    legacy_name:  TideEast_U
-    yaml_path:    "tide.TideEast_U"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tideeast_v
-    legacy_name:  TideEast_V
-    yaml_path:    "tide.TideEast_V"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tidesouth_eta
-    legacy_name:  TideSouth_ETA
-    yaml_path:    "tide.TideSouth_ETA"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         tidesouth_u
-    legacy_name:  TideSouth_U
-    yaml_path:    "tide.TideSouth_U"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tidesouth_v
-    legacy_name:  TideSouth_V
-    yaml_path:    "tide.TideSouth_V"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tidenorth_eta
-    legacy_name:  TideNorth_ETA
-    yaml_path:    "tide.TideNorth_ETA"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         tidenorth_u
-    legacy_name:  TideNorth_U
-    yaml_path:    "tide.TideNorth_U"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tidenorth_v
-    legacy_name:  TideNorth_V
-    yaml_path:    "tide.TideNorth_V"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         tidewestfilename
-    legacy_name:  TideWestFileName
-    yaml_path:    "tide.TideWestFileName"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         tideeastfilename
-    legacy_name:  TideEastFileName
-    yaml_path:    "tide.TideEastFileName"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         tidesouthfilename
-    legacy_name:  TideSouthFileName
-    yaml_path:    "tide.TideSouthFileName"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         tidenorthfilename
-    legacy_name:  TideNorthFileName
-    yaml_path:    "tide.TideNorthFileName"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # ── precipitation (legacy mod_precipitation.F) ─────────────────────────────
   - name:         rainfall_file
     legacy_name:  RAINFALL_FILE
     yaml_path:    "precipitation.RAINFALL_FILE"

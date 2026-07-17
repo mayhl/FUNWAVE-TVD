@@ -11,6 +11,28 @@ module model_config_defaults_mod
    implicit none
    public
 
+   ! ── boundaries ──
+   character(*), parameter :: DEF_BOUNDARIES_EAST_SPONGE_DIFFUSION_NU = "0.1"
+   character(*), parameter :: DEF_BOUNDARIES_EAST_SPONGE_DIRECT_A = "5.0"
+   character(*), parameter :: DEF_BOUNDARIES_EAST_SPONGE_DIRECT_R = "0.85"
+   character(*), parameter :: DEF_BOUNDARIES_EAST_SPONGE_FRICTION_CD = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_EAST_SPONGE_WIDTH = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_DIFFUSION_NU = "0.1"
+   character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_DIRECT_A = "5.0"
+   character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_DIRECT_R = "0.85"
+   character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_FRICTION_CD = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_WIDTH = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_RELAXATION_CELLS = "30"
+   character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_DIFFUSION_NU = "0.1"
+   character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_DIRECT_A = "5.0"
+   character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_DIRECT_R = "0.85"
+   character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_FRICTION_CD = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_WIDTH = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU = "0.1"
+   character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_DIRECT_A = "5.0"
+   character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_DIRECT_R = "0.85"
+   character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_FRICTION_CD = "0.0"
+   character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_WIDTH = "0.0"
    ! ── breaking ──
    character(*), parameter :: DEF_BREAKING_CBRK1 = "0.65"
    character(*), parameter :: DEF_BREAKING_CBRK2 = "0.35"
@@ -121,27 +143,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SIMULATION_STATION_OUTPUT_BUFFER = "1000"
    character(*), parameter :: DEF_SIMULATION_T_START = "0.0"
    character(*), parameter :: DEF_SIMULATION_TIME_STEPPING_FIXED_DT = "NO"
-   ! ── sponge ──
-   character(*), parameter :: DEF_SPONGE_CDSPONGE = "5.0"
-   character(*), parameter :: DEF_SPONGE_A_SPONGE = "5.0"
-   character(*), parameter :: DEF_SPONGE_CD_SPONGE = "0.0"
-   character(*), parameter :: DEF_SPONGE_CSP = "0.1"
-   character(*), parameter :: DEF_SPONGE_DIFFUSION_SPONGE = "NO"
-   character(*), parameter :: DEF_SPONGE_DIRECT_SPONGE = "NO"
-   character(*), parameter :: DEF_SPONGE_FRICTION_SPONGE = "NO"
-   character(*), parameter :: DEF_SPONGE_R_SPONGE = "0.85"
-   character(*), parameter :: DEF_SPONGE_SPONGE_EAST_WIDTH = "0.0"
-   character(*), parameter :: DEF_SPONGE_SPONGE_NORTH_WIDTH = "0.0"
-   character(*), parameter :: DEF_SPONGE_SPONGE_SOUTH_WIDTH = "0.0"
-   character(*), parameter :: DEF_SPONGE_SPONGE_WEST_WIDTH = "0.0"
    ! ── subgrid ──
    character(*), parameter :: DEF_SUBGRID_POROSITY = "NO"
    character(*), parameter :: DEF_SUBGRID_SUBMAINGRIDRATIO = "1"
-   ! ── tide ──
-   character(*), parameter :: DEF_TIDE_TIDAL_BC_ABS = "NO"
-   character(*), parameter :: DEF_TIDE_TIDAL_BC_GEN_ABS = "NO"
-   character(*), parameter :: DEF_TIDE_TIDEBCTYPE = "CONSTANT"
-   character(*), parameter :: DEF_TIDE_WAVEMAKERPOINTNUM = "30"
    ! ── vessel ──
    character(*), parameter :: DEF_VESSEL_CLEARANCE = "1.0"
    character(*), parameter :: DEF_VESSEL_CDDEEPDRAFT = "0.1"

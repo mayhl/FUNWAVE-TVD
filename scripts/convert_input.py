@@ -357,35 +357,30 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             wm.setdefault('Nfreq', 45)
         out['wavemaker'] = wm
 
-    # ---- sponge ------------------------------------------------------------
+    # ---- sponge -> boundaries face blocks (config reorg rung 2) -------------
+    # Legacy global coefficients replicate onto every face with width > 0;
+    # a type sub-block is present iff its legacy flag was T.
     ds = pop_bool('DIFFUSION_SPONGE')
     di = pop_bool('DIRECT_SPONGE')
     fs = pop_bool('FRICTION_SPONGE')
-    any_sponge = ds or di or fs or any(
-        params.get(k, '0') not in ('0', '0.0', 'F', 'FALSE', 'NO')
-        for k in ('Sponge_west_width', 'Sponge_east_width',
-                  'Sponge_south_width', 'Sponge_north_width')
-    )
-    if any_sponge:
-        sp: dict = {
-            'diffusion_sponge': ds,
-            'direct_sponge':    di,
-            'friction_sponge':  fs,
-        }
-        for k, yk in (('Csp', 'Csp'), ('CDsponge', 'CDsponge'),
-                      ('Sponge_west_width',  'Sponge_west_width'),
-                      ('Sponge_east_width',  'Sponge_east_width'),
-                      ('Sponge_south_width', 'Sponge_south_width'),
-                      ('Sponge_north_width', 'Sponge_north_width'),
-                      ('R_sponge', 'R_sponge'), ('A_sponge', 'A_sponge')):
-            v = pop_val(k)
-            if v is not None: sp[yk] = v
-        out['sponge'] = sp
-    else:
-        for k in ('Csp', 'CDsponge', 'Sponge_west_width', 'Sponge_east_width',
-                  'Sponge_south_width', 'Sponge_north_width',
-                  'R_sponge', 'A_sponge'):
-            pop(k)
+    widths = {f: pop_val(f'Sponge_{f}_width')
+              for f in ('west', 'east', 'south', 'north')}
+    r_sp, a_sp = pop_val('R_sponge'), pop_val('A_sponge')
+    cd_sp, nu_sp = pop_val('CDsponge'), pop_val('Csp')
+    if ds or di or fs:
+        for f, w in widths.items():
+            if w is None or str(w) in ('0', '0.0'): continue
+            # always emit the coefficients (legacy io.F defaults as fallback)
+            # -- a bare empty sub-block dumps as YAML null and would read as
+            # absent, silently dropping the sponge type
+            sp: dict = {'width': w}
+            if di:
+                sp['direct'] = {'r': r_sp or '0.85', 'a': a_sp or '5.0'}
+            if fs:
+                sp['friction'] = {'cd': cd_sp or '0.0'}
+            if ds:
+                sp['diffusion'] = {'nu': nu_sp or '0.1'}
+            out.setdefault('boundaries', {})[f] = {'sponge': sp}
 
     # ---- obstacle / breakwater ---------------------------------------------
     obs = pop_bool('OBSTACLE')
@@ -418,7 +413,7 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     # C_smg intentionally not consumed (Smagorinsky was amputated upstream);
     # it falls through to the unknown-key comment block.
     if pop_bool('PERIODIC'):
-        out['boundaries'] = {'periodic': ['y']}
+        out.setdefault('boundaries', {})['periodic'] = ['y']
     wl = pop_val('WATER_LEVEL')
     if wl is not None:
         out['initial'] = {'water_level': wl}

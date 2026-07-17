@@ -30,6 +30,7 @@ target_sources(${main_lib}_model PRIVATE
    breaking.f90
    output.f90
    physics.f90
+   boundaries.f90
    coupling.f90
    means.f90
    stations.f90

@@ -420,7 +420,7 @@ contains
       ! combined array whenever more than one contributor is live; the
       ! single-source cases still alias in merge_nu_vis.
       if (((this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) &
-           .and. this%sponge%diffusion_sponge) .or. ves_vis_on(this)) then
+           .and. this%sponge%any_diffusion()) .or. ves_vis_on(this)) then
          allocate (this%nu_vis(mloc, nloc), source=0.0_SP)
       end if
 
@@ -560,7 +560,7 @@ contains
                   this%nu_vis = this%nu_vis + this%vessel%vis_2d
                end if
             end if
-            if (this%sponge%diffusion_sponge) then
+            if (this%sponge%any_diffusion()) then
                this%nu_vis = this%nu_vis + this%sponge%nu_sponge
             end if
          end if
@@ -1055,7 +1055,7 @@ contains
          nu => this%nu_vis
       elseif (has_break) then
          nu => this%fields%nu_break
-      elseif (this%sponge%diffusion_sponge) then
+      elseif (this%sponge%any_diffusion()) then
          nu => this%sponge%nu_sponge
       else
          nu => this%zeros

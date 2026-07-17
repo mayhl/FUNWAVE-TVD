@@ -29,6 +29,7 @@ module model_main_mod
    use model_hot_start_mod, only: type_model_hot_start
    use model_wavemaker_mod, only: type_model_wavemaker
    use model_sponge_mod, only: type_model_sponge
+   use model_boundaries_mod, only: boundaries_read_input
    use model_obstacle_mod, only: type_model_obstacle
    use model_friction_mod, only: type_model_friction
    use model_numerics_mod, only: type_model_numerics
@@ -126,15 +127,14 @@ contains
       call this%simulation%read_input(this%env)
       call this%hot_start%read_input(this%env)
       call this%wavemaker%read_input(this%env)
-      call this%sponge%read_input(this%env)
       call this%obstacle%read_input(this%env)
       call this%friction%read_input(this%env)
       call this%numerics%read_input(this%env)
       call this%breaking%read_input(this%env)
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
+      call boundaries_read_input(this%env, this%sponge, this%tide, this%physics)
       call this%coupling%read_input(this%env)
-      call this%tide%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
       call this%foam%read_input(this%env)
@@ -174,15 +174,14 @@ contains
       call this%simulation%read_input(this%env)
       call this%hot_start%read_input(this%env)
       call this%wavemaker%read_input(this%env)
-      call this%sponge%read_input(this%env)
       call this%obstacle%read_input(this%env)
       call this%friction%read_input(this%env)
       call this%numerics%read_input(this%env)
       call this%breaking%read_input(this%env)
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
+      call boundaries_read_input(this%env, this%sponge, this%tide, this%physics)
       call this%coupling%read_input(this%env)
-      call this%tide%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
       call this%foam%read_input(this%env)

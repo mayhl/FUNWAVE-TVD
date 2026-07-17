@@ -5,15 +5,13 @@
 !
 !  Tide/surge boundary conditions (legacy mod_tide.F, TIDE_MODULE)
 !
-!  YAML block: tide:       (top-level; omit for no tidal BC)
-!    TIDAL_BC_ABS:      <bool>   absorbing-only mode, default NO
-!    TIDAL_BC_GEN_ABS:  <bool>   generating-absorbing mode (rides the ABS
-!                                wavemaker relaxation), default NO
-!    TideBcType:        CONSTANT | DATA   default CONSTANT
-!    WaveMakerPointNum: <int>    relaxation-strip width in cells, default 30
-!    TideWest_ETA/U/V:  <real>   CONSTANT targets; ETA presence enables the
-!                                boundary, U/V default 0 (all four boundaries)
-!    TideWestFileName:  <path>   DATA series; presence enables the boundary
+!  Configuration arrives from the boundaries: section reader
+!  (model_boundaries_mod) — this module owns no YAML read since the config
+!  reorg (rung 2): per-face forcing {eta,u,v} constants or file series map
+!  onto the CONSTANT/DATA targets below, boundaries.relaxation_cells onto
+!  iwidth, and tidal_bc_abs derives from forcing + sponge.direct presence.
+!  GEN_ABS currently has no YAML path (pending the rung-3 forcing.wavemaker
+!  reference).
 !
 !  Legacy call shape: TIDE_DATA once per step after ESTIMATE_DT (so at the
 !  already-advanced TIME), TIDE_BC per RK stage between UPDATE_MASK and
@@ -42,15 +40,10 @@
 
 module model_tide_mod
    use core_constants_mod, only: SP
-   use core_env_mod, only: type_env, get_sub_env
+   use core_env_mod, only: type_env
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
-
-   use model_config_defaults_mod, only: DEF_TIDE_TIDAL_BC_ABS, &
-                                        DEF_TIDE_TIDAL_BC_GEN_ABS, &
-                                        DEF_TIDE_TIDEBCTYPE, &
-                                        DEF_TIDE_WAVEMAKERPOINTNUM
 
    implicit none
 
@@ -118,70 +111,11 @@ module model_tide_mod
 
 contains
 
+   !> No-op satisfying the deferred base binding — configuration arrives
+   !> from the boundaries: reader (model_boundaries_mod)
    subroutine tide_read_input(this, env)
       class(type_model_tide), intent(inout) :: this
       type(type_env), intent(inout), target :: env
-
-      type(type_env) :: sub_env
-      character(:), allocatable :: bc_type
-      logical :: no_blk, no_key
-
-      sub_env = get_sub_env(env, "tide", is_empty=no_blk)
-      if (no_blk) return
-
-      call sub_env%yaml%read("WaveMakerPointNum", silent=no_key, &
-                             val=this%iwidth, default=DEF_TIDE_WAVEMAKERPOINTNUM)
-      call sub_env%yaml%read("TIDAL_BC_ABS", silent=no_key, &
-                             val=this%tidal_bc_abs, default=DEF_TIDE_TIDAL_BC_ABS)
-      call sub_env%yaml%read("TIDAL_BC_GEN_ABS", silent=no_key, &
-                             val=this%tidal_bc_gen_abs, default=DEF_TIDE_TIDAL_BC_GEN_ABS)
-
-      this%is_activated = this%tidal_bc_abs .or. this%tidal_bc_gen_abs
-      if (.not. this%is_activated) return
-
-      call sub_env%yaml%read("TideBcType", silent=no_key, &
-                             val=bc_type, default=DEF_TIDE_TIDEBCTYPE)
-      this%tide_bc_type = bc_type   ! fixed-len copy pads short values
-
-      if (this%tide_bc_type(1:4) == 'CONS') then
-         ! legacy Tide_READ_CONSTANT: ETA presence enables the boundary,
-         ! U/V default to zero independently
-         call sub_env%yaml%read("TideWest_ETA", silent=no_key, val=this%eta_west)
-         if (no_key) this%tide_west = .false.
-         call sub_env%yaml%read("TideWest_U", silent=no_key, val=this%u_west)
-         call sub_env%yaml%read("TideWest_V", silent=no_key, val=this%v_west)
-
-         call sub_env%yaml%read("TideEast_ETA", silent=no_key, val=this%eta_east)
-         if (no_key) this%tide_east = .false.
-         call sub_env%yaml%read("TideEast_U", silent=no_key, val=this%u_east)
-         call sub_env%yaml%read("TideEast_V", silent=no_key, val=this%v_east)
-
-         call sub_env%yaml%read("TideSouth_ETA", silent=no_key, val=this%eta_south)
-         if (no_key) this%tide_south = .false.
-         call sub_env%yaml%read("TideSouth_U", silent=no_key, val=this%u_south)
-         call sub_env%yaml%read("TideSouth_V", silent=no_key, val=this%v_south)
-
-         call sub_env%yaml%read("TideNorth_ETA", silent=no_key, val=this%eta_north)
-         if (no_key) this%tide_north = .false.
-         call sub_env%yaml%read("TideNorth_U", silent=no_key, val=this%u_north)
-         call sub_env%yaml%read("TideNorth_V", silent=no_key, val=this%v_north)
-      end if
-
-      if (this%tide_bc_type(1:4) == 'DATA') then
-         call sub_env%yaml%read_input_path("TideWestFileName", silent=no_key, &
-                                           val=this%file_west)
-         if (no_key) this%tide_west = .false.
-         call sub_env%yaml%read_input_path("TideEastFileName", silent=no_key, &
-                                           val=this%file_east)
-         if (no_key) this%tide_east = .false.
-         call sub_env%yaml%read_input_path("TideSouthFileName", silent=no_key, &
-                                           val=this%file_south)
-         if (no_key) this%tide_south = .false.
-         call sub_env%yaml%read_input_path("TideNorthFileName", silent=no_key, &
-                                           val=this%file_north)
-         if (no_key) this%tide_north = .false.
-      end if
-
    end subroutine tide_read_input
 
    ! ----------------------------------------------------------------
