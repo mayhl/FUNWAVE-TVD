@@ -54,7 +54,7 @@ module core_output_channel_mod
    integer, parameter :: VARNAME_LEN = 32
    integer, parameter :: STATNAME_LEN = 8
    integer, parameter :: ID_LEN = 64
-   integer, parameter :: VARS_MAX = 16
+   integer, parameter :: VARS_MAX = 32
    integer, parameter :: STATS_MAX = 4
 
    type :: type_output_channel
@@ -142,6 +142,11 @@ contains
       this%result_folder = trim(result_folder)
       this%icount = 0
       if (present(icount_start)) this%icount = icount_start
+
+      ! loud guard: a release build without bounds checking would silently
+      ! corrupt neighbouring components instead
+      if (n_vars > VARS_MAX) error stop "output_channel: variable list exceeds VARS_MAX"
+      if (n_stats > STATS_MAX) error stop "output_channel: statistics list exceeds STATS_MAX"
 
       this%variables(1:n_vars) = variables(1:n_vars)
       if (present(file_prefixes)) then
