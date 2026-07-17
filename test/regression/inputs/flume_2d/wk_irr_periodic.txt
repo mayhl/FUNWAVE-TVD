@@ -57,7 +57,6 @@ FroudeCap = 1.0
 MinDepth = 0.01
 
 ! pinned - dev reader default 0.7 vs ref worktree 0.8
-SWE_ETA_DEP = 0.8
 
 VISCOSITY_BREAKING = F
 
