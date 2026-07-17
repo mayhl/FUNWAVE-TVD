@@ -53,7 +53,7 @@ class UnitTestRunner(BaseRunner):
                 ".",
                 "-B",
                 self.build_dir,
-                f"-DENABLE_TESTING={testing}",
+                f"-DENABLE_UNIT_TESTING={testing}",
                 "-DENABLE_DEV_MODE=ON",
                 f"-DCMAKE_BUILD_TYPE={build_type}",
             ]

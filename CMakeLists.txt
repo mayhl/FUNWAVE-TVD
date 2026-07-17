@@ -119,17 +119,16 @@ endif()
 # 1. TESTING CONFIGURATION
 # ==============================================================================
 
-option(ENABLE_TESTING "Enable unit testing" OFF)
-option(ENABLE_REGRESSION_TESTING "Enable regression testing" OFF)
+option(ENABLE_UNIT_TESTING "Enable unit (pFUnit) testing" OFF)
 option(ENABLE_DEV_MODE "Enable development mode (skip executable)" OFF)
 
-# Enable CTest globally if ANY testing is enabled
-if(ENABLE_TESTING OR ENABLE_REGRESSION_TESTING)
+# Enable CTest when unit testing is on
+if(ENABLE_UNIT_TESTING)
   enable_testing()
 endif()
 
 # Only require PFUNIT for unit testing
-if(ENABLE_TESTING)
+if(ENABLE_UNIT_TESTING)
   if(NOT PFUNIT_DIR)
     file(GLOB PFUNIT_DIRS
          "${CMAKE_CURRENT_SOURCE_DIR}/extern/pfunit/installed/PFUNIT-*")
@@ -155,8 +154,8 @@ if(ENABLE_TESTING)
   find_package(PFUNIT REQUIRED PATHS "${PFUNIT_DIR}" NO_DEFAULT_PATH)
 endif()
 
-# Only include test subdirectory if testing is enabled
-if(ENABLE_TESTING OR ENABLE_REGRESSION_TESTING)
+# Only include test subdirectory if unit testing is enabled
+if(ENABLE_UNIT_TESTING)
   add_subdirectory(test)
 endif()
 
