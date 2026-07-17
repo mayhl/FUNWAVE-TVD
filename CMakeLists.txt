@@ -40,7 +40,8 @@ option(USE_SPHERICAL "Enable spherical coordinates" OFF)
 # Per-module 2D features are now runtime YAML switches (one binary does all);
 # USE_SEDIMENT is retained only because the 3D path still gates on -DSEDIMENT.
 option(USE_SEDIMENT "Enable sediment module (3D path only)" OFF)
-option(ZERO_PHASE "Set all random wavemaker phases to zero (for regression testing)" OFF)
+option(ZERO_PHASE
+       "Set all random wavemaker phases to zero (for regression testing)" OFF)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -103,12 +104,14 @@ if(NOT ENABLE_DEV_MODE)
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
-  # Link the 3D shared library when available (built by src/model/3d/CMakeLists.txt
-  # when HYPRE is found).  Transitional scaffolding — remove together with
-  # funwave_3d when MODULE GLOBAL is replaced by the typed framework.
+  # Link the 3D shared library when available (built by
+  # src/model/3d/CMakeLists.txt when HYPRE is found).  Transitional scaffolding
+  # — remove together with funwave_3d when MODULE GLOBAL is replaced by the
+  # typed framework.
   if(TARGET funwave_3d)
     target_link_libraries(${exe_name} PRIVATE funwave_3d)
-    target_include_directories(${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules/3d_old")
+    target_include_directories(${exe_name}
+                               PRIVATE "${CMAKE_BINARY_DIR}/modules/3d_old")
   endif()
 endif()
 

@@ -1,6 +1,4 @@
-target_sources(${main_lib}_model PRIVATE
-   base.f90
-   launcher.F90)
+target_sources(${main_lib}_model PRIVATE base.f90 launcher.F90)
 
 add_subdirectory(2d)
 add_subdirectory(3d)
@@ -11,6 +9,6 @@ set_target_properties(
 
 # Expose model modules to dependents (the exe and unit tests)
 target_include_directories(
-  ${main_lib}_model PUBLIC
-  "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/model>"
-  "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/core>")
+  ${main_lib}_model
+  PUBLIC "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/model>"
+         "$<BUILD_INTERFACE:${CMAKE_BINARY_DIR}/modules/core>")

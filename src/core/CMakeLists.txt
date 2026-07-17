@@ -15,12 +15,18 @@ add_subdirectory(numerics)
 # Layer 4: Output (peer to engine; depends on numerics + engine)
 add_subdirectory(output)
 
-target_link_libraries(${main_lib}_core INTERFACE libcore_base libcore_infra
-                                                 libcore_engine libcore_numerics
-                                                 libcore_output)
+target_link_libraries(
+  ${main_lib}_core INTERFACE libcore_base libcore_infra libcore_engine
+                             libcore_numerics libcore_output)
 
-list(APPEND all_targets libcore_base libcore_infra libcore_engine
-     libcore_numerics libcore_output)
+list(
+  APPEND
+  all_targets
+  libcore_base
+  libcore_infra
+  libcore_engine
+  libcore_numerics
+  libcore_output)
 
 set(all_targets
     "${all_targets}"
