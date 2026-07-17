@@ -47,9 +47,10 @@
 !                         0.1 — a block without cd runs drag-free)
 !      nu:        <real>  presence = hull eddy viscosity [m^2/s]
 !                         (nee ViscosityMethod + VisDeepDraft)
-!    OUT_VESSEL:       <bool>  default T     write the resistance time series
-!    PLOT_INTV_VESSEL: <real>  default SMALL resistance output interval  [s]
-!                      (both legacy-spelled until the rung-5 output move)
+!  The resistance time series is requested via the output: vessel: block
+!  (interval nee PLOT_INTV_VESSEL) and the field dumps via output:
+!  variables: Pves/VesUp/VesVp (nee OUT_VESSEL); main wires out_vessel/
+!  plot_intv from there before init_compute.
 !
 !  Legacy call shape: VESSEL_INITIAL from init; VESSEL_FORCING once per step,
 !  after ESTIMATE_DT (so TIME is already advanced) and BEFORE the RK loop.
@@ -107,8 +108,7 @@ module model_vessel_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
    use model_bc_mod, only: type_model_bc
-   use model_config_defaults_mod, only: DEF_VESSEL_COUNT, DEF_VESSEL_OUT_VESSEL, &
-                                        DEF_VESSEL_PROPELLER, &
+   use model_config_defaults_mod, only: DEF_VESSEL_COUNT, DEF_VESSEL_PROPELLER, &
                                         DEF_VESSEL_DEEP_DRAFT_MASK
    use mpi_f08
 
@@ -125,7 +125,8 @@ module model_vessel_mod
       character(:), allocatable :: vessel_folder
       character(:), allocatable :: result_folder
       integer  :: n_vessel = 0
-      logical  :: out_vessel = .true.
+      ! wired by main from the output: vessel: block (series on + cadence)
+      logical  :: out_vessel = .false.
       real(SP) :: plot_intv = ZERO
       logical  :: propeller = .false.
       logical  :: deep_draft = .false.
@@ -201,7 +202,7 @@ contains
 
       type(type_env) :: sub_env
       type(type_yaml_reader) :: blk
-      logical :: no_blk, no_key
+      logical :: no_blk, no_key, tmp_l
       real(SP) :: tmp_r
 
       sub_env = get_sub_env(env, "vessel", is_empty=no_blk)
@@ -214,12 +215,15 @@ contains
 
       call sub_env%yaml%read("count", silent=no_key, val=this%n_vessel, &
                              default=DEF_VESSEL_COUNT)
-      call sub_env%yaml%read("OUT_VESSEL", silent=no_key, val=this%out_vessel, &
-                             default=DEF_VESSEL_OUT_VESSEL)
-      ! legacy "PLOT_INTV_VESSEL not specified, use SMALL" -- SMALL, not the
-      ! main output interval, so an absent key writes resistance every step
-      call sub_env%yaml%read("PLOT_INTV_VESSEL", silent=no_key, val=this%plot_intv)
-      if (no_key) this%plot_intv = SMALL
+      ! retired keys: the series moved to output: vessel:, the fields to
+      ! output: variables:
+      call sub_env%yaml%read("OUT_VESSEL", silent=no_key, val=tmp_l)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "vessel: OUT_VESSEL moved -- set output: vessel: for the resistance "// &
+         "series and list Pves/VesUp/VesVp under output: variables:")
+      call sub_env%yaml%read("PLOT_INTV_VESSEL", silent=no_key, val=tmp_r)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "vessel: PLOT_INTV_VESSEL moved -- set output: vessel: interval")
 
       call sub_env%yaml%read("propeller", silent=no_key, val=this%propeller, &
                              default=DEF_VESSEL_PROPELLER)

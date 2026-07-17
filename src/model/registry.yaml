@@ -1082,12 +1082,6 @@ parameters:
     default:      false
     latex:        ~
 
-  - name:         eta_blow_val
-    legacy_name:  EtaBlowVal
-    yaml_path:    "output.eta_blow_val"
-    units:        "m"
-    default:      1.0e8
-    latex:        "$\\eta_{\\mathrm{blow}}$"
 
   - name:         field_io_type
     legacy_name:  FIELD_IO_TYPE
@@ -1096,12 +1090,6 @@ parameters:
     default:      ASCII
     latex:        ~
 
-  - name:         number_stations
-    legacy_name:  NumberStations
-    yaml_path:    "output.number_stations"
-    units:        ~
-    default:      0
-    latex:        ~
 
   - name:         output_res
     legacy_name:  OUTPUT_RES
@@ -1119,23 +1107,23 @@ parameters:
 
   - name:         stations_file
     legacy_name:  STATIONS_FILE
-    yaml_path:    "output.stations_file"
+    yaml_path:    "output.stations.file"
     units:        ~
     default:      ~
     latex:        ~
 
-  - name:         steady_time
+  - name:         means_steady_time
     legacy_name:  STEADY_TIME
-    yaml_path:    "output.steady_time"
+    yaml_path:    "output.means.steady_time"
     units:        "s"
-    default:      999999.0    # legacy LARGE
+    default:      0.0    # block present -> start averaging at once (legacy default LARGE = block absent)
     latex:        "$T_{\\mathrm{steady}}$"
 
-  - name:         t_intv_mean
+  - name:         means_interval
     legacy_name:  T_INTV_mean
-    yaml_path:    "output.t_intv_mean"
+    yaml_path:    "output.means.interval"
     units:        "s"
-    default:      999999.0    # legacy LARGE
+    default:      ~
     latex:        "$T_{\\mathrm{mean}}$"
 
   # ── physics ────────────────────────────────────────────────────────────────
@@ -1195,7 +1183,7 @@ parameters:
   # ── simulation ─────────────────────────────────────────────────────────────
   - name:         output_interval
     legacy_name:  PLOT_INTV
-    yaml_path:    "simulation.output_interval"
+    yaml_path:    "output.interval"
     units:        "s"
     default:      ~
     latex:        "$\\Delta t_{\\mathrm{out}}$"
@@ -1260,41 +1248,34 @@ parameters:
   # legacy (init.F:850, which overwrites its own input key).  An explicit value
   # overrides; legacy has no such escape hatch.  A fixed threshold cannot work --
   # a deep-draft hull legitimately imprints eta = -draft.
-  - name:         eta_blow_val
+  - name:         blowup_threshold
     legacy_name:  EtaBlowVal
-    yaml_path:    "output.EtaBlowVal"
+    yaml_path:    "output.blowup_threshold"
     units:        "m"
     default:      ~
     latex:        ~
 
-  - name:         plot_intv_station
+  - name:         stations_interval
     legacy_name:  PLOT_INTV_STATION
-    yaml_path:    "simulation.plot_intv_station"
-    units:        ~
+    yaml_path:    "output.stations.interval"
+    units:        "s"
     default:      1.0
     latex:        ~
 
-  - name:         station_output_buffer
+  - name:         stations_buffer
     legacy_name:  StationOutputBuffer
-    yaml_path:    "simulation.station_output_buffer"
+    yaml_path:    "output.stations.buffer"
     units:        ~
     default:      1000
     latex:        ~
 
-  # RainWaveInteraction is dropped, not renamed: legacy reads it and consumes
-  # it nowhere (no consumer of the flag exists), so there is nothing to port.
+  # RainWaveInteraction and OUT_PRECIPITATION are dropped, not renamed: legacy
+  # reads them and consumes them nowhere, so there is nothing to port.
   - name:         rainfall_file
     legacy_name:  RAINFALL_FILE
     yaml_path:    "precipitation.file"
     units:        ~
     default:      ~
-    latex:        ~
-
-  - name:         out_precipitation
-    legacy_name:  OUT_PRECIPITATION
-    yaml_path:    "precipitation.OUT_PRECIPITATION"
-    units:        ~
-    default:      true
     latex:        ~
 
   # ── initial ────────────────────────────────────────────────────────────────
@@ -1451,7 +1432,8 @@ parameters:
   # wind_force; holland carries both couplings as explicit switches.  The wind
   # knobs live inside the wind-capable blocks; crest_percent is rejected
   # unless wave_interaction (legacy forced it inert to LARGE), and absent it
-  # derives LARGE (mask == 1).  OUT_METEO stays put until rung 5.
+  # derives LARGE (mask == 1).  OUT_METEO dissolved into output: variables:
+  # Pstorm/Ustorm/Vstorm.
   - name:         gaussian_file
     legacy_name:  METEO_GAUSIAN_FILE
     yaml_path:    "meteo.gaussian.file"
@@ -1536,12 +1518,6 @@ parameters:
     default:      ~
     latex:        ~
 
-  - name:         out_meteo
-    legacy_name:  OUT_METEO
-    yaml_path:    "meteo.OUT_METEO"
-    units:        ~
-    default:      true
-    latex:        ~
 
   # ── subgrid (legacy mod_subgrid.F) ─────────────────────────────────────────
   - name:         subgrid_depth_file
@@ -1568,12 +1544,6 @@ parameters:
   # ── foam (legacy mod_foam.F) ───────────────────────────────────────────────
   # BurstRate/TransferRate are omitted: their readers sit behind USE_BURSTRATE,
   # which no build system defines, so the knobs are unreachable.
-  - name:         plot_intv_foam
-    legacy_name:  PLOT_INTV_FOAM
-    yaml_path:    "foam.PLOT_INTV_FOAM"
-    units:        "s"
-    default:      ~
-    latex:        ~
 
   - name:         foam_source_coef
     legacy_name:  f_source
@@ -1637,8 +1607,9 @@ parameters:
   # presence = hull drag (nee FrictionMethod + CdDeepDraft), nu presence = hull
   # eddy viscosity (nee ViscosityMethod + VisDeepDraft).  NOTE: legacy defaults
   # FrictionMethod on, so the converter emits cd explicitly; a hand-authored
-  # block without cd runs drag-free.  OUT_VESSEL/PLOT_INTV_VESSEL stay
-  # legacy-spelled until the rung-5 output move.
+  # block without cd runs drag-free.  OUT_VESSEL dissolved into output:
+  # variables: Pves/VesUp/VesVp + the output.vessel series block;
+  # PLOT_INTV_VESSEL lives on as output.vessel.interval.
   - name:         vessel_folder
     legacy_name:  VESSEL_FOLDER
     yaml_path:    "vessel.folder"
@@ -1653,16 +1624,10 @@ parameters:
     default:      1
     latex:        ~
 
-  - name:         out_vessel
-    legacy_name:  OUT_VESSEL
-    yaml_path:    "vessel.OUT_VESSEL"
-    units:        ~
-    default:      true
-    latex:        ~
 
-  - name:         plot_intv_vessel
+  - name:         vessel_interval
     legacy_name:  PLOT_INTV_VESSEL
-    yaml_path:    "vessel.PLOT_INTV_VESSEL"
+    yaml_path:    "output.vessel.interval"
     units:        "s"
     default:      ~
     latex:        ~

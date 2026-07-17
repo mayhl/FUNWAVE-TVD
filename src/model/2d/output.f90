@@ -6,25 +6,37 @@
 !  Output configuration YAML reader
 !
 !  YAML block: output:
+!    interval:        <real>     field output cadence (s),     REQUIRED
+!                                (nee simulation.output_interval)
 !    result_folder:   <string>   output directory,             default './output/'
 !    field_io_type:   <string>   parallel field I/O format,    default 'ASCII'
-!    number_stations: <int>      station count,                default 0
-!    stations_file:   <string>   station coordinates file      (required if number_stations > 0)
-!    plot_intv_station: <real>   station output interval (s),  default 1.0
-!    station_output_buffer: <int> station buffer size,         default 1000
 !    output_res:      <int>      field sub-sampling factor,    default 1
-!    EtaBlowVal:      <real>     blow-up threshold (m),        default 10.0
+!    blowup_threshold: <real>    blow-up |eta| threshold (m),  default derived
+!                                100*max|Depth| (nee EtaBlowVal)
 !    depth_out:       <bool>     output bathymetry (static),   default NO
-!    T_INTV_mean:     <real>     wave-averaging interval (s),  default 999999.0 (disabled)
-!    STEADY_TIME:     <real>     time to start averaging (s),  default 999999.0 (disabled)
-!                                (time-varying once sediment is active)
+!    stations:                   presence = station time series
+!      file:     <string>        one "i j" pair per line;      REQUIRED
+!                                station count = line count
+!      interval: <real>          station cadence (s),          default 1.0
+!      buffer:   <int>           station buffer size,          default 1000
+!    means:                      presence = wave-averaged output window
+!      interval:    <real>       averaging window (s),         REQUIRED
+!      steady_time: <real>       time to start averaging (s),  default 0
+!    vessel:                     presence = resistance time series
+!      interval: <real>          series cadence (s), 0 = every step; REQUIRED
+!                                (nee OUT_VESSEL + PLOT_INTV_VESSEL)
+!    arrival_time:               presence = first-arrival map
+!      min_height: <real>        arrival threshold (m),        default 0.001
 !    variables: [U, V, ETA, Hmax, Hmin, Umax, MFmax, VORmax,
 !                MASK, MASK9, Umean, Vmean, ETAmean, WaveHeight,
 !                SXL, SXR, SYL, SYR, SourceX, SourceY,
 !                FrcX, FrcY, BrkdisX, BrkdisY, P, Q,
 !                Fx, Fy, Gx, Gy, AGE, ROLLER, UNDERTOW,
-!                NU, TMP, Radiation, ETAscreen]
+!                NU, TMP, Radiation, ETAscreen,
+!                Pstorm, Ustorm, Vstorm,     # meteo fields (nee OUT_METEO)
+!                Pves, VesUp, VesVp]         # vessel fields (nee OUT_VESSEL)
 !                                temporary flat list; maps each name → OUT_* flag.
+!                                Unknown names are rejected loudly.
 !                                Will be replaced by per-channel variable lists.
 !    channels: (list of channel dicts — stub, not yet parsed)
 !
@@ -34,8 +46,9 @@
 !-------------------------------------------------
 
 module model_output_mod
-   use core_constants_mod, only: SP, type_string, MPI_SP
+   use core_constants_mod, only: SP, ZERO, SMALL, type_string, MPI_SP
    use core_env_mod, only: type_env, get_sub_env
+   use core_path_mod, only: type_path
    use core_grid_mod, only: type_grid_2d
    use model_base_mod, only: type_model_base
    use mpi_f08
@@ -45,9 +58,11 @@ module model_output_mod
    use model_config_defaults_mod, only: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT, &
                                         DEF_OUTPUT_DEPTH_OUT, &
                                         DEF_OUTPUT_FIELD_IO_TYPE, &
-                                        DEF_OUTPUT_NUMBER_STATIONS, DEF_OUTPUT_OUTPUT_RES, &
-                                        DEF_OUTPUT_RESULT_FOLDER, DEF_OUTPUT_STEADY_TIME, &
-                                        DEF_OUTPUT_T_INTV_MEAN
+                                        DEF_OUTPUT_MEANS_STEADY_TIME, &
+                                        DEF_OUTPUT_OUTPUT_RES, &
+                                        DEF_OUTPUT_RESULT_FOLDER, &
+                                        DEF_OUTPUT_STATIONS_BUFFER, &
+                                        DEF_OUTPUT_STATIONS_INTERVAL
 
    implicit none
 
@@ -81,11 +96,12 @@ module model_output_mod
       type(type_channel_config), allocatable :: channels(:)
       integer :: n_channels = 0
 
+      ! Field output cadence (nee simulation.output_interval / legacy PLOT_INTV)
+      real(SP) :: interval = 0.0_SP
+
       ! Bridge fields for legacy io.F use
       character(:), allocatable :: result_folder
       character(:), allocatable :: field_io_type
-      character(:), allocatable :: stations_file
-      integer  :: number_stations = 0
       integer  :: output_res = 1
       ! Blow-up threshold.  Legacy DERIVES this as 100*max|Depth| in
       ! INITIALIZATION (init.F:850) and overwrites whatever the input file said,
@@ -94,11 +110,23 @@ module model_output_mod
       ! it (a deliberate improvement -- legacy cannot be overridden at all).
       ! A fixed threshold cannot work: a deep-draft hull legitimately imprints
       ! eta = -draft, which a flat 10 m limit reads as a blow-up on step 1.
-      real(SP) :: EtaBlowVal = 10.0_SP
+      real(SP) :: blowup_threshold = 10.0_SP
       logical  :: has_blow_val = .false.
 
       ! Depth output — static (no time component) unless sediment is active
       logical :: depth_out = .false.
+
+      ! Station time series (nee number_stations/stations_file + the
+      ! simulation-section cadence pair); count derived from the file
+      logical :: stations_on = .false.
+      character(:), allocatable :: stations_file
+      real(SP) :: stations_interval = 1.0_SP
+      integer  :: stations_buffer = 1000
+
+      ! Vessel resistance time series (nee OUT_VESSEL + PLOT_INTV_VESSEL);
+      ! interval 0 maps to SMALL = legacy every-step default
+      logical  :: vessel_series_on = .false.
+      real(SP) :: vessel_interval = SMALL
 
       ! First-arrival map (nee numerics OUT_Time/ArrTimeMin): block presence
       ! enables the time-of-first-exceedance accumulator; no cadence
@@ -143,9 +171,17 @@ module model_output_mod
       logical :: OUT_NU = .false.
       logical :: OUT_TMP = .false.
       logical :: OUT_Radiation = .false.
+      ! Meteo/vessel field dumps (nee OUT_METEO/OUT_VESSEL bools); the field
+      ! channel builder cross-checks applicability against the active models
+      logical :: OUT_Pstorm = .false.
+      logical :: OUT_Ustorm = .false.
+      logical :: OUT_Vstorm = .false.
+      logical :: OUT_Pves = .false.
+      logical :: OUT_VesUp = .false.
+      logical :: OUT_VesVp = .false.
 
-      ! Wave-averaged output window; will map to a mean-stats channel interval/t_start
-      ! once the output block YAML is fully implemented.
+      ! Wave-averaged output window (nee T_INTV_mean/STEADY_TIME); 999999
+      ! component defaults = averaging disabled when the means: block is absent
       real(SP) :: T_INTV_mean = 999999.0_SP
       real(SP) :: STEADY_TIME = 999999.0_SP
    contains
@@ -160,12 +196,13 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      type(type_yaml_reader) :: arr_yaml
+      type(type_yaml_reader) :: blk_yaml
       type(type_string), allocatable :: var_list(:)
+      type(type_path) :: sta_path
       integer :: iv
-      logical :: is_empty, no_key, no_vars, no_arr
+      logical :: is_empty, no_key, no_vars, no_blk
 
-      ! Initialize string fields before possible early return so io.F always gets valid values
+      ! Initialize string fields before possible early exit so io.F always gets valid values
       this%result_folder = "./output/"
       this%field_io_type = "ASCII"
       this%stations_file = ""
@@ -174,33 +211,67 @@ contains
       this%is_activated = .not. is_empty
       this%n_channels = 0
       if (allocated(this%channels)) deallocate (this%channels)
-      if (is_empty) return
+      if (is_empty) call env%log%exit_on_error( &
+         "output: section is required -- at minimum set interval:")
 
+      call sub_env%yaml%read_positive("interval", val=this%interval)
       call sub_env%yaml%read("result_folder", val=this%result_folder, default=DEF_OUTPUT_RESULT_FOLDER)
       call sub_env%yaml%read("field_io_type", val=this%field_io_type, default=DEF_OUTPUT_FIELD_IO_TYPE)
-      call sub_env%yaml%read("number_stations", val=this%number_stations, default=DEF_OUTPUT_NUMBER_STATIONS)
-      if (this%number_stations > 0) then
-         call sub_env%yaml%read("stations_file", val=this%stations_file, default="")
-      end if
       call sub_env%yaml%read("output_res", val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
       ! NOTE: no `default=` here on purpose -- yaml%read only assigns `silent`
       ! when `default` is ABSENT, so asking for both hands back an unwritten
-      ! flag.  Absent key -> EtaBlowVal keeps its component value and
+      ! flag.  Absent key -> blowup_threshold keeps its component value and
       ! resolve_blowup() replaces it with the legacy-derived 100*max|Depth|
-      call sub_env%yaml%read("EtaBlowVal", silent=no_key, val=this%EtaBlowVal)
+      call sub_env%yaml%read("blowup_threshold", silent=no_key, val=this%blowup_threshold)
       this%has_blow_val = .not. no_key
       call sub_env%yaml%read("depth_out", val=this%depth_out, default=DEF_OUTPUT_DEPTH_OUT)
 
+      ! stations: block presence enables the station time series; the station
+      ! count is the file's line count (derive, don't duplicate)
+      blk_yaml = sub_env%yaml%cast_dictionary("stations", no_blk)
+      if (.not. no_blk) then
+         this%stations_on = .true.
+         call blk_yaml%read_input_path("file", silent=no_key, val=sta_path)
+         if (no_key) call env%log%exit_on_error("output: stations: file is required")
+         this%stations_file = sta_path%root
+         call blk_yaml%read("interval", silent=no_key, val=this%stations_interval, &
+                            default=DEF_OUTPUT_STATIONS_INTERVAL)
+         call blk_yaml%read("buffer", silent=no_key, val=this%stations_buffer, &
+                            default=DEF_OUTPUT_STATIONS_BUFFER)
+      end if
+
+      ! means: block presence enables the wave-averaged window
+      blk_yaml = sub_env%yaml%cast_dictionary("means", no_blk)
+      if (.not. no_blk) then
+         call blk_yaml%read_positive("interval", val=this%T_INTV_mean)
+         call blk_yaml%read("steady_time", silent=no_key, val=this%STEADY_TIME, &
+                            default=DEF_OUTPUT_MEANS_STEADY_TIME)
+      end if
+
+      ! vessel: block presence enables the resistance time series
+      blk_yaml = sub_env%yaml%cast_dictionary("vessel", no_blk)
+      if (.not. no_blk) then
+         this%vessel_series_on = .true.
+         call blk_yaml%read("interval", val=this%vessel_interval)
+         ! legacy "PLOT_INTV_VESSEL not specified, use SMALL" -- 0 keeps the
+         ! every-step behaviour without a magic literal in the config
+         if (this%vessel_interval <= ZERO) this%vessel_interval = SMALL
+      end if
+
       ! arrival_time: block presence enables the first-arrival map
-      arr_yaml = sub_env%yaml%cast_dictionary("arrival_time", no_arr)
-      if (.not. no_arr) then
+      blk_yaml = sub_env%yaml%cast_dictionary("arrival_time", no_blk)
+      if (.not. no_blk) then
          this%out_arr_time = .true.
-         call arr_yaml%read("min_height", silent=no_key, val=this%arr_time_min_h, &
+         call blk_yaml%read("min_height", silent=no_key, val=this%arr_time_min_h, &
                             default=DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT)
       end if
 
-      call sub_env%yaml%read("T_INTV_mean", silent=no_key, val=this%T_INTV_mean, default=DEF_OUTPUT_T_INTV_MEAN)
-      call sub_env%yaml%read("STEADY_TIME", silent=no_key, val=this%STEADY_TIME, default=DEF_OUTPUT_STEADY_TIME)
+      ! Retired key spellings: loud rejection beats silent acceptance
+      call reject_moved_key(sub_env, "EtaBlowVal", "blowup_threshold")
+      call reject_moved_key(sub_env, "T_INTV_mean", "means: interval")
+      call reject_moved_key(sub_env, "STEADY_TIME", "means: steady_time")
+      call reject_moved_key(sub_env, "number_stations", "stations: (count = file line count)")
+      call reject_moved_key(sub_env, "stations_file", "stations: file")
 
       call sub_env%yaml%read_string_array("variables", silent=no_vars, val=var_list)
       if (.not. no_vars) then
@@ -243,11 +314,33 @@ contains
             case ("NU"); this%OUT_NU = .true.
             case ("TMP"); this%OUT_TMP = .true.
             case ("Radiation"); this%OUT_Radiation = .true.
+            case ("Pstorm"); this%OUT_Pstorm = .true.
+            case ("Ustorm"); this%OUT_Ustorm = .true.
+            case ("Vstorm"); this%OUT_Vstorm = .true.
+            case ("Pves"); this%OUT_Pves = .true.
+            case ("VesUp"); this%OUT_VesUp = .true.
+            case ("VesVp"); this%OUT_VesVp = .true.
+            case default
+               call env%log%exit_on_error( &
+                  "output: variables: unknown name '"//trim(var_list(iv)%s)//"'")
             end select
          end do
       end if
 
    end subroutine output_read_input
+
+   subroutine reject_moved_key(sub_env, old_key, new_home)
+      type(type_env), intent(inout) :: sub_env
+      character(*), intent(in) :: old_key, new_home
+
+      character(:), allocatable :: tmp
+      logical :: no_key
+
+      call sub_env%yaml%read(old_key, silent=no_key, val=tmp)
+      if (.not. no_key) call sub_env%log%exit_on_error( &
+         "output: "//old_key//" moved -- set "//new_home)
+
+   end subroutine reject_moved_key
 
    ! Legacy INITIALIZATION (init.F:850):
    !     EtaBlowVal = 100 * MAXVAL(abs(Depth(Ibeg:Iend, Jbeg:Jend)))
@@ -275,7 +368,7 @@ contains
          local_max = global_max
       end if
 
-      this%EtaBlowVal = 100.0_SP*local_max
+      this%blowup_threshold = 100.0_SP*local_max
 
    end subroutine output_resolve_blowup
 

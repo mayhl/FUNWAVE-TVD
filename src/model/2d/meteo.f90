@@ -28,8 +28,9 @@
 !                                when wind_force (rejected otherwise)
 !    slide:                      presence = landslide source
 !      file: <path>              geometry + track; required
-!    OUT_METEO: <bool>           default YES  write the pressure field
-!                                (legacy-spelled until the rung-5 output move)
+!
+!  Field dumps (nee OUT_METEO) are requested via output: variables:
+!  Pstorm/Ustorm/Vstorm.
 !
 !  The dispatcher bools are presence-derived; gaussian and slide force the
 !  pressure coupling on (their whole output IS the pressure field), and a
@@ -108,8 +109,7 @@ module model_meteo_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_METEO_OUT_METEO, &
-                                        DEF_METEO_WIND_CD, &
+   use model_config_defaults_mod, only: DEF_METEO_WIND_CD, &
                                         DEF_METEO_WIND_WAVE_INTERACTION, &
                                         DEF_METEO_HOLLAND_AIR_PRESSURE, &
                                         DEF_METEO_HOLLAND_WIND_FORCE, &
@@ -135,7 +135,6 @@ module model_meteo_mod
       logical :: wind_wave_interaction = .false.
       real(SP) :: cdw = 0.002_SP
       real(SP) :: wind_crest_percent = LARGE
-      logical :: out_meteo = .true.
 
       type(type_path) :: gausian_file
       type(type_path) :: constant_wind_file
@@ -269,9 +268,10 @@ contains
             "meteo: block present but no sub-model (gaussian/wind/holland/slide)")
       end if
 
-      call sub_env%yaml%read("OUT_METEO", silent=no_key, &
-                             val=this%out_meteo, &
-                             default=DEF_METEO_OUT_METEO)
+      ! retired key: field dumps are requested via output: variables:
+      call sub_env%yaml%read("OUT_METEO", silent=no_key, val=tmp_l)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "meteo: OUT_METEO moved -- list Pstorm/Ustorm/Vstorm under output: variables:")
 
    end subroutine meteo_read_input
 

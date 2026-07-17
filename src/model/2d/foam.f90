@@ -26,8 +26,6 @@
 !                                           (nee MinThick)
 !    cd:             <real>  default 0.5    foam-water drag coefficient
 !                                           (nee CdFoam)
-!    PLOT_INTV_FOAM: <real>  default = output interval  (dead, see NOTE 5;
-!                                           legacy-spelled until rung 5)
 !
 !  Legacy call shape: ALLOCATE_FOAM + INITIALIZATION_FOAM from init;
 !  FOAM_FLUX -> FOAM_UPDATE -> FOAM_BC every RK stage, between
@@ -49,11 +47,10 @@
 !    4. NOTE: MaskFoam is allocated, set to 1 and never changed —
 !       UPDATE_FOAM_MASK is dead code, legacy's own comment says "useless
 !       so far".  Folded away (it multiplied the source by 1)
-!    5. NOTE: PLOT_INTV_FOAM drives OUTPUT_FOAM, whose body is an empty
-!       stub ("time series here").  The knob is read and bridged so the
-!       legacy engine sees the same value, but consumes nothing.  The
-!       real foam output is the FoamEta_ field dump in PREVIEW, which is
-!       unconditional under -DFOAM
+!    5. NOTE: legacy PLOT_INTV_FOAM drives OUTPUT_FOAM, whose body is an
+!       empty stub ("time series here") — the key is DROPPED, rejected
+!       loudly.  The real foam output is the FoamEta_ field dump in
+!       PREVIEW, which is unconditional under -DFOAM
 !    6. NOTE: BurstRate/TransferRate and the whole "old approach" branch
 !       sit behind USE_BURSTRATE, which no build system defines.  Not
 !       ported.  Usurf1/2, Vsurf1/2, VFsurf1/2 and DepthFoam are
@@ -88,8 +85,6 @@ module model_foam_mod
 
    type, extends(type_model_base) :: type_model_foam
 
-      real(SP) :: plot_intv = ZERO       ! PLOT_INTV_FOAM (dead, NOTE 5)
-      logical  :: has_plot_intv = .false.
       real(SP) :: f_source = 0.05_SP
       real(SP) :: time_scale = 3.8_SP    ! FoamTimeScale
       real(SP) :: burst_time_nb = 1.0_SP ! BurstTimeNonBreaking
@@ -107,7 +102,6 @@ module model_foam_mod
 
    contains
       procedure :: read_input => foam_read_input
-      procedure :: resolve_plot_intv => foam_resolve_plot_intv
       procedure :: init_compute => foam_init_compute
       procedure :: update => foam_update
       procedure :: free => foam_free
@@ -121,13 +115,16 @@ contains
 
       type(type_env) :: sub_env
       logical :: no_blk, no_key
+      real(SP) :: tmp_r
 
       sub_env = get_sub_env(env, "foam", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      call sub_env%yaml%read("PLOT_INTV_FOAM", silent=no_key, val=this%plot_intv)
-      this%has_plot_intv = .not. no_key
+      ! dead legacy knob (NOTE 5): dropped, not parked
+      call sub_env%yaml%read("PLOT_INTV_FOAM", silent=no_key, val=tmp_r)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "foam: PLOT_INTV_FOAM dropped -- it drove an empty legacy stub writer")
 
       call sub_env%yaml%read("source_coef", silent=no_key, val=this%f_source, &
                              default=DEF_FOAM_SOURCE_COEF)
@@ -142,18 +139,6 @@ contains
                              default=DEF_FOAM_CD)
 
    end subroutine foam_read_input
-
-   ! Legacy "PLOT_INTV_FOAM not specified, use SAME": an absent key falls
-   ! back to the main output interval.  Split out of read_input because
-   ! the deferred base signature carries no other component.
-   subroutine foam_resolve_plot_intv(this, plot_intv)
-      class(type_model_foam), intent(inout) :: this
-      real(SP), intent(in) :: plot_intv
-
-      if (.not. this%is_activated) return
-      if (.not. this%has_plot_intv) this%plot_intv = plot_intv
-
-   end subroutine foam_resolve_plot_intv
 
    ! Legacy ALLOCATE_FOAM + INITIALIZATION_FOAM: every foam array starts
    ! at zero (a still sea has no foam).

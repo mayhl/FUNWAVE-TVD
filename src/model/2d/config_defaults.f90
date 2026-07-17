@@ -69,7 +69,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_INITIAL_SOLITARY_X_CENTER = "0.0"
    character(*), parameter :: DEF_INITIAL_WATER_LEVEL = "0.0"
    ! ── meteo ──
-   character(*), parameter :: DEF_METEO_OUT_METEO = "YES"
    character(*), parameter :: DEF_METEO_HOLLAND_AIR_PRESSURE = "NO"
    character(*), parameter :: DEF_METEO_HOLLAND_CD = "0.002"
    character(*), parameter :: DEF_METEO_HOLLAND_WAVE_INTERACTION = "NO"
@@ -87,19 +86,16 @@ module model_config_defaults_mod
    ! ── output ──
    character(*), parameter :: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT = "0.001"
    character(*), parameter :: DEF_OUTPUT_DEPTH_OUT = "NO"
-   character(*), parameter :: DEF_OUTPUT_ETA_BLOW_VAL = "1.0e8"
    character(*), parameter :: DEF_OUTPUT_FIELD_IO_TYPE = "ASCII"
-   character(*), parameter :: DEF_OUTPUT_NUMBER_STATIONS = "0"
+   character(*), parameter :: DEF_OUTPUT_MEANS_STEADY_TIME = "0.0"
    character(*), parameter :: DEF_OUTPUT_OUTPUT_RES = "1"
    character(*), parameter :: DEF_OUTPUT_RESULT_FOLDER = "./output/"
-   character(*), parameter :: DEF_OUTPUT_STEADY_TIME = "999999.0"
-   character(*), parameter :: DEF_OUTPUT_T_INTV_MEAN = "999999.0"
+   character(*), parameter :: DEF_OUTPUT_STATIONS_BUFFER = "1000"
+   character(*), parameter :: DEF_OUTPUT_STATIONS_INTERVAL = "1.0"
    ! ── physics ──
    character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.8"
-   ! ── precipitation ──
-   character(*), parameter :: DEF_PRECIPITATION_OUT_PRECIPITATION = "YES"
    ! ── sediment ──
    character(*), parameter :: DEF_SEDIMENT_BED_CHANGE = "NO"
    character(*), parameter :: DEF_SEDIMENT_BEDLOAD = "NO"
@@ -123,16 +119,13 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SEDIMENT_SHIELDS_CR = "0.055"
    character(*), parameter :: DEF_SEDIMENT_SPECIFIC_GRAVITY = "2.68"
    ! ── simulation ──
-   character(*), parameter :: DEF_SIMULATION_PLOT_INTV_STATION = "1.0"
    character(*), parameter :: DEF_SIMULATION_SCREEN_INTERVAL = "1.0"
-   character(*), parameter :: DEF_SIMULATION_STATION_OUTPUT_BUFFER = "1000"
    character(*), parameter :: DEF_SIMULATION_T_START = "0.0"
    character(*), parameter :: DEF_SIMULATION_TIME_STEPPING_FIXED_DT = "NO"
    ! ── subgrid ──
    character(*), parameter :: DEF_SUBGRID_RATIO = "1"
    character(*), parameter :: DEF_SUBGRID_WRITE_POROSITY = "NO"
    ! ── vessel ──
-   character(*), parameter :: DEF_VESSEL_OUT_VESSEL = "YES"
    character(*), parameter :: DEF_VESSEL_COUNT = "1"
    character(*), parameter :: DEF_VESSEL_DEEP_DRAFT_MASK = "YES"
    character(*), parameter :: DEF_VESSEL_PROPELLER = "NO"

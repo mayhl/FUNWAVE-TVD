@@ -537,18 +537,13 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     ts = pop_val("PLOT_START_TIME")
     if ts is not None:
         sim["t_start"] = ts
-    pi = pop_val("PLOT_INTV")
-    if pi is not None:
-        sim["output_interval"] = pi
+    # PLOT_INTV / PLOT_INTV_STATION / StationOutputBuffer land under output:
+    plot_intv = pop_val("PLOT_INTV")
+    plot_intv_station = pop_val("PLOT_INTV_STATION")
+    station_buffer = pop_val("StationOutputBuffer")
     si = pop_val("SCREEN_INTV")
     if si is not None:
         sim["screen_interval"] = si
-    pis = pop_val("PLOT_INTV_STATION")
-    if pis is not None:
-        sim["plot_intv_station"] = pis
-    sob = pop_val("StationOutputBuffer")
-    if sob is not None:
-        sim["station_output_buffer"] = sob
 
     dt_fixed = pop_val("DT_fixed")  # legacy key: non-zero value implies fixed dt
     if dt_fixed is not None and dt_fixed != 0.0:
@@ -774,30 +769,41 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
 
     # ---- output ------------------------------------------------------------
     op: dict = {}
+    if plot_intv is not None:
+        op["interval"] = plot_intv
     rf = pop_str("RESULT_FOLDER")
     if rf:
         op["result_folder"] = rf
     fio = pop_str("FIELD_IO_TYPE")
     if fio:
         op["field_io_type"] = fio
+    # stations: presence block; the count is the file line count now, so
+    # NumberStations only gates the block (legacy N < line count truncated;
+    # the derived count reads every line)
     ns = pop_val("NumberStations")
-    if ns is not None:
-        op["number_stations"] = ns
     sf = pop_str("STATIONS_FILE")
-    if sf:
-        op["stations_file"] = sf
+    if sf and (ns is None or ns > 0):
+        sta: dict = {"file": sf}
+        if plot_intv_station is not None:
+            sta["interval"] = plot_intv_station
+        if station_buffer is not None:
+            sta["buffer"] = station_buffer
+        op["stations"] = sta
     ores = pop_val("OUTPUT_RES")
     if ores is not None:
         op["output_res"] = ores
     ebv = pop_val("EtaBlowVal")
     if ebv is not None:
-        op["EtaBlowVal"] = ebv
+        op["blowup_threshold"] = ebv
+    # means: presence block; absent legacy keys fall to the legacy LARGE
+    # defaults so a half-specified deck stays bitwise (window never closes)
     ti = pop_val("T_INTV_mean")
-    if ti is not None:
-        op["T_INTV_mean"] = ti
     st = pop_val("STEADY_TIME")
-    if st is not None:
-        op["STEADY_TIME"] = st
+    if ti is not None or st is not None:
+        op["means"] = {
+            "interval": ti if ti is not None else 999999.0,
+            "steady_time": st if st is not None else 999999.0,
+        }
 
     # first-arrival map (nee numerics OUT_Time/ArrTimeMin); min_height is
     # always written so the block never serialises as a bare null key
@@ -890,9 +896,17 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
             if not slf:
                 raise SystemExit("convert_input: SlideModel requires SLIDE_FILE")
             mt["slide"] = {"file": slf}
+        # OUT_METEO (default YES) -> output: variables: field dumps, per
+        # model applicability (Pstorm = any pressure model, U/Vstorm = Holland)
         om = pop("OUT_METEO")
-        if om is not None:
-            mt["OUT_METEO"] = _bool(om)
+        if om is None or _bool(om):
+            met_vars = []
+            if "gaussian" in mt or "holland" in mt or "slide" in mt:
+                met_vars.append("Pstorm")
+            if "holland" in mt:
+                met_vars += ["Ustorm", "Vstorm"]
+            if met_vars:
+                out.setdefault("output", {}).setdefault("variables", []).extend(met_vars)
     if mt:
         out["meteo"] = mt
 
@@ -913,11 +927,9 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     # (no consumer), so it lands in the unknown-key comment block.
     rff = pop_str("RAINFALL_FILE")
     if rff:
-        pr: dict = {"file": rff}
-        opr = pop("OUT_PRECIPITATION")
-        if opr is not None:
-            pr["OUT_PRECIPITATION"] = _bool(opr)
-        out["precipitation"] = pr
+        if pop("OUT_PRECIPITATION") is not None:
+            unknown.append("OUT_PRECIPITATION (dead in legacy: no writer) -- dropped")
+        out["precipitation"] = {"file": rff}
 
     # ---- foam ----------------------------------------------------------------
     # No legacy dispatcher bool: the keys exist when the deck drove a -DFOAM
@@ -929,11 +941,12 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         ("BurstTimeNonBreaking", "burst_time_non_breaking"),
         ("MinThick", "min_thickness"),
         ("CdFoam", "cd"),
-        ("PLOT_INTV_FOAM", "PLOT_INTV_FOAM"),
     ):
         v = pop_val(old_key)
         if v is not None:
             fo[new_key] = v
+    if pop("PLOT_INTV_FOAM") is not None:
+        unknown.append("PLOT_INTV_FOAM (dead in legacy: empty stub writer) -- dropped")
     if fo:
         out["foam"] = fo
 
@@ -975,10 +988,17 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         else:
             for k in ("MaskMethod", "FrictionMethod", "ViscosityMethod", "CLEARANCE", "CdDeepDraft", "VisDeepDraft"):
                 pop(k)
-        for k in ("OUT_VESSEL", "PLOT_INTV_VESSEL"):
-            v = pop(k)
-            if v is not None:
-                vs[k] = _bool(v) if k == "OUT_VESSEL" else _auto(v)
+        # OUT_VESSEL (default YES) -> output: vessel: (resistance series) +
+        # variables: Pves/VesUp/VesVp; interval 0 = legacy every-step SMALL
+        ov = pop("OUT_VESSEL")
+        piv = pop_val("PLOT_INTV_VESSEL")
+        if ov is None or _bool(ov):
+            ves_vars = ["Pves"]
+            if vs.get("propeller"):
+                ves_vars += ["VesUp", "VesVp"]
+            opv = out.setdefault("output", {})
+            opv.setdefault("variables", []).extend(ves_vars)
+            opv["vessel"] = {"interval": piv if piv is not None else 0.0}
         out["vessel"] = vs
 
     # ---- sediment --------------------------------------------------------------

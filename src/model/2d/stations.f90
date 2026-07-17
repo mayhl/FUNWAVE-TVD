@@ -64,25 +64,27 @@ module model_stations_mod
 
 contains
 
-   subroutine stations_init_compute(this, grid, env, fields, n_stations, &
+   subroutine stations_init_compute(this, grid, env, fields, enabled, &
                                     stations_file, result_folder, &
                                     plot_intv_station, buffer_size, total_time)
       class(type_model_stations), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       type(type_env), intent(inout) :: env
       type(type_fields_2d), intent(inout), target :: fields
-      integer, intent(in) :: n_stations, buffer_size
+      logical, intent(in) :: enabled
+      integer, intent(in) :: buffer_size
       character(*), intent(in) :: stations_file, result_folder
       real(SP), intent(in) :: plot_intv_station, total_time
 
       character(:), allocatable :: folder
       character(4) :: snum
+      character(12) :: line_str
       real(SP) :: dum1, dum2
       logical :: file_exist
-      integer :: i, funit
+      integer :: i, ios, funit, n_stations
 
-      this%n_stations = n_stations
-      if (n_stations <= 0) return
+      this%n_stations = 0
+      if (.not. enabled) return
 
       this%buffer_size = buffer_size
       this%total_time = total_time
@@ -95,8 +97,33 @@ contains
       inquire (file=trim(stations_file), exist=file_exist)
       if (.not. file_exist) then
          call env%log%exit_on_error( &
-            "stations: stations_file cannot be found: "//trim(stations_file))
+            "output: stations: file cannot be found: "//trim(stations_file))
       end if
+
+      ! station count = line count (nee number_stations); a parse failure
+      ! before EOF is a malformed line, not a short count.  The returns keep
+      ! non-io ranks out of the later reads while the io rank aborts.
+      open (newunit=funit, file=trim(stations_file), status="old", action="read")
+      n_stations = 0
+      do
+         read (funit, *, iostat=ios) dum1, dum2
+         if (ios /= 0) exit
+         n_stations = n_stations + 1
+      end do
+      if (ios > 0) then
+         write (line_str, '(I0)') n_stations + 1
+         call env%log%exit_on_error( &
+            "output: stations: cannot parse an 'i j' pair on line "// &
+            trim(line_str)//" of "//trim(stations_file))
+         return
+      end if
+      rewind (funit)
+      if (n_stations == 0) then
+         call env%log%exit_on_error( &
+            "output: stations: "//trim(stations_file)//" contains no stations")
+         return
+      end if
+      this%n_stations = n_stations
 
       folder = trim(result_folder)
       if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
@@ -114,7 +141,6 @@ contains
       ! Global interior indices -> local ghost-inclusive; a rank owns a
       ! station when it falls inside its interior range (legacy ykchoi
       ! iista/jjsta form; grid%ibegin is that 1-based global start).
-      open (newunit=funit, file=trim(stations_file))
       do i = 1, n_stations
          read (funit, *) dum1, dum2
          this%ista(i) = N_GHOST + int(dum1) - (grid%ibegin - 1)

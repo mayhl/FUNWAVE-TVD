@@ -139,7 +139,6 @@ contains
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
       call this%foam%read_input(this%env)
-      call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       call this%tracer%read_input(this%env)
       call this%vessel%read_input(this%env)
       call this%sediment%read_input(this%env)
@@ -187,7 +186,6 @@ contains
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
       call this%foam%read_input(this%env)
-      call this%foam%resolve_plot_intv(this%simulation%plot_intv)
       call this%tracer%read_input(this%env)
       call this%vessel%read_input(this%env)
       call this%sediment%read_input(this%env)
@@ -571,6 +569,13 @@ contains
       call this%tracer%init_compute(this%grid, this%env, &
                                     this%output%result_folder, &
                                     this%simulation%t_start)
+      ! resistance series wiring (nee OUT_VESSEL/PLOT_INTV_VESSEL): the
+      ! output: vessel: block owns the request, the vessel model runs it
+      if (this%output%vessel_series_on .and. .not. this%vessel%is_activated) &
+         call this%env%log%exit_on_error( &
+         "output: vessel: requested but there is no vessel: section")
+      this%vessel%out_vessel = this%output%vessel_series_on
+      this%vessel%plot_intv = this%output%vessel_interval
       ! legacy VESSEL_INITIAL: opens every vessel_NNNNN, reads its geometry and
       ! first track point, and builds the ghost-inclusive lattice the hull frame
       ! is evaluated on -- so the grid must already be spaced
@@ -599,11 +604,11 @@ contains
 
       call build_field_channel(this, output_mgr)
       call this%stations%init_compute(this%grid, this%env, this%fields, &
-                                      this%output%number_stations, &
+                                      this%output%stations_on, &
                                       this%output%stations_file, &
                                       this%output%result_folder, &
-                                      this%simulation%plot_intv_station, &
-                                      this%simulation%station_output_buffer, &
+                                      this%output%stations_interval, &
+                                      this%output%stations_buffer, &
                                       this%simulation%total_time)
       monitor%mgr => output_mgr
       monitor%registry => this%registry
@@ -707,29 +712,40 @@ contains
          ! build always dumps it
          if (this%foam%is_activated) &
             call add_var(vars, prefs, nv, "eta_foam", "FoamEta")
-         ! legacy PREVIEW writes Pves_ (and VesUp_/VesVp_ under -DPROPELLER)
-         ! gated on OUT_VESSEL alone.  The jet pair is the ONLY observable the
-         ! propeller has -- it feeds nothing back into the flow -- so without
-         ! these a dead jet and a live one are indistinguishable.
-         if (this%vessel%is_activated .and. this%vessel%out_vessel) then
-            call add_var(vars, prefs, nv, "vessel_pressure", "Pves")
-            if (this%vessel%propeller) then
-               call add_var(vars, prefs, nv, "vessel_up", "VesUp")
-               call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
-            end if
-         end if
-         ! legacy OUTPUT_METEO writes Pstorm_ under OUT_METEO for every spatial
-         ! pressure model (io.F:1709-1726); wind-only fields have no Pstorm
-         if (this%meteo%is_activated .and. this%meteo%out_meteo &
-             .and. (this%meteo%meteo_gausian .or. this%meteo%wind_holland_model &
-                    .or. this%meteo%slide_model)) then
+         ! Pves_/VesUp_/VesVp_ (nee legacy PREVIEW under OUT_VESSEL, now
+         ! explicit variables: entries).  The jet pair is the ONLY observable
+         ! the propeller has -- it feeds nothing back into the flow -- so
+         ! without these a dead jet and a live one are indistinguishable.
+         if ((out%OUT_Pves .or. out%OUT_VesUp .or. out%OUT_VesVp) &
+             .and. .not. this%vessel%is_activated) &
+            call this%env%log%exit_on_error( &
+            "output: variables: Pves/VesUp/VesVp require the vessel: section")
+         if ((out%OUT_VesUp .or. out%OUT_VesVp) &
+             .and. .not. this%vessel%propeller) &
+            call this%env%log%exit_on_error( &
+            "output: variables: VesUp/VesVp require vessel: propeller: true")
+         if (out%OUT_Pves) call add_var(vars, prefs, nv, "vessel_pressure", "Pves")
+         if (out%OUT_VesUp) call add_var(vars, prefs, nv, "vessel_up", "VesUp")
+         if (out%OUT_VesVp) call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
+         ! Pstorm_ (nee legacy OUTPUT_METEO under OUT_METEO, io.F:1709-1726)
+         ! exists for every spatial pressure model; wind-only fields have no
+         ! Pstorm.  Ustorm_/Vstorm_ are the Holland gradient wind.
+         if (out%OUT_Pstorm) then
+            if (.not. (this%meteo%is_activated &
+                       .and. (this%meteo%meteo_gausian &
+                              .or. this%meteo%wind_holland_model &
+                              .or. this%meteo%slide_model))) &
+               call this%env%log%exit_on_error( &
+               "output: variables: Pstorm requires a meteo pressure model "// &
+               "(gaussian/holland/slide)")
             call add_var(vars, prefs, nv, "meteo_pressure", "Pstorm")
          end if
-         ! legacy writes Ustorm_/Vstorm_ under OUT_METEO only for Holland
-         if (this%meteo%is_activated .and. this%meteo%out_meteo &
-             .and. this%meteo%wind_holland_model) then
-            call add_var(vars, prefs, nv, "meteo_wind_u", "Ustorm")
-            call add_var(vars, prefs, nv, "meteo_wind_v", "Vstorm")
+         if (out%OUT_Ustorm .or. out%OUT_Vstorm) then
+            if (.not. (this%meteo%is_activated .and. this%meteo%wind_holland_model)) &
+               call this%env%log%exit_on_error( &
+               "output: variables: Ustorm/Vstorm require meteo: holland:")
+            if (out%OUT_Ustorm) call add_var(vars, prefs, nv, "meteo_wind_u", "Ustorm")
+            if (out%OUT_Vstorm) call add_var(vars, prefs, nv, "meteo_wind_v", "Vstorm")
          end if
          ! legacy writes its sediment fields straight out of PREVIEW, ungated
          ! (OUTPUT_SEDIMENT, which PLOT_INTV_SEDIMENT gates, is an empty stub),
@@ -784,7 +800,7 @@ contains
                                    statistics=stats, n_stats=0, &
                                    snapshot=.true., &
                                    t_start=this%simulation%t_start, &
-                                   interval=this%simulation%plot_intv, &
+                                   interval=this%output%interval, &
                                    result_folder=folder, format=fmt, &
                                    coords_x=dummy_coord, coords_y=dummy_coord, &
                                    n_coords=0, grid=this%grid, &

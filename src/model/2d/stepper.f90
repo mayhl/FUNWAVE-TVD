@@ -866,7 +866,7 @@ contains
       end associate
       call MPI_Allreduce(MPI_IN_PLACE, max_abs_eta, 1, MPI_SP, MPI_MAX, &
                          this%grid%cart_comm, ierr)
-      blowup = max_abs_eta > this%output%EtaBlowVal
+      blowup = max_abs_eta > this%output%blowup_threshold
 
    end subroutine stepper_post_step
 

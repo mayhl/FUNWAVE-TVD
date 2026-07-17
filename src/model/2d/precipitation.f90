@@ -10,11 +10,9 @@
 !                                  file) records; required when the block
 !                                  is present (nee RAINFALL_FILE; legacy
 !                                  STOPs without it)
-!    OUT_PRECIPITATION:   <bool>   default YES — DEAD in legacy (no writer;
-!                                  legacy-spelled until rung 5)
 !
-!  RainWaveInteraction is dropped, not renamed: legacy reads it and consumes
-!  it nowhere, so there is nothing to port.
+!  RainWaveInteraction and OUT_PRECIPITATION are dropped, not renamed:
+!  legacy reads them and consumes them nowhere, so there is nothing to port.
 !
 !  Legacy call shape: PRECIPITATION_DISTRIBUTION once per step before the
 !  RK loop (at the already-advanced TIME); the rate enters the eta RHS in
@@ -53,8 +51,6 @@ module model_precipitation_mod
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_PRECIPITATION_OUT_PRECIPITATION
-
    implicit none
 
    private
@@ -66,9 +62,6 @@ module model_precipitation_mod
    real(SP), parameter :: SMALL = 0.000001_SP
 
    type, extends(type_model_base) :: type_model_precipitation
-
-      ! dead legacy knob (read, bridged, never consumed — see header)
-      logical :: out_precipitation = .true.
 
       type(type_path) :: rainfall_file
 
@@ -105,15 +98,16 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_blk, no_key
+      logical :: no_blk, no_key, tmp_l
 
       sub_env = get_sub_env(env, "precipitation", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (no_blk) return
 
-      call sub_env%yaml%read("OUT_PRECIPITATION", silent=no_key, &
-                             val=this%out_precipitation, &
-                             default=DEF_PRECIPITATION_OUT_PRECIPITATION)
+      ! dead legacy knob: dropped, not parked (no writer ever consumed it)
+      call sub_env%yaml%read("OUT_PRECIPITATION", silent=no_key, val=tmp_l)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "precipitation: OUT_PRECIPITATION dropped -- legacy never had a writer for it")
 
       call sub_env%yaml%read_input_path("file", silent=no_key, &
                                         val=this%rainfall_file)
