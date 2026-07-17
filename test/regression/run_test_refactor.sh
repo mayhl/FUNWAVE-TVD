@@ -6,8 +6,8 @@ TARGET_BRANCH=${1:-master}
 FILE_TO_MOVE=${2} # e.g., src/model/2d/old/io.F
 
 if [ -z "$FILE_TO_MOVE" ]; then
-    echo "Usage: $0 [branch_name] [file_to_move]"
-    exit 1
+	echo "Usage: $0 [branch_name] [file_to_move]"
+	exit 1
 fi
 
 echo "Regression testing (refactor mode) against branch: $TARGET_BRANCH"

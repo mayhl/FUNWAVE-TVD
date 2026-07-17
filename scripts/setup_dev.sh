@@ -11,10 +11,10 @@ bash scripts/setup_cli.sh
 
 # 2. Compile pFUnit for unit testing
 if [ -f "scripts/install_deps.sh" ]; then
-    echo "Compiling pFUnit..."
-    bash scripts/install_deps.sh
+	echo "Compiling pFUnit..."
+	bash scripts/install_deps.sh
 else
-    echo "Warning: scripts/install_deps.sh not found. Skipping pFUnit compilation."
+	echo "Warning: scripts/install_deps.sh not found. Skipping pFUnit compilation."
 fi
 
 # 3. Finalize setup
