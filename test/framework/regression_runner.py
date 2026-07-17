@@ -100,15 +100,10 @@ class RegressionRunner(BaseRunner):
             if os.path.exists(cache):
                 os.remove(cache)
 
+        # Regression execs funwave directly (no ctest) -> build the exe only,
+        # no unit-test scaffolding (ENABLE_UNIT_TESTING stays OFF).
         toolchain_path = os.path.join(self.repo_root, "cmake", "toolchains", "macos_mpi.cmake")
-        pfunit_glob = os.path.join(self.repo_root, "extern", "pfunit", "installed", "PFUNIT-*", "cmake")
-        import glob as _glob
-
-        pfunit_dirs = _glob.glob(pfunit_glob)
-        pfunit_dir = sorted(pfunit_dirs)[-1] if pfunit_dirs else None
-        cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir, f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}", "-DENABLE_TESTING=ON"]
-        if pfunit_dir:
-            cmake_cmd.append(f"-DPFUNIT_DIR={pfunit_dir}")
+        cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir, f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}"]
         cmake_cmd += [f"-D{flag}" for flag in (cmake_flags or [])]
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
