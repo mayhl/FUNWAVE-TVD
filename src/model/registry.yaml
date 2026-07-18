@@ -7,9 +7,8 @@
 #                  (lowercase, underscores, physical description) so future CF
 #                  migration is obvious. Omit when standard_name is non-empty.
 #
-# parameters: scalar config values stored as name/value pairs in simulation.nc.
-#   Required: name, legacy_name, yaml_path, units (null if dimensionless), default, latex
-#   Sorted by yaml_path within each yaml section group.
+# sections: hierarchical metadata catalog for config keys (legacy name, default,
+#   units, latex, values, doc).  See the sections: header below.
 #
 # Neither html descriptions, latex, nor funwave_name are written to NetCDF variable attrs.
 # funwave_name IS written as a global attr on simulation.nc for variable inventory.
@@ -134,1769 +133,429 @@ variables:
     latex:          "$t_{\\mathrm{arr}}$"
 
 
-parameters:
-
-  # ── boundaries ─────────────────────────────────────────────────────────────
-  # Axis-level periodic list (a face is never "periodic" — the axis
-  # identifies the pair).  x is pending trid_x_periodic.  Face blocks
-  # (sponge/forcing per face) land with the boundaries module (reorg rung 2).
-  - name:         periodic
-    legacy_name:  PERIODIC
-    yaml_path:    "boundaries.periodic"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # ── wavemaker — spectrum x discretization x source (config reorg rung 3a) ──
-  # Entry is a mapping or a 1-element sequence (multi-wavemaker pending).
-  # spectrum.type: regular | jonswap | tma | spectrum_2d | components;
-  # directional: presence = 2D spreading; source: presence = Wei-Kirby
-  # internal source; limiter: presence = eta limiter (nee ETA_LIMITER).
-  # freq {peak,min,max} = exact legacy path (converter emits this);
-  # period {peak,min,max} = preferred hand-authoring alternative
-  # (reciprocal fill, non-bitwise vs legacy inputs by design).
-  # Boundary consumers (rung 3b): ABS = a spectrum-only entry (no source:)
-  # referenced by boundaries.west.forcing.wavemaker — its strip keys map to
-  # the face (WidthWaveMaker -> boundaries.west.sponge.width, R/A_sponge_
-  # wavemaker -> ...direct.r/a, DepthWaveMaker -> ...forcing.depth).
-  # LEF_SOL keeps its legacy type:/LAGTIME escape; ABS_1D/LEFT_BC_IRR are
-  # deprecated pending the characteristic BC track.
-
-  - name:         wm_name
-    legacy_name:  ~
-    yaml_path:    "wavemaker.name"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         spectrum_type
-    legacy_name:  WAVEMAKER
-    yaml_path:    "wavemaker.spectrum.type"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         wm_amplitude
-    legacy_name:  AMP_WK
-    yaml_path:    "wavemaker.spectrum.amplitude"
-    units:        m
-    default:      0.0
-    latex:        "$a$"
-
-  - name:         wm_period
-    legacy_name:  Tperiod
-    yaml_path:    "wavemaker.spectrum.period"
-    units:        s
-    default:      0.0
-    latex:        "$T$"
-
-  - name:         wm_direction
-    legacy_name:  Theta_WK
-    yaml_path:    "wavemaker.spectrum.direction"
-    units:        deg
-    default:      0.0
-    latex:        "$\\theta$"
-
-  - name:         wm_hm0
-    legacy_name:  Hmo
-    yaml_path:    "wavemaker.spectrum.hm0"
-    units:        m
-    default:      0.0
-    latex:        "$H_{m0}$"
-
-  - name:         wm_gamma
-    legacy_name:  GammaTMA
-    yaml_path:    "wavemaker.spectrum.gamma"
-    units:        ~
-    default:      3.3
-    latex:        "$\\gamma$"
-
-  - name:         wm_freq_peak
-    legacy_name:  FreqPeak
-    yaml_path:    "wavemaker.spectrum.freq.peak"
-    units:        Hz
-    default:      0.0
-    latex:        "$f_p$"
-
-  - name:         wm_freq_min
-    legacy_name:  FreqMin
-    yaml_path:    "wavemaker.spectrum.freq.min"
-    units:        Hz
-    default:      0.0
-    latex:        ~
-
-  - name:         wm_freq_max
-    legacy_name:  FreqMax
-    yaml_path:    "wavemaker.spectrum.freq.max"
-    units:        Hz
-    default:      0.0
-    latex:        ~
-
-  - name:         wm_alt_period_peak
-    legacy_name:  ~
-    yaml_path:    "wavemaker.spectrum.period.peak"
-    units:        s
-    default:      ~   # alternative to freq.peak (reciprocal); mutually exclusive
-    latex:        "$T_p$"
-
-  - name:         wm_alt_period_min
-    legacy_name:  ~
-    yaml_path:    "wavemaker.spectrum.period.min"
-    units:        s
-    default:      ~
-    latex:        ~
-
-  - name:         wm_alt_period_max
-    legacy_name:  ~
-    yaml_path:    "wavemaker.spectrum.period.max"
-    units:        s
-    default:      ~
-    latex:        ~
-
-  - name:         wm_dir_peak
-    legacy_name:  ThetaPeak
-    yaml_path:    "wavemaker.spectrum.directional.peak"
-    units:        deg
-    default:      0.0
-    latex:        ~
-
-  - name:         wm_dir_spread
-    legacy_name:  Sigma_Theta
-    yaml_path:    "wavemaker.spectrum.directional.spread"
-    units:        deg
-    default:      0.0   # PENDING adjudication: legacy uses 10.0 in directional TMA/JON branch
-    latex:        ~
-
-  - name:         wm_dir_n_bins
-    legacy_name:  Ntheta
-    yaml_path:    "wavemaker.spectrum.directional.n_bins"
-    units:        ~
-    default:      1   # PENDING adjudication: legacy uses 24 in directional TMA/JON branch
-    latex:        ~
-
-  - name:         wm_freq_bins
-    legacy_name:  Nfreq
-    yaml_path:    "wavemaker.spectrum.discretization.freq_bins"
-    units:        ~
-    default:      45
-    latex:        ~
-
-  - name:         wm_equal_energy
-    legacy_name:  EqualEnergy
-    yaml_path:    "wavemaker.spectrum.discretization.equal_energy"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         wm_disc_method
-    legacy_name:  ~
-    yaml_path:    "wavemaker.spectrum.discretization.method"
-    units:        ~
-    default:      grid   # grid | single_dir_per_freq (init-gated pending)
-    latex:        ~
-
-  - name:         wm_coherence
-    legacy_name:  alpha_c
-    yaml_path:    "wavemaker.spectrum.discretization.coherence_percent"
-    units:        "%"
-    default:      0.0
-    latex:        ~
-
-  - name:         wm_file
-    legacy_name:  WaveCompFile
-    yaml_path:    "wavemaker.spectrum.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         wm_n_components
-    legacy_name:  NumWaveComp
-    yaml_path:    "wavemaker.spectrum.n"
-    units:        ~
-    default:      1
-    latex:        ~
-
-  - name:         wm_period_peak
-    legacy_name:  PeakPeriod
-    yaml_path:    "wavemaker.spectrum.period_peak"
-    units:        s
-    default:      0.0   # components type only (legacy stores a period here)
-    latex:        "$T_p$"
-
-  - name:         wm_format
-    legacy_name:  WAVE_DATA_TYPE
-    yaml_path:    "wavemaker.spectrum.format"
-    units:        ~
-    default:      DATA_1D
-    latex:        ~
-
-  - name:         src_x_center
-    legacy_name:  Xc_WK
-    yaml_path:    "wavemaker.source.x_center"
-    units:        m
-    default:      0.0
-    latex:        "$x_c$"
-
-  - name:         src_y_center
-    legacy_name:  Yc_WK
-    yaml_path:    "wavemaker.source.y_center"
-    units:        m
-    default:      0.0
-    latex:        "$y_c$"
-
-  - name:         src_depth
-    legacy_name:  DEP_WK
-    yaml_path:    "wavemaker.source.depth"
-    units:        m
-    default:      0.0
-    latex:        ~
-
-  - name:         src_delta
-    legacy_name:  Delta_WK
-    yaml_path:    "wavemaker.source.delta"
-    units:        ~
-    default:      0.5
-    latex:        "$\\delta$"
-
-  - name:         src_y_width
-    legacy_name:  Ywidth_WK
-    yaml_path:    "wavemaker.source.y_width"
-    units:        m
-    default:      999999.0
-    latex:        ~
-
-  - name:         src_time_ramp
-    legacy_name:  Time_ramp
-    yaml_path:    "wavemaker.source.time_ramp"
-    units:        s
-    default:      0.0
-    latex:        ~
-
-  - name:         src_current_cd
-    legacy_name:  WaveMakerCd
-    yaml_path:    "wavemaker.source.current_cd"
-    units:        ~
-    default:      ~   # presence enables the current-balance drag (nee WaveMakerCurrentBalance)
-    latex:        ~
-
-  - name:         lim_crest
-    legacy_name:  CrestLimit
-    yaml_path:    "wavemaker.limiter.crest"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         lim_trough
-    legacy_name:  TroughLimit
-    yaml_path:    "wavemaker.limiter.trough"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  # ── boundaries — per-face blocks (config reorg rung 2) ─────────────────────
-  # Face BC is DERIVED from block presence (design-config-reorg):
-  #   nothing -> wall; sponge only -> wall + absorbing strip;
-  #   sponge.direct + forcing -> wall + relaxation to signal (nee TIDAL_BC_ABS);
-  #   forcing w/o direct -> characteristic (init-gated pending).
-  # type: is an optional ASSERTION -- errors at init if it disagrees.
-  # forcing.wavemaker names a spectrum-only wavemaker entry as the face's
-  # relaxation signal (nee ABS; west only, others init-gated pending) with
-  # forcing.depth the series reference depth (nee DepthWaveMaker); + eta/file
-  # target = generating-absorbing (nee TIDAL_BC_GEN_ABS, derived).
-  # Dropped without successor: DIRECT/FRICTION/DIFFUSION_SPONGE (presence),
-  # TIDAL_BC_ABS (derived), TideBcType (file presence = DATA).
-
-  - name:         relaxation_cells
-    legacy_name:  WaveMakerPointNum
-    yaml_path:    "boundaries.relaxation_cells"
-    units:        ~
-    default:      30
-    latex:        ~
-
-  - name:         west_type
-    legacy_name:  ~
-    yaml_path:    "boundaries.west.type"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         west_sponge_width
-    legacy_name:  Sponge_west_width
-    yaml_path:    "boundaries.west.sponge.width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,W}$"
-
-  - name:         west_sponge_direct_r
-    legacy_name:  R_sponge
-    yaml_path:    "boundaries.west.sponge.direct.r"
-    units:        ~
-    default:      0.85
-    latex:        "$R_s$"
-
-  - name:         west_sponge_direct_a
-    legacy_name:  A_sponge
-    yaml_path:    "boundaries.west.sponge.direct.a"
-    units:        ~
-    default:      5.0
-    latex:        "$A_s$"
-
-  - name:         west_sponge_friction_cd
-    legacy_name:  CDsponge
-    yaml_path:    "boundaries.west.sponge.friction.cd"
-    units:        ~
-    default:      0.0
-    latex:        "$C_{d,s}$"
-
-  - name:         west_sponge_diffusion_nu
-    legacy_name:  Csp
-    yaml_path:    "boundaries.west.sponge.diffusion.nu"
-    units:        ~
-    default:      0.1
-    latex:        "$C_{\\mathrm{sp}}$"
-
-  - name:         west_forcing_eta
-    legacy_name:  TideWest_ETA
-    yaml_path:    "boundaries.west.forcing.eta"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         west_forcing_u
-    legacy_name:  TideWest_U
-    yaml_path:    "boundaries.west.forcing.u"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         west_forcing_v
-    legacy_name:  TideWest_V
-    yaml_path:    "boundaries.west.forcing.v"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         west_forcing_file
-    legacy_name:  TideWestFileName
-    yaml_path:    "boundaries.west.forcing.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         west_forcing_wavemaker
-    legacy_name:  ~
-    yaml_path:    "boundaries.west.forcing.wavemaker"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         west_forcing_depth
-    legacy_name:  DepthWaveMaker
-    yaml_path:    "boundaries.west.forcing.depth"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         east_type
-    legacy_name:  ~
-    yaml_path:    "boundaries.east.type"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         east_sponge_width
-    legacy_name:  Sponge_east_width
-    yaml_path:    "boundaries.east.sponge.width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,E}$"
-
-  - name:         east_sponge_direct_r
-    legacy_name:  R_sponge
-    yaml_path:    "boundaries.east.sponge.direct.r"
-    units:        ~
-    default:      0.85
-    latex:        "$R_s$"
-
-  - name:         east_sponge_direct_a
-    legacy_name:  A_sponge
-    yaml_path:    "boundaries.east.sponge.direct.a"
-    units:        ~
-    default:      5.0
-    latex:        "$A_s$"
-
-  - name:         east_sponge_friction_cd
-    legacy_name:  CDsponge
-    yaml_path:    "boundaries.east.sponge.friction.cd"
-    units:        ~
-    default:      0.0
-    latex:        "$C_{d,s}$"
-
-  - name:         east_sponge_diffusion_nu
-    legacy_name:  Csp
-    yaml_path:    "boundaries.east.sponge.diffusion.nu"
-    units:        ~
-    default:      0.1
-    latex:        "$C_{\\mathrm{sp}}$"
-
-  - name:         east_forcing_eta
-    legacy_name:  TideEast_ETA
-    yaml_path:    "boundaries.east.forcing.eta"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         east_forcing_u
-    legacy_name:  TideEast_U
-    yaml_path:    "boundaries.east.forcing.u"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         east_forcing_v
-    legacy_name:  TideEast_V
-    yaml_path:    "boundaries.east.forcing.v"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         east_forcing_file
-    legacy_name:  TideEastFileName
-    yaml_path:    "boundaries.east.forcing.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         east_forcing_wavemaker
-    legacy_name:  ~
-    yaml_path:    "boundaries.east.forcing.wavemaker"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         east_forcing_depth
-    legacy_name:  ~
-    yaml_path:    "boundaries.east.forcing.depth"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         south_type
-    legacy_name:  ~
-    yaml_path:    "boundaries.south.type"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         south_sponge_width
-    legacy_name:  Sponge_south_width
-    yaml_path:    "boundaries.south.sponge.width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,S}$"
-
-  - name:         south_sponge_direct_r
-    legacy_name:  R_sponge
-    yaml_path:    "boundaries.south.sponge.direct.r"
-    units:        ~
-    default:      0.85
-    latex:        "$R_s$"
-
-  - name:         south_sponge_direct_a
-    legacy_name:  A_sponge
-    yaml_path:    "boundaries.south.sponge.direct.a"
-    units:        ~
-    default:      5.0
-    latex:        "$A_s$"
-
-  - name:         south_sponge_friction_cd
-    legacy_name:  CDsponge
-    yaml_path:    "boundaries.south.sponge.friction.cd"
-    units:        ~
-    default:      0.0
-    latex:        "$C_{d,s}$"
-
-  - name:         south_sponge_diffusion_nu
-    legacy_name:  Csp
-    yaml_path:    "boundaries.south.sponge.diffusion.nu"
-    units:        ~
-    default:      0.1
-    latex:        "$C_{\\mathrm{sp}}$"
-
-  - name:         south_forcing_eta
-    legacy_name:  TideSouth_ETA
-    yaml_path:    "boundaries.south.forcing.eta"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         south_forcing_u
-    legacy_name:  TideSouth_U
-    yaml_path:    "boundaries.south.forcing.u"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         south_forcing_v
-    legacy_name:  TideSouth_V
-    yaml_path:    "boundaries.south.forcing.v"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         south_forcing_file
-    legacy_name:  TideSouthFileName
-    yaml_path:    "boundaries.south.forcing.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         south_forcing_wavemaker
-    legacy_name:  ~
-    yaml_path:    "boundaries.south.forcing.wavemaker"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         south_forcing_depth
-    legacy_name:  ~
-    yaml_path:    "boundaries.south.forcing.depth"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         north_type
-    legacy_name:  ~
-    yaml_path:    "boundaries.north.type"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         north_sponge_width
-    legacy_name:  Sponge_north_width
-    yaml_path:    "boundaries.north.sponge.width"
-    units:        "m"
-    default:      0.0
-    latex:        "$W_{s,N}$"
-
-  - name:         north_sponge_direct_r
-    legacy_name:  R_sponge
-    yaml_path:    "boundaries.north.sponge.direct.r"
-    units:        ~
-    default:      0.85
-    latex:        "$R_s$"
-
-  - name:         north_sponge_direct_a
-    legacy_name:  A_sponge
-    yaml_path:    "boundaries.north.sponge.direct.a"
-    units:        ~
-    default:      5.0
-    latex:        "$A_s$"
-
-  - name:         north_sponge_friction_cd
-    legacy_name:  CDsponge
-    yaml_path:    "boundaries.north.sponge.friction.cd"
-    units:        ~
-    default:      0.0
-    latex:        "$C_{d,s}$"
-
-  - name:         north_sponge_diffusion_nu
-    legacy_name:  Csp
-    yaml_path:    "boundaries.north.sponge.diffusion.nu"
-    units:        ~
-    default:      0.1
-    latex:        "$C_{\\mathrm{sp}}$"
-
-  - name:         north_forcing_eta
-    legacy_name:  TideNorth_ETA
-    yaml_path:    "boundaries.north.forcing.eta"
-    units:        m
-    default:      ~
-    latex:        ~
-
-  - name:         north_forcing_u
-    legacy_name:  TideNorth_U
-    yaml_path:    "boundaries.north.forcing.u"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         north_forcing_v
-    legacy_name:  TideNorth_V
-    yaml_path:    "boundaries.north.forcing.v"
-    units:        m/s
-    default:      ~
-    latex:        ~
-
-  - name:         north_forcing_file
-    legacy_name:  TideNorthFileName
-    yaml_path:    "boundaries.north.forcing.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         north_forcing_wavemaker
-    legacy_name:  ~
-    yaml_path:    "boundaries.north.forcing.wavemaker"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         north_forcing_depth
-    legacy_name:  ~
-    yaml_path:    "boundaries.north.forcing.depth"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  # ── breaking ───────────────────────────────────────────────────────────────
-  - name:         cbrk1
-    legacy_name:  Cbrk1
-    yaml_path:    "breaking.cbrk1"
-    units:        ~
-    default:      0.65
-    latex:        "$C_{\\mathrm{brk1}}$"
-
-  - name:         cbrk2
-    legacy_name:  Cbrk2
-    yaml_path:    "breaking.cbrk2"
-    units:        ~
-    default:      0.35
-    latex:        "$C_{\\mathrm{brk2}}$"
-
-  - name:         nu_bkg
-    legacy_name:  nu_bkg
-    yaml_path:    "breaking.nu_bkg"
-    units:        "m2 s-1"
-    default:      0.0
-    latex:        "$\\nu_{\\mathrm{bkg}}$"
-
-  - name:         roller
-    legacy_name:  ROLLER
-    yaml_path:    "breaking.roller"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         show_breaking
-    legacy_name:  SHOW_BREAKING
-    yaml_path:    "breaking.show_breaking"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  # nee physics.viscosity_breaking (T -> eddy_viscosity, F -> shock_capturing);
-  # default applies with no breaking: section — breaking is core physics,
-  # not presence-gated.
-  - name:         breaking_model
-    legacy_name:  VISCOSITY_BREAKING
-    yaml_path:    "breaking.model"
-    units:        ~
-    default:      "eddy_viscosity"
-    latex:        ~
-
-  - name:         visbrk
-    legacy_name:  visbrk
-    yaml_path:    "breaking.visbrk"
-    units:        "m2 s-1"
-    default:      0.0
-    latex:        "$\\nu_{\\mathrm{brk}}$"
-
-  - name:         wavemaker_cbrk
-    legacy_name:  WAVEMAKER_Cbrk
-    yaml_path:    "breaking.wavemaker_cbrk"
-    units:        ~
-    default:      1.0
-    latex:        "$C_{\\mathrm{brk,wm}}$"
-
-  - name:         wavemaker_vis
-    legacy_name:  WAVEMAKER_VIS
-    yaml_path:    "breaking.wavemaker_vis"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         wavemaker_visbrk
-    legacy_name:  WAVEMAKER_visbrk
-    yaml_path:    "breaking.wavemaker_visbrk"
-    units:        "m2 s-1"
-    default:      0.0
-    latex:        "$\\nu_{\\mathrm{brk,wm}}$"
-
-  # ── friction ───────────────────────────────────────────────────────────────
-  # Exactly one of cd | manning | file (exclusive value keys; section absent =
-  # zero drag).  manning holds Manning n itself (kills the dual-use Cd + the
-  # manning/friction_matrix bools); file is the spatially varying Cd map,
-  # init-gated pending (the map read was never implemented).
-  - name:         friction_cd
-    legacy_name:  Cd
-    yaml_path:    "friction.cd"
-    units:        ~
-    default:      ~
-    latex:        "$C_d$"
-
-  - name:         friction_manning
-    legacy_name:  ~
-    yaml_path:    "friction.manning"
-    units:        "s m^{-1/3}"
-    default:      ~
-    latex:        "$n$"
-
-  - name:         friction_file
-    legacy_name:  CD_FILE
-    yaml_path:    "friction.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # ── grid (nee geometry; 3-D keeps geometry:) ────────────────────────────────
-  # coriolis: f-plane escape hatch for non-georeferenced grids; a geographic
-  # CRS derives f per cell once the metric provider exists ([[design-grid-crs]]).
-  # f wins over latitude when both are given.
-  - name:         coriolis_f
-    legacy_name:  ~
-    yaml_path:    "grid.coriolis.f"
-    units:        "s-1"
-    default:      ~
-    latex:        "$f$"
-
-  - name:         coriolis_latitude
-    legacy_name:  ~
-    yaml_path:    "grid.coriolis.latitude"
-    units:        "degrees_north"
-    default:      ~
-    latex:        "$\\varphi$"
-
-  - name:         bathy_correction
-    legacy_name:  BATHY_CORRECTION
-    yaml_path:    "grid.bathy_correction"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         bathy_depth
-    legacy_name:  Depth_Flat
-    yaml_path:    "grid.bathy_depth"
-    units:        "m"
-    default:      ~
-    latex:        "$d_0$"
-
-  - name:         bathy_file
-    legacy_name:  DEPTH_FILE
-    yaml_path:    "grid.bathy_file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         bathy_slope
-    legacy_name:  SLP
-    yaml_path:    "grid.bathy_slope"
-    units:        ~
-    default:      ~
-    latex:        "$s$"
-
-  - name:         bathy_slope_x0
-    legacy_name:  Xslp
-    yaml_path:    "grid.bathy_slope_x0"
-    units:        "m"
-    default:      ~
-    latex:        "$x_{s0}$"
-
-  - name:         bathy_type
-    legacy_name:  DEPTH_TYPE
-    yaml_path:    "grid.bathy_type"
-    units:        ~
-    default:      "flat"
-    latex:        ~
-
-  - name:         dx
-    legacy_name:  DX
-    yaml_path:    "grid.dx"
-    units:        "m"
-    default:      ~
-    latex:        "$\\Delta x$"
-
-  - name:         dy
-    legacy_name:  DY
-    yaml_path:    "grid.dy"
-    units:        "m"
-    default:      ~
-    latex:        "$\\Delta y$"
-
-  - name:         grid_nx
-    legacy_name:  Mglob
-    yaml_path:    "grid.grid_nx"
-    units:        ~
-    default:      ~
-    latex:        "$N_x$"
-
-  - name:         grid_ny
-    legacy_name:  Nglob
-    yaml_path:    "grid.grid_ny"
-    units:        ~
-    default:      ~
-    latex:        "$N_y$"
-
-  - name:         nx_proc
-    legacy_name:  px
-    yaml_path:    "grid.nx_proc"
-    units:        ~
-    default:      ~
-    latex:        "$P_x$"
-
-  - name:         ny_proc
-    legacy_name:  py
-    yaml_path:    "grid.ny_proc"
-    units:        ~
-    default:      ~
-    latex:        "$P_y$"
-
-  # ── hot_start ──────────────────────────────────────────────────────────────
-  - name:         bed_deformation
-    legacy_name:  BED_DEFORMATION
-    yaml_path:    "hot_start.bed_deformation"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         hotstart_eta_file
-    legacy_name:  ETA_FILE
-    yaml_path:    "hot_start.eta_file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         hotstart_mask_file
-    legacy_name:  MASK_FILE
-    yaml_path:    "hot_start.mask_file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         hotstart_output_start_number
-    legacy_name:  FileNumber_HOTSTART
-    yaml_path:    "hot_start.output_start_number"
-    units:        ~
-    default:      0
-    latex:        ~
-
-  - name:         hotstart_time
-    legacy_name:  HotStartTime
-    yaml_path:    "hot_start.time"
-    units:        "s"
-    default:      0.0
-    latex:        "$t_{\\mathrm{hs}}$"
-
-  - name:         hotstart_u_file
-    legacy_name:  U_FILE
-    yaml_path:    "hot_start.u_file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         hotstart_v_file
-    legacy_name:  V_FILE
-    yaml_path:    "hot_start.v_file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # ── numerics ───────────────────────────────────────────────────────────────
-  # Enum values are lowercase in YAML; the reader upcases before the
-  # prefix-dispatch comparisons in kernel_fluxes.
-  - name:         cfl
-    legacy_name:  CFL
-    yaml_path:    "numerics.cfl"
-    units:        ~
-    default:      0.5
-    latex:        "$C_{\\mathrm{CFL}}$"
-
-  - name:         flux_solver
-    legacy_name:  CONSTR
-    yaml_path:    "numerics.flux_solver"
-    units:        ~
-    default:      "hllc"
-    latex:        ~
-
-  - name:         froude_cap
-    legacy_name:  FroudeCap
-    yaml_path:    "numerics.froude_cap"
-    units:        ~
-    default:      3.0
-    latex:        "$Fr_{\\mathrm{cap}}$"
-
-  # Single wet/dry floor: legacy folded MinDepth/MinDepthFrc to their
-  # minimum (old io.F), so the pair was one value in practice.
-  - name:         min_depth
-    legacy_name:  MinDepth
-    yaml_path:    "numerics.min_depth"
-    units:        "m"
-    default:      0.1
-    latex:        "$d_{\\min}$"
-
-  - name:         reconstruction
-    legacy_name:  HIGH_ORDER
-    yaml_path:    "numerics.reconstruction"
-    units:        ~
-    default:      "fourth"
-    latex:        ~
-
-  # ── obstacle ───────────────────────────────────────────────────────────────
-  # file presence = obstacle mask on; breakwater block presence = breakwater on
-  # (nee the OBSTACLE/BREAKWATER dispatcher bools, derived and entry-less)
-  - name:         obstacle_file
-    legacy_name:  OBSTACLE_FILE
-    yaml_path:    "obstacle.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         breakwater_file
-    legacy_name:  BREAKWATER_FILE
-    yaml_path:    "obstacle.breakwater.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         breakwater_absorb_coef
-    legacy_name:  BreakWaterAbsorbCoef
-    yaml_path:    "obstacle.breakwater.absorb_coef"
-    units:        ~
-    default:      10.0
-    latex:        "$C_{\\mathrm{bw}}$"
-
-  # ── output ─────────────────────────────────────────────────────────────────
-  # arrival_time: block presence enables the first-arrival map (nee
-  # numerics.OUT_Time); time-of-first-exceedance reducer, no cadence.
-  - name:         arrival_time_min_height
-    legacy_name:  ArrTimeMin
-    yaml_path:    "output.arrival_time.min_height"
-    units:        "m"
-    default:      0.001
-    latex:        "$H_{\\mathrm{arr}}$"
-
-  - name:         depth_out
-    legacy_name:  OUT_DEPTH
-    yaml_path:    "output.depth_out"
-    units:        ~
-    default:      false
-    latex:        ~
-
-
-  - name:         field_io_type
-    legacy_name:  FIELD_IO_TYPE
-    yaml_path:    "output.field_io_type"
-    units:        ~
-    default:      ASCII
-    latex:        ~
-
-
-  - name:         output_res
-    legacy_name:  OUTPUT_RES
-    yaml_path:    "output.output_res"
-    units:        ~
-    default:      1
-    latex:        ~
-
-  - name:         result_folder
-    legacy_name:  RESULT_FOLDER
-    yaml_path:    "output.result_folder"
-    units:        ~
-    default:      "./output/"
-    latex:        ~
-
-  - name:         stations_file
-    legacy_name:  STATIONS_FILE
-    yaml_path:    "output.stations.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         means_steady_time
-    legacy_name:  STEADY_TIME
-    yaml_path:    "output.means.steady_time"
-    units:        "s"
-    default:      0.0    # block present -> start averaging at once (legacy default LARGE = block absent)
-    latex:        "$T_{\\mathrm{steady}}$"
-
-  - name:         means_interval
-    legacy_name:  T_INTV_mean
-    yaml_path:    "output.means.interval"
-    units:        "s"
-    default:      ~
-    latex:        "$T_{\\mathrm{mean}}$"
-
-  # ── physics ────────────────────────────────────────────────────────────────
-  # dispersion.scheme presets Gamma1/2/3 (fully_nonlinear 1,1,1 /
-  # weakly_nonlinear 1,1,0 / linear 1,0,1 / nswe 0,0,1 + dispersion off);
-  # the gamma entries have no static default — explicit values override
-  # the preset.  physics.{breaking,wavemaker,sediment,c_smg,water_level,
-  # periodic,viscosity_breaking,disp_time_left} removed 2026-07-16:
-  # dead toggles (section presence activates), Smagorinsky amputated
-  # upstream, water_level -> initial: (port gap, pending), periodic ->
-  # boundaries:, viscosity_breaking -> breaking.model, disp_time_left
-  # keyless until the semi-implicit Gamma2 chain is ported.
-  - name:         dispersion_beta_ref
-    legacy_name:  Beta_ref
-    yaml_path:    "physics.dispersion.beta_ref"
-    units:        ~
-    default:      -0.531
-    latex:        "$\\beta_{\\mathrm{ref}}$"
-
-  - name:         dispersion_gamma1
-    legacy_name:  gamma1
-    yaml_path:    "physics.dispersion.gamma1"
-    units:        ~
-    default:      ~
-    latex:        "$\\Gamma_1$"
-
-  - name:         dispersion_gamma2
-    legacy_name:  gamma2
-    yaml_path:    "physics.dispersion.gamma2"
-    units:        ~
-    default:      ~
-    latex:        "$\\Gamma_2$"
-
-  - name:         dispersion_gamma3
-    legacy_name:  gamma3
-    yaml_path:    "physics.dispersion.gamma3"
-    units:        ~
-    default:      ~
-    latex:        "$\\Gamma_3$"
-
-  - name:         dispersion_scheme
-    legacy_name:  DISPERSION
-    yaml_path:    "physics.dispersion.scheme"
-    units:        ~
-    default:      "fully_nonlinear"
-    latex:        ~
-
-  # 0.8 adopted as the project standard 2026-07-16 (deliberate post-cut
-  # change; the legacy default was 0.7)
-  - name:         dispersion_swe_eta_dep
-    legacy_name:  SWE_ETA_DEP
-    yaml_path:    "physics.dispersion.swe_eta_dep"
-    units:        ~
-    default:      0.8
-    latex:        "$\\eta_{\\mathrm{SWE}}$"
-
-  # ── simulation ─────────────────────────────────────────────────────────────
-  - name:         output_interval
-    legacy_name:  PLOT_INTV
-    yaml_path:    "output.interval"
-    units:        "s"
-    default:      ~
-    latex:        "$\\Delta t_{\\mathrm{out}}$"
-
-  - name:         screen_interval
-    legacy_name:  SCREEN_INTV
-    yaml_path:    "simulation.screen_interval"
-    units:        "s"
-    default:      1.0
-    latex:        "$\\Delta t_{\\mathrm{screen}}$"
-
-  - name:         t_start
-    legacy_name:  PLOT_START_TIME
-    yaml_path:    "simulation.t_start"
-    units:        "s"
-    default:      0.0
-    latex:        "$t_0$"
-
-  - name:         title
-    legacy_name:  TITLE
-    yaml_path:    "simulation.title"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         total_time
-    legacy_name:  TOTAL_TIME
-    yaml_path:    "simulation.total_time"
-    units:        "s"
-    default:      ~
-    latex:        "$T$"
-
-  - name:         dt
-    legacy_name:  DT_fixed
-    yaml_path:    "simulation.time_stepping.dt"
-    units:        "s"
-    default:      ~
-    latex:        "$\\Delta t$"
-
-  - name:         fixed_dt
-    legacy_name:  FIXED_DT
-    yaml_path:    "simulation.time_stepping.fixed_dt"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         roller_effect
-    legacy_name:  ROLLER_EFFECT
-    yaml_path:    "breaking.roller_effect"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         coupling_file
-    legacy_name:  COUPLING_FILE
-    yaml_path:    "coupling.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # No static default: absent -> DERIVED as 100 * max|Depth| at init, exactly as
-  # legacy (init.F:850, which overwrites its own input key).  An explicit value
-  # overrides; legacy has no such escape hatch.  A fixed threshold cannot work --
-  # a deep-draft hull legitimately imprints eta = -draft.
-  - name:         blowup_threshold
-    legacy_name:  EtaBlowVal
-    yaml_path:    "output.blowup_threshold"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         stations_interval
-    legacy_name:  PLOT_INTV_STATION
-    yaml_path:    "output.stations.interval"
-    units:        "s"
-    default:      1.0
-    latex:        ~
-
-  - name:         stations_buffer
-    legacy_name:  StationOutputBuffer
-    yaml_path:    "output.stations.buffer"
-    units:        ~
-    default:      1000
-    latex:        ~
-
-  # RainWaveInteraction and OUT_PRECIPITATION are dropped, not renamed: legacy
-  # reads them and consumes them nowhere, so there is nothing to port.
-  - name:         rainfall_file
-    legacy_name:  RAINFALL_FILE
-    yaml_path:    "precipitation.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # ── initial ────────────────────────────────────────────────────────────────
-  # Initial-condition types (nee wavemaker INI_*/N_WAVE).  Block presence
-  # selects the type; solitary + sine_mode are live in apply_ic, hump +
-  # n_wave are init-gated pending their port.  water_level is the legacy
-  # still-water offset (Depth/DEP_WK/Dep_Ser += value) — a port gap, so a
-  # non-zero value is init-gated pending until it is wired.
-  - name:         initial_water_level
-    legacy_name:  WaterLevel
-    yaml_path:    "initial.water_level"
-    units:        "m"
-    default:      0.0
-    latex:        "$\\eta_0$"
-
-  - name:         hump_amplitude
-    legacy_name:  AMP_SOLI
-    yaml_path:    "initial.hump.amplitude"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         hump_radius
-    legacy_name:  GauRadius
-    yaml_path:    "initial.hump.radius"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         hump_shape
-    legacy_name:  ~
-    yaml_path:    "initial.hump.shape"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         hump_width
-    legacy_name:  WID
-    yaml_path:    "initial.hump.width"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         hump_x_center
-    legacy_name:  Xc
-    yaml_path:    "initial.hump.x_center"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         hump_y_center
-    legacy_name:  Yc
-    yaml_path:    "initial.hump.y_center"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         n_wave_a0
-    legacy_name:  a0_Nwave
-    yaml_path:    "initial.n_wave.a0"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         n_wave_depth
-    legacy_name:  dep_Nwave
-    yaml_path:    "initial.n_wave.depth"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         n_wave_gamma
-    legacy_name:  gamma_Nwave
-    yaml_path:    "initial.n_wave.gamma"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         n_wave_x1
-    legacy_name:  x1_Nwave
-    yaml_path:    "initial.n_wave.x1"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         n_wave_x2
-    legacy_name:  x2_Nwave
-    yaml_path:    "initial.n_wave.x2"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         sine_mode_amplitude
-    legacy_name:  AMP_SOLI
-    yaml_path:    "initial.sine_mode.amplitude"
-    units:        "m"
-    default:      0.0
-    latex:        "$a$"
-
-  - name:         sine_mode_depth
-    legacy_name:  DEP_SOLI
-    yaml_path:    "initial.sine_mode.depth"
-    units:        "m"
-    default:      0.0
-    latex:        "$d$"
-
-  - name:         sine_mode_x
-    legacy_name:  MODE_X
-    yaml_path:    "initial.sine_mode.mode_x"
-    units:        ~
-    default:      1
-    latex:        ~
-
-  - name:         sine_mode_y
-    legacy_name:  MODE_Y
-    yaml_path:    "initial.sine_mode.mode_y"
-    units:        ~
-    default:      0
-    latex:        ~
-
-  - name:         solitary_amplitude
-    legacy_name:  AMP_SOLI
-    yaml_path:    "initial.solitary.amplitude"
-    units:        "m"
-    default:      0.0
-    latex:        "$a$"
-
-  - name:         solitary_depth
-    legacy_name:  DEP_SOLI
-    yaml_path:    "initial.solitary.depth"
-    units:        "m"
-    default:      0.0
-    latex:        "$d$"
-
-  - name:         solitary_direction
-    legacy_name:  SolitaryPositiveDirection
-    yaml_path:    "initial.solitary.direction"
-    units:        ~
-    default:      "+x"
-    latex:        ~
-
-  - name:         solitary_x_center
-    legacy_name:  XWAVEMAKER
-    yaml_path:    "initial.solitary.x_center"
-    units:        "m"
-    default:      0.0
-    latex:        ~
-
-  # ── meteo (legacy mod_meteo.F) ─────────────────────────────────────────────
-  # Sub-model blocks: presence = model on (nee the MeteoGausian/
-  # WindConstantField/WindHollandModel/SlideModel dispatcher bools, which are
-  # derived and carry no entries).  gaussian and slide force the pressure
-  # coupling on; wind's only job is the stress, so its presence derives
-  # wind_force; holland carries both couplings as explicit switches.  The wind
-  # knobs live inside the wind-capable blocks; crest_percent is rejected
-  # unless wave_interaction (legacy forced it inert to LARGE), and absent it
-  # derives LARGE (mask == 1).  OUT_METEO dissolved into output: variables:
-  # Pstorm/Ustorm/Vstorm.
-  - name:         gaussian_file
-    legacy_name:  METEO_GAUSIAN_FILE
-    yaml_path:    "meteo.gaussian.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         wind_file
-    legacy_name:  CONSTANT_WIND_FILE
-    yaml_path:    "meteo.wind.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         wind_cd
-    legacy_name:  Cdw
-    yaml_path:    "meteo.wind.cd"
-    units:        ~
-    default:      0.002
-    latex:        "$C_{dw}$"
-
-  - name:         wind_wave_interaction
-    legacy_name:  WindWaveInteraction
-    yaml_path:    "meteo.wind.wave_interaction"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         wind_crest_percent
-    legacy_name:  WindCrestPercent
-    yaml_path:    "meteo.wind.crest_percent"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         holland_file
-    legacy_name:  STORM_FILE
-    yaml_path:    "meteo.holland.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         holland_air_pressure
-    legacy_name:  AirPressure
-    yaml_path:    "meteo.holland.air_pressure"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         holland_wind_force
-    legacy_name:  WindForce
-    yaml_path:    "meteo.holland.wind_force"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         holland_cd
-    legacy_name:  ~
-    yaml_path:    "meteo.holland.cd"
-    units:        ~
-    default:      0.002
-    latex:        "$C_{dw}$"
-
-  - name:         holland_wave_interaction
-    legacy_name:  ~
-    yaml_path:    "meteo.holland.wave_interaction"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         holland_crest_percent
-    legacy_name:  ~
-    yaml_path:    "meteo.holland.crest_percent"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         slide_file
-    legacy_name:  SLIDE_FILE
-    yaml_path:    "meteo.slide.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-
-  # ── subgrid (legacy mod_subgrid.F) ─────────────────────────────────────────
-  - name:         subgrid_depth_file
-    legacy_name:  DEPTH_SUBGRID_FILE
-    yaml_path:    "subgrid.depth_file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         subgrid_write_porosity
-    legacy_name:  Porosity
-    yaml_path:    "subgrid.write_porosity"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         subgrid_ratio
-    legacy_name:  SubMainGridRatio
-    yaml_path:    "subgrid.ratio"
-    units:        ~
-    default:      1
-    latex:        ~
-
-  # ── foam (legacy mod_foam.F) ───────────────────────────────────────────────
-  # BurstRate/TransferRate are omitted: their readers sit behind USE_BURSTRATE,
-  # which no build system defines, so the knobs are unreachable.
-
-  - name:         foam_source_coef
-    legacy_name:  f_source
-    yaml_path:    "foam.source_coef"
-    units:        ~
-    default:      0.05
-    latex:        "$f_{\\mathrm{source}}$"
-
-  - name:         foam_time_scale
-    legacy_name:  FoamTimeScale
-    yaml_path:    "foam.time_scale"
-    units:        "s"
-    default:      3.8
-    latex:        "$\\tau_f$"
-
-  - name:         foam_burst_time_non_breaking
-    legacy_name:  BurstTimeNonBreaking
-    yaml_path:    "foam.burst_time_non_breaking"
-    units:        "s"
-    default:      1.0
-    latex:        ~
-
-  - name:         foam_min_thickness
-    legacy_name:  MinThick
-    yaml_path:    "foam.min_thickness"
-    units:        "m"
-    default:      0.01
-    latex:        ~
-
-  - name:         foam_cd
-    legacy_name:  CdFoam
-    yaml_path:    "foam.cd"
-    units:        ~
-    default:      0.5
-    latex:        "$C_{d,f}$"
-
-  # ── tracer (legacy mod_tracer.F) ───────────────────────────────────────────
-  # The tracker table (count, output interval, and one row per tracker) lives in
-  # TRACER_FILE, not here: registry v1 is flat and cannot express a list.  Both
-  # engines read that file, so it is the parity-shared input.
-  - name:         tracer_file
-    legacy_name:  TRACER_FILE
-    yaml_path:    "tracer.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # ── vessel (legacy mod_vessel.F) ───────────────────────────────────────────
-  # One vessel_NNNNN file per hull (geometry, propeller specs, and the time/x/y
-  # track) lives in VESSEL_FOLDER, not here: registry v1 is flat and cannot
-  # express a list.  Both engines read those files, so they are the parity-shared
-  # input.
-  #
-  # PROPELLER and DEEP_DRAFT_VESSEL are cpp flags in legacy; the modern engine is
-  # not preprocessed, so they become runtime switches.  The io.F bridge checks
-  # them against the legacy build flags and stops on a mismatch, so a modern
-  # `propeller: true` against a binary built without -DPROPELLER cannot silently
-  # score as parity.
-  # deep_draft is a presence block (nee the DEEP_DRAFT bool): clearance is its
-  # required key (an empty block dumps as YAML null and reads as absent); cd
-  # presence = hull drag (nee FrictionMethod + CdDeepDraft), nu presence = hull
-  # eddy viscosity (nee ViscosityMethod + VisDeepDraft).  NOTE: legacy defaults
-  # FrictionMethod on, so the converter emits cd explicitly; a hand-authored
-  # block without cd runs drag-free.  OUT_VESSEL dissolved into output:
-  # variables: Pves/VesUp/VesVp + the output.vessel series block;
-  # PLOT_INTV_VESSEL lives on as output.vessel.interval.
-  - name:         vessel_folder
-    legacy_name:  VESSEL_FOLDER
-    yaml_path:    "vessel.folder"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         vessel_count
-    legacy_name:  NumVessel
-    yaml_path:    "vessel.count"
-    units:        ~
-    default:      1
-    latex:        ~
-
-
-  - name:         vessel_interval
-    legacy_name:  PLOT_INTV_VESSEL
-    yaml_path:    "output.vessel.interval"
-    units:        "s"
-    default:      ~
-    latex:        ~
-
-  - name:         propeller
-    legacy_name:  PROPELLER
-    yaml_path:    "vessel.propeller"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         deep_draft_clearance
-    legacy_name:  CLEARANCE
-    yaml_path:    "vessel.deep_draft.clearance"
-    units:        "m"
-    default:      ~
-    latex:        ~
-
-  - name:         deep_draft_mask
-    legacy_name:  MaskMethod
-    yaml_path:    "vessel.deep_draft.mask"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  - name:         deep_draft_cd
-    legacy_name:  CdDeepDraft
-    yaml_path:    "vessel.deep_draft.cd"
-    units:        ~
-    default:      ~
-    latex:        "$C_{d,v}$"
-
-  - name:         deep_draft_nu
-    legacy_name:  VisDeepDraft
-    yaml_path:    "vessel.deep_draft.nu"
-    units:        "m^2/s"
-    default:      ~
-    latex:        ~
-
-  # ── sediment (legacy mod_sediment.F) ───────────────────────────────────────
-  # Suspended-load transport of a single grain size.  Kappa1/Kappa2 are read and
-  # echoed by legacy but never enter a formula, so they are not ported.
-  #
-  # WS and C_limiter are PRESENCE-tested, not value-tested: an absent WS switches
-  # to the settling-velocity formula, an absent C_limiter disables the limiter.
-  # Both therefore carry no default (a default would make them always "present").
-  - name:         sed_scheme
-    legacy_name:  Sed_Scheme
-    yaml_path:    "sediment.scheme"
-    units:        ~
-    default:      upwinding
-    latex:        ~
-
-  # D50 is presence-tested because its fallback depends on CohesiveSediment:
-  # 0.5 mm sand, or 5 nm mud.  A flat default cannot express that, so the two
-  # sit as parameters in sediment.f90.
-  - name:         d50
-    legacy_name:  D50
-    yaml_path:    "sediment.d50"
-    units:        "m"
-    default:      ~
-    latex:        "$D_{50}$"
-
-  - name:         specific_gravity
-    legacy_name:  Sdensity
-    yaml_path:    "sediment.specific_gravity"
-    units:        ~
-    default:      2.68
-    latex:        "$s$"
-
-  - name:         sediment_porosity
-    legacy_name:  n_porosity
-    yaml_path:    "sediment.porosity"
-    units:        ~
-    default:      0.47
-    latex:        "$n$"
-
-  - name:         settling_velocity
-    legacy_name:  WS
-    yaml_path:    "sediment.settling_velocity"
-    units:        "m/s"
-    default:      ~
-    latex:        "$w_s$"
-
-  - name:         shields_cr
-    legacy_name:  Shields_cr
-    yaml_path:    "sediment.shields_cr"
-    units:        ~
-    default:      0.055
-    latex:        "$\\theta_{cr}$"
-
-  - name:         min_depth_pickup
-    legacy_name:  MinDepthPickup
-    yaml_path:    "sediment.min_depth_pickup"
-    units:        "m"
-    default:      0.1
-    latex:        ~
-
-  - name:         pickup_reduction
-    legacy_name:  PickupReduction
-    yaml_path:    "sediment.pickup_reduction"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  - name:         reduction_parameter
-    legacy_name:  ReductionParameter
-    yaml_path:    "sediment.reduction_parameter"
-    units:        ~
-    default:      0.65
-    latex:        ~
-
-  - name:         c_limiter
-    legacy_name:  C_limiter
-    yaml_path:    "sediment.c_limiter"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  - name:         morph_interval
-    legacy_name:  Morph_interval
-    yaml_path:    "sediment.morph_interval"
-    units:        "s"
-    default:      ~
-    latex:        ~
-
-  # Morphology.  Shields_cr_bedload is presence-tested like WS above: absent, it
-  # falls back to Shields_cr, so it carries no default of its own.
-  - name:         bed_change
-    legacy_name:  Bed_Change
-    yaml_path:    "sediment.bed_change"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         bedload
-    legacy_name:  BedLoad
-    yaml_path:    "sediment.bedload"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         shields_cr_bedload
-    legacy_name:  Shields_cr_bedload
-    yaml_path:    "sediment.shields_cr_bedload"
-    units:        ~
-    default:      ~
-    latex:        "$\\theta_{cr,b}$"
-
-  - name:         morph_factor
-    legacy_name:  Morph_factor
-    yaml_path:    "sediment.morph_factor"
-    units:        ~
-    default:      1
-    latex:        ~
-
-  # hard_bottom is a presence block (nee the Hard_bottom bool): file required
-  - name:         hard_bottom_file
-    legacy_name:  Mask_s_File
-    yaml_path:    "sediment.hard_bottom.file"
-    units:        ~
-    default:      ~
-    latex:        ~
-
-  # Avalanching: presence block (nee the Avalanche bool).  tan_phi is its
-  # required key (an empty block dumps as YAML null and reads as absent;
-  # converter emits the legacy 0.7 fallback).  interval is presence-tested:
-  # absent, the slope is relaxed every step.
-  - name:         tan_phi
-    legacy_name:  tan_phi
-    yaml_path:    "sediment.avalanche.tan_phi"
-    units:        ~
-    default:      ~
-    latex:        "$\\tan\\phi$"
-
-  - name:         aval_interval
-    legacy_name:  Aval_interval
-    yaml_path:    "sediment.avalanche.interval"
-    units:        "s"
-    default:      ~
-    latex:        ~
-
-  # Cohesive sediment: presence block (nee the CohesiveSediment bool).
-  # Switching it on replaces the pickup law and the settling velocity
-  # wholesale, and silently retires the bedload.  tau_cr is its required key
-  # (converter emits the legacy 0.001 fallback).  k_coh is dropped, not
-  # renamed: legacy assigns it to the molecular viscosity, whose only two
-  # consumers (Dstar, the WS formula) are non-cohesive-only -- inert.
-  - name:         soft_bed
-    legacy_name:  SoftBed
-    yaml_path:    "sediment.cohesive.soft_bed"
-    units:        ~
-    default:      true
-    latex:        ~
-
-  - name:         tau_cr_coh
-    legacy_name:  Tau_cr_coh
-    yaml_path:    "sediment.cohesive.tau_cr"
-    units:        "m2/s2"
-    default:      ~
-    latex:        "$\\tau_{cr}$"
-
-  - name:         tau_crd_coh
-    legacy_name:  Tau_crd_coh
-    yaml_path:    "sediment.cohesive.tau_crd"
-    units:        "m2/s2"
-    default:      0.001
-    latex:        "$\\tau_{cr,d}$"
-
-  - name:         e_coh
-    legacy_name:  E_coh
-    yaml_path:    "sediment.cohesive.e"
-    units:        "m/s"
-    default:      0.0001
-    latex:        "$E$"
-
-  - name:         alpha_coh
-    legacy_name:  alpha_coh
-    yaml_path:    "sediment.cohesive.alpha"
-    units:        ~
-    default:      1.0
-    latex:        "$\\alpha$"
-
-  - name:         a_coh
-    legacy_name:  a_coh
-    yaml_path:    "sediment.cohesive.a"
-    units:        ~
-    default:      0.1
-    latex:        "$a$"
-
-  - name:         b_coh
-    legacy_name:  b_coh
-    yaml_path:    "sediment.cohesive.b"
-    units:        ~
-    default:      2.0
-    latex:        "$b$"
-
-  - name:         n_coh
-    legacy_name:  n_coh
-    yaml_path:    "sediment.cohesive.n"
-    units:        ~
-    default:      0.5
-    latex:        "$n$"
-
-  - name:         m_coh
-    legacy_name:  m_coh
-    yaml_path:    "sediment.cohesive.m"
-    units:        ~
-    default:      1.5
-    latex:        "$m$"
-
-  # Feedback into the flow: presence block for the three switch bools
-  - name:         sediment_mass_source
-    legacy_name:  SedimentMassSource
-    yaml_path:    "sediment.feedback.mass_source"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         sediment_moment_dc
-    legacy_name:  SedimentMomentDC
-    yaml_path:    "sediment.feedback.moment_dc"
-    units:        ~
-    default:      false
-    latex:        ~
-
-  - name:         sediment_moment_exg
-    legacy_name:  SedimentMomentEXG
-    yaml_path:    "sediment.feedback.moment_exg"
-    units:        ~
-    default:      false
-    latex:        ~
+# ═══════════════════════════════════════════════════════════════════════════════
+# sections — hierarchical metadata tree (registry v2)
+# ═══════════════════════════════════════════════════════════════════════════════
+#
+# A DESCRIPTIVE catalog of every config key, mirroring the deck tree — NOT a schema
+# code is generated from.  The code (the hand-written readers) is the source of
+# truth for structure and validation; this tree only annotates it with the metadata
+# the code does not carry (legacy name, default, units, latex, doc).  Two consumers:
+#   * readability / de-dup — variant + per-face structure written once;
+#   * docs + example-config generation per section and per variant.
+# gen_registry.py still emits the DEF_ default constants (config_defaults.f90,
+# unchanged) by walking this tree's `default`s.
+#
+# Per-key metadata (all descriptive):
+#   legacy   mod_global.F name for the input.txt converter (~ if none)
+#   default  registry default (feeds the DEF_ constant)
+#   units    null (~) if dimensionless; else a CF unit string
+#   latex    terminal/Doxygen label (~ if none)
+#   values   documented value set for docs/examples (NOT validated here — the
+#            reader validates; this is the option list the docs should show)
+#   doc      one-line human description for generated docs
+#
+# Per-face sections (boundaries) use `per_face:` so a face's keys are written
+# once and expanded across faces ({face}/{Face}/{F} templating + overrides).
+# A key may carry a dotted deck sub-path (wavemaker spectrum.freq.peak); a
+# `variant:` tag documents which discriminant value a key belongs to.
+
+sections:
+
+  # ── wavemaker (spectrum shape x discretization x source) ────────────────────
+  wavemaker:
+    doc: >-
+      Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby
+      internal source box or a boundary signal.  spectrum.type discriminates the
+      shape; source:/limiter: presence enables the source box / eta limiter.
+      Entry is a mapping or a 1-element sequence (multi-wavemaker pending).  Keys
+      carry their deck sub-path; `variant:` tags which spectrum.type a shape key
+      belongs to (untagged keys apply regardless, e.g. source/limiter).
+    keys:
+      name: { legacy: ~, default: ~, units: ~, doc: "Name (referenced by boundaries.<face>.forcing.wavemaker)." }
+      spectrum.type:
+        { legacy: WAVEMAKER, default: ~, units: ~, values: [regular, jonswap, tma, spectrum_2d, components], doc: "Spectrum shape discriminant." }
+      spectrum.amplitude: { legacy: AMP_WK, default: 0.0, units: m, latex: "$a$", variant: [regular], doc: "Monochromatic wave amplitude." }
+      spectrum.period: { legacy: Tperiod, default: 0.0, units: s, latex: "$T$", variant: [regular], doc: "Monochromatic wave period." }
+      spectrum.direction: { legacy: Theta_WK, default: 0.0, units: deg, latex: "$\\theta$", variant: [regular], doc: "Monochromatic wave direction." }
+      spectrum.hm0: { legacy: Hmo, default: 0.0, units: m, latex: "$H_{m0}$", variant: [jonswap, tma], doc: "Significant wave height (total eta)." }
+      spectrum.gamma: { legacy: GammaTMA, default: 3.3, units: ~, latex: "$\\gamma$", variant: [jonswap, tma], doc: "Peak enhancement factor." }
+      spectrum.freq.peak: { legacy: FreqPeak, default: 0.0, units: Hz, latex: "$f_p$", variant: [jonswap, tma], doc: "Peak frequency (exact legacy path)." }
+      spectrum.freq.min: { legacy: FreqMin, default: 0.0, units: Hz, variant: [jonswap, tma], doc: "Minimum frequency." }
+      spectrum.freq.max: { legacy: FreqMax, default: 0.0, units: Hz, variant: [jonswap, tma], doc: "Maximum frequency." }
+      spectrum.period.peak: { legacy: ~, default: ~, units: s, latex: "$T_p$", variant: [jonswap, tma], doc: "Hand-authoring alt to freq.peak (reciprocal; mutually exclusive)." }
+      spectrum.period.min: { legacy: ~, default: ~, units: s, variant: [jonswap, tma], doc: "Alt to freq.max (note the min<->max swap)." }
+      spectrum.period.max: { legacy: ~, default: ~, units: s, variant: [jonswap, tma], doc: "Alt to freq.min." }
+      spectrum.directional.peak: { legacy: ThetaPeak, default: 0.0, units: deg, variant: [jonswap, tma], doc: "Mean direction (presence => 2D spreading)." }
+      spectrum.directional.spread: { legacy: Sigma_Theta, default: 0.0, units: deg, variant: [jonswap, tma], doc: "Directional spread (legacy 10.0 in directional branch; PENDING)." }
+      spectrum.directional.n_bins: { legacy: Ntheta, default: 1, units: ~, variant: [jonswap, tma], doc: "Directional bin count (legacy 24 in directional branch; PENDING)." }
+      spectrum.discretization.freq_bins: { legacy: Nfreq, default: 45, units: ~, variant: [jonswap, tma], doc: "Frequency bin count." }
+      spectrum.discretization.equal_energy: { legacy: EqualEnergy, default: false, units: ~, variant: [jonswap, tma], doc: "Equal-energy frequency binning." }
+      spectrum.discretization.method:
+        { legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method (single_dir_per_freq init-gated pending)." }
+      spectrum.discretization.coherence_percent: { legacy: alpha_c, default: 0.0, units: "%", variant: [jonswap, tma], doc: "Percent of components sharing a frequency." }
+      spectrum.file: { legacy: WaveCompFile, default: ~, units: ~, variant: [components, spectrum_2d], doc: "Wave-component / 2D-spectrum data file." }
+      spectrum.n: { legacy: NumWaveComp, default: 1, units: ~, variant: [components], doc: "Number of wave components." }
+      spectrum.period_peak: { legacy: PeakPeriod, default: 0.0, units: s, latex: "$T_p$", variant: [components], doc: "Peak period (components store a period here)." }
+      spectrum.format: { legacy: WAVE_DATA_TYPE, default: DATA_1D, units: ~, variant: [spectrum_2d], doc: "2D-spectrum data format." }
+      source.x_center: { legacy: Xc_WK, default: 0.0, units: m, latex: "$x_c$", doc: "Source-box x center (presence of source: => Wei-Kirby)." }
+      source.y_center: { legacy: Yc_WK, default: 0.0, units: m, latex: "$y_c$", doc: "Source-box y center." }
+      source.depth: { legacy: DEP_WK, default: 0.0, units: m, doc: "Source-box reference depth." }
+      source.delta: { legacy: Delta_WK, default: 0.5, units: ~, latex: "$\\delta$", doc: "Source-box width parameter." }
+      source.y_width: { legacy: Ywidth_WK, default: 999999.0, units: m, doc: "Source-box alongshore width (large = full span)." }
+      source.time_ramp: { legacy: Time_ramp, default: 0.0, units: s, doc: "Source ramp-up time." }
+      source.current_cd: { legacy: WaveMakerCd, default: ~, units: ~, doc: "Current-balance drag (presence enables; nee WaveMakerCurrentBalance)." }
+      limiter.crest: { legacy: CrestLimit, default: ~, units: m, doc: "Crest elevation limit (presence => eta limiter)." }
+      limiter.trough: { legacy: TroughLimit, default: ~, units: m, doc: "Trough elevation limit." }
+
+  # ── boundaries (per-face de-dup) ───────────────────────────────────────────
+  boundaries:
+    doc: >-
+      Per-face boundary conditions.  The reader DERIVES each face's BC from which
+      blocks are present (nothing -> wall; sponge only -> wall + absorbing strip;
+      sponge.direct + forcing -> relaxation to a signal; forcing without direct ->
+      characteristic, pending).  type: is an optional assertion.
+    keys:
+      periodic:
+        legacy: PERIODIC
+        default: ~
+        units: ~
+        doc: "Axis-level periodic pair list (e.g. [y]); x pending trid_x_periodic."
+      relaxation_cells:
+        legacy: WaveMakerPointNum
+        default: 30
+        units: ~
+        doc: "Width in cells of the forcing relaxation strip."
+    per_face:
+      faces: [west, east, south, north] # {face}=west  {Face}=West  {F}=W
+      keys:
+        type:
+          legacy: ~
+          default: ~
+          units: ~
+          doc: "Optional BC assertion; errors at init if it disagrees with the derived BC."
+        sponge.width:
+          legacy: "Sponge_{face}_width"
+          default: 0.0
+          units: "m"
+          latex: "$W_{s,{F}}$"
+          doc: "Absorbing sponge strip width (0 = no sponge)."
+        sponge.direct.r:
+          legacy: R_sponge
+          default: 0.85
+          units: ~
+          latex: "$R_s$"
+          doc: "Direct-sponge damping ratio."
+        sponge.direct.a:
+          legacy: A_sponge
+          default: 5.0
+          units: ~
+          latex: "$A_s$"
+          doc: "Direct-sponge damping exponent."
+        sponge.friction.cd:
+          legacy: CDsponge
+          default: 0.0
+          units: ~
+          latex: "$C_{d,s}$"
+          doc: "Sponge bottom-friction coefficient."
+        sponge.diffusion.nu:
+          legacy: Csp
+          default: 0.1
+          units: ~
+          latex: "$C_{\\mathrm{sp}}$"
+          doc: "Sponge diffusion coefficient."
+        forcing.eta:
+          legacy: "Tide{Face}_ETA"
+          default: ~
+          units: m
+          doc: "Prescribed surface-elevation forcing (constant; file for a series)."
+        forcing.u:
+          legacy: "Tide{Face}_U"
+          default: ~
+          units: m/s
+          doc: "Prescribed x-velocity forcing."
+        forcing.v:
+          legacy: "Tide{Face}_V"
+          default: ~
+          units: m/s
+          doc: "Prescribed y-velocity forcing."
+        forcing.file:
+          legacy: "Tide{Face}FileName"
+          default: ~
+          units: ~
+          doc: "Time-series forcing file (presence => DATA forcing)."
+        forcing.wavemaker:
+          legacy: ~
+          default: ~
+          units: ~
+          doc: "Name of a spectrum-only wavemaker entry driving this face (nee ABS)."
+        forcing.depth:
+          legacy: ~
+          default: ~
+          units: "m"
+          doc: "Reference depth for the wavemaker forcing series (nee DepthWaveMaker)."
+      overrides:
+        west.forcing.depth: { legacy: DepthWaveMaker } # legacy global; west-only
+
+  # ── numerics (format pilot; no variants) ───────────────────────────────────
+  numerics:
+    doc: "Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor."
+    keys:
+      cfl:
+        legacy: CFL
+        default: 0.5
+        units: ~
+        latex: "$C_{\\mathrm{CFL}}$"
+        doc: "CFL number for the adaptive timestep."
+      flux_solver:
+        legacy: CONSTR
+        default: hllc
+        units: ~
+        values: [hllc, hll]
+        doc: "Approximate Riemann solver."
+      froude_cap:
+        legacy: FroudeCap
+        default: 3.0
+        units: ~
+        latex: "$Fr_{\\mathrm{cap}}$"
+        doc: "Maximum Froude number (velocity limiter)."
+      min_depth:
+        legacy: MinDepth
+        default: 0.1
+        units: "m"
+        latex: "$d_{\\min}$"
+        doc: "Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc)."
+      reconstruction:
+        legacy: HIGH_ORDER
+        default: fourth
+        units: ~
+        values: [fourth, fminmod, weno, mlp, basic]
+        doc: "Spatial reconstruction scheme."
+
+  # ── grid ──
+  grid:
+    doc: "Computational grid — extent, spacing, bathymetry source, MPI decomposition, optional Coriolis."
+    keys:
+      coriolis.f: {legacy: ~, default: ~, units: s-1, latex: $f$, doc: Constant Coriolis parameter (f-plane; overrides latitude).}
+      coriolis.latitude: {legacy: ~, default: ~, units: degrees_north, latex: $\varphi$, doc: Reference latitude for the f-plane Coriolis parameter.}
+      bathy_correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass.}
+      bathy_depth: {legacy: Depth_Flat, default: ~, units: m, latex: $d_0$, doc: Still-water depth for a flat bottom.}
+      bathy_file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: Bathymetry data file.}
+      bathy_slope: {legacy: SLP, default: ~, units: ~, latex: $s$, doc: Bed slope for a sloping-beach bathymetry.}
+      bathy_slope_x0: {legacy: Xslp, default: ~, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
+      bathy_type: {legacy: DEPTH_TYPE, default: flat, units: ~, values: [flat, slope, data], doc: Bathymetry generator.}
+      dx: {legacy: DX, default: ~, units: m, latex: $\Delta x$, doc: Grid spacing in x.}
+      dy: {legacy: DY, default: ~, units: m, latex: $\Delta y$, doc: Grid spacing in y.}
+      grid_nx: {legacy: Mglob, default: ~, units: ~, latex: $N_x$, doc: Number of grid cells in x (global).}
+      grid_ny: {legacy: Nglob, default: ~, units: ~, latex: $N_y$, doc: Number of grid cells in y (global).}
+      nx_proc: {legacy: px, default: ~, units: ~, latex: $P_x$, doc: MPI process count in x (absent = auto-decompose).}
+      ny_proc: {legacy: py, default: ~, units: ~, latex: $P_y$, doc: MPI process count in y (absent = auto-decompose).}
+
+  # ── simulation ──
+  simulation:
+    doc: "Run control — title, total/start time, screen-log cadence, and time-stepping."
+    keys:
+      screen_interval: {legacy: SCREEN_INTV, default: 1.0, units: s, latex: '$\Delta t_{\mathrm{screen}}$', doc: Screen-log / monitor cadence.}
+      t_start: {legacy: PLOT_START_TIME, default: 0.0, units: s, latex: $t_0$, doc: Simulation time at which output begins.}
+      title: {legacy: TITLE, default: ~, units: ~, doc: Run title (reserved for NetCDF global attrs).}
+      total_time: {legacy: TOTAL_TIME, default: ~, units: s, latex: $T$, doc: Total simulated duration.}
+      time_stepping.dt: {legacy: DT_fixed, default: ~, units: s, latex: $\Delta t$, doc: Fixed timestep value (with fixed_dt).}
+      time_stepping.fixed_dt: {legacy: FIXED_DT, default: false, units: ~, doc: Use a fixed timestep instead of adaptive CFL.}
+
+  # ── initial ──
+  initial:
+    doc: "Initial condition — block presence selects the type (solitary/sine_mode/hump/n_wave) + still-water level."
+    keys:
+      water_level: {legacy: WaterLevel, default: 0.0, units: m, latex: $\eta_0$, doc: Uniform still-water level offset (non-zero init-gated pending).}
+      hump.amplitude: {legacy: AMP_SOLI, default: ~, units: m, doc: Hump amplitude.}
+      hump.radius: {legacy: GauRadius, default: ~, units: m, doc: Gaussian hump radius.}
+      hump.shape: {legacy: ~, default: ~, units: ~, values: [rect, gaussian, dipole], doc: Hump shape.}
+      hump.width: {legacy: WID, default: ~, units: m, doc: Hump width.}
+      hump.x_center: {legacy: Xc, default: ~, units: m, doc: Hump center x.}
+      hump.y_center: {legacy: Yc, default: ~, units: m, doc: Hump center y.}
+      n_wave.a0: {legacy: a0_Nwave, default: ~, units: m, doc: N-wave amplitude.}
+      n_wave.depth: {legacy: dep_Nwave, default: ~, units: m, doc: N-wave still-water depth.}
+      n_wave.gamma: {legacy: gamma_Nwave, default: ~, units: ~, doc: N-wave shape parameter.}
+      n_wave.x1: {legacy: x1_Nwave, default: ~, units: m, doc: N-wave leading position.}
+      n_wave.x2: {legacy: x2_Nwave, default: ~, units: m, doc: N-wave trailing position.}
+      sine_mode.amplitude: {legacy: AMP_SOLI, default: 0.0, units: m, latex: $a$, doc: Standing sine-mode amplitude.}
+      sine_mode.depth: {legacy: DEP_SOLI, default: 0.0, units: m, latex: $d$, doc: Sine-mode still-water depth.}
+      sine_mode.mode_x: {legacy: MODE_X, default: 1, units: ~, doc: Sine mode number in x.}
+      sine_mode.mode_y: {legacy: MODE_Y, default: 0, units: ~, doc: Sine mode number in y.}
+      solitary.amplitude: {legacy: AMP_SOLI, default: 0.0, units: m, latex: $a$, doc: Solitary-wave amplitude.}
+      solitary.depth: {legacy: DEP_SOLI, default: 0.0, units: m, latex: $d$, doc: Solitary-wave still-water depth.}
+      solitary.direction: {legacy: SolitaryPositiveDirection, default: +x, units: ~, values: [+x, -x, +y, -y], doc: Solitary-wave propagation direction.}
+      solitary.x_center: {legacy: XWAVEMAKER, default: 0.0, units: m, doc: Solitary-wave initial crest x.}
+
+  # ── physics ──
+  physics:
+    doc: "Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE transition depth."
+    keys:
+      dispersion.beta_ref: {legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
+      dispersion.gamma1: {legacy: gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: Dispersion coefficient Gamma1 (overrides the scheme preset).}
+      dispersion.gamma2: {legacy: gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: Dispersion coefficient Gamma2 (overrides the scheme preset).}
+      dispersion.gamma3: {legacy: gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: Dispersion coefficient Gamma3 (overrides the scheme preset).}
+      dispersion.scheme: {legacy: DISPERSION, default: fully_nonlinear, units: ~, values: [fully_nonlinear, weakly_nonlinear, linear, nswe], doc: Dispersion preset for Gamma1/2/3.}
+      dispersion.swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: eta/depth ratio above which cells switch to shallow-water equations.}
+
+  # ── breaking ──
+  breaking:
+    doc: "Wave breaking — dissipation model, roller, and wavemaker-region overrides (core physics, not presence-gated)."
+    keys:
+      cbrk1: {legacy: Cbrk1, default: 0.65, units: ~, latex: '$C_{\mathrm{brk1}}$', doc: Breaking onset threshold coefficient.}
+      cbrk2: {legacy: Cbrk2, default: 0.35, units: ~, latex: '$C_{\mathrm{brk2}}$', doc: Breaking cessation threshold coefficient.}
+      nu_bkg: {legacy: nu_bkg, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{bkg}}$', doc: Background eddy viscosity added everywhere.}
+      roller: {legacy: ROLLER, default: false, units: ~, doc: Enable surface-roller momentum flux.}
+      show_breaking: {legacy: SHOW_BREAKING, default: true, units: ~, doc: Output the breaking-index field.}
+      model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing], doc: Breaking dissipation model.}
+      visbrk: {legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: Breaking eddy-viscosity coefficient.}
+      wavemaker_cbrk: {legacy: WAVEMAKER_Cbrk, default: 1.0, units: ~, latex: '$C_{\mathrm{brk,wm}}$', doc: Breaking threshold scale inside the wavemaker region.}
+      wavemaker_vis: {legacy: WAVEMAKER_VIS, default: false, units: ~, doc: Enable extra viscosity in the wavemaker region.}
+      wavemaker_visbrk: {legacy: WAVEMAKER_visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk,wm}}$', doc: Breaking viscosity coefficient in the wavemaker region.}
+      roller_effect: {legacy: ROLLER_EFFECT, default: false, units: ~, doc: Apply the roller effect to the momentum equations.}
+
+  # ── friction ──
+  friction:
+    doc: "Bottom friction — exactly one of cd, manning (n), or file; section absent = zero drag."
+    keys:
+      cd: {legacy: Cd, default: ~, units: ~, latex: $C_d$, doc: Constant quadratic bottom-drag coefficient.}
+      manning: {legacy: ~, default: ~, units: 's m^{-1/3}', latex: $n$, doc: Manning roughness n (converted to Cd per cell).}
+      file: {legacy: CD_FILE, default: ~, units: ~, doc: Spatially varying Cd map file (init-gated pending).}
+
+  # ── obstacle ──
+  obstacle:
+    doc: "Interior obstacles — obstacle mask file and breakwater absorbing block."
+    keys:
+      file: {legacy: OBSTACLE_FILE, default: ~, units: ~, doc: Obstacle mask file (presence enables interior walls).}
+      breakwater.file: {legacy: BREAKWATER_FILE, default: ~, units: ~, doc: Breakwater location file.}
+      breakwater.absorb_coef: {legacy: BreakWaterAbsorbCoef, default: 10.0, units: ~, latex: '$C_{\mathrm{bw}}$', doc: Breakwater absorption coefficient.}
+
+  # ── meteo ──
+  meteo:
+    doc: "Atmospheric forcing — presence-derived sub-models (gaussian/wind/holland/slide)."
+    keys:
+      gaussian.file: {legacy: METEO_GAUSIAN_FILE, default: ~, units: ~, doc: Gaussian pressure-disturbance file (presence enables; forces pressure coupling).}
+      wind.file: {legacy: CONSTANT_WIND_FILE, default: ~, units: ~, doc: Constant wind-field file (presence enables wind stress).}
+      wind.cd: {legacy: Cdw, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient.}
+      wind.wave_interaction: {legacy: WindWaveInteraction, default: false, units: ~, doc: Modulate wind stress by the wave field.}
+      wind.crest_percent: {legacy: WindCrestPercent, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
+      holland.file: {legacy: STORM_FILE, default: ~, units: ~, doc: Holland-model storm-track file.}
+      holland.air_pressure: {legacy: AirPressure, default: false, units: ~, doc: Apply the storm pressure coupling.}
+      holland.wind_force: {legacy: WindForce, default: false, units: ~, doc: Apply the storm wind-stress coupling.}
+      holland.cd: {legacy: ~, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient (Holland).}
+      holland.wave_interaction: {legacy: ~, default: false, units: ~, doc: Modulate storm wind stress by the wave field.}
+      holland.crest_percent: {legacy: ~, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
+      slide.file: {legacy: SLIDE_FILE, default: ~, units: ~, doc: Submarine-landslide forcing file (presence enables; forces pressure coupling).}
+
+  # ── subgrid ──
+  subgrid:
+    doc: "Subgrid porosity (urban flooding) — depth file, ratio, porosity output."
+    keys:
+      depth_file: {legacy: DEPTH_SUBGRID_FILE, default: ~, units: ~, doc: High-resolution subgrid bathymetry file.}
+      write_porosity: {legacy: Porosity, default: false, units: ~, doc: Output the computed porosity field.}
+      ratio: {legacy: SubMainGridRatio, default: 1, units: ~, doc: Subgrid-to-main-grid refinement ratio.}
+
+  # ── foam ──
+  foam:
+    doc: "Foam / bubble model — production and decay parameters."
+    keys:
+      source_coef: {legacy: f_source, default: 0.05, units: ~, latex: '$f_{\mathrm{source}}$', doc: Foam production coefficient.}
+      time_scale: {legacy: FoamTimeScale, default: 3.8, units: s, latex: $\tau_f$, doc: Foam decay time scale.}
+      burst_time_non_breaking: {legacy: BurstTimeNonBreaking, default: 1.0, units: s, doc: Foam burst time in non-breaking regions.}
+      min_thickness: {legacy: MinThick, default: 0.01, units: m, doc: Minimum foam-layer thickness tracked.}
+      cd: {legacy: CdFoam, default: 0.5, units: ~, latex: '$C_{d,f}$', doc: Foam-layer drag coefficient.}
+
+  # ── precipitation ──
+  precipitation:
+    doc: "Precipitation — rainfall forcing file."
+    keys:
+      file: {legacy: RAINFALL_FILE, default: ~, units: ~, doc: Rainfall forcing file.}
+
+  # ── tracer ──
+  tracer:
+    doc: "Passive tracers — the tracker table lives in the tracer file."
+    keys:
+      file: {legacy: TRACER_FILE, default: ~, units: ~, doc: 'Tracer table file (count, cadence, one row per tracker).'}
+
+  # ── vessel ──
+  vessel:
+    doc: "Moving vessels — per-hull files in a folder; propeller and deep-draft options."
+    keys:
+      folder: {legacy: VESSEL_FOLDER, default: ~, units: ~, doc: Directory of per-hull vessel_NNNNN files.}
+      count: {legacy: NumVessel, default: 1, units: ~, doc: Number of vessels.}
+      propeller: {legacy: PROPELLER, default: false, units: ~, doc: Enable propeller jets (must match the build's -DPROPELLER).}
+      deep_draft.clearance: {legacy: CLEARANCE, default: ~, units: m, doc: Keel clearance above the bed (required for deep_draft).}
+      deep_draft.mask: {legacy: MaskMethod, default: true, units: ~, doc: Mask cells fully blocked by the hull.}
+      deep_draft.cd: {legacy: CdDeepDraft, default: ~, units: ~, latex: '$C_{d,v}$', doc: Hull drag coefficient (presence enables hull drag).}
+      deep_draft.nu: {legacy: VisDeepDraft, default: ~, units: m^2/s, doc: Hull eddy viscosity (presence enables).}
+
+  # ── sediment ──
+  sediment:
+    doc: "Sediment — single grain size, morphology, avalanching, cohesive, and flow-feedback sub-blocks."
+    keys:
+      scheme: {legacy: Sed_Scheme, default: upwinding, units: ~, values: [upwinding, tvd], doc: Advection scheme for suspended load.}
+      d50: {legacy: D50, default: ~, units: m, latex: '$D_{50}$', doc: 'Median grain diameter (absent: 0.5 mm sand / 5 nm mud by cohesive).'}
+      specific_gravity: {legacy: Sdensity, default: 2.68, units: ~, latex: $s$, doc: Sediment specific gravity.}
+      porosity: {legacy: n_porosity, default: 0.47, units: ~, latex: $n$, doc: Bed porosity.}
+      settling_velocity: {legacy: WS, default: ~, units: m/s, latex: $w_s$, doc: Settling velocity (absent = computed from grain size).}
+      shields_cr: {legacy: Shields_cr, default: 0.055, units: ~, latex: '$\theta_{cr}$', doc: Critical Shields parameter for suspension.}
+      min_depth_pickup: {legacy: MinDepthPickup, default: 0.1, units: m, doc: Minimum water depth for pickup.}
+      pickup_reduction: {legacy: PickupReduction, default: true, units: ~, doc: Reduce pickup on steep slopes.}
+      reduction_parameter: {legacy: ReductionParameter, default: 0.65, units: ~, doc: Slope pickup-reduction coefficient (requires pickup_reduction).}
+      c_limiter: {legacy: C_limiter, default: ~, units: ~, doc: Suspended-concentration limiter (presence enables).}
+      morph_interval: {legacy: Morph_interval, default: ~, units: s, doc: Morphology update interval.}
+      bed_change: {legacy: Bed_Change, default: false, units: ~, doc: Enable bed-level change (morphodynamics).}
+      bedload: {legacy: BedLoad, default: false, units: ~, doc: Include bed-load transport.}
+      shields_cr_bedload: {legacy: Shields_cr_bedload, default: ~, units: ~, latex: '$\theta_{cr,b}$', doc: Critical Shields for bed load (absent = shields_cr).}
+      morph_factor: {legacy: Morph_factor, default: 1, units: ~, doc: Morphological acceleration factor.}
+      hard_bottom.file: {legacy: Mask_s_File, default: ~, units: ~, doc: Non-erodible hard-bottom mask file (required).}
+      avalanche.tan_phi: {legacy: tan_phi, default: ~, units: ~, latex: $\tan\phi$, doc: Tangent of the repose angle (required for avalanche).}
+      avalanche.interval: {legacy: Aval_interval, default: ~, units: s, doc: Avalanche relaxation interval (absent = every step).}
+      cohesive.soft_bed: {legacy: SoftBed, default: true, units: ~, doc: Track a consolidating soft-bed layer.}
+      cohesive.tau_cr: {legacy: Tau_cr_coh, default: ~, units: m2/s2, latex: '$\tau_{cr}$', doc: Critical erosion shear stress (required for cohesive).}
+      cohesive.tau_crd: {legacy: Tau_crd_coh, default: 0.001, units: m2/s2, latex: '$\tau_{cr,d}$', doc: Critical deposition shear stress.}
+      cohesive.e: {legacy: E_coh, default: 0.0001, units: m/s, latex: $E$, doc: Erosion-rate coefficient.}
+      cohesive.alpha: {legacy: alpha_coh, default: 1.0, units: ~, latex: $\alpha$, doc: Consolidation coefficient.}
+      cohesive.a: {legacy: a_coh, default: 0.1, units: ~, latex: $a$, doc: Soft-bed density parameter a.}
+      cohesive.b: {legacy: b_coh, default: 2.0, units: ~, latex: $b$, doc: Soft-bed density parameter b.}
+      cohesive.n: {legacy: n_coh, default: 0.5, units: ~, latex: $n$, doc: Soft-bed exponent n.}
+      cohesive.m: {legacy: m_coh, default: 1.5, units: ~, latex: $m$, doc: Soft-bed exponent m.}
+      feedback.mass_source: {legacy: SedimentMassSource, default: false, units: ~, doc: Feed erosion/deposition mass back into continuity.}
+      feedback.moment_dc: {legacy: SedimentMomentDC, default: false, units: ~, doc: Feed the density-current momentum term back.}
+      feedback.moment_exg: {legacy: SedimentMomentEXG, default: false, units: ~, doc: Feed the sediment-exchange momentum term back.}
+
+  # ── coupling ──
+  coupling:
+    doc: "External-model coupling — coupling data file."
+    keys:
+      file: {legacy: COUPLING_FILE, default: ~, units: ~, doc: Nesting/coupling boundary data file.}
+
+  # ── hot_start ──
+  hot_start:
+    doc: "Hot-start (restart) — field files, restart time, and output numbering."
+    keys:
+      bed_deformation: {legacy: BED_DEFORMATION, default: false, units: ~, doc: Apply bed deformation on restart.}
+      eta_file: {legacy: ETA_FILE, default: ~, units: ~, doc: Surface-elevation restart field file.}
+      mask_file: {legacy: MASK_FILE, default: ~, units: ~, doc: Wet/dry mask restart field file.}
+      output_start_number: {legacy: FileNumber_HOTSTART, default: 0, units: ~, doc: First output frame number after restart.}
+      time: {legacy: HotStartTime, default: 0.0, units: s, latex: '$t_{\mathrm{hs}}$', doc: Simulation time at the restart instant.}
+      u_file: {legacy: U_FILE, default: ~, units: ~, doc: x-velocity restart field file.}
+      v_file: {legacy: V_FILE, default: ~, units: ~, doc: y-velocity restart field file.}
+
+  # ── output ──
+  output:
+    doc: "Output control — cadence, format, folder, plus stations/means/vessel/arrival-time sub-blocks."
+    keys:
+      arrival_time.min_height: {legacy: ArrTimeMin, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
+      depth_out: {legacy: OUT_DEPTH, default: false, units: ~, doc: Write the still-water depth field.}
+      field_io_type: {legacy: FIELD_IO_TYPE, default: ASCII, units: ~, values: [ASCII, BINARY], doc: Field output format.}
+      output_res: {legacy: OUTPUT_RES, default: 1, units: ~, doc: Output spatial subsampling stride.}
+      result_folder: {legacy: RESULT_FOLDER, default: ./output/, units: ~, doc: Directory for output files.}
+      stations.file: {legacy: STATIONS_FILE, default: ~, units: ~, doc: Gauge-station coordinate file (presence enables station output).}
+      means.steady_time: {legacy: STEADY_TIME, default: 0.0, units: s, latex: '$T_{\mathrm{steady}}$', doc: Time to begin time-averaging.}
+      means.interval: {legacy: T_INTV_mean, default: ~, units: s, latex: '$T_{\mathrm{mean}}$', doc: Averaging output cadence.}
+      interval: {legacy: PLOT_INTV, default: ~, units: s, latex: '$\Delta t_{\mathrm{out}}$', doc: Global field-output cadence.}
+      blowup_threshold: {legacy: EtaBlowVal, default: ~, units: m, doc: Elevation above which the run aborts (absent = 100*max|Depth|).}
+      stations.interval: {legacy: PLOT_INTV_STATION, default: 1.0, units: s, doc: Station-output cadence.}
+      stations.buffer: {legacy: StationOutputBuffer, default: 1000, units: ~, doc: Station time-series buffer length (rows).}
+      vessel.interval: {legacy: PLOT_INTV_VESSEL, default: ~, units: s, doc: Vessel resistance-series output cadence.}
