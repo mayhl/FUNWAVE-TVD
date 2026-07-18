@@ -74,7 +74,7 @@ contains
       type(type_yaml_reader) :: decomp_yaml, bathy_yaml, bot_yaml
       integer, allocatable :: grid_size(:)
       real(SP), allocatable :: cell_size(:)
-      logical :: no_decomp, no_grd_r
+      logical :: no_decomp, no_grd_r, no_nx_proc, no_ny_proc
 
       sub_env = get_sub_env(env, "geometry")
       this%is_activated = .true.
@@ -91,10 +91,18 @@ contains
       call sub_env%yaml%read("ivgrd", val=this%ivgrd, default="1")
       call sub_env%yaml%read("grd_r", silent=no_grd_r, val=this%grd_r, default="1.0")
 
+      ! nx_proc/ny_proc keep their 0 sentinel when the decomposition block is
+      ! omitted -> auto-decomposition resolved from the MPI rank count in
+      ! READ_INPUT (src/model/3d/old/io.F).  When the block is present both keys
+      ! must be given (mirrors the 2D reader, model/2d/geometry.f90).
       decomp_yaml = sub_env%yaml%cast_dictionary("decomposition", no_decomp)
       if (.not. no_decomp) then
-         call decomp_yaml%read_positive("nx_proc", val=this%nx_proc, default="0")
-         call decomp_yaml%read_positive("ny_proc", val=this%ny_proc, default="0")
+         call decomp_yaml%read_positive("nx_proc", silent=no_nx_proc, val=this%nx_proc)
+         call decomp_yaml%read_positive("ny_proc", silent=no_ny_proc, val=this%ny_proc)
+         if (no_nx_proc .neqv. no_ny_proc) then
+            call sub_env%log%exit_on_error( &
+               "geometry/decomposition: nx_proc and ny_proc must both be specified")
+         end if
       end if
 
       bathy_yaml = sub_env%yaml%cast_dictionary("bathymetry")

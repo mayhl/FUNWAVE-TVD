@@ -3,6 +3,9 @@
 SUBROUTINE READ_INPUT
      USE GLOBAL
      use model_3d_config_mod, only: type_model_3d_config
+# if defined (PARALLEL)
+     use core_grid_mod, only: compute_optimal_grid_size
+# endif
      IMPLICIT NONE
 
      type(type_model_3d_config) :: config
@@ -29,6 +32,19 @@ SUBROUTINE READ_INPUT
 # if defined (PARALLEL)
      PX    = config%geometry%nx_proc
      PY    = config%geometry%ny_proc
+     ! Resolve auto-decomposition: a 0 sentinel (nx_proc/ny_proc omitted in YAML)
+     ! means pick the PX*PY factor pair of NumP minimising local-tile aspect ratio,
+     ! using the same algorithm as the 2D layer.  NumP is seeded in MODULE GLOBAL
+     ! by INIT_3D_GLOBAL before READ_INPUT, so the rank count is available here.
+     ! This guarantees the legacy cart-topology math never divides by a zero PX/PY.
+     if (PX <= 0 .or. PY <= 0) then
+       call compute_optimal_grid_size(NumP, Mglob, Nglob, PX, PY)
+     elseif (PX*PY /= NumP) then
+       if (myid == 0) write(*,*) &
+         'ERROR: geometry/decomposition nx_proc*ny_proc =', PX*PY, &
+         ' must equal MPI rank count =', NumP
+       call MPI_ABORT(MPI_COMM_WORLD, 1, ier)
+     endif
 # endif
      DEPTH_TYPE = config%geometry%bathy_type
      if (allocated(config%geometry%depth_file)) &
