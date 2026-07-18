@@ -108,6 +108,10 @@ module model_wavemaker_mod
    public :: solitary_coefficients
    public :: wk_regular_coefficients
 
+   ! Default wavemaker phase-RNG seed — matches the legacy WAVE_COHERENCE
+   ! fixed-seed convention (a fixed, nonzero value keeps runs reproducible).
+   integer, parameter :: DEFAULT_WAVE_PHASE_SEED = 66
+
    type, extends(type_model_base) :: type_model_wavemaker
 
       character(:), allocatable :: wavemaker_type   ! YAML key: type
@@ -172,6 +176,11 @@ module model_wavemaker_mod
       integer  :: Ntheta = 1
       real(SP) :: Sigma_Theta = 0.0_SP
       real(SP) :: alpha_c = 0.0_SP   ! WK_NEW_IRR only
+
+      ! RNG seed for the random phase realization — see seed_wave_phases.
+      ! Deterministic by default so runs are reproducible AND a hotstart
+      ! restart reproduces the same realization (the seed rides the shared deck).
+      integer  :: seed = DEFAULT_WAVE_PHASE_SEED
 
       ! Eta limiter (type-independent)
       logical  :: ETA_LIMITER = .false.
@@ -277,6 +286,9 @@ contains
 
       call wm%read_string("name", silent=no_key, val=this%name)
       if (no_key) this%name = ""
+
+      ! phase-RNG seed (rides the shared deck -> reproducible + restart-coherent)
+      call wm%read("seed", silent=no_key, val=this%seed, default="66")
 
       ! legacy-shaped escape hatch: LEF_SOL keeps its old spelling until
       ! the characteristic BC track; the rest reject loudly
@@ -577,6 +589,13 @@ contains
          return
       end select
 
+      ! Seed the phase RNG once, before any coefficient routine draws phases.
+      ! gfortran's default RANDOM_NUMBER randomizes per process (per run AND per
+      ! rank), which desyncs the phase realization across ranks and breaks
+      ! hotstart restart coherence; a fixed, rank-uniform seed fixes both.
+      if (this%spectral_source .or. this%abs_source .or. this%left_bc_source) &
+         call seed_wave_phases(this%seed)
+
       ! legacy uses the scalar spacing (DXg) throughout the wavemaker
       if (grid%dx0 <= 0.0_SP .or. grid%dy0 <= 0.0_SP) &
          error stop "wavemaker: internal source requires uniform grid spacing"
@@ -660,6 +679,26 @@ contains
       end if
 
    end subroutine wavemaker_init_compute
+
+   ! Deterministic, rank-uniform seed for the wavemaker phase RNG.  Every rank
+   ! seeds RANDOM_NUMBER with the same value so the random phase realization is
+   ! (a) rank-consistent (the west-boundary wavemaker spans the y-decomposition;
+   ! each strip must draw the SAME phases) and (b) reproduced on a hotstart
+   ! re-init (the seed lives in the shared input deck, so no checkpoint scalar is
+   ! needed).  Filling every seed word with the scalar matches the legacy
+   ! WAVE_COHERENCE idiom.  Note: WK_NEW_IRR's coherence shuffle re-seeds to its
+   ! own fixed value mid-init; it stays deterministic (restart-coherent) but the
+   ! `seed:` knob does not vary its post-shuffle phases (FUTURE: thread it through).
+   subroutine seed_wave_phases(seed_val)
+      integer, intent(in) :: seed_val
+
+      integer :: n
+      integer, allocatable :: seed(:)
+
+      call random_seed(size=n)
+      allocate (seed(n), source=seed_val)
+      call random_seed(put=seed)
+   end subroutine seed_wave_phases
 
    ! ----------------------------------------------------------------
    ! Per-stage mass source refresh (legacy SourceTerms head,
