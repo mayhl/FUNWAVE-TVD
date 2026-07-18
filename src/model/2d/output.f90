@@ -103,6 +103,11 @@ module model_output_mod
       character(:), allocatable :: result_folder
       character(:), allocatable :: field_io_type
       integer  :: output_res = 1
+
+      ! Checkpoint (hot-start) write dir; empty => none.  Presence => write the
+      ! checkpoint set (core.bin now, later per-module bins) at run end.
+      character(:), allocatable :: checkpoint
+      logical  :: write_checkpoint = .false.
       ! Blow-up threshold.  Legacy DERIVES this as 100*max|Depth| in
       ! INITIALIZATION (init.F:850) and overwrites whatever the input file said,
       ! so legacy's own EtaBlowVal key is dead.  resolve_blowup() reproduces the
@@ -216,6 +221,8 @@ contains
 
       call sub_env%yaml%read_positive("interval", val=this%interval)
       call sub_env%yaml%read("result_folder", val=this%result_folder, default=DEF_OUTPUT_RESULT_FOLDER)
+      call sub_env%yaml%read("checkpoint", silent=no_key, val=this%checkpoint, default="")
+      this%write_checkpoint = .not. no_key
       call sub_env%yaml%read("field_io_type", val=this%field_io_type, default=DEF_OUTPUT_FIELD_IO_TYPE)
       call sub_env%yaml%read("output_res", val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
       ! NOTE: no `default=` here on purpose -- yaml%read only assigns `silent`

@@ -190,6 +190,8 @@ module model_stepper_2d_mod
       procedure :: estimate_dt => stepper_estimate_dt
       procedure :: stage => stepper_stage
       procedure :: post_step => stepper_post_step
+      procedure :: sync_from_flux => stepper_sync_from_flux
+      procedure :: restart_sync => stepper_restart_sync
    end type type_model_stepper_2d
 
 contains
@@ -203,7 +205,7 @@ contains
                            breaking, friction, simulation, output, &
                            wavemaker, sponge, obstacle, means, tide, &
                            precipitation, subgrid, foam, tracer, vessel, &
-                           sediment, meteo)
+                           sediment, meteo, restart)
       class(type_model_stepper_2d), intent(inout) :: this
       ! all component dummies are intent(inout) targets: they are
       ! captured as pointers on the stepper (intent(in) may not be a
@@ -254,8 +256,15 @@ contains
       ! read, pressure lattice built).  TWO-WAY like the vessel: the storm
       ! pressure gradient feeds the momentum RHS via cal_sources.
       type(type_model_meteo), intent(inout), target :: meteo
+      ! a checkpoint restart carries the exact hu,hv (froude-capped,
+      ! mask-zeroed) — skip the p = Hu initial seeding that would clobber them
+      logical, intent(in), optional :: restart
 
+      logical :: is_restart
       integer :: i, j, ii, jj, mloc, nloc
+
+      is_restart = .false.
+      if (present(restart)) is_restart = restart
 
       this%env => env
       this%grid => grid
@@ -432,10 +441,12 @@ contains
       ! and the legacy initial state is exactly Ubar = HU.  Parity
       ! therefore requires p = Hu (set in model_setup) with NO
       ! dispersion correction here.
-      associate (f => this%fields)
-         f%hu = f%h*f%u
-         f%hv = f%h*f%v
-      end associate
+      if (.not. is_restart) then
+         associate (f => this%fields)
+            f%hu = f%h*f%u
+            f%hv = f%h*f%v
+         end associate
+      end if
 
    end subroutine stepper_init
 
@@ -597,61 +608,9 @@ contains
                             sed_exg_x(this), sed_exg_y(this), &
                             f%eta0, f%p0, f%q0, f%eta, f%p, f%q)
 
-         ! legacy GET_Eta_U_V_HU_HV: whole-array H (unclamped; ghost eta
-         ! is one exchange behind, exactly as legacy)
-         f%h = phy%Gamma3*f%eta + f%depth
-
-         ! sub-cell porosity/pixel average off the new eta, then the
-         ! pixel-averaged column replaces H at subgrid cells; the
-         ! porosity the NEXT stage divides by is the one left here
-         if (this%subgrid%is_activated) then
-            call this%subgrid%update(f%eta)
-            call this%subgrid%apply_h(f%h)
-         end if
-
-         if (phy%dispersion) then
-            call cal_etauv_assemble_x(lp, phy%Gamma1, num%MinDepthFrc, &
-                                      this%b1, this%b2, this%inv_dx, &
-                                      f%mask, f%mask9, f%depth, f%h, f%p, &
-                                      this%dws%vxy, this%dws%dvxy, &
-                                      this%west_dirichlet, f%u, this%ews)
-            call trid_x(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
-                        this%ews%f)
-            f%u(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
-
-            call cal_etauv_assemble_y(lp, phy%disp_time_left, phy%Gamma1, &
-                                      phy%Gamma2, num%MinDepthFrc, &
-                                      this%b1, this%b2, this%inv_dy, &
-                                      f%mask, f%mask9, f%depth, f%h, f%eta, &
-                                      f%q, this%dws%uxy, this%dws%duxy, &
-                                      this%dws%ux, this%dws%dux, this%ews)
-            if (phy%periodic) then
-               call trid_y_periodic(lp, this%grid, this%ews%a, this%ews%c, &
-                                    this%ews%d, this%tws, this%ews%f)
-            else
-               call trid_y(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
-                           this%ews%f)
-            end if
-            f%v(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
-         else
-            call cal_uv_no_dispersion(lp, num%MinDepthFrc, f%h, f%p, f%q, &
-                                      f%u, f%v)
-         end if
-
-         call cal_etauv_update(lp, num%FroudeCap, num%MinDepthFrc, f%mask, &
-                               f%h, f%u, f%v, f%hu, f%hv, f%p, f%q)
-         if (.not. phy%dispersion) then
-            ! legacy: without dispersion the conserved flux IS the
-            ! (Froude-capped, mask-zeroed) cell flux
-            f%p = f%hu
-            f%q = f%hv
-         end if
-
-         call update_mask(lp, f%eta, f%depth, f%mask_struc, f%mask, &
-                          this%depth_fx, this%depth_fy, truncate_depth=.true.)
-         call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
-                           num%MinDepthFrc, phy%SWE_ETA_DEP, &
-                           phy%viscosity_breaking)
+         ! legacy GET_Eta_U_V_HU_HV: rebuild H, invert the dispersion
+         ! operator for u,v, refresh hu,hv and the masks off the new eta,p,q
+         call this%sync_from_flux()
 
          ! deep-draft hull blanks mask9 (legacy UPDATE_MASK:
          ! MASK9 = MASK9tmp*MaskVessel, before the ghost exchange)
@@ -718,6 +677,105 @@ contains
       end associate
 
    end subroutine stepper_stage
+
+   ! ----------------------------------------------------------------
+   ! legacy GET_Eta_U_V_HU_HV: from the current (eta, p, q) rebuild H,
+   ! invert the dispersion operator for the cell velocities u,v, refresh
+   ! the conserved face fluxes hu,hv and the wet/dry masks.  Runs once per
+   ! RK stage (the stepper carries p,q; u,v are derived), and once at a
+   ! checkpoint restart to seed u,v,hu,hv,mask9 from the loaded p,q — the
+   ! stepper_init p = Hu path leaves u = 0, so the first stage's fluxes
+   ! would otherwise see zero velocity.
+   ! ----------------------------------------------------------------
+   subroutine stepper_sync_from_flux(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      associate (f => this%fields, lp => this%grid%lp, &
+                 phy => this%physics, num => this%numerics)
+
+         ! whole-array H (unclamped; ghost eta is one exchange behind,
+         ! exactly as legacy)
+         f%h = phy%Gamma3*f%eta + f%depth
+
+         ! sub-cell porosity/pixel average off the new eta, then the
+         ! pixel-averaged column replaces H at subgrid cells; the
+         ! porosity the NEXT stage divides by is the one left here
+         if (this%subgrid%is_activated) then
+            call this%subgrid%update(f%eta)
+            call this%subgrid%apply_h(f%h)
+         end if
+
+         if (phy%dispersion) then
+            call cal_etauv_assemble_x(lp, phy%Gamma1, num%MinDepthFrc, &
+                                      this%b1, this%b2, this%inv_dx, &
+                                      f%mask, f%mask9, f%depth, f%h, f%p, &
+                                      this%dws%vxy, this%dws%dvxy, &
+                                      this%west_dirichlet, f%u, this%ews)
+            call trid_x(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
+                        this%ews%f)
+            f%u(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
+
+            call cal_etauv_assemble_y(lp, phy%disp_time_left, phy%Gamma1, &
+                                      phy%Gamma2, num%MinDepthFrc, &
+                                      this%b1, this%b2, this%inv_dy, &
+                                      f%mask, f%mask9, f%depth, f%h, f%eta, &
+                                      f%q, this%dws%uxy, this%dws%duxy, &
+                                      this%dws%ux, this%dws%dux, this%ews)
+            if (phy%periodic) then
+               call trid_y_periodic(lp, this%grid, this%ews%a, this%ews%c, &
+                                    this%ews%d, this%tws, this%ews%f)
+            else
+               call trid_y(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
+                           this%ews%f)
+            end if
+            f%v(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
+         else
+            call cal_uv_no_dispersion(lp, num%MinDepthFrc, f%h, f%p, f%q, &
+                                      f%u, f%v)
+         end if
+
+         call cal_etauv_update(lp, num%FroudeCap, num%MinDepthFrc, f%mask, &
+                               f%h, f%u, f%v, f%hu, f%hv, f%p, f%q)
+         if (.not. phy%dispersion) then
+            ! legacy: without dispersion the conserved flux IS the
+            ! (Froude-capped, mask-zeroed) cell flux
+            f%p = f%hu
+            f%q = f%hv
+         end if
+
+         call update_mask(lp, f%eta, f%depth, f%mask_struc, f%mask, &
+                          this%depth_fx, this%depth_fy, truncate_depth=.true.)
+         call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
+                           num%MinDepthFrc, phy%SWE_ETA_DEP, &
+                           phy%viscosity_breaking)
+
+      end associate
+
+   end subroutine stepper_sync_from_flux
+
+   ! ----------------------------------------------------------------
+   ! Checkpoint restart: the checkpoint carries the full live core state
+   ! (eta,p,q,u,v,hu,hv,mask,mask9), so we do NOT re-invert the dispersion
+   ! operator — that reads the previous stage's ghosts (a legacy-parity
+   ! quirk) which a fresh restart cannot reproduce.  We only refill the
+   ! ghosts with the parity exchange (periodic wrap / MPI seams, overwriting
+   ! load_checkpoint's crude edge replicate) and rebuild H, a pure local
+   ! function of eta (unclamped, exactly as the stage does at GET_Eta...).
+   ! ----------------------------------------------------------------
+   subroutine stepper_restart_sync(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      call this%bc%exchange_state(this%grid, this%fields)
+
+      associate (f => this%fields, phy => this%physics)
+         f%h = phy%Gamma3*f%eta + f%depth
+         if (this%subgrid%is_activated) then
+            call this%subgrid%update(f%eta)
+            call this%subgrid%apply_h(f%h)
+         end if
+      end associate
+
+   end subroutine stepper_restart_sync
 
    ! ----------------------------------------------------------------
    ! Register stepper-owned output arrays (after init): the legacy

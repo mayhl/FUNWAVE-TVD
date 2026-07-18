@@ -6,7 +6,11 @@
 !  Hot start parameters YAML reader
 !
 !  YAML block: hot_start:      (top-level; omit to disable)
-!    eta_file: <path>          required
+!    checkpoint: <dir>         restart from a binary checkpoint set (holds
+!                              core.bin = eta,p,q,mask,time; later per-module
+!                              bins).  When present, the eta/u/v/mask/time keys
+!                              below are unused (state + time come from the bin).
+!    eta_file: <path>          required (ASCII path; when checkpoint absent)
 !    u_file: <path>            optional (zero velocity if absent)
 !    v_file: <path>            optional (zero velocity if absent)
 !    mask_file: <path>         optional (no mask if absent)
@@ -35,6 +39,8 @@ module model_hot_start_mod
 
    type, extends(type_model_base) :: type_model_hot_start
 
+      character(:), allocatable :: checkpoint   ! restart checkpoint dir ("" if unused)
+      logical :: use_checkpoint = .false.
       type(type_path) :: eta_file
       type(type_path) :: u_file
       type(type_path) :: v_file
@@ -56,21 +62,29 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_hs, no_u, no_v, no_mask
+      logical :: no_hs, no_chk, no_u, no_v, no_mask
 
       sub_env = get_sub_env(env, "hot_start", is_empty=no_hs)
       this%is_activated = .not. no_hs
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read_input_path("eta_file", val=this%eta_file)
-      call sub_env%yaml%read_input_path("u_file", silent=no_u, val=this%u_file)
-      call sub_env%yaml%read_input_path("v_file", silent=no_v, val=this%v_file)
-      call sub_env%yaml%read_input_path("mask_file", silent=no_mask, val=this%mask_file)
-      this%no_uv_file = no_u .or. no_v
-      this%no_mask_file = no_mask
+      ! A binary checkpoint set supersedes the ASCII eta/u/v/mask path: state
+      ! and time come from core.bin, so those keys are not read when present.
+      call sub_env%yaml%read("checkpoint", silent=no_chk, val=this%checkpoint, default="")
+      this%use_checkpoint = .not. no_chk
 
-      call sub_env%yaml%read("bed_deformation", val=this%bed_deformation, default="NO")
-      call sub_env%yaml%read_nonnegative("time", val=this%time, default="0.0")
+      if (.not. this%use_checkpoint) then
+         call sub_env%yaml%read_input_path("eta_file", val=this%eta_file)
+         call sub_env%yaml%read_input_path("u_file", silent=no_u, val=this%u_file)
+         call sub_env%yaml%read_input_path("v_file", silent=no_v, val=this%v_file)
+         call sub_env%yaml%read_input_path("mask_file", silent=no_mask, val=this%mask_file)
+         this%no_uv_file = no_u .or. no_v
+         this%no_mask_file = no_mask
+
+         call sub_env%yaml%read("bed_deformation", val=this%bed_deformation, default="NO")
+         call sub_env%yaml%read_nonnegative("time", val=this%time, default="0.0")
+      end if
+
       call sub_env%yaml%read_positive("output_start_number", val=this%output_start_number, default="1")
 
    end subroutine hot_start_read_input

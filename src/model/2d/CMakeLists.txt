@@ -36,4 +36,5 @@ target_sources(
           means.f90
           stations.f90
           stepper.f90
+          checkpoint.f90
           main.f90)

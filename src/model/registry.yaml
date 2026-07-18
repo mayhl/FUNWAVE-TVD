@@ -532,8 +532,9 @@ sections:
 
   # ── hot_start ──
   hot_start:
-    doc: "Hot-start (restart) — field files, restart time, and output numbering."
+    doc: "Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time, output numbering."
     keys:
+      checkpoint: {legacy: ~, default: ~, units: ~, doc: Restart from a binary checkpoint directory (holds core.bin; supersedes the ASCII field/time keys).}
       bed_deformation: {legacy: BED_DEFORMATION, default: false, units: ~, doc: Apply bed deformation on restart.}
       eta_file: {legacy: ETA_FILE, default: ~, units: ~, doc: Surface-elevation restart field file.}
       mask_file: {legacy: MASK_FILE, default: ~, units: ~, doc: Wet/dry mask restart field file.}
@@ -547,6 +548,7 @@ sections:
     doc: "Output control — cadence, format, folder, plus stations/means/vessel/arrival-time sub-blocks."
     keys:
       arrival_time.min_height: {legacy: ArrTimeMin, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
+      checkpoint: {legacy: ~, default: ~, units: ~, doc: Directory to write the hot-start checkpoint set (core.bin) at run end.}
       depth_out: {legacy: OUT_DEPTH, default: false, units: ~, doc: Write the still-water depth field.}
       field_io_type: {legacy: FIELD_IO_TYPE, default: ASCII, units: ~, values: [ASCII, BINARY], doc: Field output format.}
       output_res: {legacy: OUTPUT_RES, default: 1, units: ~, doc: Output spatial subsampling stride.}

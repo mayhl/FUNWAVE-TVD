@@ -27,6 +27,7 @@ module model_main_mod
    use model_geometry_mod, only: type_model_geometry, read_field_ascii, stagger_depth
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
+   use model_checkpoint_mod, only: write_checkpoint_core, read_checkpoint_core
    use model_wavemaker_mod, only: type_model_wavemaker
    use model_sponge_mod, only: type_model_sponge
    use model_boundaries_mod, only: boundaries_read_input
@@ -95,6 +96,9 @@ module model_main_mod
       type(type_grid_2d)        :: grid
       type(type_fields_2d)      :: fields
       type(type_field_registry) :: registry
+      ! Checkpoint restart: the interface flux workspace (p_flux/q_flux) loaded
+      ! from core.bin, staged here until register_output wires the registry
+      real(SP), allocatable     :: chk_pflux(:, :), chk_qflux(:, :)
       ! Time-averaged statistics (legacy MIXING_STUFF port) — engine
       ! path only, initialised in run()
       type(type_model_means)    :: means
@@ -260,15 +264,21 @@ contains
       ! not supported here.
       call this%wavemaker%apply_ic(this%grid, this%fields%eta, &
                                    this%fields%u, this%fields%v)
-      if (this%hot_start%is_activated) call load_hot_start(this)
+      if (this%hot_start%use_checkpoint) then
+         call load_checkpoint(this)   ! seeds eta,p,q,mask + hot_start%time
+      else if (this%hot_start%is_activated) then
+         call load_hot_start(this)    ! ASCII eta/u/v (u,v -> p=Hu below)
+      end if
 
       ! wet/dry mask from the initial condition (structure masks: Step 6+);
       ! a hot-start mask file REPLACES this derivation (legacy NO_MASK_FILE
       ! guard on the "get Eta and H" block)
       this%fields%mask_struc = 1
       associate (f => this%fields, lp => this%grid%lp)
-      if (.not. (this%hot_start%is_activated .and. &
-                 .not. this%hot_start%no_mask_file)) then
+      ! a hot-start mask (ASCII mask_file OR checkpoint) REPLACES the derivation
+      if (.not. ((this%hot_start%is_activated .and. &
+                  .not. this%hot_start%no_mask_file) .or. &
+                 this%hot_start%use_checkpoint)) then
          do j = 1, lp%nloc
             do i = 1, lp%mloc
                if (f%eta(i, j) < -f%depth(i, j)) then
@@ -286,8 +296,13 @@ contains
       ! H at structure cells is built from the pre-obstacle depth and
       ! never refreshed at init)
       f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
-      f%p = f%h*f%u
-      f%q = f%h*f%v
+      ! On a checkpoint restart p,q are the SAVED conserved dispersive flux; keep
+      ! them (the stepper derives u,v from p,q on stage 1).  Otherwise seed the
+      ! flux from the initial/loaded u,v as plain H*u.
+      if (.not. this%hot_start%use_checkpoint) then
+         f%p = f%h*f%u
+         f%q = f%h*f%v
+      end if
 
       ! permanent structures (legacy init.F obstacle block): mask from
       ! file, depth -> -LARGE at structure cells; the staggered faces
@@ -304,25 +319,29 @@ contains
       ! reconstruction reads — is ZERO (legacy allocates zeroed and
       ! PHI_INT_EXCH fills MPI seams only, never walls).  Anything
       ! else kicks the stage-1 fluxes and seeds a persistent swash
-      ! divergence (parity ledger 8c).
-      f%mask9 = 0
-      do j = lp%jb, lp%je
-         do i = lp%ib, lp%ie
-            f%mask9(i, j) = f%mask(i, j)*f%mask(i - 1, j)*f%mask(i + 1, j) &
-                            *f%mask(i + 1, j + 1)*f%mask(i, j + 1)*f%mask(i - 1, j + 1) &
-                            *f%mask(i + 1, j - 1)*f%mask(i, j - 1)*f%mask(i - 1, j - 1)
+      ! divergence (parity ledger 8c).  A checkpoint restart carries the
+      ! saved mask9 (with its SWE_ETA_DEP zeroing) verbatim — the pure
+      ! product would drop that, so skip the derivation here.
+      if (.not. this%hot_start%use_checkpoint) then
+         f%mask9 = 0
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               f%mask9(i, j) = f%mask(i, j)*f%mask(i - 1, j)*f%mask(i + 1, j) &
+                               *f%mask(i + 1, j + 1)*f%mask(i, j + 1)*f%mask(i - 1, j + 1) &
+                               *f%mask(i + 1, j - 1)*f%mask(i, j - 1)*f%mask(i - 1, j - 1)
+            end do
          end do
-      end do
-      ! MPI-seam ghosts (real-copy ride on the halo exchange); NOTE:
-      ! under periodic-y this also wraps, where legacy PHI_INT_EXCH
-      ! leaves 1-rank y-ghosts zeroed — revisit if a periodic case
-      ! shows a step-1 ring deviation
-      block
-         real(SP), allocatable :: rmask(:, :)
-         allocate (rmask, source=real(f%mask9, SP))
-         call this%grid%halo_exchange(rmask)
-         f%mask9 = nint(rmask)
-      end block
+         ! MPI-seam ghosts (real-copy ride on the halo exchange); NOTE:
+         ! under periodic-y this also wraps, where legacy PHI_INT_EXCH
+         ! leaves 1-rank y-ghosts zeroed — revisit if a periodic case
+         ! shows a step-1 ring deviation
+         block
+            real(SP), allocatable :: rmask(:, :)
+            allocate (rmask, source=real(f%mask9, SP))
+            call this%grid%halo_exchange(rmask)
+            f%mask9 = nint(rmask)
+         end block
+      end if
       end associate
 
       call this%fields%register(this%registry)
@@ -503,6 +522,58 @@ contains
 
    end subroutine load_hot_start
 
+   ! Restart from a checkpoint set: read core.bin into the live core fields,
+   ! restore the saved time (drives engine%init).  Only eta gets a crude edge
+   ! fill for the interim setup ops; stepper%restart_sync later refills every
+   ! ghost with the parity exchange.  The per-module dispatch (later:
+   ! wavemaker.bin, sediment.bin, ...) lands here; a missing module bin =>
+   ! cold-init that module (design-hotstart mode-3).
+   subroutine load_checkpoint(this)
+      class(type_model_main), intent(inout) :: this
+
+      character(:), allocatable :: dir
+      real(SP) :: t
+
+      associate (hs => this%hot_start, f => this%fields, g => this%grid)
+         dir = trim(hs%checkpoint)
+         if (len(dir) > 0 .and. dir(len(dir):len(dir)) /= "/") dir = dir//"/"
+
+         allocate (this%chk_pflux(g%lp%mloc, g%lp%nloc), source=0.0_SP)
+         allocate (this%chk_qflux(g%lp%mloc, g%lp%nloc), source=0.0_SP)
+         call read_checkpoint_core(this%env, g, f, this%chk_pflux, this%chk_qflux, t, dir)
+         hs%time = t
+
+         call ghost_fill_replicate(this, f%eta)
+      end associate
+
+   end subroutine load_checkpoint
+
+   ! Write the checkpoint set to output%checkpoint (mkdir + core.bin now; later
+   ! per-module bins appended behind this dispatcher).
+   subroutine write_checkpoint_set(this, time)
+      class(type_model_main), intent(inout) :: this
+      real(SP), intent(in) :: time
+
+      type(type_path) :: cdir
+      character(:), allocatable :: dir
+      logical :: ok
+
+      dir = trim(this%output%checkpoint)
+      if (len(dir) == 0) return
+      if (dir(len(dir):len(dir)) /= "/") dir = dir//"/"
+
+      if (this%env%comm%is_io_node()) then
+         cdir = type_path(dir)
+         if (.not. cdir%is_dir()) ok = cdir%mkdir()
+      end if
+      call this%env%comm%barrier()
+
+      call write_checkpoint_core(this%env, this%env%comm, this%grid, &
+                                 this%fields, this%registry%get("p_flux"), &
+                                 this%registry%get("q_flux"), time, dir)
+
+   end subroutine write_checkpoint_set
+
    ! Halo exchange + edge replication at physical walls (legacy
    ! GetFile global ghost fill).
    subroutine ghost_fill_replicate(this, arr)
@@ -541,6 +612,7 @@ contains
       type(type_stepper_engine) :: engine
       type(type_output_manager), target :: output_mgr
       type(type_output_monitor) :: monitor
+      real(SP), pointer :: pf(:, :), qf(:, :)
 
       call this%setup()
       call this%friction%init_compute(this%grid)
@@ -599,8 +671,22 @@ contains
                         this%simulation, this%output, this%wavemaker, &
                         this%sponge, this%obstacle, this%means, this%tide, &
                         this%precipitation, this%subgrid, this%foam, &
-                        this%tracer, this%vessel, this%sediment, this%meteo)
+                        this%tracer, this%vessel, this%sediment, this%meteo, &
+                        restart=this%hot_start%use_checkpoint)
       call stepper%register_output(this%registry)
+
+      ! checkpoint restart: the loaded state is the full live core set.  Copy
+      ! the staged interface flux (p_flux/q_flux) into the now-registered
+      ! workspace, then refill the parity ghosts and rebuild H before the run.
+      if (this%hot_start%use_checkpoint) then
+         pf => this%registry%get("p_flux")
+         qf => this%registry%get("q_flux")
+         associate (lp => this%grid%lp)
+            pf(lp%ib:lp%ie, lp%jb:lp%je) = this%chk_pflux(lp%ib:lp%ie, lp%jb:lp%je)
+            qf(lp%ib:lp%ie, lp%jb:lp%je) = this%chk_qflux(lp%ib:lp%ie, lp%jb:lp%je)
+         end associate
+         call stepper%restart_sync()
+      end if
 
       call build_field_channel(this, output_mgr)
       call this%stations%init_compute(this%grid, this%env, this%fields, &
@@ -622,6 +708,10 @@ contains
                        this%simulation%total_time, &
                        this%simulation%screen_interval)
       call engine%run(stepper, monitor, this%env%log)
+
+      ! checkpoint the final state (this slice: end-of-run only)
+      if (this%output%write_checkpoint) &
+         call write_checkpoint_set(this, engine%clock%current_time)
 
       ! legacy calls STATIONS once after the loop (residual flush)
       call this%stations%finish()
