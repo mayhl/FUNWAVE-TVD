@@ -221,6 +221,40 @@ simulations:
     tolerances:
       field: { eta: 2.0e-2, u: 3.0e-2, v: 3.0e-2, hmax: 3.0e-3, hmin: 3.0e-3, umax: 1.0e-2, mask: 2.0e-3 }
 
+  # hotstart_{bouss,nswe}: checkpoint round-trip self-consistency (no ref branch).
+  # A continuous run (0->T) and a checkpoint+restart pair (0->T/2, then restart
+  # T/2->T) must leave the same end-of-run core.bin. Both legs run the dev binary
+  # and the two core.bin files are self-compared (test.regression.postproc.checkpoint_compare).
+  # NSWE is exactly bitwise (tol 0). Boussinesq carries a ~1e-7 interior residual
+  # propagated from the one-exchange-behind ghost — 200x below legacy's 2e-5
+  # self-noise — so its fields tolerate 1e-5 while the integer masks stay exact.
+  # decomp pinned [1,1]: the round-trip requires a fixed decomposition.
+  - name: hotstart_bouss
+    test_type: self_consistency
+    exe_type: central
+    input: test/regression/inputs/hotstart
+    input_file: bouss.yaml
+    decomp: [1, 1]
+    binary: funwave
+    tags: [hotstart, smoke]
+    postprocess:
+      field: test.regression.postproc.checkpoint_compare
+    tolerances:
+      field: { default: 1.0e-5, mask: 0.0, mask9: 0.0 }
+
+  - name: hotstart_nswe
+    test_type: self_consistency
+    exe_type: central
+    input: test/regression/inputs/hotstart
+    input_file: nswe.yaml
+    decomp: [1, 1]
+    binary: funwave
+    tags: [hotstart, smoke]
+    postprocess:
+      field: test.regression.postproc.checkpoint_compare
+    tolerances:
+      field: { default: 0.0 }
+
   - name: standing_wave_3d_10m
     exe_type: central-3d
     # decomp pinned np=2 (PX=2|Mglob=100): wheat scan showed the 3D HYPRE Poisson

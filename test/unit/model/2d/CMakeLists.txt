@@ -1,6 +1,9 @@
 qadd_pfunit_ctest(test_fields 2)
 target_link_libraries(test_fields libfunwave_model)
 
+qadd_pfunit_ctest(test_checkpoint 2)
+target_link_libraries(test_checkpoint libfunwave_model)
+
 qadd_pfunit_ctest(test_scratch_pool)
 target_link_libraries(test_scratch_pool libfunwave_model)
 

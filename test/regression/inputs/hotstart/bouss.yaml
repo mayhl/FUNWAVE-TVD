@@ -1,0 +1,36 @@
+# Hotstart round-trip base deck — Boussinesq (dispersion on).
+# The self_consistency harness derives three legs from this base:
+#   A  : continuous     total_time = 2*checkpoint_time, checkpoint at end
+#   B1 : first half      total_time =   checkpoint_time, checkpoint at end
+#   B2 : restart          hot_start.checkpoint = B1 dir, runs to full total_time
+# and asserts A/core.bin vs B2/core.bin agree (interior bitwise; ~1e-7 dispersive).
+# Fixed dt + np=1 keep the legs on identical step boundaries.
+grid:
+  cell_size: [1.0, 1.0]
+  grid_size: [200, 4]
+  decomposition:
+    nx_proc: 1
+    ny_proc: 1
+  bathymetry:
+    type: flat
+    depth: 10.0
+simulation:
+  title: hotstart_bouss
+  total_time: 4.0
+  time_stepping:
+    fixed_dt: yes
+    dt: 0.02
+initial:
+  solitary:
+    amplitude: 0.5
+    depth: 10.0
+    x_center: 60.0
+boundaries:
+  periodic: [y]
+numerics:
+  cfl: 0.5
+  min_depth: 0.01
+output:
+  result_folder: ./out/
+  interval: 4.0
+  variables: [ETA]

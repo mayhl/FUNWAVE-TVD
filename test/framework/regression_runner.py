@@ -5,6 +5,7 @@ import os
 import shutil
 import subprocess
 import importlib
+import copy
 from dataclasses import dataclass
 from pathlib import Path
 import yaml
@@ -446,6 +447,8 @@ class RegressionRunner(BaseRunner):
         """
         exe_type = sim["exe_type"]
         ref_build_dir, curr_build_dir, _ref_branch = exe_dirs[exe_type]
+        if sim.get("test_type") == "self_consistency":
+            return self._prepare_selfconsistency_task(sim, index, curr_build_dir, fixed_dt, force, budget)
         oracle_mode = ref_build_dir is None
         curr_input = sim.get("curr_input", sim["input_file"])
 
@@ -504,9 +507,106 @@ class RegressionRunner(BaseRunner):
             ref_status="pending" if ref_state == "needs_run" else ref_state,
         )
 
+    def _prepare_selfconsistency_task(self, sim, index, build_dir, fixed_dt, force, budget) -> _SimTask:
+        """A checkpoint round-trip: leg A (continuous) and leg B (checkpoint+restart)
+        both run the DEV binary, and their end-of-run core.bin files are self-compared.
+
+        There is no ref branch — ref_run_dir holds leg A, curr_run_dir holds leg B —
+        so ref_out/sim_stamp are None (leg A never caches; the dev binary it runs
+        changes every rebuild).
+        """
+        base = os.path.join(build_dir, "runs", sim["name"])
+        ref_run_dir = os.path.join(base, "A")   # continuous 0 -> T
+        curr_run_dir = os.path.join(base, "B")  # checkpoint 0 -> T/2, then restart T/2 -> T
+        if force and os.path.exists(base):
+            shutil.rmtree(base, ignore_errors=True)
+        eff_np, declared_np, decomp = self._auto_np(sim, budget)  # decomp pin -> (1, 1)
+        return _SimTask(
+            sim=sim,
+            index=index,
+            ref_build_dir=build_dir,
+            curr_build_dir=build_dir,
+            oracle_mode=False,
+            curr_run_dir=curr_run_dir,
+            ref_run_dir=ref_run_dir,
+            ref_out=None,
+            sim_stamp=None,
+            curr_input="B2.yaml",
+            ref_input="A.yaml",
+            eff_np=eff_np,
+            declared_np=declared_np,
+            decomp=decomp,
+            dt_mode="fixed_dt" if fixed_dt else "adaptive",
+            ref_state="needs_run",
+            ref_status="pending",
+        )
+
+    def _hotstart_base(self, sim) -> dict:
+        """Load the base hotstart deck (a native simulation:/output: yaml, not legacy txt)."""
+        path = os.path.join(self.repo_root, sim["input"], sim["input_file"])
+        with open(path) as f:
+            return yaml.safe_load(f)
+
+    @staticmethod
+    def _hotstart_legs(base: dict) -> tuple[dict, dict, dict]:
+        """Derive the three legs from one base deck (T = base total_time):
+            A  : continuous 0 -> T,     checkpoint at end
+            B1 : first half 0 -> T/2,   checkpoint at end
+            B2 : restart    T/2 -> T,   restarts from B1's checkpoint, checkpoint at end
+        All write ./chk (relative to the run dir); B2 restarts from ./chk, which B1
+        laid down in the same dir. A/chk and B/chk are then compared at t = T.
+        """
+        t_full = float(base["simulation"]["total_time"])
+        t_chk = t_full / 2.0
+
+        def _leg(total, restart=False):
+            d = copy.deepcopy(base)
+            d["simulation"]["total_time"] = total
+            d.setdefault("output", {})["checkpoint"] = "./chk"
+            if restart:
+                d.setdefault("hot_start", {})["checkpoint"] = "./chk"
+            return d
+
+        return _leg(t_full), _leg(t_chk), _leg(t_full, restart=True)
+
+    def _write_leg(self, deck: dict, run_dir: str, name: str) -> None:
+        os.makedirs(run_dir, exist_ok=True)
+        rf = (deck.get("output") or {}).get("result_folder")
+        if rf:
+            os.makedirs(os.path.join(run_dir, rf), exist_ok=True)
+        with open(os.path.join(run_dir, name), "w") as f:
+            yaml.safe_dump(deck, f, sort_keys=False)
+
+    def _run_blocking(self, binary, input_file, run_dir, np) -> str:
+        """Run one leg to completion inline (used for leg B1, which must finish
+        before B2 can restart). Cheap here — B1 is np=1 and a few hundred steps."""
+        jid = self.provider.submit(binary, input_file, run_dir, np=np)
+        while self.provider.get_status(jid) == "RUNNING":
+            time.sleep(0.2)
+        return self.provider.get_status(jid)
+
     def _launch_run(self, task: _SimTask, kind: str, fixed_dt: bool) -> str:
-        """Set up the run dir, preprocess, and submit the ref or dev run."""
+        """Set up the run dir, preprocess, and submit the ref or dev run.
+
+        A self_consistency task runs the dev binary for both slots: ref = leg A
+        (continuous); dev = leg B1 (blocking, lays down the checkpoint) then B2
+        (restart, whose async job id drives the slot). If B1 fails, B2 is still
+        submitted so the outcome surfaces as a loud SIM_FAILED, not a silent skip.
+        """
         sim = task.sim
+        if sim.get("test_type") == "self_consistency":
+            binary = os.path.join(task.curr_build_dir, sim["binary"])
+            a_deck, b1_deck, b2_deck = self._hotstart_legs(self._hotstart_base(sim))
+            if kind == "ref":
+                self._write_leg(a_deck, task.ref_run_dir, "A.yaml")
+                return self.provider.submit(binary, "A.yaml", task.ref_run_dir, np=task.eff_np)
+            # dev: B1 lays down the checkpoint that B2 restarts from
+            self._write_leg(b1_deck, task.curr_run_dir, "B1.yaml")
+            self._write_leg(b2_deck, task.curr_run_dir, "B2.yaml")
+            st = self._run_blocking(binary, "B1.yaml", task.curr_run_dir, task.eff_np)
+            if st != "COMPLETED":
+                self.reporter.warn(f"{sim['name']}: checkpoint leg B1 {st}; restart will fail")
+            return self.provider.submit(binary, "B2.yaml", task.curr_run_dir, np=task.eff_np)
         if kind == "ref":
             run_dir, binary, input_file = task.ref_run_dir, os.path.join(task.ref_build_dir, sim["binary"]), task.ref_input
             self._setup_run_dir(sim, run_dir, fixed_dt=fixed_dt, decomp=task.decomp)
@@ -521,6 +621,8 @@ class RegressionRunner(BaseRunner):
 
     def _write_sim_stamp(self, task: _SimTask) -> None:
         """Record (dt_mode, eff_np) so a later run under a different rank budget re-runs the ref."""
+        if task.sim_stamp is None:  # self_consistency: leg A never caches
+            return
         try:
             os.makedirs(task.ref_out, exist_ok=True)
             with open(task.sim_stamp, "w") as f:

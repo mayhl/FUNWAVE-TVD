@@ -1,0 +1,143 @@
+! allow(E001)
+!
+! Serialization contract for the hotstart core.bin checkpoint: a
+! gather -> write -> read -> slice round-trip must return every interior
+! value bitwise, including the integer masks (the SWE_ETA_DEP mask9 zeros
+! must survive the real<->integer gather round-trip) and the saved time.
+!
+! Scope is the format only; restart FIDELITY (a restarted stepper
+! reproducing a continuous run) is the regression self_consistency test.
+!
+module test_checkpoint
+
+   use mpi_f08
+   use pFUnit
+   use core_constants_mod, only: SP
+   use core_comm_mod, only: type_comm, new_comm
+   use core_env_mod, only: type_env
+   use core_log_io_mod, only: new_log_writer
+   use core_grid_mod, only: type_grid_2d
+   use model_fields_2d_mod, only: type_fields_2d
+   use model_checkpoint_mod, only: write_checkpoint_core, read_checkpoint_core
+
+   implicit none
+
+   integer, parameter :: TEST_M = 8
+   integer, parameter :: TEST_N = 6
+   real(SP), parameter :: TEST_TIME = 12.5_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! Build a minimal env (log + comm) — new_env would re-init MPI and clash
+   ! with the pFUnit-provided communicator.
+   subroutine open_env(this, env, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env), intent(inout) :: env
+      type(type_comm), intent(inout) :: comm
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      allocate (env%log)
+      env%log = new_log_writer("test_ckpt", comm%is_io_node())
+      ! env%comm is a pointer and the checkpoint I/O takes comm separately,
+      ! so leave it null — only env%log is dereferenced by write/read
+   end subroutine open_env
+
+   subroutine open_grid(grid, comm)
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 2; grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+   end subroutine open_grid
+
+   ! Fill each interior cell with a globally-unique value per field so a
+   ! wrong slice or field-order swap would fail an assert.
+   subroutine seed_fields(grid, f, pflux, qflux)
+      type(type_grid_2d), intent(in) :: grid
+      type(type_fields_2d), intent(inout) :: f
+      real(SP), intent(inout) :: pflux(:, :), qflux(:, :)
+      integer :: i, j, gi, gj
+      real(SP) :: key
+      call f%alloc(grid)
+      f%mask = 1; f%mask9 = 1
+      pflux = 0.0_SP; qflux = 0.0_SP
+      do j = grid%lp%jb, grid%lp%je
+         do i = grid%lp%ib, grid%lp%ie
+            gi = grid%ibegin + (i - grid%lp%ib)
+            gj = grid%jbegin + (j - grid%lp%jb)
+            key = real(100*gi + gj, SP)
+            f%eta(i, j) = key
+            f%p(i, j) = key + 0.1_SP
+            f%q(i, j) = key + 0.2_SP
+            f%u(i, j) = key + 0.3_SP
+            f%v(i, j) = key + 0.4_SP
+            f%hu(i, j) = key + 0.5_SP
+            f%hv(i, j) = key + 0.6_SP
+            pflux(i, j) = key + 0.7_SP
+            qflux(i, j) = key + 0.8_SP
+            ! a scatter of dry / SWE-zeroed cells to prove the integer masks
+            ! survive the real gather round-trip
+            if (mod(gi + gj, 5) == 0) f%mask(i, j) = 0
+            if (mod(gi*gj, 7) == 0) f%mask9(i, j) = 0
+         end do
+      end do
+   end subroutine seed_fields
+
+   @test(npes=[2])
+   subroutine test_core_bin_roundtrip(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env) :: env
+      type(type_comm) :: comm
+      type(type_grid_2d) :: grid
+      type(type_fields_2d) :: fw, fr
+      real(SP), allocatable :: pfw(:, :), qfw(:, :), pfr(:, :), qfr(:, :)
+      real(SP) :: t_read
+      integer :: mloc, nloc, i, j
+
+      call open_env(this, env, comm)
+      call open_grid(grid, comm)
+      mloc = grid%lp%mloc; nloc = grid%lp%nloc
+      allocate (pfw(mloc, nloc), qfw(mloc, nloc))
+      allocate (pfr(mloc, nloc), qfr(mloc, nloc), source=0.0_SP)
+
+      call seed_fields(grid, fw, pfw, qfw)
+      call write_checkpoint_core(env, comm, grid, fw, pfw, qfw, TEST_TIME, "./")
+      call comm%barrier()   ! IO node writes; every rank reads
+
+      call fr%alloc(grid)
+      call read_checkpoint_core(env, grid, fr, pfr, qfr, t_read, "./")
+
+      @assertEqual(TEST_TIME, t_read)
+      ! interior must round-trip bitwise (ghosts are restart_sync's job)
+      do j = grid%lp%jb, grid%lp%je
+         do i = grid%lp%ib, grid%lp%ie
+            @assertEqual(fw%eta(i, j), fr%eta(i, j))
+            @assertEqual(fw%p(i, j), fr%p(i, j))
+            @assertEqual(fw%q(i, j), fr%q(i, j))
+            @assertEqual(fw%u(i, j), fr%u(i, j))
+            @assertEqual(fw%v(i, j), fr%v(i, j))
+            @assertEqual(fw%hu(i, j), fr%hu(i, j))
+            @assertEqual(fw%hv(i, j), fr%hv(i, j))
+            @assertEqual(fw%mask(i, j), fr%mask(i, j))
+            @assertEqual(fw%mask9(i, j), fr%mask9(i, j))
+            @assertEqual(pfw(i, j), pfr(i, j))
+            @assertEqual(qfw(i, j), qfr(i, j))
+         end do
+      end do
+
+      if (comm%is_io_node()) call delete_core_bin()
+   end subroutine test_core_bin_roundtrip
+
+   subroutine delete_core_bin()
+      integer :: unit
+      logical :: exists
+      inquire (file="./core.bin", exist=exists)
+      if (.not. exists) return
+      open (newunit=unit, file="./core.bin", status="old")
+      close (unit, status="delete")
+   end subroutine delete_core_bin
+
+end module test_checkpoint
