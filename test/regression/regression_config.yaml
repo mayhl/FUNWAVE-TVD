@@ -28,6 +28,11 @@ executables:
     cmake_flags: []
     ref: 3d
 
+  # ── 2D, random phases (ZERO_PHASE off) — for the phase-seeding reproducibility
+  #     guard; no ref branch (self-compares two dev runs). ──────────────────
+  central-random:
+    cmake_flags: [ZERO_PHASE=OFF]
+
 simulations:
   # preprocess (optional): command run in dev run dir before simulation.
   #   {input_file}  → the current txt file being processed
@@ -250,6 +255,25 @@ simulations:
     decomp: [1, 1]
     binary: funwave
     tags: [hotstart, smoke]
+    postprocess:
+      field: test.regression.postproc.checkpoint_compare
+    tolerances:
+      field: { default: 0.0 }
+
+  # wavemaker_repro_tma: deterministic phase-seed guard (ZERO_PHASE off).
+  # Runs the irregular-TMA deck twice with the same dev binary and asserts the
+  # two end-of-run core.bin files are BITWISE identical (tol 0). ny_proc=2 splits
+  # the wavemaker strip across ranks, so it guards both run-to-run repeatability
+  # and rank-consistency of the random phases. Regresses if the phase RNG loses
+  # its deterministic, rank-uniform seed (seed_wave_phases).
+  - name: wavemaker_repro_tma
+    test_type: reproducibility
+    exe_type: central-random
+    input: test/regression/inputs/wavemaker_repro
+    input_file: tma.yaml
+    decomp: [1, 2]
+    binary: funwave
+    tags: [wavemaker, reproducibility, smoke]
     postprocess:
       field: test.regression.postproc.checkpoint_compare
     tolerances:

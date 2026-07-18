@@ -447,8 +447,8 @@ class RegressionRunner(BaseRunner):
         """
         exe_type = sim["exe_type"]
         ref_build_dir, curr_build_dir, _ref_branch = exe_dirs[exe_type]
-        if sim.get("test_type") == "self_consistency":
-            return self._prepare_selfconsistency_task(sim, index, curr_build_dir, fixed_dt, force, budget)
+        if sim.get("test_type") in ("self_consistency", "reproducibility"):
+            return self._prepare_selfcompare_task(sim, index, curr_build_dir, fixed_dt, force, budget)
         oracle_mode = ref_build_dir is None
         curr_input = sim.get("curr_input", sim["input_file"])
 
@@ -507,20 +507,20 @@ class RegressionRunner(BaseRunner):
             ref_status="pending" if ref_state == "needs_run" else ref_state,
         )
 
-    def _prepare_selfconsistency_task(self, sim, index, build_dir, fixed_dt, force, budget) -> _SimTask:
-        """A checkpoint round-trip: leg A (continuous) and leg B (checkpoint+restart)
-        both run the DEV binary, and their end-of-run core.bin files are self-compared.
-
-        There is no ref branch — ref_run_dir holds leg A, curr_run_dir holds leg B —
-        so ref_out/sim_stamp are None (leg A never caches; the dev binary it runs
-        changes every rebuild).
+    def _prepare_selfcompare_task(self, sim, index, build_dir, fixed_dt, force, budget) -> _SimTask:
+        """Two DEV-binary runs whose end-of-run core.bin files are self-compared
+        (no ref branch). Covers two test types:
+          self_consistency: leg A (continuous) vs leg B (checkpoint+restart)
+          reproducibility:  two identical runs (guards deterministic phase seeding)
+        ref_out/sim_stamp are None (the ref slot runs the dev binary, which changes
+        every rebuild, so it never caches).
         """
         base = os.path.join(build_dir, "runs", sim["name"])
-        ref_run_dir = os.path.join(base, "A")   # continuous 0 -> T
-        curr_run_dir = os.path.join(base, "B")  # checkpoint 0 -> T/2, then restart T/2 -> T
+        ref_run_dir = os.path.join(base, "A")  # self_consistency: continuous 0 -> T; reproducibility: run 1
+        curr_run_dir = os.path.join(base, "B")  # self_consistency: checkpoint+restart; reproducibility: run 2
         if force and os.path.exists(base):
             shutil.rmtree(base, ignore_errors=True)
-        eff_np, declared_np, decomp = self._auto_np(sim, budget)  # decomp pin -> (1, 1)
+        eff_np, declared_np, decomp = self._auto_np(sim, budget)  # decomp pin
         return _SimTask(
             sim=sim,
             index=index,
@@ -531,8 +531,8 @@ class RegressionRunner(BaseRunner):
             ref_run_dir=ref_run_dir,
             ref_out=None,
             sim_stamp=None,
-            curr_input="B2.yaml",
-            ref_input="A.yaml",
+            curr_input="run.yaml",
+            ref_input="run.yaml",
             eff_np=eff_np,
             declared_np=declared_np,
             decomp=decomp,
@@ -592,9 +592,13 @@ class RegressionRunner(BaseRunner):
         (continuous); dev = leg B1 (blocking, lays down the checkpoint) then B2
         (restart, whose async job id drives the slot). If B1 fails, B2 is still
         submitted so the outcome surfaces as a loud SIM_FAILED, not a silent skip.
+
+        A reproducibility task runs the SAME deck (with a ./chk checkpoint) in both
+        slots; the two end-of-run core.bin files must be bitwise identical.
         """
         sim = task.sim
-        if sim.get("test_type") == "self_consistency":
+        ttype = sim.get("test_type")
+        if ttype == "self_consistency":
             binary = os.path.join(task.curr_build_dir, sim["binary"])
             a_deck, b1_deck, b2_deck = self._hotstart_legs(self._hotstart_base(sim))
             if kind == "ref":
@@ -607,6 +611,13 @@ class RegressionRunner(BaseRunner):
             if st != "COMPLETED":
                 self.reporter.warn(f"{sim['name']}: checkpoint leg B1 {st}; restart will fail")
             return self.provider.submit(binary, "B2.yaml", task.curr_run_dir, np=task.eff_np)
+        if ttype == "reproducibility":
+            binary = os.path.join(task.curr_build_dir, sim["binary"])
+            deck = self._hotstart_base(sim)
+            deck.setdefault("output", {})["checkpoint"] = "./chk"
+            run_dir = task.ref_run_dir if kind == "ref" else task.curr_run_dir
+            self._write_leg(deck, run_dir, "run.yaml")
+            return self.provider.submit(binary, "run.yaml", run_dir, np=task.eff_np)
         if kind == "ref":
             run_dir, binary, input_file = task.ref_run_dir, os.path.join(task.ref_build_dir, sim["binary"]), task.ref_input
             self._setup_run_dir(sim, run_dir, fixed_dt=fixed_dt, decomp=task.decomp)

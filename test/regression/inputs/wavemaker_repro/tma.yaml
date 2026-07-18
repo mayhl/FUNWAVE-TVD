@@ -1,0 +1,65 @@
+# Wavemaker phase-seeding reproducibility guard (dev-vs-dev, ZERO_PHASE=OFF).
+# The harness runs this deck TWICE with the same binary and asserts the two
+# end-of-run core.bin files are BITWISE identical. It only bites without a
+# deterministic phase seed: unseeded RANDOM_NUMBER randomizes per process (per
+# run AND per rank), so two runs — or two ranks of one run — would draw
+# different phases. ny_proc=2 splits the wavemaker strip across ranks, so this
+# also guards rank-consistency of the drawn phases, not just run-to-run repeat.
+grid:
+  cell_size: [2.0, 2.0]
+  grid_size: [120, 10]
+  decomposition:
+    nx_proc: 1
+    ny_proc: 2
+  bathymetry:
+    type: flat
+    depth: 8.0
+simulation:
+  title: wavemaker_repro_tma
+  total_time: 24.0
+  time_stepping:
+    fixed_dt: true
+    dt: 0.08
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 1.0
+    gamma: 5.0
+    freq:
+      peak: 0.0833
+      min: 0.05
+      max: 0.3
+    directional:
+      peak: 0.0
+      spread: 10.0
+      n_bins: 24
+    discretization:
+      freq_bins: 45
+  source:
+    x_center: 80.0
+    y_center: 0.0
+    depth: 8.0
+boundaries:
+  west:
+    sponge:
+      width: 60.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  interval: 24.0
+  result_folder: output/
+  field_io_type: BINARY
+  checkpoint: ./chk
+  variables: [ETA]
