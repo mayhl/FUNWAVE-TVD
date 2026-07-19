@@ -275,73 +275,73 @@ contains
       ! guard on the "get Eta and H" block)
       this%fields%mask_struc = 1
       associate (f => this%fields, lp => this%grid%lp)
-      ! a hot-start mask (ASCII mask_file OR checkpoint) REPLACES the derivation
-      if (.not. ((this%hot_start%is_activated .and. &
-                  .not. this%hot_start%no_mask_file) .or. &
-                 this%hot_start%use_checkpoint)) then
-         do j = 1, lp%nloc
-            do i = 1, lp%mloc
-               if (f%eta(i, j) < -f%depth(i, j)) then
-                  f%mask(i, j) = 0
-                  f%eta(i, j) = -this%numerics%MinDepth - f%depth(i, j)
-               else
-                  f%mask(i, j) = 1
-               end if
+         ! a hot-start mask (ASCII mask_file OR checkpoint) REPLACES the derivation
+         if (.not. ((this%hot_start%is_activated .and. &
+                     .not. this%hot_start%no_mask_file) .or. &
+                    this%hot_start%use_checkpoint)) then
+            do j = 1, lp%nloc
+               do i = 1, lp%mloc
+                  if (f%eta(i, j) < -f%depth(i, j)) then
+                     f%mask(i, j) = 0
+                     f%eta(i, j) = -this%numerics%MinDepth - f%depth(i, j)
+                  else
+                     f%mask(i, j) = 1
+                  end if
+               end do
             end do
-         end do
-      end if
+         end if
 
-      ! H and the conserved fluxes BEFORE the structure mask lands
-      ! (legacy init.F "get Eta and H" precedes the obstacle block, so
-      ! H at structure cells is built from the pre-obstacle depth and
-      ! never refreshed at init)
-      f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
-      ! On a checkpoint restart p,q are the SAVED conserved dispersive flux; keep
-      ! them (the stepper derives u,v from p,q on stage 1).  Otherwise seed the
-      ! flux from the initial/loaded u,v as plain H*u.
-      if (.not. this%hot_start%use_checkpoint) then
-         f%p = f%h*f%u
-         f%q = f%h*f%v
-      end if
+         ! H and the conserved fluxes BEFORE the structure mask lands
+         ! (legacy init.F "get Eta and H" precedes the obstacle block, so
+         ! H at structure cells is built from the pre-obstacle depth and
+         ! never refreshed at init)
+         f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
+         ! On a checkpoint restart p,q are the SAVED conserved dispersive flux; keep
+         ! them (the stepper derives u,v from p,q on stage 1).  Otherwise seed the
+         ! flux from the initial/loaded u,v as plain H*u.
+         if (.not. this%hot_start%use_checkpoint) then
+            f%p = f%h*f%u
+            f%q = f%h*f%v
+         end if
 
-      ! permanent structures (legacy init.F obstacle block): mask from
-      ! file, depth -> -LARGE at structure cells; the staggered faces
-      ! are NOT rebuilt (legacy leaves DepthX/DepthY pre-obstacle)
-      if (this%obstacle%obstacle) call load_obstacle(this)
-      where (f%mask_struc == 0) f%depth = -LARGE
+         ! permanent structures (legacy init.F obstacle block): mask from
+         ! file, depth -> -LARGE at structure cells; the staggered faces
+         ! are NOT rebuilt (legacy leaves DepthX/DepthY pre-obstacle)
+         if (this%obstacle%obstacle) call load_obstacle(this)
+         where (f%mask_struc == 0) f%depth = -LARGE
 
-      f%mask = f%mask*f%mask_struc
+         f%mask = f%mask*f%mask_struc
 
-      ! initial MASK9 is the pure 3x3 product on the INTERIOR only
-      ! (legacy init.F): neither the viscosity_breaking all-1 override
-      ! nor the SWE_ETA_DEP zeroing of the in-loop update applies at
-      ! t = 0, and every ghost — including the ring the stage-1 face
-      ! reconstruction reads — is ZERO (legacy allocates zeroed and
-      ! PHI_INT_EXCH fills MPI seams only, never walls).  Anything
-      ! else kicks the stage-1 fluxes and seeds a persistent swash
-      ! divergence (parity ledger 8c).  A checkpoint restart carries the
-      ! saved mask9 (with its SWE_ETA_DEP zeroing) verbatim — the pure
-      ! product would drop that, so skip the derivation here.
-      if (.not. this%hot_start%use_checkpoint) then
-         f%mask9 = 0
-         do j = lp%jb, lp%je
-            do i = lp%ib, lp%ie
-               f%mask9(i, j) = f%mask(i, j)*f%mask(i - 1, j)*f%mask(i + 1, j) &
-                               *f%mask(i + 1, j + 1)*f%mask(i, j + 1)*f%mask(i - 1, j + 1) &
-                               *f%mask(i + 1, j - 1)*f%mask(i, j - 1)*f%mask(i - 1, j - 1)
+         ! initial MASK9 is the pure 3x3 product on the INTERIOR only
+         ! (legacy init.F): neither the viscosity_breaking all-1 override
+         ! nor the SWE_ETA_DEP zeroing of the in-loop update applies at
+         ! t = 0, and every ghost — including the ring the stage-1 face
+         ! reconstruction reads — is ZERO (legacy allocates zeroed and
+         ! PHI_INT_EXCH fills MPI seams only, never walls).  Anything
+         ! else kicks the stage-1 fluxes and seeds a persistent swash
+         ! divergence (parity ledger 8c).  A checkpoint restart carries the
+         ! saved mask9 (with its SWE_ETA_DEP zeroing) verbatim — the pure
+         ! product would drop that, so skip the derivation here.
+         if (.not. this%hot_start%use_checkpoint) then
+            f%mask9 = 0
+            do j = lp%jb, lp%je
+               do i = lp%ib, lp%ie
+                  f%mask9(i, j) = f%mask(i, j)*f%mask(i - 1, j)*f%mask(i + 1, j) &
+                                  *f%mask(i + 1, j + 1)*f%mask(i, j + 1)*f%mask(i - 1, j + 1) &
+                                  *f%mask(i + 1, j - 1)*f%mask(i, j - 1)*f%mask(i - 1, j - 1)
+               end do
             end do
-         end do
-         ! MPI-seam ghosts (real-copy ride on the halo exchange); NOTE:
-         ! under periodic-y this also wraps, where legacy PHI_INT_EXCH
-         ! leaves 1-rank y-ghosts zeroed — revisit if a periodic case
-         ! shows a step-1 ring deviation
-         block
-            real(SP), allocatable :: rmask(:, :)
-            allocate (rmask, source=real(f%mask9, SP))
-            call this%grid%halo_exchange(rmask)
-            f%mask9 = nint(rmask)
-         end block
-      end if
+            ! MPI-seam ghosts (real-copy ride on the halo exchange); NOTE:
+            ! under periodic-y this also wraps, where legacy PHI_INT_EXCH
+            ! leaves 1-rank y-ghosts zeroed — revisit if a periodic case
+            ! shows a step-1 ring deviation
+            block
+               real(SP), allocatable :: rmask(:, :)
+               allocate (rmask, source=real(f%mask9, SP))
+               call this%grid%halo_exchange(rmask)
+               f%mask9 = nint(rmask)
+            end block
+         end if
       end associate
 
       call this%fields%register(this%registry)
@@ -617,9 +617,11 @@ contains
       call this%setup()
       call this%friction%init_compute(this%grid)
       call this%sponge%init_compute(this%grid)
-      ! NOTE: max-merge, where legacy adds the sponge drag on top of Cd
-      ! — identical while Cd = 0 in the sponge zone (all current tests)
-      call this%sponge%merge_friction(this%friction%Cd, this%fields%depth)
+      ! Sponge friction drag composes additively onto friction's constant base
+      ! (ledger 8d: was a max-merge; identical while Cd = 0 in the sponge zone,
+      ! as in all current tests); sync_base then hands it to the effective Cd
+      call this%sponge%merge_friction(this%friction%cd_base, this%fields%depth)
+      call this%friction%sync_base()
       ! legacy TIDE_INITIAL runs after INITIALIZATION — profiles, DATA
       ! series open, and the (inert-on-sponge) REMOVE_SPONGE disable
       call this%tide%init_compute(this%grid)

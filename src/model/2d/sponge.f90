@@ -173,20 +173,24 @@ contains
 
    end subroutine sponge_init_compute
 
-   !> Max-merge friction sponge profile into an external Cd array.
+   !> Add the friction sponge profile into an external drag-base array.
    !>
    !> Must be called after init_compute().  When a friction sponge is active,
-   !> max-merges cd_sponge*depth into cd_inout and then deallocates cd_sponge.
+   !> adds cd_sponge*depth into cd_inout and then deallocates cd_sponge.
    !> No-op when no friction sponge is active or not allocated.
    !>
    !> The *depth factor converts the flux-based sponge drag to the same units
    !> as the velocity-based friction term in cal_sources:
    !>   legacy: -CD_4_SPONGE * U * |UV| * Depth  (Wei et al. flux form)
    !>   merged: -(CD_4_SPONGE * Depth) * U * |UV|  (same as Cd * U * |UV|)
+   !> Composition with a constant/Manning drag is additive (drag terms sum),
+   !> superseding the earlier max()-merge (legacy ledger 8d).
    !>
-   !> Use this instead of holding both cd_sponge and friction%Cd simultaneously:
+   !> Merge into friction's constant base so both survive the per-step Manning
+   !> rebuild, then sync_base pushes it into the effective Cd:
    !>   call sponge%init_compute(grid)
-   !>   call sponge%merge_friction(friction%Cd, fields%depth)
+   !>   call sponge%merge_friction(friction%cd_base, fields%depth)
+   !>   call friction%sync_base()
    subroutine sponge_merge_friction(this, cd_inout, depth)
       class(type_model_sponge), intent(inout) :: this
       real(SP), intent(inout) :: cd_inout(:, :)
@@ -199,7 +203,7 @@ contains
 
       do j = 1, size(cd_inout, 2)
          do i = 1, size(cd_inout, 1)
-            cd_inout(i, j) = max(cd_inout(i, j), this%cd_sponge(i, j)*depth(i, j))
+            cd_inout(i, j) = cd_inout(i, j) + this%cd_sponge(i, j)*depth(i, j)
          end do
       end do
 

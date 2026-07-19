@@ -46,14 +46,21 @@ module model_friction_mod
       ! Cd_fixed: constant Manning n (manning=YES) or drag coefficient (manning=NO).
       real(SP) :: Cd_fixed = 0.0_SP
 
-      ! Ghost-inclusive drag coefficient: (local_nx+2*N_GHOST, local_ny+2*N_GHOST).
-      ! Allocated by init_compute; nil when friction is not active.
-      ! When manning=YES, update_cd overwrites this with g*n²/H^(1/3) each timestep.
+      ! cd_base: time-constant drag base, ghost-inclusive.  Holds the constant
+      ! drag coefficient (manning=NO) plus any sponge friction merged in by
+      ! sponge%merge_friction; Manning mode carries a roughness in Cd_fixed
+      ! (not a drag), so its constant part is only the merged sponge term.
+      real(SP), allocatable :: cd_base(:, :)
+
+      ! Ghost-inclusive effective drag cal_sources reads: (local_nx+2*N_GHOST,
+      ! local_ny+2*N_GHOST).  Starts at cd_base; when manning=YES, update_cd
+      ! rebuilds it as cd_base + g*n²/H^(1/3) each timestep.
       real(SP), allocatable :: Cd(:, :)
 
    contains
       procedure :: read_input => friction_read_input
       procedure :: init_compute => friction_init_compute
+      procedure :: sync_base => friction_sync_base
       procedure :: update_cd => friction_update_cd
       procedure :: free => friction_free
    end type type_model_friction
@@ -109,14 +116,32 @@ contains
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
 
-      ! No friction: block => zero drag; Cd is always allocated so
-      ! cal_sources can take it unconditionally (Cd_fixed defaults 0).
-      allocate (this%Cd(mloc_g, nloc_g), source=this%Cd_fixed)
+      ! Constant drag base: the plain Cd (manning=NO) or zero (manning carries
+      ! a roughness in Cd_fixed, not a drag).  sponge%merge_friction adds its
+      ! contribution here; sync_base then pushes it into the effective Cd.
+      if (this%manning) then
+         allocate (this%cd_base(mloc_g, nloc_g), source=0.0_SP)
+      else
+         allocate (this%cd_base(mloc_g, nloc_g), source=this%Cd_fixed)
+      end if
+
+      ! Effective drag; Cd is always allocated so cal_sources can take it
+      ! unconditionally (base defaults 0 => zero drag).
+      allocate (this%Cd(mloc_g, nloc_g), source=this%cd_base)
 
    end subroutine friction_init_compute
 
-   ! Recompute effective drag from Manning n and current total depth H.
-   ! No-op when manning=.false. or friction not active.
+   ! Push the constant drag base into the effective Cd.  Call after any
+   ! sponge%merge_friction so the merged sponge drag reaches cal_sources on
+   ! the non-Manning path (update_cd rebuilds Cd from the base otherwise).
+   subroutine friction_sync_base(this)
+      class(type_model_friction), intent(inout) :: this
+      if (allocated(this%Cd) .and. allocated(this%cd_base)) this%Cd = this%cd_base
+   end subroutine friction_sync_base
+
+   ! Recompute effective drag as the constant base plus the Manning term from
+   ! the current total depth H.  No-op when manning=.false. (Cd already holds
+   ! cd_base via sync_base) or friction not active.
    ! Call once per timestep after update_h, before cal_sources.
    subroutine friction_update_cd(this, h, min_depth_frc)
       class(type_model_friction), intent(inout) :: this
@@ -131,7 +156,7 @@ contains
       ! separate n_raw(:,:) array populated from cd_file in init_compute.
       do j = 1, size(this%Cd, 2)
          do i = 1, size(this%Cd, 1)
-            this%Cd(i, j) = GRAV*this%Cd_fixed**2 &
+            this%Cd(i, j) = this%cd_base(i, j) + GRAV*this%Cd_fixed**2 &
                             /max(h(i, j), min_depth_frc)**(0.333333_SP)
          end do
       end do
@@ -141,6 +166,7 @@ contains
    subroutine friction_free(this)
       class(type_model_friction), intent(inout) :: this
       if (allocated(this%Cd)) deallocate (this%Cd)
+      if (allocated(this%cd_base)) deallocate (this%cd_base)
    end subroutine friction_free
 
 end module model_friction_mod
