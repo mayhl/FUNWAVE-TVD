@@ -67,6 +67,7 @@ contains
       this%is_activated = .true.
 
       call sub_env%yaml%read("title", silent=no_title, val=this%title)
+      if (no_title) this%title = ""
       call sub_env%yaml%read_positive("total_time", val=this%total_time)
       call sub_env%yaml%read("t_start", silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)
       call sub_env%yaml%read("screen_interval", silent=no_screen, &

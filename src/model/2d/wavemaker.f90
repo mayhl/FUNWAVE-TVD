@@ -403,10 +403,14 @@ contains
          call spec_yaml%read("period_peak", silent=no_key, val=this%PeakPeriod, &
                              default=DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK)
          call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
+         if (no_key) call env%log%exit_on_error( &
+            "wavemaker/spectrum: components needs a file: (wave-component data)")
          this%wavemaker_type = "WK_TIME_SERIES"
 
       case ("spectrum_2d")
          call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
+         if (no_key) call env%log%exit_on_error( &
+            "wavemaker/spectrum: spectrum_2d needs a file: (2D-spectrum data)")
          call spec_yaml%read("format", val=this%WAVE_DATA_TYPE, &
                              default=DEF_WAVEMAKER_SPECTRUM_FORMAT)
          this%wavemaker_type = "WK_DATA2D"

@@ -96,6 +96,7 @@ contains
       type(type_yaml_reader) :: bathy_yaml, decomp_yaml
       real(SP), allocatable :: cell_size(:), origin(:)
       integer, allocatable :: grid_size(:)
+      integer :: tmp_nx, tmp_ny
       logical :: no_cell_size, no_origin, no_decomp
       logical :: no_nx_proc, no_ny_proc, no_dx_file, no_dy_file
       logical :: no_bathy_nx, no_bathy_ny
@@ -129,13 +130,25 @@ contains
       end if
 
       ! --- Decomposition (optional) ---
+      ! NOTE: plain read into temps + validate/assign only when present -- an empty
+      ! decomposition: block (both keys absent) must fall through to auto-decompose,
+      ! but read_positive would wipe this%nx_proc's 0 sentinel (intent(out)) to
+      ! garbage on that path and then abort on its own positivity check
       decomp_yaml = sub_env%yaml%cast_dictionary("decomposition", no_decomp)
       if (.not. no_decomp) then
-         call decomp_yaml%read_positive("nx_proc", silent=no_nx_proc, val=this%nx_proc)
-         call decomp_yaml%read_positive("ny_proc", silent=no_ny_proc, val=this%ny_proc)
+         call decomp_yaml%read("nx_proc", silent=no_nx_proc, val=tmp_nx)
+         call decomp_yaml%read("ny_proc", silent=no_ny_proc, val=tmp_ny)
          if (no_nx_proc .neqv. no_ny_proc) then
             call sub_env%log%exit_on_error( &
                "geometry/decomposition: nx_proc and ny_proc must both be specified")
+         end if
+         if (.not. no_nx_proc) then
+            if (tmp_nx <= 0 .or. tmp_ny <= 0) then
+               call sub_env%log%exit_on_error( &
+                  "geometry/decomposition: nx_proc and ny_proc must be positive")
+            end if
+            this%nx_proc = tmp_nx
+            this%ny_proc = tmp_ny
          end if
       end if
 
