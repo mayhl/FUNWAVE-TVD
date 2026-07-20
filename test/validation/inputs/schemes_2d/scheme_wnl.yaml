@@ -1,0 +1,36 @@
+# Dispersion-scheme preset guard — weakly_nonlinear (Gamma1/2/3 = 1,1,0).
+# The kh = 1.88 fundamental seiche (h = 12 m, L = 20 m basin) is run under each
+# physics.dispersion.scheme preset and gated against ITS OWN linear relation:
+# the dispersive presets against Nwogu, nswe against the non-dispersive
+# c = sqrt(gh) — the two periods differ by ~17 % at this kh, so any
+# preset -> gamma wiring fault (e.g. the 2026-07-16 silent gamma wipe) trips
+# the 5 % period gate instantly.
+grid:
+  cell_size: [0.2, 0.2]
+  grid_size: [100, 3]
+  bathymetry:
+    type: flat
+    depth: 12.0
+simulation:
+  title: scheme_weakly_nonlinear
+  total_time: 50.0
+  screen_interval: 25.0
+initial:
+  sine_mode:
+    amplitude: 0.01
+physics:
+  dispersion:
+    scheme: weakly_nonlinear
+numerics:
+  cfl: 0.5
+  froude_cap: 3.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+output:
+  interval: 50.0
+  stations:
+    file: stations.txt
+    interval: 0.05
+  depth_out: true
+  variables: [ETA]

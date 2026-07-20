@@ -104,19 +104,19 @@ def _extract_period(sta: np.ndarray, t_start: float) -> float:
 # ---------------------------------------------------------------------------
 
 
-def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, int]:
-    """Parse (h, Lx, Ly, beta_ref, m_x, m_y) from the run YAML (Lx = Mglob*dx).
+def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, int, str]:
+    """Parse (h, Lx, Ly, beta_ref, m_x, m_y, scheme) from the run YAML (Lx = Mglob*dx).
 
     The INI_SINE mode numbers default to the fundamental seiche (1, 0) when absent,
     so a case with no ``mode_x/mode_y`` keys reduces to the 1D standing wave.
     """
     yaml_files = sorted(run_dir.glob("*.yaml"))
     if not yaml_files:
-        return None, 0.0, 0.0, BETA_REF_DEFAULT, 1, 0
+        return None, 0.0, 0.0, BETA_REF_DEFAULT, 1, 0, "fully_nonlinear"
     with open(yaml_files[0]) as fh:
         cfg = yaml.safe_load(fh)
 
-    geo = cfg.get("geometry", {})
+    geo = cfg.get("grid", {})
     gs = geo.get("grid_size", [1, 1])
     cs = geo.get("cell_size", [1.0, 1.0])
     lx = float(gs[0]) * float(cs[0])
@@ -131,12 +131,14 @@ def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, i
         if p.exists():
             h = float(np.median(np.loadtxt(p).ravel()))
 
-    wm = cfg.get("wavemaker", {})
-    mode_x = int(wm.get("mode_x", 1))
-    mode_y = int(wm.get("mode_y", 0))
+    sine = cfg.get("initial", {}).get("sine_mode", {})
+    mode_x = int(sine.get("mode_x", 1))
+    mode_y = int(sine.get("mode_y", 0))
 
-    beta_ref = float(cfg.get("physics", {}).get("beta_ref", BETA_REF_DEFAULT))
-    return h, lx, ly, beta_ref, mode_x, mode_y
+    disp = cfg.get("physics", {}).get("dispersion", {})
+    beta_ref = float(disp.get("beta_ref", BETA_REF_DEFAULT))
+    scheme = str(disp.get("scheme", "fully_nonlinear"))
+    return h, lx, ly, beta_ref, mode_x, mode_y, scheme
 
 
 def _find_station_files(output_dir: Path) -> list[Path]:
@@ -159,7 +161,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         _console.print("[yellow]dispersion:[/yellow] no station files found — skipping")
         return SubsectionResult(kind="statistics", label="Linear Dispersion", metrics=[])
 
-    h, lx, ly, beta_ref, mode_x, mode_y = _read_case(dev_dir)
+    h, lx, ly, beta_ref, mode_x, mode_y, scheme = _read_case(dev_dir)
     if h is None or lx <= 0.0:
         _console.print("[yellow]dispersion:[/yellow] depth/domain not found — skipping")
         return SubsectionResult(kind="statistics", label="Linear Dispersion", metrics=[])
@@ -173,6 +175,9 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     lam = 2.0 * math.pi / kmag
     kh, T_bous = _boussinesq_period(h, lam, beta_ref)
     T_airy = _airy_period(h, lam)
+    # each dispersion preset targets ITS OWN relation: nswe is non-dispersive
+    # (c = sqrt(gh)); the dispersive presets share the Nwogu linear relation
+    T_target = lam / math.sqrt(G * h) if scheme == "nswe" else T_bous
 
     sta = np.loadtxt(sta_files[0])
     if sta.ndim == 1:
@@ -180,7 +185,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     t_start = max(0.0, float(sta[-1, 0]) * 0.2)  # skip the first 20% as start-up
     T_meas = _extract_period(sta, t_start=t_start)
 
-    err_pct = abs(T_meas - T_bous) / T_bous * 100.0 if math.isfinite(T_meas) else float("nan")
+    err_pct = abs(T_meas - T_target) / T_target * 100.0 if math.isfinite(T_meas) else float("nan")
     tol_pct = float(tolerances.get("period_error_pct", 5.0))
     passed = math.isfinite(err_pct) and err_pct < tol_pct
 
@@ -193,12 +198,14 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
 
     if verbose or not passed:
-        _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, passed)
+        _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, passed,
+                     scheme, T_target)
 
     return SubsectionResult(kind="statistics", label="Linear Dispersion", metrics=metrics)
 
 
-def _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, passed) -> None:
+def _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, passed,
+                 scheme="fully_nonlinear", T_target=None) -> None:
     table = Table(
         box=box.SIMPLE_HEAD,
         header_style="bold cyan",
@@ -216,8 +223,11 @@ def _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, 
     table.add_row("Basin  L", f"{lx:.2f} m", "—", "")
     table.add_row("beta_ref", f"{beta_ref:.3f}", "—", "")
     table.add_row("kh", f"{kh:.4f}", "—", "")
+    table.add_row("Scheme", scheme, "—", "")
     table.add_row("T  (Nwogu)", f"{T_bous:.4f} s", "—", "")
     table.add_row("T  (Airy, diag)", f"{T_airy:.4f} s", "—", "")
+    if T_target is not None and T_target != T_bous:
+        table.add_row("T  (target, nswe)", f"{T_target:.4f} s", "—", "")
     table.add_row("T  (measured)", f"{T_meas:.4f} s", "—", "")
     if math.isfinite(err_pct):
         status = "[bold green]✓ PASS[/bold green]" if passed else "[bold red]✗ FAIL[/bold red]"
