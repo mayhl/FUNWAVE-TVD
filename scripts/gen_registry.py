@@ -34,6 +34,7 @@ import yaml
 REPO = Path(__file__).resolve().parent.parent
 REGISTRY = REPO / "src" / "model" / "registry.yaml"
 OUTPUT = REPO / "src" / "model" / "2d" / "config_defaults.f90"
+DOCS_OUTPUT = REPO / "docs" / "guide" / "config_reference.md"
 
 HEADER = """\
 ! allow(E001)
@@ -150,6 +151,142 @@ def generate(reg: dict) -> str:
     return "".join(lines)
 
 
+DOCS_HEADER = """\
+<!-- =================================================================
+  GENERATED FILE — DO NOT EDIT.
+  Source:    src/model/registry.yaml
+  Generator: scripts/gen_registry.py   (rerun after registry edits)
+  Sync test: scripts/gen_registry.py --check
+================================================================= -->
+
+# Configuration Reference
+
+To configure a run, we provide one YAML file whose top-level sections each
+control one model component; a section marked **required** must appear in every
+deck, while the remaining sections are presence-gated — omitting the section
+disables the component, and within a section, keys with no default are likewise
+presence-derived (setting them enables the associated behaviour).  Keys are
+listed by their dotted sub-path, e.g. `spectrum.freq.peak` denotes
+
+```yaml
+wavemaker:
+  spectrum:
+    freq:
+      peak: 0.1
+```
+
+The **Legacy** column gives the corresponding `input.txt` parameter name from
+FUNWAVE-TVD, for migrating old decks; `—` marks keys with no legacy
+counterpart.
+
+"""
+
+
+def _md_escape(text: str) -> str:
+    return str(text).replace("|", "\\|").replace("<", "\\<").replace("\n", " ").strip()
+
+
+def _md_default(value) -> str:
+    if value is None:
+        return "—"
+    if isinstance(value, bool):
+        return f"`{'true' if value else 'false'}`"
+    return f"`{value}`"
+
+
+def _md_desc(meta: dict) -> str:
+    parts = []
+    variant = meta.get("variant")
+    if variant:
+        parts.append(f"*({'/'.join(variant)})*")
+    doc = meta.get("doc")
+    if doc:
+        parts.append(_md_escape(doc))
+    values = meta.get("values")
+    if values:
+        parts.append("One of " + " \\| ".join(f"`{v}`" for v in values) + ".")
+    return " ".join(parts) or "—"
+
+
+def _md_row(key: str, meta: dict) -> str:
+    meta = meta or {}
+    legacy = meta.get("legacy")
+    legacy_cell = f"`{legacy}`" if legacy else "—"
+    units = meta.get("units")
+    units_cell = _md_escape(units) if units else "—"
+    return f"| `{key}` | {_md_default(meta.get('default'))} | {legacy_cell} | {units_cell} | {_md_desc(meta)} |\n"
+
+
+TABLE_HEAD = "| Key | Default | Legacy | Units | Description |\n|---|---|---|---|---|\n"
+
+
+def generate_docs(reg: dict) -> str:
+    """Render the sections tree as the markdown configuration reference.
+
+    One table per section (key, default, legacy name, units, description);
+    per_face keys render once with <face> placeholders and override notes.
+    """
+    lines = [DOCS_HEADER]
+    for sec_name, sec in (reg.get("sections") or {}).items():
+        lines.append(f"## `{sec_name}:`\n\n")
+        badge = "**Required.**  " if sec.get("required") else ""
+        doc = sec.get("doc")
+        if badge or doc:
+            lines.append(badge + (_md_escape(doc) if doc else "") + "\n\n")
+
+        keys = sec.get("keys") or {}
+        if keys:
+            lines.append(TABLE_HEAD)
+            for key, meta in keys.items():
+                lines.append(_md_row(key, meta))
+            lines.append("\n")
+
+        pf = sec.get("per_face")
+        if pf:
+            faces = " / ".join(f"`{f}:`" for f in pf["faces"])
+            lines.append(f"### Per-face keys ({faces})\n\n")
+            lines.append(TABLE_HEAD)
+            overrides = pf.get("overrides") or {}
+            for subkey, meta in (pf.get("keys") or {}).items():
+                row_meta = dict(meta or {})
+                notes = []
+                for face in pf["faces"]:
+                    ov = overrides.get(f"{face}.{subkey}")
+                    if ov:
+                        ov_bits = ", ".join(f"{k} `{v}`" for k, v in ov.items())
+                        notes.append(f"{face}: {ov_bits}")
+                if notes:
+                    row_meta["doc"] = (row_meta.get("doc") or "") + "  (" + "; ".join(notes) + ")"
+                lines.append(_md_row(f"<face>.{subkey}", _subst_meta(row_meta)))
+            lines.append("\n")
+    return "".join(lines)
+
+
+def _subst_meta(meta: dict) -> dict:
+    """Render {face}/{Face}/{F} placeholders generically for the docs table."""
+    out = {}
+    for k, v in meta.items():
+        if isinstance(v, str):
+            v = v.replace("{face}", "<face>").replace("{Face}", "<Face>").replace("{F}", "<F>")
+        out[k] = v
+    return out
+
+
+def _check_one(path: Path, new: str) -> bool:
+    old = path.read_text() if path.exists() else ""
+    if old == new:
+        print(f"OK: {path.relative_to(REPO)} is in sync with registry.yaml")
+        return True
+    print(
+        f"STALE: {path.relative_to(REPO)} does not match registry.yaml — rerun: uv run scripts/gen_registry.py",
+        file=sys.stderr,
+    )
+    sys.stderr.writelines(
+        difflib.unified_diff(old.splitlines(keepends=True), new.splitlines(keepends=True), fromfile="committed", tofile="generated")
+    )
+    return False
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true", help="verify committed output matches the registry")
@@ -164,24 +301,16 @@ def main() -> int:
         return 2
 
     new = generate(reg)
+    new_docs = generate_docs(reg)
     if args.check:
-        old = OUTPUT.read_text() if OUTPUT.exists() else ""
-        if old == new:
-            print(f"OK: {OUTPUT.relative_to(REPO)} is in sync with registry.yaml")
-            return 0
-        print(
-            f"STALE: {OUTPUT.relative_to(REPO)} does not match registry.yaml — rerun: uv run scripts/gen_registry.py",
-            file=sys.stderr,
-        )
-        sys.stderr.writelines(
-            difflib.unified_diff(
-                old.splitlines(keepends=True), new.splitlines(keepends=True), fromfile="committed", tofile="generated"
-            )
-        )
-        return 1
+        ok = _check_one(OUTPUT, new)
+        ok = _check_one(DOCS_OUTPUT, new_docs) and ok
+        return 0 if ok else 1
 
     OUTPUT.write_text(new)
     print(f"wrote {OUTPUT.relative_to(REPO)}")
+    DOCS_OUTPUT.write_text(new_docs)
+    print(f"wrote {DOCS_OUTPUT.relative_to(REPO)}")
     return 0
 
 

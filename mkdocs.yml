@@ -53,6 +53,7 @@ nav:
   - User Guide:
     - Installation: guide/installation.md
     - Configuration: guide/configuration.md
+    - Configuration Reference: guide/config_reference.md
     - Output: guide/output.md
   - Examples:
     - Standing Wave: examples/standing_wave.md

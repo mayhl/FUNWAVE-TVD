@@ -334,6 +334,7 @@ sections:
 
   # ── grid ──
   grid:
+    required: true
     doc: "Computational grid — extent, spacing, bathymetry source, MPI decomposition, optional Coriolis."
     keys:
       coriolis.f: {legacy: ~, default: ~, units: s-1, latex: $f$, doc: Constant Coriolis parameter (f-plane; overrides latitude).}
@@ -353,6 +354,7 @@ sections:
 
   # ── simulation ──
   simulation:
+    required: true
     doc: "Run control — title, total/start time, screen-log cadence, and time-stepping."
     keys:
       screen_interval: {legacy: SCREEN_INTV, default: 1.0, units: s, latex: '$\Delta t_{\mathrm{screen}}$', doc: Screen-log / monitor cadence.}
@@ -545,6 +547,7 @@ sections:
 
   # ── output ──
   output:
+    required: true
     doc: "Output control — cadence, format, folder, plus stations/means/vessel/arrival-time sub-blocks."
     keys:
       arrival_time.min_height: {legacy: ArrTimeMin, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
