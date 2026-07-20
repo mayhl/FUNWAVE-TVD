@@ -208,11 +208,14 @@ contains
    end subroutine channel_init
 
    ! Called every timestep. Accumulates from registry; flushes when triggered.
-   subroutine channel_step(this, t, dt, registry, comm)
+   ! force=.true. (after-loop final flush) fires unconditionally once the
+   ! channel has started.
+   subroutine channel_step(this, t, dt, registry, comm, force)
       class(type_output_channel), intent(inout) :: this
       real(SP), intent(in)    :: t, dt
       type(type_field_registry), intent(in)    :: registry
       type(type_comm), intent(inout) :: comm
+      logical, intent(in), optional :: force
 
       integer  :: iv
       real(SP), pointer :: fld(:, :)
@@ -224,6 +227,7 @@ contains
 
       ! dt-accumulator mode: legacy PLOT_COUNT frame cadence
       do_flush = this%trigger%should_trigger(t, dt)
+      if (present(force)) do_flush = do_flush .or. force
       if (do_flush) this%icount = this%icount + 1
       this%fired = do_flush
 

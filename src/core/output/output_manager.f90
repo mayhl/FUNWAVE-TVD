@@ -41,15 +41,18 @@ module core_output_manager_mod
 contains
 
    ! Called every timestep. Dispatches to each active channel.
-   subroutine manager_step(this, t, dt, registry, comm)
+   ! force=.true. (after-loop final flush) fires every started channel
+   ! regardless of its cadence trigger.
+   subroutine manager_step(this, t, dt, registry, comm, force)
       class(type_output_manager), intent(inout) :: this
       real(SP), intent(in)    :: t, dt
       type(type_field_registry), intent(in)    :: registry
       type(type_comm), intent(inout) :: comm
+      logical, intent(in), optional :: force
 
       integer :: k
       do k = 1, this%n_channels
-         call this%channels(k)%step(t, dt, registry, comm)
+         call this%channels(k)%step(t, dt, registry, comm, force=force)
       end do
    end subroutine manager_step
 

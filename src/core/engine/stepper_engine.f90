@@ -17,8 +17,9 @@
 !    (mixing/statistics/blow-up check).
 !  Time advances between estimate_dt and the stages: legacy
 !  ESTIMATE_DT increments TIME internally, so the stages see t + dt.
-!  Like legacy, the final state at t >= t_end is NOT written — output
-!  runs at the loop top only.
+!  Output runs at the loop top; after the loop one forced monitor call
+!  flushes the final state at t >= t_end as its own frame (parity
+!  ledger #2 — legacy never wrote it, reversed post cord-cut).
 !
 !  This module has NO output dependency (libcore_output links
 !  libcore_engine): the loop-top output call site is the abstract
@@ -91,10 +92,13 @@ module core_stepper_engine_mod
       end subroutine i_post_step
 
       ! Output/diagnostics at the loop top, before the state advances.
-      subroutine i_monitor_step(this, t, dt)
+      ! force=.true. is the after-loop final flush: write the end state
+      ! as its own frame regardless of the cadence trigger.
+      subroutine i_monitor_step(this, t, dt, force)
          import :: type_engine_monitor, SP
          class(type_engine_monitor), intent(inout) :: this
          real(SP), intent(in) :: t, dt
+         logical, intent(in), optional :: force
       end subroutine i_monitor_step
    end interface
 
@@ -169,6 +173,10 @@ contains
          end if
 
       end do
+
+      ! final flush (ledger #2): the loop-top cadence never sees the
+      ! state at t >= t_end — write it as one forced frame
+      call monitor%step(this%clock%current_time, dt, force=.true.)
 
    end subroutine engine_run
 

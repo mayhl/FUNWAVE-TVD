@@ -298,7 +298,8 @@ contains
          f%h = max(this%physics%Gamma3*f%eta + f%depth, this%numerics%MinDepthFrc)
          ! On a checkpoint restart p,q are the SAVED conserved dispersive flux; keep
          ! them (the stepper derives u,v from p,q on stage 1).  Otherwise seed the
-         ! flux from the initial/loaded u,v as plain H*u.
+         ! flux from the initial/loaded u,v as plain H*u; stepper_init then adds
+         ! the initial-Ubar dispersion correction (parity ledger #1, now enabled).
          if (.not. this%hot_start%use_checkpoint) then
             f%p = f%h*f%u
             f%q = f%h*f%v
@@ -732,18 +733,27 @@ contains
 
    end subroutine model_run
 
-   subroutine output_monitor_step(this, t, dt)
+   subroutine output_monitor_step(this, t, dt, force)
       class(type_output_monitor), intent(inout) :: this
       real(SP), intent(in) :: t, dt
+      logical, intent(in), optional :: force
 
       integer :: unit
+      logical :: forced
 
-      call this%mgr%step(t, dt, this%registry, this%comm)
-      if (associated(this%stations)) call this%stations%update(t, dt)
-      ! legacy OUTPUT_TRACKING: loop-top, on the PLOT_COUNT_TRACKING cadence
-      if (associated(this%tracer)) call this%tracer%write_output(t, dt)
-      ! legacy OUTPUT_VESSEL: resistance time series on the PLOT_COUNT_VESSEL cadence
-      if (associated(this%vessel)) call this%vessel%write_output(t, dt)
+      forced = .false.
+      if (present(force)) forced = force
+
+      call this%mgr%step(t, dt, this%registry, this%comm, force=forced)
+      ! the forced final flush covers field frames only: stations flush
+      ! their residual via finish(), tracer/vessel keep their cadence
+      if (.not. forced) then
+         if (associated(this%stations)) call this%stations%update(t, dt)
+         ! legacy OUTPUT_TRACKING: loop-top, on the PLOT_COUNT_TRACKING cadence
+         if (associated(this%tracer)) call this%tracer%write_output(t, dt)
+         ! legacy OUTPUT_VESSEL: resistance time series on the PLOT_COUNT_VESSEL cadence
+         if (associated(this%vessel)) call this%vessel%write_output(t, dt)
+      end if
 
       ! Legacy PREVIEW appends "time dt" to time_dt.out (run dir, not
       ! result_folder) at every field-frame flush; io rank only here.
