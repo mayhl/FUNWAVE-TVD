@@ -37,9 +37,15 @@ class LocalProvider(BaseProvider):
     def submit(self, binary_path, input_file, work_dir, np=1) -> str:
         env = os.environ.copy()
         # Let the OS scheduler spread packed runs across the node instead of
-        # every launcher binding to the same low cores. OMPI_* -> OpenMPI/PRRTE,
-        # I_MPI_PIN -> Intel MPI; each is a no-op under the other launcher.
-        env.setdefault("OMPI_MCA_hwloc_base_binding_policy", "none")
+        # every launcher binding to the same low cores.  Each var is a no-op
+        # under the other launchers.  NOTE the OpenMPI 4 -> 5 rename: v5's
+        # PRRTE ignores the OMPI_MCA_hwloc_* form, so both spellings are set
+        # (missing PRTE_* left packed wheat runs core-stacked ~5x slow).
+        env.setdefault("OMPI_MCA_hwloc_base_binding_policy", "none")  # OpenMPI 4
+        env.setdefault("PRTE_MCA_hwloc_default_binding_policy", "none")  # OpenMPI 5
+        # :OVERSUBSCRIBE — PRRTE also ignores the v4 oversubscribe var and
+        # counts physical cores, not hwthreads, so np up to cpu_count needs it
+        env.setdefault("PRTE_MCA_rmaps_default_mapping_policy", "node:OVERSUBSCRIBE")  # v5 spread, not core-packed
         env.setdefault("OMPI_MCA_rmaps_base_oversubscribe", "1")
         env.setdefault("I_MPI_PIN", "0")
 
