@@ -135,6 +135,33 @@ simulations:
     tolerances:
       runup: { runup_error_pct: 15.0 }
 
+  # ── periodic runup: Carrier-Greenspan/Keller amplification, plane beach ──
+  # Monochromatic T = 10 s (kh ~ 0.2) over h = 1 m onto the 1/15 slope; for
+  # nonbreaking waves the maximum runup equals the LINEAR amplification of the
+  # incident amplitude (CG 1958).  The oracle integrates the linear SWE over
+  # the actual dep.out profile (RK4 flux form, matches the exact Bessel value
+  # to 4 decimals — no convention risk), measures the incident amplitude by
+  # lock-in demodulation + e^{+-ikx} split on the flat (raw min/max envelopes
+  # are bound-harmonic contaminated: 18% false fail at first light), and gates
+  # the steady shoreline peak against the linear prediction.  First light
+  # 2026-07-20: amplification 6.363, error 5.5%, CG breaking param 0.39,
+  # reflection 0.91; shoreline granularity dx*slope ~ 8% of R bounds the
+  # measurement, so 15% is a tripwire, not a discretization claim.  The steady
+  # incident amplitude is ~1.35x the deck value via beach-sponge cavity pumping
+  # (source itself calibrates to ~1%; the deck comment has the split).
+  - name: runup_cg
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/runup_2d
+    input_files: [cg_periodic.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, runup]
+    postprocess:
+      runup_cg: test.validation.oracles.runup_cg
+    tolerances:
+      runup_cg: { runup_amp_error_pct: 15.0 }
+
   # ── dispersion isotropy: oblique modes at fixed |k| across angles ────────
   # Square-basin standing modes (m_x, m_y) sharing m_x^2+m_y^2 = 25 -> one |k| (kh
   # ~ 1.57) at theta = 0/36.9/53.1/90 deg; (5,0) vs (0,5) is the x<->y symmetry
