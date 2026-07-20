@@ -205,6 +205,14 @@ class RegressionRunner(BaseRunner):
         input_dir = os.path.join(self.repo_root, sim["input"])
         for item in os.listdir(input_dir):
             src = os.path.join(input_dir, item)
+            # native-YAML deck stages verbatim (no legacy DT-strip / PX-PY
+            # rewrite — new-schema decks omit decomposition: for auto).
+            # ONLY the sim's own deck: metadata readers and oracles resolve
+            # the run deck as the single *.yaml in the run dir.
+            if os.path.isfile(src) and item.endswith(".yaml"):
+                if item == sim.get("input_file"):
+                    shutil.copy2(src, os.path.join(run_dir, item))
+                continue
             if os.path.isfile(src) and item.endswith(".txt"):
                 dst = os.path.join(run_dir, item)
                 edit_pxpy = decomp is not None and item == sim["input_file"]
