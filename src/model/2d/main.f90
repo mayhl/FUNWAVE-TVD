@@ -232,7 +232,8 @@ contains
       if (this%physics%viscosity_breaking) this%breaking%show_breaking = .true.
 
       call this%geometry%build_grid(this%env%comm, this%grid, &
-                                    periodic_y=this%physics%periodic)
+                                    periodic_y=this%physics%periodic, &
+                                    periodic_x=this%physics%periodic_x)
       call this%fields%alloc(this%grid)
       ! WAVEMAKER_VIS and the show-only display mode need nu_break/age
       ! too (legacy allocates the breaking arrays for all options since

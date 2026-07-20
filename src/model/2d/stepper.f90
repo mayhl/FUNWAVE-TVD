@@ -35,8 +35,8 @@ module model_stepper_2d_mod
    use core_grid_mod, only: type_grid_2d
    use core_env_mod, only: type_env
    use core_stepper_engine_mod, only: type_stepper_model
-   use core_solver_tridiag_mod, only: trid_x, trid_y, trid_y_periodic, &
-                                      type_trid_workspace
+   use core_solver_tridiag_mod, only: trid_x, trid_x_periodic, trid_y, &
+                                      trid_y_periodic, type_trid_workspace
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_bc_mod, only: type_model_bc
@@ -365,7 +365,8 @@ contains
       call this%ews%alloc(mloc, nloc)
       if (this%physics%dispersion) then
          call this%dws%alloc(mloc, nloc)
-         if (this%physics%periodic) call this%tws%alloc(mloc, nloc)
+         if (this%physics%periodic .or. this%physics%periodic_x) &
+            call this%tws%alloc(mloc, nloc)
       end if
 
       allocate (this%u0(mloc, nloc), source=0.0_SP)
@@ -723,8 +724,13 @@ contains
                                       f%mask, f%mask9, f%depth, f%h, f%p, &
                                       this%dws%vxy, this%dws%dvxy, &
                                       this%west_dirichlet, f%u, this%ews)
-            call trid_x(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
-                        this%ews%f)
+            if (phy%periodic_x) then
+               call trid_x_periodic(lp, this%grid, this%ews%a, this%ews%c, &
+                                    this%ews%d, this%tws, this%ews%f)
+            else
+               call trid_x(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
+                           this%ews%f)
+            end if
             f%u(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
 
             call cal_etauv_assemble_y(lp, phy%disp_time_left, phy%Gamma1, &
@@ -823,6 +829,9 @@ contains
          ! > 1) stay carried — the np=1 round-trip is the bitwise gate.
          if (phy%periodic .and. this%grid%ny_proc == 1) then
             this%fws%q(:, this%grid%lp%je + 1) = this%fws%q(:, this%grid%lp%jb)
+         end if
+         if (phy%periodic_x .and. this%grid%nx_proc == 1) then
+            this%fws%p(this%grid%lp%ie + 1, :) = this%fws%p(this%grid%lp%ib, :)
          end if
       end associate
 

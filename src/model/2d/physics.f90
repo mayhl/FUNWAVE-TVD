@@ -56,6 +56,7 @@ module model_physics_mod
    type, extends(type_model_base) :: type_model_physics
 
       logical  :: periodic = .false.   ! y-axis periodic (south-north wrap)
+      logical  :: periodic_x = .false. ! x-axis periodic (west-east wrap)
       logical  :: dispersion = .true.
       real(SP) :: Gamma1 = 1.0_SP
       real(SP) :: Gamma2 = 1.0_SP

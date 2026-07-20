@@ -60,30 +60,34 @@ module core_grid_mod
 
 contains
 
-   ! periodic_y: wrap the cart topology in y (legacy PERIODIC, south-north).
-   ! halo_exchange then fills y-ghosts across the wrap and no rank reports
-   ! a left/right boundary, so physical-BC ghost fills skip those faces.
-   subroutine setup(this, comm, create_partition, periodic_y)
+   ! periodic_y: wrap the cart topology in y (legacy PERIODIC, south-north);
+   ! periodic_x likewise for west-east.  halo_exchange then fills ghosts
+   ! across the wrap and no rank reports a boundary on the wrapped axis,
+   ! so physical-BC ghost fills skip those faces.
+   subroutine setup(this, comm, create_partition, periodic_y, periodic_x)
       class(type_grid_2d), intent(inout) :: this
       type(type_comm), intent(in)    :: comm
       logical, intent(in)    :: create_partition
       logical, optional, intent(in)    :: periodic_y
+      logical, optional, intent(in)    :: periodic_x
 
       integer, parameter :: n_dims = 2
       integer, dimension(n_dims) :: dims, coords
       logical, dimension(n_dims) :: periods
       integer :: ier
-      logical :: wrap_y
+      logical :: wrap_y, wrap_x
 
       wrap_y = .false.
       if (present(periodic_y)) wrap_y = periodic_y
+      wrap_x = .false.
+      if (present(periodic_x)) wrap_x = periodic_x
 
       if (create_partition) then
          call compute_optimal_grid_size(comm%size, this%M, this%N, this%nx_proc, this%ny_proc)
       end if
 
       dims = [this%nx_proc, this%ny_proc]
-      periods = [.false., wrap_y]
+      periods = [wrap_x, wrap_y]
 
       ! Create Cart topology from the caller's comm without mutating it.
       ! reorder=.false. guarantees Cart ranks == caller ranks, so comm%rank_id

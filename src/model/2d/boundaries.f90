@@ -8,7 +8,7 @@
 !  physics periodic stop-gap used to read).
 !
 !  YAML block: boundaries:       (top-level; omit for all-wall)
-!    periodic: [y]               axis-level list (x pending trid_x_periodic)
+!    periodic: [y]               axis-level list, x and/or y
 !    relaxation_cells: <int>     forcing relaxation-strip width in cells,
 !                                default 30 (nee WaveMakerPointNum)
 !    west: / east: / south: / north:
@@ -127,8 +127,7 @@ contains
             case ("y")
                physics%periodic = .true.
             case ("x")
-               call env%log%exit_on_error( &
-                  "boundaries/periodic: x is pending trid_x_periodic")
+               physics%periodic_x = .true.
             case default
                call env%log%exit_on_error( &
                   "boundaries/periodic: expected axis labels x and/or y")
@@ -144,7 +143,8 @@ contains
          face_yaml = bnd_env%yaml%cast_dictionary(trim(FACE_KEY(f)), no_face)
          if (no_face) cycle
 
-         if (physics%periodic .and. (f == FACE_S .or. f == FACE_N)) &
+         if ((physics%periodic .and. (f == FACE_S .or. f == FACE_N)) .or. &
+             (physics%periodic_x .and. (f == FACE_W .or. f == FACE_E))) &
             call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
                                        ": face block on a periodic axis")
 

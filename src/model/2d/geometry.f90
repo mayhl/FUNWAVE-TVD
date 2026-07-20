@@ -201,11 +201,12 @@ contains
    ! Config validity is checked at read_input; the guards here are
    ! unimplemented-feature stops, not user-error handling.
    ! ----------------------------------------------------------------
-   subroutine geometry_build_grid(this, comm, grid, periodic_y)
+   subroutine geometry_build_grid(this, comm, grid, periodic_y, periodic_x)
       class(type_model_geometry), intent(in)    :: this
       type(type_comm), intent(in)    :: comm
       type(type_grid_2d), intent(inout) :: grid
       logical, intent(in)    :: periodic_y
+      logical, intent(in), optional :: periodic_x
 
       logical :: create_partition
 
@@ -231,7 +232,13 @@ contains
          grid%ny_proc = this%ny_proc
       end if
 
-      call grid%setup(comm, create_partition, periodic_y=periodic_y)
+      block
+         logical :: wrap_x
+         wrap_x = .false.
+         if (present(periodic_x)) wrap_x = periodic_x
+         call grid%setup(comm, create_partition, periodic_y=periodic_y, &
+                         periodic_x=wrap_x)
+      end block
       call grid%init_spacing(this%dx, this%dy, this%x0, this%y0)
 
    end subroutine geometry_build_grid
