@@ -218,9 +218,36 @@ contains
       real(SP), intent(inout) :: f(:, :)
       real(SP), intent(in) :: sign_x, sign_y
 
+      integer :: j, k, ng
+
       call grid%halo_exchange(f)
       call fill_ghost_wall(grid%lp, this%fill_west, this%fill_east, &
                            this%fill_south, this%fill_north, sign_x, sign_y, f)
+
+      ! Corner repair (ledger 18b/18c class): the wall mirror sweeps
+      ! interior rows only, while halo phase 2 shipped the PRE-mirror
+      ! x-ghost columns into the y-ghost rows — so the corner blocks
+      ! held one-exchange-behind history.  Re-mirroring x-walls over
+      ! ALL rows rewrites interior rows bitwise-identical and leaves
+      ! corners = mirror(wrap(interior)), a pure function of the
+      ! interior (checkpoint-restart reproducible).
+      associate (lp => grid%lp)
+         ng = lp%ib - 1
+         if (this%fill_west) then
+            do j = 1, lp%nloc
+               do k = 1, ng
+                  f(k, j) = sign_x*f(2*ng + 1 - k, j)
+               end do
+            end do
+         end if
+         if (this%fill_east) then
+            do j = 1, lp%nloc
+               do k = 1, ng
+                  f(lp%ie + k, j) = sign_x*f(lp%ie - k + 1, j)
+               end do
+            end do
+         end if
+      end associate
 
    end subroutine exchange_one
 

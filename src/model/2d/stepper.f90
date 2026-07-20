@@ -761,6 +761,20 @@ contains
                            num%MinDepthFrc, phy%SWE_ETA_DEP, &
                            phy%viscosity_breaking)
 
+         ! 18c quirk-drop, honouring the kernel_masks caller contract:
+         ! update_mask9 is interior-only, and nothing since init refreshed
+         ! the seam/periodic ghost ring the derivative stencils read — it
+         ! sat stale (history at seams, init values under periodic-y).
+         ! Ride the real-copy halo exchange so the ring is a pure function
+         ! of the interior; wall ghosts keep their well-defined zeros
+         ! (halo_exchange fills seams and wraps only, ledger 8c intact).
+         block
+            real(SP), allocatable :: rmask(:, :)
+            allocate (rmask, source=real(f%mask9, SP))
+            call this%grid%halo_exchange(rmask)
+            f%mask9 = nint(rmask)
+         end block
+
       end associate
 
    end subroutine stepper_sync_from_flux
@@ -784,6 +798,31 @@ contains
          if (this%subgrid%is_activated) then
             call this%subgrid%update(f%eta)
             call this%subgrid%apply_h(f%h)
+         end if
+
+         ! mask9 rebuild (18c): update_mask9 is a pure function of the
+         ! loaded eta/depth/mask — re-running it reproduces the interior
+         ! verbatim (incl. the SWE_ETA_DEP zeroing) AND the ring-1 ghost
+         ! writes the continuous run carries but the interior checkpoint
+         ! misses; the ring exchange then matches the sync_from_flux tail
+         call update_mask9(this%grid%lp, f%eta, f%depth, f%mask, f%mask9, &
+                           this%numerics%MinDepthFrc, phy%SWE_ETA_DEP, &
+                           phy%viscosity_breaking)
+         block
+            real(SP), allocatable :: rmask(:, :)
+            allocate (rmask, source=real(f%mask9, SP))
+            call this%grid%halo_exchange(rmask)
+            f%mask9 = nint(rmask)
+         end block
+
+         ! carried fws face restore (18c): the first stage's etat reads the
+         ! interface flux one row past the interior, which the interior-only
+         ! checkpoint misses.  Under periodic-y the je+1 face IS the jb face
+         ! (wrapped reconstruction, bitwise), so wrap it back; wall faces are
+         ! flux-BC zeros and match the allocation.  MPI-seam faces (ny_proc
+         ! > 1) stay carried — the np=1 round-trip is the bitwise gate.
+         if (phy%periodic .and. this%grid%ny_proc == 1) then
+            this%fws%q(:, this%grid%lp%je + 1) = this%fws%q(:, this%grid%lp%jb)
          end if
       end associate
 
@@ -1013,6 +1052,11 @@ contains
                                     g%is_right_boundary, g%is_left_boundary, &
                                     this%etat, this%ut, this%vt, this%etax, &
                                     this%etay)
+         ! 18c quirk-drop: etat's ghost ring used to inherit the CARRIED
+         ! fws ghost faces (one-exchange-behind, history-dependent — a
+         ! checkpoint restart cannot reproduce it); exchange so ghost
+         ! etat = exchange(interior), same ring continuous or restarted
+         call this%bc%exchange_scalar(g, this%etat)
          call this%bc%exchange_dispersion(g, phy%Gamma2, this%dws, this%ut, &
                                           this%vt, this%etax, this%etay)
          call cal_dispersion_assemble(lp, this%dws, f%eta, f%depth, f%u, f%v, &

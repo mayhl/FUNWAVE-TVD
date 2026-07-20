@@ -230,10 +230,10 @@ simulations:
   # A continuous run (0->T) and a checkpoint+restart pair (0->T/2, then restart
   # T/2->T) must leave the same end-of-run core.bin. Both legs run the dev binary
   # and the two core.bin files are self-compared (test.regression.postproc.checkpoint_compare).
-  # NSWE is exactly bitwise (tol 0). Boussinesq carries a ~1e-7 interior residual
-  # propagated from the one-exchange-behind ghost — 200x below legacy's 2e-5
-  # self-noise — so its fields tolerate 1e-5 while the integer masks stay exact.
-  # decomp pinned [1,1]: the round-trip requires a fixed decomposition.
+  # Both are exactly bitwise (tol 0): the Boussinesq ~1e-7 ghost residual closed
+  # with the ledger-18c quirk-drop (etat + mask9 ring = exchange(interior)).
+  # decomp pinned [1,1]: the round-trip requires a fixed decomposition, and the
+  # bitwise claim is np=1 — MPI-seam fws faces are still carried, not restored.
   - name: hotstart_bouss
     test_type: self_consistency
     exe_type: central
@@ -245,7 +245,7 @@ simulations:
     postprocess:
       field: test.regression.postproc.checkpoint_compare
     tolerances:
-      field: { default: 1.0e-5, mask: 0.0, mask9: 0.0 }
+      field: { default: 0.0, mask: 0.0, mask9: 0.0 }
 
   - name: hotstart_nswe
     test_type: self_consistency
