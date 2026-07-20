@@ -891,13 +891,22 @@ class RegressionRunner(BaseRunner):
             )
             base = Path(self.repo_root) / "workspaces" / "regression_report"
             want_pdf = pdf or any_failed
+            pdf_path = None
             with Progress(
                 SpinnerColumn(), TextColumn("[progress.description]{task.description}"), TimeElapsedColumn(), transient=True
             ) as progress:
                 progress.add_task("  Generating report...", total=None)
                 html_path = generate_html_report(sim_results, meta, base.with_suffix(".html"))
                 if want_pdf:
-                    pdf_path = generate_pdf_report(sim_results, meta, base.with_suffix(".pdf"))
+                    try:
+                        pdf_path = generate_pdf_report(sim_results, meta, base.with_suffix(".pdf"))
+                    except Exception as exc:
+                        # PDF rendering (WeasyPrint) is best-effort: headless HPC nodes
+                        # lack a compatible libpango, so a render failure must degrade
+                        # to "no PDF" instead of crashing the board (which -- since a
+                        # failing test forces want_pdf -- would bury the results under a
+                        # traceback).  HTML report and pass/fail are unaffected.
+                        self.reporter.info(f"PDF report skipped (render failed: {exc})")
             self.reporter.info(f"HTML report: file://{html_path}")
-            if want_pdf:
+            if pdf_path is not None:
                 self.reporter.info(f"PDF  report: {pdf_path}")
