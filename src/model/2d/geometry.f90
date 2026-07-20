@@ -259,7 +259,7 @@ contains
       type(type_grid_2d), intent(in)    :: grid
       real(SP), intent(inout) :: depth(:, :), depth_x(:, :), depth_y(:, :)
 
-      integer :: i, j, gi, i_slp
+      integer :: i, j, k, ng, gi, i_slp
 
       associate (lp => grid%lp)
 
@@ -289,6 +289,28 @@ contains
          call fill_ghost_wall(lp, grid%is_back_boundary, grid%is_shore_boundary, &
                               grid%is_right_boundary, grid%is_left_boundary, &
                               SIGN_MIRROR, SIGN_MIRROR, depth)
+
+         ! Re-mirroring x-walls over ALL rows (ledger 18b corner hygiene):
+         ! the wall fill above sweeps interior rows only, and halo_exchange
+         ! phase 2 shipped the then-zero x-ghost columns into the y-seam/
+         ! periodic corner blocks -- interior rows rewrite bitwise-identical,
+         ! the corner blocks become exchange-then-mirror well-defined.
+         ! Init-only: per-step BC calls keep the legacy PHI_COLL order.
+         ng = lp%ib - 1
+         if (grid%is_back_boundary) then
+            do j = 1, lp%nloc
+               do k = 1, ng
+                  depth(k, j) = depth(2*ng + 1 - k, j)
+               end do
+            end do
+         end if
+         if (grid%is_shore_boundary) then
+            do j = 1, lp%nloc
+               do k = 1, ng
+                  depth(lp%ie + k, j) = depth(lp%ie - k + 1, j)
+               end do
+            end do
+         end if
 
          call stagger_depth(lp, depth, depth_x, depth_y)
 
