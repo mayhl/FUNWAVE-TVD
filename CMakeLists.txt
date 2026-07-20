@@ -100,18 +100,23 @@ if(NOT ENABLE_DEV_MODE)
     ${exe_name} PRIVATE "${CMAKE_BINARY_DIR}/modules"
                         "${CMAKE_BINARY_DIR}/modules/model")
   target_compile_definitions(${exe_name} PRIVATE ${MODULE_FLAGS})
-  target_link_libraries(${exe_name} PRIVATE ${main_lib})
   # Intel needs linker_language Fortran else error "undefined reference to
   # `main'"
   set_property(TARGET ${exe_name} PROPERTY LINKER_LANGUAGE Fortran)
-  # Link the 3D shared library when available (built by
-  # src/model/3d/CMakeLists.txt when HYPRE is found).  Transitional scaffolding
-  # — remove together with funwave_3d when MODULE GLOBAL is replaced by the
-  # typed framework.
+  # Link the 3D static library when available (built by src/model/3d/CMakeLists
+  # .txt when HYPRE is found).  funwave_3d and the model lib are mutually
+  # dependent — model_3d.f90 calls funwave_3d's bridge entries, funwave_3d calls
+  # back into model/core — so a rescan group (--start-group/--end-group) lets ld
+  # close the static cycle.  Transitional scaffolding, retires with funwave_3d.
   if(TARGET funwave_3d)
-    target_link_libraries(${exe_name} PRIVATE funwave_3d)
+    target_link_libraries(
+      ${exe_name}
+      PRIVATE
+        "$<LINK_GROUP:RESCAN,${main_lib}_model,${main_lib}_core,funwave_3d>")
     target_include_directories(${exe_name}
                                PRIVATE "${CMAKE_BINARY_DIR}/modules/3d_old")
+  else()
+    target_link_libraries(${exe_name} PRIVATE ${main_lib})
   endif()
 endif()
 

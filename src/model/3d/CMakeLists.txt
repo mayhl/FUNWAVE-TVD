@@ -62,20 +62,23 @@ add_executable(
   old/master.F)
 
 # ==============================================================================
-# TRANSITIONAL SCAFFOLDING — funwave_3d shared library
+# TRANSITIONAL SCAFFOLDING — funwave_3d static library
 # ---------------------------------------------------------------------------
-# The 3D legacy sources (old/*.F) define MODULE GLOBAL, PARAM, INPUT_READ which
-# conflict with identically-named modules in the 2D old sources.  To allow both
-# to coexist in the unified "funwave" binary we build the 3D old sources as a
-# hidden shared library that exposes only the 9 entry-point symbols the wrapper
-# (model_3d.f90) needs to call.
+# The 3D legacy sources (old/*.F) as a static library the unified "funwave"
+# binary links via the model_3d.f90 wrapper (bridge.F entry points).
 #
-# Remove this target (and bridge.F, exports_macos.txt, exports_linux.map) once
-# MODULE GLOBAL is replaced by the new type_model_3d typed framework and the 3D
-# physics no longer rely on global module state.
+# Formerly a symbol-hidden SHARED library: the 3D old sources define MODULE
+# GLOBAL/PARAM/INPUT_READ, which once clashed with identically-named modules in
+# the 2D old sources in the same binary.  The 2D path is now fully typed (no old
+# modules survive), so the clash is gone and a plain static lib suffices — no
+# -shared, no visibility hiding, no export maps (their attendant x86-64 Linux
+# PIC / version-script / MPI-wrapper grief goes with them).
+#
+# Retire this target (and bridge.F) once the 3D physics move to the typed
+# type_model_3d framework and no longer rely on global module state.
 # ==============================================================================
 add_library(
-  funwave_3d SHARED
+  funwave_3d STATIC
   old/mod_param.F
   old/mod_global.F
   old/mod_input.F
@@ -102,20 +105,6 @@ target_include_directories(
 
 target_link_libraries(funwave_3d PRIVATE HYPRE::HYPRE MPI::MPI_Fortran
                                          ${main_lib}_model ${main_lib}_core)
-
-# Hide all symbols by default; expose only the 9 entry points via platform
-# export lists.  (Transitional scaffolding — see comment block above.)
-if(APPLE)
-  target_link_options(
-    funwave_3d PRIVATE
-    "-Wl,-exported_symbols_list,${CMAKE_CURRENT_SOURCE_DIR}/exports_macos.txt"
-    "-fvisibility=hidden")
-else()
-  target_link_options(
-    funwave_3d PRIVATE
-    "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/exports_linux.map")
-  target_compile_options(funwave_3d PRIVATE -fvisibility=hidden)
-endif()
 
 if(USE_VESSEL)
   target_sources(full_dispersion PRIVATE old/mod_vessel.F)
