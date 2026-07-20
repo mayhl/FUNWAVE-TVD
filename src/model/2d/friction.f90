@@ -152,7 +152,7 @@ contains
 
       if (.not. this%is_activated .or. .not. this%manning) return
 
-      ! TODO: spatially varying Manning n (friction_matrix=YES) needs a
+      ! FUTURE: spatially varying Manning n (friction_matrix=YES) needs a
       ! separate n_raw(:,:) array populated from cd_file in init_compute.
       do j = 1, size(this%Cd, 2)
          do i = 1, size(this%Cd, 1)
