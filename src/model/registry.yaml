@@ -220,7 +220,7 @@ sections:
         legacy: PERIODIC
         default: ~
         units: ~
-        doc: "Axis-level periodic pair list (e.g. [y]); x pending trid_x_periodic."
+        doc: "Axis-level periodic pair list, x and/or y (e.g. [y] or [x, y])."
       relaxation_cells:
         legacy: WaveMakerPointNum
         default: 30
@@ -388,6 +388,8 @@ sections:
       solitary.depth: {legacy: DEP_SOLI, default: 0.0, units: m, latex: $d$, doc: Solitary-wave still-water depth.}
       solitary.direction: {legacy: SolitaryPositiveDirection, default: +x, units: ~, values: [+x, -x, +y, -y], doc: Solitary-wave propagation direction.}
       solitary.x_center: {legacy: XWAVEMAKER, default: 0.0, units: m, doc: Solitary-wave initial crest x.}
+      solitary.angle: {legacy: ~, default: ~, units: deg, latex: $\theta$, doc: Oblique crest angle from +x (presence selects the doubly-periodic tiled train; excludes direction).}
+      solitary.y_center: {legacy: ~, default: 0.0, units: m, doc: Solitary-wave initial crest y (angle only).}
 
   # ── physics ──
   physics:

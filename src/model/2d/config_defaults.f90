@@ -67,6 +67,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_INITIAL_SOLITARY_DEPTH = "0.0"
    character(*), parameter :: DEF_INITIAL_SOLITARY_DIRECTION = "+x"
    character(*), parameter :: DEF_INITIAL_SOLITARY_X_CENTER = "0.0"
+   character(*), parameter :: DEF_INITIAL_SOLITARY_Y_CENTER = "0.0"
    character(*), parameter :: DEF_INITIAL_WATER_LEVEL = "0.0"
    ! ── meteo ──
    character(*), parameter :: DEF_METEO_HOLLAND_AIR_PRESSURE = "NO"

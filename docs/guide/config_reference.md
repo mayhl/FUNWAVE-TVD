@@ -71,7 +71,7 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `periodic` | — | `PERIODIC` | — | Axis-level periodic pair list (e.g. [y]); x pending trid_x_periodic. |
+| `periodic` | — | `PERIODIC` | — | Axis-level periodic pair list, x and/or y (e.g. [y] or [x, y]). |
 | `relaxation_cells` | `30` | `WaveMakerPointNum` | — | Width in cells of the forcing relaxation strip. |
 
 ### Per-face keys (`west:` / `east:` / `south:` / `north:`)
@@ -163,6 +163,8 @@ Initial condition — block presence selects the type (solitary/sine_mode/hump/n
 | `solitary.depth` | `0.0` | `DEP_SOLI` | m | Solitary-wave still-water depth. |
 | `solitary.direction` | `+x` | `SolitaryPositiveDirection` | — | Solitary-wave propagation direction. One of `+x` \| `-x` \| `+y` \| `-y`. |
 | `solitary.x_center` | `0.0` | `XWAVEMAKER` | m | Solitary-wave initial crest x. |
+| `solitary.angle` | — | — | deg | Oblique crest angle from +x (presence selects the doubly-periodic tiled train; excludes direction). |
+| `solitary.y_center` | `0.0` | — | m | Solitary-wave initial crest y (angle only). |
 
 ## `physics:`
 

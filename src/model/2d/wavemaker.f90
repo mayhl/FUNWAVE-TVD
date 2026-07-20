@@ -75,6 +75,7 @@ module model_wavemaker_mod
                                         DEF_INITIAL_SOLITARY_DEPTH, &
                                         DEF_INITIAL_SOLITARY_DIRECTION, &
                                         DEF_INITIAL_SOLITARY_X_CENTER, &
+                                        DEF_INITIAL_SOLITARY_Y_CENTER, &
                                         DEF_INITIAL_WATER_LEVEL, &
                                         DEF_WAVEMAKER_SOURCE_DELTA, &
                                         DEF_WAVEMAKER_SOURCE_DEPTH, &
@@ -137,6 +138,13 @@ module model_wavemaker_mod
       real(SP) :: LAG_SOLI = 0.0_SP   ! YAML key: LAGTIME
       real(SP) :: XWAVEMAKER = 0.0_SP
       logical  :: SolitaryPositiveDirection = .true.
+      ! Oblique solitary (angle: present): crest angle from +x and the crest
+      ! line's y anchor.  The doubly-periodic tiled-train IC evaluates the
+      ! profile at the wrapped phase, so the box must tile: Lx cos = p*P,
+      ! Ly sin = q*P (checked at apply_ic).  angle < 0 sentinel = straight
+      ! legacy path.
+      real(SP) :: solitary_angle = -1.0_SP  ! degrees
+      real(SP) :: solitary_yc = 0.0_SP
 
       ! Standing wave — INI_SINE.  Basin-mode numbers along x and y; the
       ! default (1, 0) is the 1D fundamental seiche, mode_y >= 1 gives an
@@ -518,6 +526,21 @@ contains
             call env%log%exit_on_error( &
                "initial/solitary/direction: expected +x or -x")
          end select
+         ! oblique tiled-train variant — presence-selected; read into a
+         ! temp so a missing key preserves the -1 straight-path sentinel
+         block
+            real(SP) :: tmp_ang
+            call blk_yaml%read("angle", silent=no_key, val=tmp_ang)
+            if (.not. no_key) then
+               if (tmp_ang <= 0.0_SP .or. tmp_ang >= 90.0_SP) &
+                  call env%log%exit_on_error( &
+                  "initial/solitary/angle: expected 0 < angle < 90 deg")
+               this%solitary_angle = tmp_ang
+               call blk_yaml%read("y_center", silent=no_key, &
+                                  val=this%solitary_yc, &
+                                  default=DEF_INITIAL_SOLITARY_Y_CENTER)
+            end if
+         end block
       end if
 
       blk_yaml = ini_env%yaml%cast_dictionary("sine_mode", no_blk)
@@ -1916,6 +1939,43 @@ contains
       if (this%wavemaker_type /= "INI_SOLITARY") return
 
       call solitary_coefficients(this%AMP_SOLI, this%DEP_SOLI, c_ph, b, a1, a2, au)
+
+      ! Oblique tiled train (angle: present): the profile is evaluated at the
+      ! wrapped phase $\xi \bmod P$ along $\hat{k} = (\cos\theta, \sin\theta)$,
+      ! so the doubly-periodic box holds an exact train of parallel crests
+      ! with spacing $P$.  Well-posed only when the box tiles the crest line:
+      !   $$ L_x \cos\theta = p\,P, \qquad L_y \sin\theta = q\,P $$
+      ! (integers p, q >= 1) — e.g. a square box at 45 deg (p = q = 1).
+      ! Physical cell-centre coordinates here (the legacy index form is a
+      ! straight-crest quirk kept on the angle-absent path only).
+      if (this%solitary_angle > 0.0_SP) then
+         block
+            real(SP) :: cth, sth, per, qreal, xi, xg, yg
+            cth = cos(this%solitary_angle*DEG2RAD)
+            sth = sin(this%solitary_angle*DEG2RAD)
+            per = real(grid%M, SP)*grid%dx0*cth
+            qreal = real(grid%N, SP)*grid%dy0*sth/per
+            if (abs(qreal - real(nint(qreal), SP)) > 1.0e-4_SP .or. &
+                nint(qreal) < 1) then
+               error stop "initial/solitary/angle: box does not tile the"// &
+                  " oblique crest — need Lx*cos(angle) = p*P and"// &
+                  " Ly*sin(angle) = q*P (e.g. a square box at 45 deg)"
+            end if
+            do j = 1, grid%lp%nloc
+               do i = 1, grid%lp%mloc
+                  xg = (real(grid%ibegin + i - grid%lp%ib, SP) - 0.5_SP)*grid%dx0
+                  yg = (real(grid%jbegin + j - grid%lp%jb, SP) - 0.5_SP)*grid%dy0
+                  xi = (xg - this%XWAVEMAKER)*cth + (yg - this%solitary_yc)*sth
+                  xi = modulo(xi + 0.5_SP*per, per) - 0.5_SP*per
+                  sc = 1.0_SP/cosh(b*xi)
+                  eta(i, j) = a1*sc*sc + a2*sc*sc*sc*sc
+                  u(i, j) = au*sc*sc*cth
+                  v(i, j) = au*sc*sc*sth
+               end do
+            end do
+         end block
+         return
+      end if
 
       usign = 1.0_SP
       if (.not. this%SolitaryPositiveDirection) usign = -1.0_SP
