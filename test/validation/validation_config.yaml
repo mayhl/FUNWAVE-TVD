@@ -81,18 +81,22 @@ simulations:
   # form).  Measured 2026-07-20 at first light: celerity 0.0024 %, amplitude
   # 0.0069 %, shape 2.4 % (the shed dispersive tail wrapping the domain
   # dominates the L2 — the crest itself is permanent to ~1e-4).
+  # np_sweep: the same deck at several rank counts; the runner aggregates a
+  # decomp-invariance gate (metric spread across np vs sweep_tolerances) on
+  # top of the per-np physics gates.  Periodic-x seams stress the x-halo path.
   - name: soliton_2d
     exe_type: validation-2d
-    np: 2
+    np_sweep: [1, 2, 8]
     input: test/validation/inputs/soliton_2d
     input_files: [soliton_x.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, soliton]
+    tags: [validation, 2d, soliton, sweep]
     postprocess:
       soliton: test.validation.oracles.soliton
     tolerances:
       soliton: { celerity_error_pct: 1.0, amplitude_decay_pct: 1.0, shape_error_pct: 5.0 }
+    sweep_tolerances: { celerity_error_pct: 0.05, amplitude_decay_pct: 0.1, shape_error_pct: 1.0 }
 
   # ── oblique tiled train: 45-deg crest, doubly periodic square box ────────
   # Full 2D path (nonzero v, both periodic tridiagonals).  Crest metrics stay
@@ -100,18 +104,22 @@ simulations:
   # gate is looser than the flume's because the 2D adjustment radiation wraps
   # the closed box and sits under the row-profile L2 (7.5 % measured) — it is
   # a radiation-noise bound, not a crest-permanence bound.
+  # Flagship decomp sweep: square doubly-periodic domain factorizes to real
+  # 2D decompositions (1x1 / 2x2 / 4x4 / 8x8), exercising both halo axes +
+  # corners; the np=64 variant needs the HPC rank pool (skipped locally).
   - name: soliton_oblique
     exe_type: validation-2d
-    np: 4
+    np_sweep: [1, 4, 16, 64]
     input: test/validation/inputs/soliton_2d
     input_files: [soliton_oblique.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, soliton]
+    tags: [validation, 2d, soliton, sweep]
     postprocess:
       soliton: test.validation.oracles.soliton
     tolerances:
       soliton: { celerity_error_pct: 1.0, amplitude_decay_pct: 2.0, shape_error_pct: 10.0 }
+    sweep_tolerances: { celerity_error_pct: 0.05, amplitude_decay_pct: 0.2, shape_error_pct: 1.0 }
 
   # ── solitary runup: Synolakis nonbreaking canonical case ─────────────────
   # H/h = 0.019 on the cot(beta) = 19.85 beach vs the asymptotic NSWE runup
@@ -122,18 +130,22 @@ simulations:
   # FUNWAVE-TVD's standing distance from the asymptotic law (lab data scatter
   # below it too), not a modern-side swash regression.  The 15 % law-referenced
   # gate is the drift tripwire around that documented behaviour.
+  # Swept for the wet/dry front crossing x-rank seams; the runup metric moves
+  # in front-cell quanta (~dx*slope ~ 0.6 % of the law here), so its sweep
+  # tolerance allows a couple of quanta, not roundoff.
   - name: runup_synolakis
     exe_type: validation-2d
-    np: 2
+    np_sweep: [1, 2, 4]
     input: test/validation/inputs/runup_2d
     input_files: [synolakis_nb.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, runup]
+    tags: [validation, 2d, runup, sweep]
     postprocess:
       runup: test.validation.oracles.runup
     tolerances:
       runup: { runup_error_pct: 15.0 }
+    sweep_tolerances: { runup_error_pct: 2.0 }
 
   # ── periodic runup: Carrier-Greenspan/Keller amplification, plane beach ──
   # Monochromatic T = 10 s (kh ~ 0.2) over h = 1 m onto the 1/15 slope; for

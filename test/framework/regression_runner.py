@@ -26,7 +26,7 @@ from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 from test.framework.base_runner import BaseRunner
 from test.framework.workspace_utils import get_build_path
-from test.framework.results import SimResult, SubsectionResult
+from test.framework.results import MetricResult, SimResult, SubsectionResult
 from test.framework.html_report import generate as generate_html_report, generate_pdf as generate_pdf_report, ReportMeta
 
 STAMP_FILE = ".build_stamp"
@@ -196,7 +196,20 @@ class RegressionRunner(BaseRunner):
                     expanded.append(s)
             else:
                 expanded.append(sim)
-        return expanded
+        # decomp sweep: one variant per rank count; the group is aggregated
+        # post-run into a spread-across-np invariance gate (_sweep_results)
+        swept = []
+        for sim in expanded:
+            if "np_sweep" not in sim:
+                swept.append(sim)
+                continue
+            for np_want in sim["np_sweep"]:
+                s = {k: v for k, v in sim.items() if k != "np_sweep"}
+                s["np_pin"] = int(np_want)
+                s["sweep_group"] = sim["name"]
+                s["name"] = f"{sim['name']}_np{np_want}"
+                swept.append(s)
+        return swept
 
     def _setup_run_dir(self, sim, run_dir, fixed_dt=False, decomp=None):
         os.makedirs(run_dir, exist_ok=True)
@@ -363,7 +376,15 @@ class RegressionRunner(BaseRunner):
 
     @staticmethod
     def _grid_cells(input_path) -> tuple[int, int, int] | None:
-        """Parse (Mglob, Nglob, Kglob) from a legacy input .txt; Kglob=1 if absent (2D)."""
+        """Parse (Mglob, Nglob, Kglob) from a legacy .txt or a native YAML deck; Kglob=1 if absent (2D)."""
+        if str(input_path).endswith(".yaml"):
+            try:
+                with open(input_path) as f:
+                    cfg = yaml.safe_load(f)
+                gs = cfg["grid"]["grid_size"]
+            except (OSError, KeyError, TypeError, yaml.YAMLError):
+                return None
+            return int(gs[0]), int(gs[1]), int(gs[2]) if len(gs) > 2 else 1
         try:
             text = open(input_path).read()
         except OSError:
@@ -436,7 +457,12 @@ class RegressionRunner(BaseRunner):
         if grid is None:
             return 1, 1, (1, 1)
         m, n, _k = grid
-        target_np = max(1, round(math.sqrt(m * n) / self._np_K))
+        # sweep variants pin the rank count (not the decomposition — the
+        # factorization stays aspect-optimal so it matches what a production
+        # run at that -np would use); collapse below the pin surfaces via the
+        # capped-np warning, declared_np = the pin
+        pin = sim.get("np_pin")
+        target_np = int(pin) if pin else max(1, round(math.sqrt(m * n) / self._np_K))
         px, py = self._factor_decomp(min(target_np, budget), m, n)
         return px * py, target_np, (px, py)
 
@@ -795,6 +821,91 @@ class RegressionRunner(BaseRunner):
             self.reporter.warn(result_line)
         return result
 
+    def _sweep_results(self, simulations, sim_results, verbose: bool) -> list[SimResult]:
+        """Aggregate np_sweep variant groups into decomp-invariance results.
+
+        For each sweep group, every oracle metric gated in ALL variants is
+        compared across rank counts: the spread max-min must sit inside the
+        sim's `sweep_tolerances: {stat: tol}` entry (same units as the metric,
+        usually percentage points). Metrics without a sweep tolerance are
+        reported as ungated diagnostics. This gates decomp-INVARIANCE of the
+        physics, not run-to-run bitwise — the proven bug class is a rank seam
+        shifting a physical metric, not roundoff.
+        """
+        groups: dict[str, list[dict]] = {}
+        for sim in simulations:
+            if sim.get("sweep_group"):
+                groups.setdefault(sim["sweep_group"], []).append(sim)
+        by_name = {r.name: r for r in sim_results}
+
+        out = []
+        for group, sims in groups.items():
+            sweep_tol = sims[0].get("sweep_tolerances", {})
+            per_np: list[tuple[int, SimResult]] = []
+            broken = []
+            for s in sims:
+                r = by_name.get(s["name"])
+                if r is None or r.status in ("SIM_FAILED", "POSTPROCESS_ERROR"):
+                    broken.append(s["name"])
+                else:
+                    per_np.append((s["np_pin"], r))
+            name = f"{group}_sweep"
+            if broken or len(per_np) < 2:
+                out.append(SimResult(name=name, status="SIM_FAILED",
+                                     notes=f"sweep incomplete: {', '.join(broken) or 'fewer than 2 variants'}"))
+                self.reporter.error(f"  \\[{name}]  [bold red]✗ SWEEP INCOMPLETE[/bold red]")
+                continue
+
+            # values per (variable, stat) across np, gated metrics only
+            series: dict[tuple[str, str], dict[int, float]] = {}
+            for np_val, r in per_np:
+                for sub in r.subsections:
+                    for m in sub.metrics:
+                        if math.isfinite(m.tolerance):
+                            series.setdefault((m.variable, m.stat), {})[np_val] = m.value
+
+            nps = sorted(np for np, _ in per_np)
+            metrics = []
+            rows = []
+            for (var, stat), vals in sorted(series.items()):
+                if len(vals) != len(nps):
+                    continue  # metric missing in some variant (e.g. skipped frames)
+                spread = max(vals.values()) - min(vals.values())
+                tol = sweep_tol.get(stat, math.inf)
+                ok = spread <= tol
+                metrics.append(MetricResult(var, f"{stat}_spread", spread, ok, tol))
+                rows.append((stat, vals, spread, tol, ok))
+
+            sub = SubsectionResult(kind="statistics", label="Decomp sweep", metrics=metrics)
+            status = "PASS" if all(m.passed for m in metrics if math.isfinite(m.tolerance)) else "FAIL"
+            res = SimResult(name=name, status=status, subsections=[sub])
+            out.append(res)
+
+            if verbose or status == "FAIL":
+                table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", show_edge=False,
+                              pad_edge=True, title=f"[bold]Decomp Sweep ({group})[/bold]",
+                              title_justify="left")
+                table.add_column("Metric", min_width=20)
+                for np_val in nps:
+                    table.add_column(f"np={np_val}", justify="right")
+                table.add_column("Spread", justify="right")
+                table.add_column("Tol", justify="right")
+                table.add_column("", min_width=8)
+                for stat, vals, spread, tol, ok in rows:
+                    icon = "[green]✓[/green]" if ok else "[bold red]✗[/bold red]"
+                    if not math.isfinite(tol):
+                        icon, tol_s = "[dim]—[/dim]", "[dim]—[/dim]"
+                    else:
+                        tol_s = f"{tol:.4g}"
+                    table.add_row(stat, *[f"{vals[np_val]:.5g}" for np_val in nps],
+                                  f"{spread:.4g}", tol_s, icon)
+                self.reporter.console.print(table)
+
+            icon = "[bold green]✓ PASS[/bold green]" if status == "PASS" else "[bold red]✗ FAIL[/bold red]"
+            line = f"  \\[{name}]  {icon}  [dim]statistics: {sub.summary}[/dim]"
+            (self.reporter.success if status == "PASS" else self.reporter.warn)(line)
+        return out
+
     def run(
         self,
         filter_tags=None,
@@ -877,10 +988,18 @@ class RegressionRunner(BaseRunner):
             )
 
         budget, budget_src = self._rank_budget(ranks)
+        # a sweep variant capped below its pin would duplicate a smaller
+        # variant's decomposition — drop it instead (the HPC board with the
+        # full rank pool runs the complete sweep)
+        skipped = [s["name"] for s in simulations if s.get("np_pin", 0) > budget]
+        if skipped:
+            self.reporter.info(f"sweep variant(s) beyond the {budget}-rank budget skipped: {', '.join(skipped)}")
+            simulations = [s for s in simulations if s.get("np_pin", 0) <= budget]
         self.reporter.info(f"scheduling {len(simulations)} test(s) across {budget} ranks ({budget_src})")
 
         tasks = [self._prepare_task(sim, i, exe_dirs, fixed_dt, force, budget) for i, sim in enumerate(simulations)]
         sim_results = self._run_scheduler(tasks, budget, fixed_dt, verbose, stop_on_pass)
+        sim_results += self._sweep_results(simulations, sim_results, verbose)
 
         self._print_summary(sim_results)
 
