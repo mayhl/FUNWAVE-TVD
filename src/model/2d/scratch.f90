@@ -2,6 +2,15 @@ module model_scratch_mod
    use core_constants_mod, only: SP
    implicit none
 
+   ! PARKED 2026-07-19 — built + unit-tested (test_scratch_pool.pf) but wired into
+   !   nothing: no reserve/acquire/finalize caller, not a coordinator member.  Live
+   !   scratch is the named-member workspaces (type_flux/disp/etauv_workspace in the
+   !   kernels), alloc'd once in stepper_init.  Kept, not deleted — this is the future
+   !   device-mapping + peak-footprint vehicle.
+   ! FUTURE: wire at the !$acc offload pass (one slots(:,:,:) device map vs ~100
+   !   per-component deep-copy clauses) or on a per-rank footprint squeeze
+   !   (phase-bracketed acquire/release holds the high-water mark, not the sum)
+
    !> Generic pre-allocated slot pool for intra-timestep temporary 2-D arrays.
    !>
    !> Lifecycle:
