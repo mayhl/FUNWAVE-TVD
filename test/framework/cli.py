@@ -52,13 +52,26 @@ def regression(
         "-s",
         help="Keep DT_fixed from input files for deterministic frame times (default strips it; --strict is a deprecated alias)",
     ),
+    jobs: int = typer.Option(
+        None,
+        "--jobs",
+        "-j",
+        help="Total MPI ranks to pack concurrent test runs into (default: FUNWAVE_TEST_RANKS or CPU count)",
+    ),
 ):
     """Run Regression Tests."""
     reporter = ConsoleReporter()
     provider = LocalProvider()
     runner = RegressionRunner(reporter, provider)
     runner.run(
-        filter_tags=tags or None, force=force, report=report, pdf=pdf, verbose=verbose, stop_on_pass=stop_on_pass, fixed_dt=fixed_dt
+        filter_tags=tags or None,
+        force=force,
+        report=report,
+        pdf=pdf,
+        verbose=verbose,
+        stop_on_pass=stop_on_pass,
+        fixed_dt=fixed_dt,
+        ranks=jobs,
     )
 
 

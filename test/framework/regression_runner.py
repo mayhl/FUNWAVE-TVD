@@ -5,10 +5,21 @@ import os
 import shutil
 import subprocess
 import importlib
+from dataclasses import dataclass
 from pathlib import Path
 import yaml
 
 _STRICT_STRIP_RE = re.compile(r"^\s*DT_fixed\s*=", re.IGNORECASE)
+# Grid-size keys in a legacy input.txt; Kglob absent -> 2D (treated as 1 layer).
+_GRID_RE = {k: re.compile(rf"^\s*{k}\s*=\s*(\d+)", re.IGNORECASE | re.MULTILINE) for k in ("Mglob", "Nglob", "Kglob")}
+# Rewrite the hardwired PX/PY so mpirun -np matches the auto-sized decomposition.
+_PX_RE = re.compile(r"(?im)^(\s*PX\s*=\s*)\d+")
+_PY_RE = re.compile(r"(?im)^(\s*PY\s*=\s*)\d+")
+# Default rank-sizing dial: np = round(sqrt(cells) / K). K=13 ~ 60% eff (debug,
+# max node usage); K=25 ~ 85% eff (production). Measured on wheat (92-core, shm).
+_DEFAULT_NP_K = 13.0
+# Halo (Nghost=3) needs a few interior cells; floor each subdomain axis here.
+_MIN_SUBDOMAIN = 4
 from rich import box
 from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
@@ -19,6 +30,42 @@ from test.framework.html_report import generate as generate_html_report, generat
 
 STAMP_FILE = ".build_stamp"
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "regression", "regression_config.yaml")
+
+
+@dataclass
+class _SimTask:
+    """One scheduled simulation: a dev run plus (unless cached/oracle) a ref run.
+
+    ref_state fixes the plan at prep time ("needs_run" | "cached" | "oracle");
+    ref_status / dev_status carry the runtime outcome as the scheduler drains
+    the pool. eff_np is the rank count actually launched (the auto-sized declared_np
+    capped to the budget, factored into decomp=(px,py)); ref+dev of one task both
+    run at eff_np/decomp so their comparison stays valid — and bitwise — regardless
+    of the machine's rank budget.
+    """
+
+    sim: dict
+    index: int
+    ref_build_dir: str | None
+    curr_build_dir: str
+    oracle_mode: bool
+    curr_run_dir: str
+    ref_run_dir: str | None
+    ref_out: str | None
+    sim_stamp: str | None
+    curr_input: str
+    ref_input: str | None
+    eff_np: int
+    declared_np: int
+    decomp: tuple[int, int]
+    dt_mode: str
+    ref_state: str
+    ref_status: str = "pending"
+    dev_status: str = "pending"
+    ref_elapsed: float = 0.0
+    dev_elapsed: float = 0.0
+    ref_stderr: str = ""
+    dev_stderr: str = ""
 
 
 class RegressionRunner(BaseRunner):
@@ -33,6 +80,8 @@ class RegressionRunner(BaseRunner):
         self._refs = config.get("refs", {})
         self.executables = self._normalize_executables(config["executables"])
         self.simulations = config["simulations"]
+        # Auto rank-sizing dial (see _auto_np); config field, default debug (K=13).
+        self._np_K = float(config.get("np_sizing", {}).get("K") or _DEFAULT_NP_K)
 
     def _normalize_executables(self, raw):
         result = {}
@@ -148,7 +197,7 @@ class RegressionRunner(BaseRunner):
                 expanded.append(sim)
         return expanded
 
-    def _setup_run_dir(self, sim, run_dir, fixed_dt=False):
+    def _setup_run_dir(self, sim, run_dir, fixed_dt=False, decomp=None):
         os.makedirs(run_dir, exist_ok=True)
         if "output_dir" in sim:
             os.makedirs(os.path.join(run_dir, sim["output_dir"]), exist_ok=True)
@@ -157,13 +206,18 @@ class RegressionRunner(BaseRunner):
             src = os.path.join(input_dir, item)
             if os.path.isfile(src) and item.endswith(".txt"):
                 dst = os.path.join(run_dir, item)
-                if fixed_dt:
+                edit_pxpy = decomp is not None and item == sim["input_file"]
+                if fixed_dt and not edit_pxpy:
                     shutil.copy2(src, dst)
-                else:
-                    with open(src) as f:
-                        lines = f.readlines()
-                    with open(dst, "w") as f:
-                        f.writelines(l for l in lines if not _STRICT_STRIP_RE.match(l))
+                    continue
+                with open(src) as f:
+                    text = f.read()
+                if not fixed_dt:
+                    text = "".join(l for l in text.splitlines(keepends=True) if not _STRICT_STRIP_RE.match(l))
+                if edit_pxpy:
+                    text = self._rewrite_pxpy(text, decomp[0], decomp[1])
+                with open(dst, "w") as f:
+                    f.write(text)
         data_src = os.path.join(input_dir, "data")
         if os.path.isdir(data_src):
             data_dst = os.path.join(run_dir, "data")
@@ -273,6 +327,353 @@ class RegressionRunner(BaseRunner):
         self.reporter.console.print(table)
         self.reporter.console.print()
 
+    @staticmethod
+    def _rank_budget(ranks) -> tuple[int, str]:
+        """Resolve the total ranks to pack into, and where the number came from.
+
+        Precedence: explicit -j, then FUNWAVE_TEST_RANKS, then the batch
+        allocation (SLURM/PBS) so an offloaded run on a compute node saturates
+        the node without a manual flag, then the local CPU count.
+        """
+        if ranks:
+            return ranks, "-j"
+        env = os.environ
+        for var in ("FUNWAVE_TEST_RANKS", "SLURM_CPUS_ON_NODE", "SLURM_NTASKS", "PBS_NCPUS"):
+            val = env.get(var)
+            if val and val.isdigit() and int(val) > 0:
+                return int(val), var
+        nodefile = env.get("PBS_NODEFILE")
+        if nodefile and os.path.exists(nodefile):
+            try:
+                n = sum(1 for line in open(nodefile) if line.strip())
+                if n > 0:
+                    return n, "PBS_NODEFILE"
+            except OSError:
+                pass
+        return os.cpu_count() or 1, "cpu_count"
+
+    @staticmethod
+    def _grid_cells(input_path) -> tuple[int, int, int] | None:
+        """Parse (Mglob, Nglob, Kglob) from a legacy input .txt; Kglob=1 if absent (2D)."""
+        try:
+            text = open(input_path).read()
+        except OSError:
+            return None
+        m = _GRID_RE["Mglob"].search(text)
+        n = _GRID_RE["Nglob"].search(text)
+        if not m or not n:
+            return None
+        k = _GRID_RE["Kglob"].search(text)
+        return int(m.group(1)), int(n.group(1)), int(k.group(1)) if k else 1
+
+    @staticmethod
+    def _factor_decomp(np_want, m, n, min_cells=_MIN_SUBDOMAIN) -> tuple[int, int]:
+        """Aspect-aware PX*PY <= np_want, each subdomain axis >= min_cells.
+
+        Mirrors the binary's compute_optimal_grid_size: among factor pairs whose
+        product is the largest achievable <= np_want, pick the one whose PX/PY
+        aspect best matches M/N (log-ratio) so halos (Nghost=3) always fit and the
+        subdomains stay square-ish. A grid too small to split just returns (1, 1).
+        """
+        px_max = max(1, m // min_cells)
+        py_max = max(1, n // min_cells)
+        target = math.log((m / n) if n else 1.0)
+        for total in range(min(np_want, px_max * py_max), 0, -1):
+            best = None
+            for px in range(1, total + 1):
+                if total % px or px > px_max:
+                    continue
+                py = total // px
+                if py > py_max:
+                    continue
+                score = abs(math.log(px / py) - target)
+                if best is None or score < best[0]:
+                    best = (score, px, py)
+            if best:
+                return best[1], best[2]
+        return 1, 1
+
+    def _auto_np(self, sim, budget) -> tuple[int, int, tuple[int, int]]:
+        """Size ranks per test from the horizontal footprint: np = round(sqrt(Mglob*Nglob) / K).
+
+        Returns (eff_np, target_np, (px, py)). target_np is the pre-budget wish;
+        eff_np = px*py is what launches (feasible factorization capped to budget).
+        Only the horizontal plane decomposes (nx*ny), so Kglob (vertical layers) is
+        NOT in the count: a 2026-07-18 wheat scan of the 3D standing wave showed its
+        HYPRE Poisson solve does not strong-scale (np=1 fastest, np=16 slower than
+        serial), so counting K would over-provision. M*N → the 3D case sizes to np=1,
+        matching the data; every 2D case is unchanged (K=1). 3D stays uncalibrated
+        beyond "don't parallelize this tiny domain"; a larger horizontal 3D grid may
+        scale and would want its own K — and the legacy 3D path needs PX|Mglob,
+        PY|Nglob (np=7 crashed rc=24), unlike the modern 2D path which tolerates
+        remainder cells.
+
+        A test may pin `decomp: [px, py]` to force a specific decomposition when its
+        coverage intent depends on it (e.g. flume_2d_irr exercises periodic-Y across
+        ranks, which aspect-sizing would collapse to py=1). The pin must fit the
+        budget. FUTURE: a square periodic domain would keep that coverage under pure
+        auto-sizing and let the pin go.
+        """
+        override = sim.get("decomp")
+        if override:
+            px, py = int(override[0]), int(override[1])
+            # A pin fixes both np and decomposition (mpirun -np must equal px*py), so
+            # it can't be budget-capped like an auto size; fall back if it won't fit.
+            if px * py <= budget:
+                return px * py, px * py, (px, py)
+            self.reporter.warn(f"{sim['name']}: decomp pin {px}x{py} exceeds rank budget {budget}; auto-sizing instead")
+        input_path = os.path.join(self.repo_root, sim["input"], sim["input_file"])
+        grid = self._grid_cells(input_path)
+        if grid is None:
+            return 1, 1, (1, 1)
+        m, n, _k = grid
+        target_np = max(1, round(math.sqrt(m * n) / self._np_K))
+        px, py = self._factor_decomp(min(target_np, budget), m, n)
+        return px * py, target_np, (px, py)
+
+    @staticmethod
+    def _rewrite_pxpy(text, px, py) -> str:
+        """Set PX/PY in a legacy input.txt to the auto-sized decomposition."""
+        text = _PX_RE.sub(rf"\g<1>{px}", text)
+        return _PY_RE.sub(rf"\g<1>{py}", text)
+
+    def _prepare_task(self, sim, index, exe_dirs, fixed_dt, force, budget) -> _SimTask:
+        """Resolve run dirs, the ref cache state, and the effective np for one sim.
+
+        Effective np is the declared np capped to the rank budget so a single
+        run always fits the pool. The ref cache is keyed on (dt_mode, eff_np):
+        a stamp written under a different rank budget is stale and re-runs.
+        """
+        exe_type = sim["exe_type"]
+        ref_build_dir, curr_build_dir, _ref_branch = exe_dirs[exe_type]
+        oracle_mode = ref_build_dir is None
+        curr_input = sim.get("curr_input", sim["input_file"])
+
+        curr_run_dir = os.path.join(curr_build_dir, "runs", sim["name"])
+        ref_run_dir = os.path.join(ref_build_dir, "runs", sim["name"]) if not oracle_mode else None
+        ref_out = os.path.join(ref_run_dir, sim["output_dir"]) if not oracle_mode else None
+        sim_stamp = os.path.join(ref_out, ".sim_complete") if not oracle_mode else None
+
+        eff_np, declared_np, decomp = self._auto_np(sim, budget)
+        dt_mode = "fixed_dt" if fixed_dt else "adaptive"
+
+        if force:
+            if sim_stamp and os.path.exists(sim_stamp):
+                os.remove(sim_stamp)
+            for d in (ref_run_dir, curr_run_dir):
+                if d and os.path.exists(d):
+                    shutil.rmtree(d, ignore_errors=True)
+
+        ref_state = "oracle" if oracle_mode else "needs_run"
+        ref_input = None if oracle_mode else sim["input_file"]
+        if not oracle_mode:
+            stamp_val = f"{dt_mode} np={eff_np}"
+            cached = False
+            if os.path.exists(sim_stamp):
+                try:
+                    cached = open(sim_stamp).read().strip() == stamp_val
+                except OSError:
+                    cached = False
+            if cached:
+                ref_state = "cached"
+            else:
+                # stale ref: clear both run dirs so ref+dev regenerate in lockstep
+                for d in (ref_run_dir, curr_run_dir):
+                    if os.path.exists(d):
+                        shutil.rmtree(d, ignore_errors=True)
+                if "preprocess" in sim and sim.get("preprocess_ref", False):
+                    ref_input = curr_input
+
+        return _SimTask(
+            sim=sim,
+            index=index,
+            ref_build_dir=ref_build_dir,
+            curr_build_dir=curr_build_dir,
+            oracle_mode=oracle_mode,
+            curr_run_dir=curr_run_dir,
+            ref_run_dir=ref_run_dir,
+            ref_out=ref_out,
+            sim_stamp=sim_stamp,
+            curr_input=curr_input,
+            ref_input=ref_input,
+            eff_np=eff_np,
+            declared_np=declared_np,
+            decomp=decomp,
+            dt_mode=dt_mode,
+            ref_state=ref_state,
+            ref_status="pending" if ref_state == "needs_run" else ref_state,
+        )
+
+    def _launch_run(self, task: _SimTask, kind: str, fixed_dt: bool) -> str:
+        """Set up the run dir, preprocess, and submit the ref or dev run."""
+        sim = task.sim
+        if kind == "ref":
+            run_dir, binary, input_file = task.ref_run_dir, os.path.join(task.ref_build_dir, sim["binary"]), task.ref_input
+            self._setup_run_dir(sim, run_dir, fixed_dt=fixed_dt, decomp=task.decomp)
+            if "preprocess" in sim and sim.get("preprocess_ref", False):
+                self._preprocess(sim, run_dir)
+        else:
+            run_dir, binary, input_file = task.curr_run_dir, os.path.join(task.curr_build_dir, sim["binary"]), task.curr_input
+            self._setup_run_dir(sim, run_dir, fixed_dt=fixed_dt, decomp=task.decomp)
+            if "preprocess" in sim:
+                self._preprocess(sim, run_dir)
+        return self.provider.submit(binary, input_file, run_dir, np=task.eff_np)
+
+    def _write_sim_stamp(self, task: _SimTask) -> None:
+        """Record (dt_mode, eff_np) so a later run under a different rank budget re-runs the ref."""
+        try:
+            os.makedirs(task.ref_out, exist_ok=True)
+            with open(task.sim_stamp, "w") as f:
+                f.write(f"{task.dt_mode} np={task.eff_np}\n")
+        except Exception:
+            pass
+
+    @staticmethod
+    def _sched_desc(running, used, budget, queued) -> str:
+        names = ", ".join(f"{r['task'].sim['name']}/{r['kind']}" for r in running.values()) or "—"
+        return f"running {len(running)} [{used}/{budget} ranks]  queued {queued}  |  {names}"
+
+    def _run_scheduler(self, tasks, budget, fixed_dt, verbose, stop_on_pass) -> list[SimResult]:
+        """Bin-pack ref/dev runs into the rank budget, draining the pool as jobs finish.
+
+        Each run costs eff_np ranks; a run launches only when eff_np <= free
+        ranks (first-fit-decreasing, largest first). A task's postprocess fires
+        once both its ref and dev runs have completed. stop_on_pass halts new
+        launches after the first PASS; in-flight runs still finalize.
+        """
+        queue = []
+        remaining = {}
+        for t in tasks:
+            n = 1  # dev always runs
+            if t.ref_state == "needs_run":
+                queue.append((t, "ref"))
+                n += 1
+            queue.append((t, "dev"))
+            remaining[t.index] = n
+        queue.sort(key=lambda tk: tk[0].eff_np, reverse=True)
+
+        capped = [t for t in tasks if t.eff_np < t.declared_np]
+        if capped:
+            names = ", ".join(f"{t.sim['name']} ({t.declared_np}->{t.eff_np})" for t in capped)
+            self.reporter.warn(
+                f"rank budget {budget}: sized-down np for {names} — grid wants more ranks than the pool (ref+dev still matched)"
+            )
+
+        results: dict[int, SimResult] = {}
+        running: dict[str, dict] = {}
+        used = 0
+        stop = False
+
+        with Progress(
+            SpinnerColumn(),
+            TextColumn("[progress.description]{task.description}"),
+            TimeElapsedColumn(),
+            console=self.reporter.console,
+            transient=True,
+        ) as progress:
+            pt = progress.add_task("scheduling", total=None)
+            while queue or running:
+                launched = True
+                while launched and not stop:
+                    launched = False
+                    for i, (t, kind) in enumerate(queue):
+                        if t.eff_np <= budget - used:
+                            jid = self._launch_run(t, kind, fixed_dt)
+                            running[jid] = {"task": t, "kind": kind, "np": t.eff_np, "t0": time.time()}
+                            used += t.eff_np
+                            queue.pop(i)
+                            launched = True
+                            break
+                progress.update(pt, description=self._sched_desc(running, used, budget, len(queue)))
+                if not running:
+                    break
+                time.sleep(1)
+
+                done = []
+                for jid, r in running.items():
+                    st = self.provider.get_status(jid)
+                    if st in ("COMPLETED", "FAILED"):
+                        r["status"] = st
+                        r["elapsed"] = time.time() - r["t0"]
+                        done.append(jid)
+                for jid in done:
+                    r = running.pop(jid)
+                    used -= r["np"]
+                    t, kind = r["task"], r["kind"]
+                    if kind == "ref":
+                        t.ref_status, t.ref_elapsed = r["status"], r["elapsed"]
+                        if r["status"] == "COMPLETED":
+                            self._write_sim_stamp(t)
+                        else:
+                            _, t.ref_stderr = self.provider.get_output(jid)
+                    else:
+                        t.dev_status, t.dev_elapsed = r["status"], r["elapsed"]
+                        if r["status"] == "FAILED":
+                            _, t.dev_stderr = self.provider.get_output(jid)
+                    remaining[t.index] -= 1
+                    if remaining[t.index] == 0:
+                        res = self._finalize_and_emit(t, verbose)
+                        results[t.index] = res
+                        if stop_on_pass and res.status == "PASS":
+                            self.reporter.info("  [dim]--stop-on-pass: first passing test found, stopping.[/dim]")
+                            stop = True
+                if stop:
+                    queue.clear()
+
+        return [results[i] for i in sorted(results)]
+
+    def _finalize_and_emit(self, task: _SimTask, verbose: bool) -> SimResult:
+        """Postprocess a completed task and print its run + result lines."""
+        sim = task.sim
+        result = self._run_postprocess(sim, task.ref_run_dir, task.curr_run_dir, task.ref_status, task.dev_status, verbose=verbose)
+
+        def _fmt_run(s, elapsed=0.0):
+            if s == "cached":
+                return "[dim]cached[/dim]"
+            if s == "oracle":
+                return "[dim]oracle[/dim]"
+            if s == "COMPLETED":
+                return f"[green]ran {elapsed:.0f}s[/green]"
+            return f"[red]{s}[/red]"
+
+        np_hint = f"np={task.eff_np}" if task.eff_np == task.declared_np else f"np={task.eff_np}(capped)"
+        run_line = (
+            f"  \\[{sim['name']}]  {np_hint}  "
+            f"ref: {_fmt_run(task.ref_status, task.ref_elapsed)}  dev: {_fmt_run(task.dev_status, task.dev_elapsed)}"
+        )
+
+        STATUS_ICON = {
+            "PASS": "[bold green]✓ PASS[/bold green]",
+            "FAIL": "[bold red]✗ FAIL[/bold red]",
+            "XFAIL": "[yellow]⚠ XFAIL[/yellow]",
+            "XPASS": "[bold red]✗ XPASS[/bold red]",
+            "SIM_FAILED": "[bold red]✗ SIM FAILED[/bold red]",
+            "POSTPROCESS_ERROR": "[yellow]⚠ ERROR[/yellow]",
+            "COMPLETED": "[dim]no comparison[/dim]",
+        }
+        sub_summary = "  ".join(f"{s.kind}: {s.summary}" for s in result.subsections)
+        result_icon = STATUS_ICON.get(result.status, result.status)
+        if result.status in ("XFAIL", "XPASS"):
+            result_icon += f" [dim]({sim.get('known_fail')})[/dim]"
+        result_line = f"  \\[{sim['name']}]  {result_icon}" + (f"  [dim]{sub_summary}[/dim]" if sub_summary else "")
+
+        self.reporter.info(run_line)
+        if task.ref_status == "FAILED" or task.dev_status == "FAILED":
+            for label, err in [("ref", task.ref_stderr), ("dev", task.dev_stderr)]:
+                if err:
+                    self.reporter.info(f"    {label} stderr: {err[:400]}")
+
+        if result.status == "PASS":
+            self.reporter.success(result_line)
+        elif result.status == "XPASS":
+            self.reporter.error(result_line)
+            self.reporter.error(f"    unexpected pass — remove known_fail: {sim.get('known_fail')} from regression_config.yaml")
+        elif result.status in ("SIM_FAILED", "POSTPROCESS_ERROR"):
+            self.reporter.error(result_line)
+        else:
+            self.reporter.warn(result_line)
+        return result
+
     def run(
         self,
         filter_tags=None,
@@ -282,6 +683,7 @@ class RegressionRunner(BaseRunner):
         verbose: bool = False,
         stop_on_pass: bool = False,
         fixed_dt: bool = False,
+        ranks: int | None = None,
     ):
         try:
             current_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
@@ -353,141 +755,11 @@ class RegressionRunner(BaseRunner):
                 f"build \\[{exe_type}]  ref: {_tag(ref_branch, ref_hash, ref_rebuilt)}  dev: {_tag(current_branch, curr_hash, curr_rebuilt)}"
             )
 
-        def _run_with_spinner(job_id, description):
-            t0 = time.time()
-            with Progress(
-                SpinnerColumn(), TextColumn("[progress.description]{task.description}"), TimeElapsedColumn(), transient=True
-            ) as progress:
-                progress.add_task(description, total=None)
-                while self.provider.get_status(job_id) not in ["COMPLETED", "FAILED"]:
-                    time.sleep(2)
-            return self.provider.get_status(job_id), time.time() - t0
+        budget, budget_src = self._rank_budget(ranks)
+        self.reporter.info(f"scheduling {len(simulations)} test(s) across {budget} ranks ({budget_src})")
 
-        all_passed = True
-        sim_results: list[SimResult] = []
-        for sim in simulations:
-            exe_type = sim["exe_type"]
-            ref_build_dir, curr_build_dir, ref_branch = exe_dirs[exe_type]
-            curr_input = sim.get("curr_input", sim["input_file"])
-            oracle_mode = ref_build_dir is None  # validation — no ref run, compare vs theory
-
-            curr_run_dir = os.path.join(curr_build_dir, "runs", sim["name"])
-            ref_run_dir = os.path.join(ref_build_dir, "runs", sim["name"]) if not oracle_mode else None
-            ref_out = os.path.join(ref_run_dir, sim["output_dir"]) if not oracle_mode else None
-            sim_stamp = os.path.join(ref_out, ".sim_complete") if not oracle_mode else None
-
-            if force:
-                if sim_stamp and os.path.exists(sim_stamp):
-                    os.remove(sim_stamp)
-                for d in (ref_run_dir, curr_run_dir):
-                    if d and os.path.exists(d):
-                        shutil.rmtree(d, ignore_errors=True)
-
-            # --- ref (skipped in oracle mode: theory is the reference) ---
-            # Stamp records the dt mode that generated the cached ref; a
-            # mismatch (or a legacy empty stamp) invalidates it — adaptive
-            # refs are not comparable against fixed-dt dev runs or vice versa
-            ref_status = "oracle"
-            ref_stderr = ""
-            ref_elapsed = 0.0
-            if not oracle_mode:
-                dt_mode = "fixed_dt" if fixed_dt else "adaptive"
-                stamp_mode = None
-                if os.path.exists(sim_stamp):
-                    try:
-                        stamp_mode = open(sim_stamp).read().strip() or None
-                    except OSError:
-                        pass
-                if stamp_mode == dt_mode:
-                    ref_status = "cached"
-                else:
-                    for d in (ref_run_dir, curr_run_dir):
-                        if os.path.exists(d):
-                            shutil.rmtree(d, ignore_errors=True)
-                    self._setup_run_dir(sim, ref_run_dir, fixed_dt=fixed_dt)
-                    ref_input = sim["input_file"]
-                    if "preprocess" in sim and sim.get("preprocess_ref", False):
-                        self._preprocess(sim, ref_run_dir)
-                        ref_input = curr_input
-                    ref_id = self.provider.submit(
-                        os.path.join(ref_build_dir, sim["binary"]), ref_input, ref_run_dir, np=sim.get("np", 1)
-                    )
-                    ref_status, ref_elapsed = _run_with_spinner(
-                        ref_id, f"  \\[{sim['name']}]  ref  running  (np={sim.get('np', 1)})"
-                    )
-                    if ref_status == "COMPLETED":
-                        try:
-                            os.makedirs(ref_out, exist_ok=True)
-                            with open(os.path.join(ref_out, ".sim_complete"), "w") as f:
-                                f.write(dt_mode + "\n")
-                        except Exception:
-                            pass
-                    else:
-                        all_passed = False
-                        _, ref_stderr = self.provider.get_output(ref_id)
-
-            # --- dev ---
-            self._setup_run_dir(sim, curr_run_dir, fixed_dt=fixed_dt)
-            if "preprocess" in sim:
-                self._preprocess(sim, curr_run_dir)
-            curr_id = self.provider.submit(
-                os.path.join(curr_build_dir, sim["binary"]), curr_input, curr_run_dir, np=sim.get("np", 1)
-            )
-            curr_status, curr_elapsed = _run_with_spinner(curr_id, f"  \\[{sim['name']}]  dev  running  (np={sim.get('np', 1)})")
-            dev_stderr = ""
-            if curr_status != "COMPLETED":
-                all_passed = False
-                _, dev_stderr = self.provider.get_output(curr_id)
-
-            # --- execution result line ---
-            def _fmt_run(s, elapsed=0.0):
-                if s == "cached":
-                    return "[dim]cached[/dim]"
-                if s == "oracle":
-                    return "[dim]oracle[/dim]"
-                if s == "COMPLETED":
-                    return f"[green]ran {elapsed:.0f}s[/green]"
-                return f"[red]{s}[/red]"
-
-            run_line = f"  \\[{sim['name']}]  ref: {_fmt_run(ref_status, ref_elapsed)}  dev: {_fmt_run(curr_status, curr_elapsed)}"
-            sim_result = self._run_postprocess(sim, ref_run_dir, curr_run_dir, ref_status, curr_status, verbose=verbose)
-
-            # --- pass/fail result line ---
-            STATUS_ICON = {
-                "PASS": "[bold green]✓ PASS[/bold green]",
-                "FAIL": "[bold red]✗ FAIL[/bold red]",
-                "XFAIL": "[yellow]⚠ XFAIL[/yellow]",
-                "XPASS": "[bold red]✗ XPASS[/bold red]",
-                "SIM_FAILED": "[bold red]✗ SIM FAILED[/bold red]",
-                "POSTPROCESS_ERROR": "[yellow]⚠ ERROR[/yellow]",
-                "COMPLETED": "[dim]no comparison[/dim]",
-            }
-            sub_summary = "  ".join(f"{s.kind}: {s.summary}" for s in sim_result.subsections)
-            result_icon = STATUS_ICON.get(sim_result.status, sim_result.status)
-            if sim_result.status in ("XFAIL", "XPASS"):
-                result_icon += f" [dim]({sim.get('known_fail')})[/dim]"
-            result_line = f"  \\[{sim['name']}]  {result_icon}" + (f"  [dim]{sub_summary}[/dim]" if sub_summary else "")
-
-            self.reporter.info(run_line)
-            if ref_status == "FAILED" or curr_status == "FAILED":
-                for label, err in [("ref", ref_stderr), ("dev", dev_stderr)]:
-                    if err:
-                        self.reporter.info(f"    {label} stderr: {err[:400]}")
-
-            if sim_result.status == "PASS":
-                self.reporter.success(result_line)
-            elif sim_result.status == "XPASS":
-                self.reporter.error(result_line)
-                self.reporter.error(f"    unexpected pass — remove known_fail: {sim.get('known_fail')} from regression_config.yaml")
-            elif sim_result.status in ("SIM_FAILED", "POSTPROCESS_ERROR"):
-                self.reporter.error(result_line)
-            else:
-                self.reporter.warn(result_line)
-            sim_results.append(sim_result)
-
-            if stop_on_pass and sim_result.status == "PASS":
-                self.reporter.info("  [dim]--stop-on-pass: first passing test found, stopping.[/dim]")
-                break
+        tasks = [self._prepare_task(sim, i, exe_dirs, fixed_dt, force, budget) for i, sim in enumerate(simulations)]
+        sim_results = self._run_scheduler(tasks, budget, fixed_dt, verbose, stop_on_pass)
 
         self._print_summary(sim_results)
 

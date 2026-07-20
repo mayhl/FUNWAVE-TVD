@@ -1,3 +1,15 @@
+# Auto rank-sizing: each test's MPI np is derived from its grid, not hand-set.
+#   np = clamp(round(sqrt(Mglob*Nglob) / K), 1, rank_budget)
+# Only the horizontal plane decomposes, so Kglob (vertical layers) is excluded:
+# a wheat scan showed the 3D HYPRE solve does not strong-scale (np=1 fastest), so
+# M*N sizes the 3D case to np=1 while leaving 2D unchanged.
+# K is the efficiency dial (measured on wheat, 92-core, shm transport):
+#   K=13 -> ~60% per-run efficiency (debug: max node usage, fastest turnaround)
+#   K=25 -> ~85% per-run efficiency (production: revisit near release)
+# ref and dev auto-size identically, so the comparison stays bitwise.
+np_sizing:
+  K: 25
+
 refs:
   2d:
     branch: regression-ref/v4.0-modern
@@ -27,7 +39,6 @@ simulations:
   # ── flume_1d_reg: REG wavemaker — stats meaningful, kept for regression ──
   - name: flume_1d_reg
     exe_type: central
-    np: 4
     input: test/regression/inputs/flume_1d
     input_files: [wk_reg.txt]
     preprocess:
@@ -55,7 +66,6 @@ simulations:
   # Stats (spectral shape, Hm0) belong in the validation framework.
   - name: flume_1d_irr
     exe_type: central
-    np: 4
     input: test/regression/inputs/flume_1d
     input_files: [wk_irr.txt]
     preprocess:
@@ -81,7 +91,6 @@ simulations:
   # T_INTV_mean removed from inputs; spectral stats belong in validation.
   - name: flume_1d_spectral
     exe_type: central
-    np: 4
     input: test/regression/inputs/flume_1d
     input_files: [jon_1d.txt, tma_1d.txt]
     preprocess:
@@ -109,7 +118,6 @@ simulations:
   # regular waves since both ref and dev compile from the same commit.
   - name: flume_2d
     exe_type: central
-    np: 8
     input: test/regression/inputs/flume_2d
     input_files: [wk_reg_wall.txt, wk_reg_wall_sponge.txt]
     preprocess:
@@ -137,7 +145,10 @@ simulations:
   # belong in the validation framework, not regression.
   - name: flume_2d_irr
     exe_type: central
-    np: 8
+    # decomp pinned: this case exists to cover periodic-Y across ranks (PY>=2);
+    # aspect auto-sizing collapses its 5:1 grid to PY=1. FUTURE: swap for a square
+    # periodic domain so it keeps that coverage under pure auto-sizing, then drop the pin.
+    decomp: [4, 2]
     input: test/regression/inputs/flume_2d
     input_files: [wk_irr_periodic.txt]
     preprocess:
@@ -163,7 +174,6 @@ simulations:
   # No sponge, no friction, PERIODIC=T so wave wraps; short run to verify mass conservation.
   - name: solitary_flat_1d
     exe_type: central
-    np: 4
     input: test/regression/inputs/solitary_flat_1d
     input_files: [solitary_flat_1d.txt]
     preprocess:
@@ -192,7 +202,6 @@ simulations:
   # fresh refs (legacy nondeterministic even at fixed dt, ledger 15).
   - name: rip_2d
     exe_type: central
-    np: 4
     input: test/regression/inputs/rip_2d
     input_files: [rip_2d.txt]
     preprocess:
@@ -214,7 +223,11 @@ simulations:
 
   - name: standing_wave_3d_10m
     exe_type: central-3d
-    np: 4
+    # decomp pinned np=2 (PX=2|Mglob=100): wheat scan showed the 3D HYPRE Poisson
+    # solve does not strong-scale (np=1 52.9s, np=2 47.3s best, np=16 slower than
+    # serial) — HYPRE is not yet implemented efficiently. np=2 is the measured
+    # optimum; revisit if/when the 3D solver is tuned. PY=1 forced by Nglob=3.
+    decomp: [2, 1]
     input: test/regression/inputs/standing_wave_3d
     input_files: [input_10m.txt]
     preprocess:
