@@ -1,0 +1,32 @@
+# Solitary-wave permanence — periodic-x flume, flat bottom.
+# A solitary wave of permanent form transits the periodic domain repeatedly;
+# after the initial-profile adjustment sheds, the crest must keep its
+# amplitude, shape, and the analytic celerity c = sqrt(g*(h + a)).  The
+# oracle tracks the crest through the ETA frames (times from time_dt.out):
+# celerity from an unwrapped linear fit, amplitude decay between the first
+# and last transit, and a best-shift L2 shape error vs the post-adjustment
+# profile.  a/h = 0.1; one transit = L/c ~ 30.4 s, run ~3 transits.
+grid:
+  cell_size: [0.2, 0.2]
+  grid_size: [500, 4]
+  bathymetry:
+    type: flat
+    depth: 1.0
+simulation:
+  title: soliton_x
+  total_time: 92.0
+  screen_interval: 20.0
+initial:
+  solitary:
+    amplitude: 0.1
+    depth: 1.0
+    x_center: 20.0
+boundaries:
+  periodic: [x]
+numerics:
+  cfl: 0.5
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  interval: 0.5
+  variables: [ETA]

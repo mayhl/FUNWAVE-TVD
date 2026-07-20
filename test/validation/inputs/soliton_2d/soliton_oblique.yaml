@@ -1,0 +1,32 @@
+# Solitary-wave permanence — OBLIQUE tiled train, doubly periodic square box.
+# A 45-degree crest train (spacing P = L*cos45) exercises the full 2D
+# Boussinesq path with nonzero v and both periodic tridiagonal solves; the
+# box tiles the crest line exactly (square + 45 deg, p = q = 1).  A fixed
+# row sees the crest cross at the trace speed c/cos45; the same oracle
+# gates celerity, amplitude decay, and shape on the row profile.
+grid:
+  cell_size: [0.2, 0.2]
+  grid_size: [200, 200]
+  bathymetry:
+    type: flat
+    depth: 1.0
+simulation:
+  title: soliton_oblique
+  total_time: 40.0
+  screen_interval: 10.0
+initial:
+  solitary:
+    amplitude: 0.1
+    depth: 1.0
+    x_center: 10.0
+    y_center: 10.0
+    angle: 45.0
+boundaries:
+  periodic: [x, y]
+numerics:
+  cfl: 0.5
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  interval: 0.5
+  variables: [ETA]

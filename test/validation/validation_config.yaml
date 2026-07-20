@@ -75,6 +75,44 @@ simulations:
     tolerances:
       conservation: { mass_drift_pct: 0.01, energy_drift_pct: 3.0 }
 
+  # ── solitary permanence: periodic-x flume, crest tracked over ~3 transits ──
+  # A solitary wave must keep amplitude, shape, and c = sqrt(g(h+a)) after the
+  # initial adjustment sheds.  Native-YAML deck (periodic-x has no legacy .txt
+  # form).  Measured 2026-07-20 at first light: celerity 0.0024 %, amplitude
+  # 0.0069 %, shape 2.4 % (the shed dispersive tail wrapping the domain
+  # dominates the L2 — the crest itself is permanent to ~1e-4).
+  - name: soliton_2d
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/soliton_2d
+    input_files: [soliton_x.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, soliton]
+    postprocess:
+      soliton: test.validation.oracles.soliton
+    tolerances:
+      soliton: { celerity_error_pct: 1.0, amplitude_decay_pct: 1.0, shape_error_pct: 5.0 }
+
+  # ── oblique tiled train: 45-deg crest, doubly periodic square box ────────
+  # Full 2D path (nonzero v, both periodic tridiagonals).  Crest metrics stay
+  # tight (trace celerity 0.004 %, amplitude 0.44 % at first light); the shape
+  # gate is looser than the flume's because the 2D adjustment radiation wraps
+  # the closed box and sits under the row-profile L2 (7.5 % measured) — it is
+  # a radiation-noise bound, not a crest-permanence bound.
+  - name: soliton_oblique
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/soliton_2d
+    input_files: [soliton_oblique.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, soliton]
+    postprocess:
+      soliton: test.validation.oracles.soliton
+    tolerances:
+      soliton: { celerity_error_pct: 1.0, amplitude_decay_pct: 2.0, shape_error_pct: 10.0 }
+
   # ── dispersion isotropy: oblique modes at fixed |k| across angles ────────
   # Square-basin standing modes (m_x, m_y) sharing m_x^2+m_y^2 = 25 -> one |k| (kh
   # ~ 1.57) at theta = 0/36.9/53.1/90 deg; (5,0) vs (0,5) is the x<->y symmetry
