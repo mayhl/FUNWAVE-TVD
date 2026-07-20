@@ -113,6 +113,28 @@ simulations:
     tolerances:
       soliton: { celerity_error_pct: 1.0, amplitude_decay_pct: 2.0, shape_error_pct: 10.0 }
 
+  # ── solitary runup: Synolakis nonbreaking canonical case ─────────────────
+  # H/h = 0.019 on the cot(beta) = 19.85 beach vs the asymptotic NSWE runup
+  # law R/h = 2.831 sqrt(cot beta) (H/h)^{5/4} = 0.0889.  The model lands
+  # ~10 % below the law (R/h ~ 0.080), robust to scheme/dx/min_depth/breaking
+  # path — ADJUDICATED INHERITED 2026-07-20: the legacy binary on the same
+  # bathy/IC gives R = 0.0797 vs modern 0.0794 (0.3 % apart), so this is
+  # FUNWAVE-TVD's standing distance from the asymptotic law (lab data scatter
+  # below it too), not a modern-side swash regression.  The 15 % law-referenced
+  # gate is the drift tripwire around that documented behaviour.
+  - name: runup_synolakis
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/runup_2d
+    input_files: [synolakis_nb.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, runup]
+    postprocess:
+      runup: test.validation.oracles.runup
+    tolerances:
+      runup: { runup_error_pct: 15.0 }
+
   # ── dispersion isotropy: oblique modes at fixed |k| across angles ────────
   # Square-basin standing modes (m_x, m_y) sharing m_x^2+m_y^2 = 25 -> one |k| (kh
   # ~ 1.57) at theta = 0/36.9/53.1/90 deg; (5,0) vs (0,5) is the x<->y symmetry
