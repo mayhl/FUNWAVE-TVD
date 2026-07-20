@@ -109,10 +109,18 @@ if(NOT ENABLE_DEV_MODE)
   # back into model/core — so a rescan group (--start-group/--end-group) lets ld
   # close the static cycle.  Transitional scaffolding, retires with funwave_3d.
   if(TARGET funwave_3d)
-    target_link_libraries(
-      ${exe_name}
-      PRIVATE
-        "$<LINK_GROUP:RESCAN,${main_lib}_model,${main_lib}_core,funwave_3d>")
+    # Apple ld64 rejects LINK_GROUP:RESCAN for Fortran but resolves archive
+    # cycles without grouping; plain listing suffices there
+    if(CMAKE_Fortran_LINK_GROUP_USING_RESCAN_SUPPORTED
+       OR CMAKE_LINK_GROUP_USING_RESCAN_SUPPORTED)
+      target_link_libraries(
+        ${exe_name}
+        PRIVATE
+          "$<LINK_GROUP:RESCAN,${main_lib}_model,${main_lib}_core,funwave_3d>")
+    else()
+      target_link_libraries(${exe_name} PRIVATE ${main_lib}_model
+                                                ${main_lib}_core funwave_3d)
+    endif()
     target_include_directories(${exe_name}
                                PRIVATE "${CMAKE_BINARY_DIR}/modules/3d_old")
   else()
