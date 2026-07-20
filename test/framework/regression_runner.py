@@ -296,8 +296,14 @@ class RegressionRunner(BaseRunner):
                 result.notes += f"\n[{kind}] {type(exc).__name__}: {exc}"
                 return result
 
-        all_passed = all(m.passed for s in result.subsections for m in s.metrics if math.isfinite(m.tolerance))
-        result.status = "PASS" if all_passed else "FAIL"
+        gated = [m for s in result.subsections for m in s.metrics if math.isfinite(m.tolerance)]
+        # zero gated metrics = a silently-skipping postproc (e.g. an oracle that
+        # no longer recognises the deck schema), never a vacuous pass
+        if not gated:
+            result.status = "POSTPROCESS_ERROR"
+            result.notes += "\npostprocess produced no gated metrics (oracle skipped?)"
+            return result
+        result.status = "PASS" if all(m.passed for m in gated) else "FAIL"
 
         # known_fail remaps comparison outcomes only — SIM_FAILED/POSTPROCESS_ERROR
         # stay loud (a crash is never the documented ledger gap)
