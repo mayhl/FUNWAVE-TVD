@@ -198,8 +198,8 @@ contains
 
    ! ----------------------------------------------------------------
    ! Bind component references, allocate workspaces, and complete the
-   ! initial state (HU/HV; see the initial-flux note at the end —
-   ! the legacy dispersion correction of the initial Ubar is inert).
+   ! initial state (HU/HV plus the initial-Ubar dispersion correction —
+   ! see the initial-flux note at the end; legacy shipped it inert).
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
@@ -434,17 +434,29 @@ contains
       end if
 
       ! -- initial cell fluxes ---------------------------------------
-      ! Legacy init.F writes Ubar = HU + Gamma1*U1p*H, but that
-      ! correction is DEAD CODE: the init-time CAL_DISPERSION runs
-      ! before MASK9 is first assigned (init.F:1168 vs :1036), so the
-      ! MASK9-weighted derivatives — hence U1p — are identically zero
-      ! and the legacy initial state is exactly Ubar = HU.  Parity
-      ! therefore requires p = Hu (set in model_setup) with NO
-      ! dispersion correction here.
+      ! Legacy init.F intends Ubar = HU + Gamma1*U1p*H, but its init-time
+      ! CAL_DISPERSION ran before MASK9 was first assigned (init.F:1168
+      ! vs :1036), so U1p was identically zero and the shipped initial
+      ! state was exactly Ubar = HU (parity ledger #1).  Post cord-cut
+      ! the correction runs as intended: refresh ghosts, one dispersion
+      ! pass on the IC (u0 = u zeroes the gamma2 time terms, so the dt
+      ! argument is inert), then
+      !   $$ \bar{U} = H u + \Gamma_1 U_{1p} H $$
+      ! Still-water ICs have U1p = 0 — wavemaker-from-rest cases are
+      ! unchanged; solitary/hot-start ICs gain the intended dispersive
+      ! flux.  A checkpoint restart keeps the saved p/q verbatim.
       if (.not. is_restart) then
-         associate (f => this%fields)
+         associate (f => this%fields, phy => this%physics)
             f%hu = f%h*f%u
             f%hv = f%h*f%v
+            if (phy%dispersion) then
+               call this%bc%exchange_state(this%grid, f)
+               this%u0 = f%u
+               this%v0 = f%v
+               call run_dispersion(this, 1.0_SP)
+               f%p = f%h*f%u + phy%Gamma1*this%u1p*f%h
+               f%q = f%h*f%v + phy%Gamma1*this%v1p*f%h
+            end if
          end associate
       end if
 
