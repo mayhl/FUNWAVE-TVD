@@ -42,6 +42,7 @@
 module model_3d_wavemaker_mod
    use core_constants_mod, only: SP
    use core_env_mod, only: type_env, get_sub_env
+   use core_misc_mod, only: random_phase
    use model_base_mod, only: type_model_base
 
    implicit none
@@ -187,7 +188,7 @@ contains
          close (14)
          do j = 1, this%num_freq
             do i = 1, this%num_dir
-               this%random_phs(i, j) = rand(0)*2.0_SP*pi
+               this%random_phs(i, j) = random_phase()
             end do
          end do
       end if
@@ -226,7 +227,7 @@ contains
          a_jon = this%hm0**2/16.0_SP/sum_int
          do i = 1, this%num_freq
             this%jon_spc(i) = this%jon_spc(i)*a_jon
-            this%ran_phs(i) = rand(0)*2.0_SP*pi
+            this%ran_phs(i) = random_phase()
          end do
       end if
 

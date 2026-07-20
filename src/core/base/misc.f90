@@ -1,23 +1,20 @@
 module core_misc_mod
 
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, PI
 
    implicit none
-   public random2
+   public random_phase
 contains
 
-   function random2() result(val)
-      real(SP) :: val
+   ! Uniform random wave phase in [0, 2*pi), from the standard RANDOM_NUMBER
+   ! intrinsic — portable across compilers, unlike the gfortran rand()/rand(0).
+   function random_phase() result(phase)
+      real(SP) :: phase
 
-! # if defined (INTEL)
-!       val = rand()
-! # elif defined (CRAY)
-!       val = rand()
-! # else
-      call random_number(val)
-      !# endif
+      call random_number(phase)
+      phase = phase*2.0_SP*PI
 
-   end function random2
+   end function random_phase
 
    elemental subroutine str2int(str, int, stat, fmt, is_empty)
       character(len=*), intent(in) :: str

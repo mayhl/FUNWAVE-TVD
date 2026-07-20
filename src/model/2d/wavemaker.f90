@@ -1553,7 +1553,7 @@ contains
    ! bare STOP on zero); directions convert via DEG2RAD; input
    ! phases via the truncated-pi literal.
    ! Missing phases: zero for parity builds, RANDOM_NUMBER otherwise
-   ! (legacy random2() is compiler-specific).  Overrides Nfreq from
+   ! (legacy rand()-based phase is compiler-specific).  Overrides Nfreq from
    ! the file header.
    ! ----------------------------------------------------------------
    subroutine read_boundary_2d_spectrum(this, num_dir, per_ser, theta_ser, &
