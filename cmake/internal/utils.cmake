@@ -16,6 +16,15 @@ macro("my_fetch_package" package url rev)
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
     set(FETCHCONTENT_QUIET FALSE)
   endif()
+  # Offline hosts (HPC compute nodes have no egress): FUNWAVE_DEPS_DIR points at
+  # pre-cloned sources, one subdir per package, populated on a login node --
+  # FetchContent then skips the network entirely
+  if(DEFINED ENV{FUNWAVE_DEPS_DIR})
+    if(EXISTS "$ENV{FUNWAVE_DEPS_DIR}/${_pkg_lc}")
+      set(FETCHCONTENT_SOURCE_DIR_${_pkg_uc}
+          "$ENV{FUNWAVE_DEPS_DIR}/${_pkg_lc}")
+    endif()
+  endif()
   FetchContent_Declare(
     "${_pkg_lc}"
     GIT_REPOSITORY "${url}"
