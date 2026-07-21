@@ -1,4 +1,5 @@
 import math
+import platform
 import re
 import time
 import os
@@ -152,13 +153,19 @@ class RegressionRunner(BaseRunner):
 
         # Regression execs funwave directly (no ctest) -> build the exe only,
         # no unit-test scaffolding (ENABLE_UNIT_TESTING stays OFF).
-        toolchain_path = os.path.join(self.repo_root, "cmake", "toolchains", "macos_mpi.cmake")
-        cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir, f"-DCMAKE_TOOLCHAIN_FILE={toolchain_path}"]
+        # Compiler selection is CMake auto-config from the environment (batch
+        # scripts export FC: mpifort on wheat, ftn on Cray PE).  On macOS
+        # FindMPI misdetects under bare gfortran, so default FC to the OpenMPI
+        # wrapper there -- an explicit FC always wins.
+        env = os.environ.copy()
+        if platform.system() == "Darwin":
+            env.setdefault("FC", "mpif90")
+        cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir]
         cmake_cmd += [f"-D{flag}" for flag in (cmake_flags or [])]
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
             config_task = progress.add_task(f"cmake  {tag}  configuring...", total=None)
-            subprocess.run(cmake_cmd, check=True, capture_output=True)
+            subprocess.run(cmake_cmd, check=True, capture_output=True, env=env)
             progress.remove_task(config_task)
 
             build_task = progress.add_task(f"make   {tag}  compiling...  [dim]0%[/dim]", total=100)

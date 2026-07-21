@@ -16,55 +16,47 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
         DESTINATION "${CMAKE_INSTALL_LIBDIR}/cmake/${PROJECT_NAME}")
 
 # ==============================================================================
-# 1. MAC OS MPI OVERRIDES
-# ==============================================================================
-# Toolchain usage: cmake -DCMAKE_TOOLCHAIN_FILE=macos_mpi.cmake .
-
-# ==============================================================================
 # 1. COMPILER-SPECIFIC FLAGS
 # ==============================================================================
-# We define compiler-specific standard flags and diagnostic "traps" (FPE) to
-# ensure code portability and early error detection during development.
-if(CMAKE_Fortran_COMPILER_ID MATCHES "^GNU$")
-  # Strict flags for modern Fortran development
-  set(standard_compile_flags
-      "-ffree-form -ffree-line-length-none -fimplicit-none -fcheck=all -fbacktrace -cpp"
-  )
-  set(warning_flags
-      "-Wall -Wextra -Wpedantic -Wsurprising -Waliasing -Wampersand -Warray-bounds -Wcharacter-truncation -Wconversion -Wline-truncation -Wintrinsics-std -Wno-tabs -Wunderflow -Wunused-parameter -Wintrinsic-shadow -Wno-align-commons -Wsurprising"
-  )
-  set(fpe "-frange-check -ffpe-trap=invalid,zero,overflow")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "^Intel$")
-  set(standard_compile_flags "-traceback")
-  set(fpe "-check all -fpe0")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "^IntelLLVM$")
-  set(standard_compile_flags "-axAVX2 -traceback -fpp -free -stand")
-  set(fpe "-check all -fpe0 -traceback -fpp -free -stand -O0")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "^NVHPC$")
-  set(standard_compile_flags "-traceback")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "^LLVMFlang$")
-  set(standard_compile_flags "")
-elseif(CMAKE_Fortran_COMPILER_ID MATCHES "^Cray$")
-  set(standard_compile_flags "-f free")
-else()
+# One file per compiler ID (pFUnit-style).  Each file sets funwave_base_flags
+# (dialect/portability, every build) and the per-build-type sets:
+#
+# * Release: portable optimized (baseline ISA, reproducible anywhere)
+# * RelWithDebInfo: default; the refs/boards build
+# * Debug: runtime checks + FPE traps + warnings
+# * Coverage: GNU-only lcov diagnostic (empty elsewhere -> guarded)
+# * Benchmark: this-machine peak + symbols for timing/profiling
+set(fc_config
+    "${CMAKE_CURRENT_SOURCE_DIR}/compilers/${CMAKE_Fortran_COMPILER_ID}.cmake")
+if(NOT EXISTS "${fc_config}")
   message(
     FATAL_ERROR "Unsupported FORTRAN compiler ID: ${CMAKE_Fortran_COMPILER_ID}")
 endif()
+include("${fc_config}")
 
-# We propagate these flags to the PARENT_SCOPE so that they apply globally
-# across all project targets defined in the root CMakeLists.txt.
-set(CMAKE_Fortran_FLAGS_DEBUG
-    "${CMAKE_Fortran_FLAGS_DEBUG} ${fpe}"
-    PARENT_SCOPE)
-set(CMAKE_Fortran_FLAGS
-    "${CMAKE_Fortran_FLAGS} ${standard_compile_flags}"
-    PARENT_SCOPE)
-
-# Optional Coverage build type
-set(CMAKE_Fortran_FLAGS_COVERAGE
-    "-O0 -g -coverage -fprofile-arcs -ftest-coverage")
-if(CMAKE_BUILD_TYPE STREQUAL "Coverage")
-  set(CMAKE_Fortran_FLAGS
-      "${CMAKE_Fortran_FLAGS} ${CMAKE_Fortran_FLAGS_COVERAGE}"
-      PARENT_SCOPE)
+if(CMAKE_BUILD_TYPE STREQUAL "Coverage" AND funwave_flags_coverage STREQUAL "")
+  message(
+    FATAL_ERROR "Coverage build not configured for ${CMAKE_Fortran_COMPILER_ID}"
+  )
 endif()
+
+# Propagated to PARENT_SCOPE so the flags apply to every target defined in
+# the root CMakeLists.txt
+set(CMAKE_Fortran_FLAGS
+    "${CMAKE_Fortran_FLAGS} ${funwave_base_flags}"
+    PARENT_SCOPE)
+set(CMAKE_Fortran_FLAGS_RELEASE
+    "${funwave_flags_release}"
+    PARENT_SCOPE)
+set(CMAKE_Fortran_FLAGS_RELWITHDEBINFO
+    "${funwave_flags_relwithdebinfo}"
+    PARENT_SCOPE)
+set(CMAKE_Fortran_FLAGS_DEBUG
+    "${funwave_flags_debug}"
+    PARENT_SCOPE)
+set(CMAKE_Fortran_FLAGS_COVERAGE
+    "${funwave_flags_coverage}"
+    PARENT_SCOPE)
+set(CMAKE_Fortran_FLAGS_BENCHMARK
+    "${funwave_flags_benchmark}"
+    PARENT_SCOPE)

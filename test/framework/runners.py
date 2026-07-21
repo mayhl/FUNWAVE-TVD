@@ -57,9 +57,12 @@ class UnitTestRunner(BaseRunner):
                 "-DENABLE_DEV_MODE=ON",
                 f"-DCMAKE_BUILD_TYPE={build_type}",
             ]
+            # macOS FindMPI misdetects under bare gfortran -> default FC to
+            # the OpenMPI wrapper (explicit FC always wins)
+            env = os.environ.copy()
             if platform.system() == "Darwin":
-                cmake_args += ["-DCMAKE_TOOLCHAIN_FILE=cmake/toolchains/macos_mpi.cmake"]
-            subprocess.run(cmake_args, check=True)
+                env.setdefault("FC", "mpif90")
+            subprocess.run(cmake_args, check=True, env=env)
             nproc = os.cpu_count() or 4
             subprocess.run(["cmake", "--build", self.build_dir, f"-j{nproc}"], check=True)
             if not self.compile_only:
