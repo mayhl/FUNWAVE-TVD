@@ -1,0 +1,79 @@
+# Spectral wavemaker fidelity — TMA source on a flat frictionless flume.
+# The internal Wei-Kirby source is asked for Hm0 = 0.2 m over 0.05-0.3 Hz
+# (Tp = 12 s at h = 8 m, kh_p ~ 0.49, lambda_p ~ 102 m); the oracle measures
+# Hm0 from station variance ~2-3 lambda_p downwave and gates it against the
+# deck value.  Steepness is kept small so breaking never triggers and the
+# measurement stays linear; the east sponge is ~2 lambda_p wide to keep the
+# reflected contamination below the station-spread diagnostic.
+#
+# FIRST LIGHT (2026-07-21): measured Hm0 = 0.141 m — a 29.6 % deficit, per-bin
+# lock-in decomposition:
+#   1. source-box truncation (ledger A7c): Width_WK from the LAST (0.3 Hz)
+#      component clips the low-frequency Gaussians to ~4.3 m half-width
+#      (erf-curve verified per bin: 0.53 at 0.05 Hz -> 1.0 above ~0.19 Hz);
+#   2. kh-dependent Wei-Kirby delivery: REGULAR waves in this flume radiate
+#      ~0.80 of nominal at kh 0.5-0.9 (measured 30 m from the source; the CG
+#      runup case saw 0.986 at kh 0.2) — inherited, not spectral-specific;
+#   3. transport dissipation ~1.2 %/lambda at ppw 29, collapsing the ppw < 12
+#      high band (0.010 measured vs 0.062 theory band fraction).
+# The 35 % gate is a CHARACTERIZATION bound on today's behaviour; tighten when
+# the spectrum-pipeline refactor fixes A7c (rung 3) and the validate pass
+# addresses the kh transfer curve.
+grid:
+  cell_size: [2.0, 2.0]
+  grid_size: [450, 5]
+  bathymetry:
+    type: flat
+    depth: 8.0
+simulation:
+  title: spectral_tma_fidelity
+  total_time: 900.0
+  screen_interval: 100.0
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 0.2
+    gamma: 3.3
+    freq:
+      peak: 0.0833
+      min: 0.05
+      max: 0.3
+    discretization:
+      freq_bins: 45
+  source:
+    x_center: 150.0
+    y_center: 0.0
+    depth: 8.0
+boundaries:
+  west:
+    sponge:
+      width: 100.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  east:
+    sponge:
+      width: 200.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  interval: 900.0
+  stations:
+    file: stations.txt
+    interval: 0.1
+  depth_out: true
+  variables: [ETA]

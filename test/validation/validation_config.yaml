@@ -210,3 +210,23 @@ simulations:
       dispersion: test.validation.oracles.dispersion
     tolerances:
       dispersion: { period_error_pct: 5.0 }
+
+  # ── spectral wavemaker fidelity: Hm0 out vs Hm0 asked ────────────────────
+  # TMA internal source on a flat frictionless flume, breaking never triggered;
+  # station-mean variance Hm0 ~2-3 lambda_p downwave gated against the deck Hm0
+  # (the band renormalization makes the deck value the exact analytic target).
+  # Band-fraction diagnostics separate generation-side deficits (source-width
+  # truncation, ledger A7c) from sponge leakage; primary coverage for the
+  # wavemaker spectrum-pipeline refactor.
+  - name: spectral_2d
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/spectral_2d
+    input_files: [tma_fidelity.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, spectral]
+    postprocess:
+      spectral_fidelity: test.validation.oracles.spectral_fidelity
+    tolerances:
+      spectral_fidelity: { hm0_error_pct: 35.0 }
