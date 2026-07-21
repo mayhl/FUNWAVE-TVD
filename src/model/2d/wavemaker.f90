@@ -641,7 +641,7 @@ contains
          call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
          if (no_key) call env%log%exit_on_error( &
             "wavemaker/spectrum: components needs a file: (wave-component data)")
-         this%wavemaker_type = "WK_TIME_SERIES"
+         this%wavemaker_type = "WK_TIME"
 
       case ("spectrum_2d")
          call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
