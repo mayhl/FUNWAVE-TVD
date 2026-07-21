@@ -1,0 +1,53 @@
+# FUNWAVE-TVD input — converted from legacy input.txt
+# Source: test/regression/inputs/flume_2d/wk_reg_wall.txt
+#
+# No unrecognised keys.
+
+grid:
+  cell_size: [2.0, 2.0]
+  grid_size: [250, 100]
+  bathymetry:
+    type: slope
+    depth: 8.0
+    slope: 0.05
+    x0: 300.0
+simulation:
+  title: flume_2d_wk_reg_wall
+  total_time: 900.0
+  screen_interval: 2.0
+wavemaker:
+  spectrum:
+    type: regular
+    amplitude: 0.5
+    period: 12.0
+    direction: 20.0
+  source:
+    x_center: 150.0
+    y_center: 100.0
+    depth: 8.0
+    time_ramp: 20.0
+boundaries:
+  west:
+    sponge:
+      width: 100.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  interval: 5.0
+  result_folder: output/
+  field_io_type: BINARY
+  means:
+    interval: 100.0
+    steady_time: 100.0
+  depth_out: true
+  variables: [U, V, ETA, ETAscreen, Hmax, Hmin, Umax, MASK, MASK9, Umean, Vmean, ETAmean, WaveHeight, P, Q]

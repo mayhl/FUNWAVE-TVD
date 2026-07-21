@@ -1,0 +1,80 @@
+# FUNWAVE-TVD 3D input — converted from legacy input.txt
+# Source: test/regression/inputs/standing_wave_3d/input_40m.txt
+
+geometry:
+  grid_size: [100, 3, 24]
+  cell_size: [0.2, 0.2]
+  grd_r: 1.1
+  decomposition:
+    nx_proc: 4
+    ny_proc: 1
+  bathymetry:
+    type: CELL_CENTER
+    analytic: false
+    file: data/depth_40m.txt
+  bottom:
+    roughness_type: 1
+    cd: 0.0025
+    zob: 1.5e-05
+    min_depth: 0.002
+simulation:
+  total_time: 50.0
+  sim_steps: 100000000
+  plot_start: 0.0
+  plot_intv: 1.0
+  screen_intv: 1.0
+  cfl: 0.5
+  time_stepping:
+    dt_ini: 0.01
+    dt_min: 1e-05
+    dt_max: 1.0
+  stations:
+    count: 2
+    interval: 0.02
+    file: data/stat.txt
+physics:
+  barotropic: true
+  non_hydro: true
+  high_order: SECOND
+  time_order: SECOND
+  convection: HLPA
+  tramp: 5.0
+  froude_cap: 10.0
+  wave_average:
+    active: false
+    t_start: 200.0
+    t_end: 1800.0
+    height_id: 2
+turbulence:
+  ivturb: 10
+  ihturb: 10
+  visc: 1e-06
+  schmidt: 1.0
+  cvs: 0.001
+  chs: 0.001
+  viscous_number: 0.1666667
+solver:
+  solver_type: 2
+  max_iter: 100000
+  tolerance: 1e-08
+boundary_conditions:
+  bc_x0: 1
+  bc_xn: 1
+  bc_y0: 1
+  bc_yn: 1
+  bc_z0: 1
+  bc_zn: 1
+hot_start:
+  eta_file: data/eta0.txt
+  u_file: data/u0.txt
+  v_file: data/v0.txt
+  w_file: data/w0.txt
+  p_file: data/p0.txt
+  sali_file: ./results/sali_01232
+  temp_file: ./results/temp_01232
+  rho_file: ./results/rho_01232
+  tke_file: ./results/k_01232
+  eps_file: ./results/d_01232
+output:
+  result_folder: output/
+  variables: [ETA]

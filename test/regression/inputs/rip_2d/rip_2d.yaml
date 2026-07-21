@@ -1,0 +1,60 @@
+# FUNWAVE-TVD input — converted from legacy input.txt
+# Source: test/regression/inputs/rip_2d/rip_2d.txt
+#
+# No unrecognised keys.
+
+grid:
+  cell_size: [1.0, 2.0]
+  grid_size: [512, 250]
+  bathymetry:
+    type: file
+    file: depth_a15.txt
+    nx: 512
+    ny: 250
+simulation:
+  title: rip_2d
+  total_time: 200.0
+  screen_interval: 20.0
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 1.0
+    gamma: 5.0
+    freq:
+      peak: 0.1
+      min: 0.03
+      max: 0.5
+    directional:
+      peak: 0.0
+      spread: 10.0
+      n_bins: 24
+    discretization:
+      freq_bins: 45
+  source:
+    x_center: 425.0
+    y_center: 0.0
+    depth: 13.0
+boundaries:
+  east:
+    sponge:
+      width: 60.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  interval: 20.0
+  result_folder: output/
+  field_io_type: BINARY
+  depth_out: true
+  variables: [U, V, ETA, ETAscreen, Hmax, Hmin, Umax, MASK]

@@ -45,16 +45,7 @@ simulations:
   - name: flume_1d_reg
     exe_type: central
     input: test/regression/inputs/flume_1d
-    input_files: [wk_reg.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [wk_reg.yaml]
     binary: funwave
     output_dir: output
     tags: [flume, 1d, smoke]
@@ -72,16 +63,7 @@ simulations:
   - name: flume_1d_irr
     exe_type: central
     input: test/regression/inputs/flume_1d
-    input_files: [wk_irr.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [wk_irr.yaml]
     binary: funwave
     output_dir: output
     tags: [flume, 1d, smoke]
@@ -97,16 +79,7 @@ simulations:
   - name: flume_1d_spectral
     exe_type: central
     input: test/regression/inputs/flume_1d
-    input_files: [jon_1d.txt, tma_1d.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [jon_1d.yaml, tma_1d.yaml]
     binary: funwave
     output_dir: output
     tags: [flume, 1d, smoke]
@@ -124,16 +97,7 @@ simulations:
   - name: flume_2d
     exe_type: central
     input: test/regression/inputs/flume_2d
-    input_files: [wk_reg_wall.txt, wk_reg_wall_sponge.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [wk_reg_wall.yaml, wk_reg_wall_sponge.yaml]
     binary: funwave
     output_dir: output
     tags: [flume, 2d]
@@ -155,16 +119,7 @@ simulations:
     # periodic domain so it keeps that coverage under pure auto-sizing, then drop the pin.
     decomp: [4, 2]
     input: test/regression/inputs/flume_2d
-    input_files: [wk_irr_periodic.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [wk_irr_periodic.yaml]
     binary: funwave
     output_dir: output
     tags: [flume, 2d]
@@ -177,6 +132,8 @@ simulations:
   # solitary_flat_1d: INI_SOLITARY on flat bottom — wavemaker-free physics path.
   # Exercises core flux divergence (ESTIMATE_HUV else branch) + dispersion tridiagonal.
   # No sponge, no friction, PERIODIC=T so wave wraps; short run to verify mass conservation.
+  # Deliberately kept on a legacy .txt deck — the standing convert_input.py guard
+  # (all other cases run native YAML decks).
   - name: solitary_flat_1d
     exe_type: central
     input: test/regression/inputs/solitary_flat_1d
@@ -208,16 +165,7 @@ simulations:
   - name: rip_2d
     exe_type: central
     input: test/regression/inputs/rip_2d
-    input_files: [rip_2d.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [rip_2d.yaml]
     binary: funwave
     output_dir: output
     tags: [2d, bathy]
@@ -286,17 +234,10 @@ simulations:
     # serial) — HYPRE is not yet implemented efficiently. np=2 is the measured
     # optimum; revisit if/when the 3D solver is tuned. PY=1 forced by Nglob=3.
     decomp: [2, 1]
+    # the vendor ref reads ./input.txt only (no yaml, no argv): the legacy 10m
+    # deck stays in the input dir under that name and stages with the run
     input: test/regression/inputs/standing_wave_3d
-    input_files: [input_10m.txt]
-    preprocess:
-      [
-        uv,
-        run,
-        "{repo_root}/scripts/convert_input.py",
-        "{input_file}",
-        "{curr_input}",
-      ]
-    preprocess_ref: true
+    input_files: [input_10m.yaml]
     binary: funwave
     output_dir: output
     tags: [3d]
