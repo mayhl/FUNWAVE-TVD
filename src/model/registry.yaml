@@ -180,6 +180,8 @@ sections:
       spectrum.direction: { legacy: Theta_WK, default: 0.0, units: deg, latex: "$\\theta$", variant: [regular], doc: "Monochromatic wave direction." }
       spectrum.hm0: { legacy: Hmo, default: 0.0, units: m, latex: "$H_{m0}$", variant: [jonswap, tma], doc: "Significant wave height (total eta)." }
       spectrum.gamma: { legacy: GammaTMA, default: 3.3, units: ~, latex: "$\\gamma$", variant: [jonswap, tma], doc: "Peak enhancement factor." }
+      spectrum.normalize:
+        { legacy: ~, default: band, units: ~, values: [band, total], variant: [jonswap, tma], doc: "Hm0 normalization: band renormalizes the truncated [min, max] band to carry the full Hm0 (legacy); total keeps the band's natural share of the full-spectrum integral." }
       spectrum.freq.peak: { legacy: FreqPeak, default: 0.0, units: Hz, latex: "$f_p$", variant: [jonswap, tma], doc: "Peak frequency (exact legacy path)." }
       spectrum.freq.min: { legacy: FreqMin, default: 0.0, units: Hz, variant: [jonswap, tma], doc: "Minimum frequency." }
       spectrum.freq.max: { legacy: FreqMax, default: 0.0, units: Hz, variant: [jonswap, tma], doc: "Maximum frequency." }

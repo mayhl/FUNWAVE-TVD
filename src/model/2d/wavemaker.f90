@@ -98,6 +98,7 @@ module model_wavemaker_mod
                                         DEF_WAVEMAKER_SPECTRUM_FREQ_PEAK, &
                                         DEF_WAVEMAKER_SPECTRUM_GAMMA, &
                                         DEF_WAVEMAKER_SPECTRUM_HM0, &
+                                        DEF_WAVEMAKER_SPECTRUM_NORMALIZE, &
                                         DEF_WAVEMAKER_SPECTRUM_N, &
                                         DEF_WAVEMAKER_SPECTRUM_PERIOD, &
                                         DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK
@@ -184,6 +185,10 @@ module model_wavemaker_mod
       integer  :: Ntheta = 1
       real(SP) :: Sigma_Theta = 0.0_SP
       real(SP) :: alpha_c = 0.0_SP   ! WK_NEW_IRR only
+      ! normalize: total — Hm0 refers to the full spectrum and the
+      ! [min, max] band carries only its natural energy share; default
+      ! band renormalizes the band to the full Hm0 (legacy)
+      logical  :: normalize_total = .false.
 
       ! RNG seed for the random phase realization — see seed_wave_phases.
       ! Deterministic by default so runs are reproducible AND a hotstart
@@ -493,7 +498,7 @@ contains
 
       type(type_yaml_reader), allocatable :: entries(:)
       type(type_yaml_reader) :: wm, spec_yaml, blk
-      character(:), allocatable :: stype, method, legacy_type
+      character(:), allocatable :: stype, method, legacy_type, normalize
       logical :: no_wm, no_key, has_initial, has_dir
       logical :: no_spec, no_blk, no_freq, no_per
       real(SP) :: p_tmp
@@ -596,6 +601,10 @@ contains
                              default=DEF_WAVEMAKER_SPECTRUM_HM0)
          call spec_yaml%read("gamma", silent=no_key, val=this%GammaTMA, &
                              default=DEF_WAVEMAKER_SPECTRUM_GAMMA)
+         call spec_yaml%read_enum("normalize", [character(5) :: "band", "total"], &
+                                  val=normalize, &
+                                  default=DEF_WAVEMAKER_SPECTRUM_NORMALIZE)
+         this%normalize_total = normalize == "total"
          ! freq {peak,min,max} = exact legacy path; period {peak,min,max} =
          ! hand-authoring alternative (reciprocal fill — 1/(1/x) is NOT
          ! bitwise x, acceptable off the legacy-parity path by design)
@@ -1314,7 +1323,7 @@ contains
       call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, &
                                  ag, env)
 
-      alpha_spec = this%Hmo**2/16.0_SP/Ef
+      alpha_spec = wk_alpha_spec(this, is_jonswap, this%DEP_WK, Ef)
 
       ! flat component set, theta-fastest — matches both the legacy
       ! kf-outer/ktheta-inner solve order (snap scratch carry) and the
@@ -1913,7 +1922,7 @@ contains
       call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, &
                                  ag, env)
 
-      alpha_spec = this%Hmo**2/16.0_SP/Ef
+      alpha_spec = wk_alpha_spec(this, is_jonswap, h_ser, Ef)
       alpha1 = alpha + 1.0_SP/3.0_SP
 
       do ktheta = 1, this%Ntheta
@@ -2561,7 +2570,7 @@ contains
          Ef = Ef + energy_bin(kf)
       end do
 
-      alpha_spec = this%Hmo**2/16.0_SP/Ef
+      alpha_spec = wk_alpha_spec(this, .false., this%DEP_WK, Ef)
       correction_coeff = Ef/dot_product(ag, energy_bin)
       do kf = 1, nfreq
          ag(kf) = ag(kf)*correction_coeff
@@ -2863,6 +2872,56 @@ contains
              *gamma_spec**(exp(-(fre/fm - 1.0_SP)**2/(2.0_SP*sigma_spec**2)))
 
    end function tma_density
+
+   ! ----------------------------------------------------------------
+   ! Private: the spectral scale $\alpha_s = H_{m0}^2/(16 E)$.  Under
+   ! normalize: band (legacy default) $E$ is the truncated [min, max]
+   ! band integral, so the band is inflated to carry the full Hm0;
+   ! under normalize: total $E$ is the full-spectrum integral and the
+   ! band keeps its natural energy share.
+   ! ----------------------------------------------------------------
+   function wk_alpha_spec(this, is_jonswap, h_gen, Ef) result(alpha_spec)
+      class(type_model_wavemaker), intent(in) :: this
+      logical, intent(in)  :: is_jonswap
+      real(SP), intent(in) :: h_gen, Ef
+      real(SP) :: alpha_spec
+
+      if (this%normalize_total) then
+         alpha_spec = this%Hmo**2/16.0_SP &
+                      /spectrum_total_energy(is_jonswap, this%FreqPeak, h_gen, &
+                                             this%GammaTMA)
+      else
+         alpha_spec = this%Hmo**2/16.0_SP/Ef
+      end if
+   end function wk_alpha_spec
+
+   ! ----------------------------------------------------------------
+   ! Private: full-spectrum energy for normalize: total — trapezoid of
+   ! the density over $[f_p/10,\ 10 f_p]$; the tails beyond contribute
+   ! < 1e-4 of the integral (double-exponential low side, $f^{-5}$
+   ! high side).
+   ! ----------------------------------------------------------------
+   function spectrum_total_energy(is_jonswap, fm, h_gen, gamma_spec) result(E_total)
+      logical, intent(in)  :: is_jonswap
+      real(SP), intent(in) :: fm, h_gen, gamma_spec
+      real(SP) :: E_total
+
+      integer, parameter :: n_scan = 10000
+      real(SP) :: f_lo, df_scan, weight
+      integer :: k
+
+      f_lo = fm/10.0_SP
+      df_scan = (10.0_SP*fm - f_lo)/real(n_scan, SP)
+      E_total = 0.0_SP
+      do k = 0, n_scan
+         weight = 1.0_SP
+         if (k == 0 .or. k == n_scan) weight = 0.5_SP
+         E_total = E_total + weight*tma_density(is_jonswap, &
+                                                f_lo + real(k, SP)*df_scan, &
+                                                fm, h_gen, gamma_spec)
+      end do
+      E_total = E_total*df_scan
+   end function spectrum_total_energy
 
    ! ----------------------------------------------------------------
    ! Private: wrapped-normal directional spreading (Borgman 1984;

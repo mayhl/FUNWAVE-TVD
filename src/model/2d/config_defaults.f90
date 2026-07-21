@@ -153,6 +153,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_GAMMA = "3.3"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_HM0 = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_N = "1"
+   character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_NORMALIZE = "band"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_PERIOD = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK = "0.0"
 

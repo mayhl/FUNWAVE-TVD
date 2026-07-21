@@ -38,6 +38,7 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.direction` | `0.0` | `Theta_WK` | deg | *(regular)* Monochromatic wave direction. |
 | `spectrum.hm0` | `0.0` | `Hmo` | m | *(jonswap/tma)* Significant wave height (total eta). |
 | `spectrum.gamma` | `3.3` | `GammaTMA` | — | *(jonswap/tma)* Peak enhancement factor. |
+| `spectrum.normalize` | `band` | — | — | *(jonswap/tma)* Hm0 normalization: band renormalizes the truncated [min, max] band to carry the full Hm0 (legacy); total keeps the band's natural share of the full-spectrum integral. One of `band` \| `total`. |
 | `spectrum.freq.peak` | `0.0` | `FreqPeak` | Hz | *(jonswap/tma)* Peak frequency (exact legacy path). |
 | `spectrum.freq.min` | `0.0` | `FreqMin` | Hz | *(jonswap/tma)* Minimum frequency. |
 | `spectrum.freq.max` | `0.0` | `FreqMax` | Hz | *(jonswap/tma)* Maximum frequency. |
