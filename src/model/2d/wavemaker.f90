@@ -302,9 +302,9 @@ contains
    !      I = \sqrt{\pi/\beta}\;e^{-l^2/4\beta}, \qquad l = k\cos\theta $$
    !   $$ D = \frac{2 a \cos\theta\,(\omega^2 - \alpha_1 g k^4 h^3)}
    !               {\omega k I \left(1 - \alpha (kh)^2\right)} $$
-   ! Emits D/lambda/beta per component plus the trailing-component
-   ! width $W = \delta L/2$ (own wavelength when n = 1; the
-   ! last-component spectral quirk, parity ledger A7c).
+   ! Emits D/lambda/beta per component; the source width comes from
+   ! wk_peak_width — one peak-based width for every path (the legacy
+   ! last-component width was ledger A7c, fixed at rung 3).
    ! Legacy float sequences are selected per path, not unified:
    !  * ri_pi — the sqrt(pi/beta) constant: PI for the WK_IRR/WK_NEW_IRR
    !    family, the truncated 3.14159 literal for REG/TIME/DATA2D
@@ -317,13 +317,13 @@ contains
    !    pre-pass and passes SNAP_NONE
    ! ----------------------------------------------------------------
    subroutine wk_solve_components(cs, h_gen, delta, ri_pi, fm, use_peak_cphase, &
-                                  D_gen, rlamda, beta_gen, width, snap_mode, &
+                                  D_gen, rlamda, beta_gen, snap_mode, &
                                   dy, nglob, env, snap_label)
       use core_constants_mod, only: GRAV, SMALL
       type(type_component_set), intent(inout) :: cs
       real(SP), intent(in) :: h_gen, delta, ri_pi, fm
       logical, intent(in) :: use_peak_cphase
-      real(SP), intent(out) :: D_gen(:), rlamda(:), beta_gen(:), width
+      real(SP), intent(out) :: D_gen(:), rlamda(:), beta_gen(:)
       integer, intent(in), optional :: snap_mode, nglob
       real(SP), intent(in), optional :: dy
       type(type_env), intent(inout), optional :: env
@@ -339,7 +339,6 @@ contains
       if (present(snap_mode)) snap = snap_mode
 
       alpha1 = alpha + 1.0_SP/3.0_SP
-      wave_length = 0.0_SP
       ! legacy PARAM scratch is static: a theta = 0 component under
       ! periodic reuses the previous component's snapped value
       snap_scratch = 0.0_SP
@@ -395,8 +394,6 @@ contains
                     *(omgn**2 - alpha1*GRAV*wkn**4*h_gen**3) &
                     /(omgn*wkn*ri*(1.0_SP - alpha*(wkn*h_gen)**2))
       end do
-
-      width = delta*wave_length/2.0_SP
 
    end subroutine wk_solve_components
 
@@ -467,8 +464,9 @@ contains
    end subroutine wk_merge_slots
 
    ! ----------------------------------------------------------------
-   ! Private: source width from the peak period (legacy tail block of
-   ! the WK_TIME/WK_DATA2D/WK_NEW_DATA2D solves).
+   ! Private: source width $W = \delta L_p/2$ from the peak period —
+   ! THE width for every internal-source path (legacy computed it from
+   ! whatever component the solve loop ended on; ledger A7c).
    ! ----------------------------------------------------------------
    subroutine wk_peak_width(peak_period, h_gen, delta, width)
       use core_constants_mod, only: GRAV
@@ -1353,8 +1351,10 @@ contains
       if (periodic) snap_mode = SNAP_SPECTRAL
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
                                this%FreqPeak, .true., D_gen, rlamda, beta_gen, &
-                               this%Width_WK, snap_mode=snap_mode, &
+                               snap_mode=snap_mode, &
                                dy=grid%dy0, nglob=grid%N, env=env)
+      call wk_peak_width(1.0_SP/this%FreqPeak, this%DEP_WK, this%Delta_WK, &
+                         this%Width_WK)
 
       ! parity builds fix all phases to zero; the random path draws into
       ! the legacy (nfreq, ntheta) shape so the column-major draw order
@@ -1389,7 +1389,6 @@ contains
 
       type(type_component_set) :: cs
       real(SP), allocatable :: rlamda(:)
-      real(SP) :: width_last
       integer :: kf, i, unit, ios
 
       allocate (this%wave_comp(this%NumWaveComp, 3), &
@@ -1422,7 +1421,7 @@ contains
 
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, 3.14159_SP, &
                                0.0_SP, .false., this%D_genS, rlamda, &
-                               this%Beta_genS, width_last)
+                               this%Beta_genS)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
 
@@ -1456,7 +1455,7 @@ contains
       real(SP), allocatable :: dire_flt(:), amp_flt(:, :), phase_flt(:, :)
       real(SP), allocatable :: dire_rad(:), dir2d(:, :)
       real(SP), allocatable :: D_gen(:), rlamda(:), beta_gen(:)
-      real(SP) :: alpha1, omgn, tb, tc, wkn_snap, width_last
+      real(SP) :: alpha1, omgn, tb, tc, wkn_snap
       logical :: input_phase
       integer :: nfreq, ndir_in, ndir, unit, ios, i, j, kf, kt, c, nfre
       integer :: mloc, nloc
@@ -1579,8 +1578,7 @@ contains
 
       allocate (D_gen(cs%n), rlamda(cs%n), beta_gen(cs%n))
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, 3.14159_SP, &
-                               0.0_SP, .false., D_gen, rlamda, beta_gen, &
-                               width_last)
+                               0.0_SP, .false., D_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
 
@@ -1621,7 +1619,7 @@ contains
       real(SP), allocatable :: freq(:), dire(:), amp(:), phase(:)
       real(SP), allocatable :: freq_flt(:), dire_flt(:), amp_flt(:), phase_flt(:)
       real(SP), allocatable :: d_gen(:), rlamda(:), beta_gen(:)
-      real(SP) :: alpha1, omgn, tb, tc, wkn_snap, snapped, width_last
+      real(SP) :: alpha1, omgn, tb, tc, wkn_snap, snapped
       logical :: input_phase
       integer :: nfreq_in, nfreq, unit, ios, i, j
       character(96) :: msg
@@ -1717,8 +1715,7 @@ contains
 
       allocate (d_gen(nfreq), rlamda(nfreq), beta_gen(nfreq))
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, 3.14159_SP, &
-                               0.0_SP, .false., d_gen, rlamda, beta_gen, &
-                               width_last)
+                               0.0_SP, .false., d_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
 
@@ -1766,9 +1763,11 @@ contains
       if (periodic) snap_mode = SNAP_NEW
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
                                this%FreqPeak, .true., d_gen, rlamda, beta_gen, &
-                               this%Width_WK, snap_mode=snap_mode, &
+                               snap_mode=snap_mode, &
                                dy=grid%dy0, nglob=grid%N, env=env, &
                                snap_label="WK_NEW_IRR")
+      call wk_peak_width(1.0_SP/this%FreqPeak, this%DEP_WK, this%Delta_WK, &
+                         this%Width_WK)
 
       ! legacy assigns phases only under PERIODIC (uninitialized
       ! otherwise — UB); assigned unconditionally here, AFTER the solve
@@ -2442,7 +2441,8 @@ contains
       cs%amp(1) = amp
 
       call wk_solve_components(cs, h_gen, delta, 3.14159_SP, 0.0_SP, .false., &
-                               D1, rl1, b1, width)
+                               D1, rl1, b1)
+      call wk_peak_width(Tperiod, h_gen, delta, width)
       D_gen = D1(1)
       rlamda = rl1(1)
       beta_gen = b1(1)
