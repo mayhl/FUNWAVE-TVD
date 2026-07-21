@@ -931,6 +931,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_post_step(this, time, blowup)
       use mpi_f08, only: MPI_Allreduce, MPI_MAX, MPI_IN_PLACE
+      use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
       class(type_model_stepper_2d), intent(inout) :: this
       real(SP), intent(in) :: time
       logical, intent(out) :: blowup
@@ -981,6 +982,11 @@ contains
 
       associate (f => this%fields, lp => this%grid%lp)
          max_abs_eta = maxval(abs(f%eta(lp%ib:lp%ie, lp%jb:lp%je)))
+         ! NaN compares false against any threshold, so a NaN'd run cruises
+         ! to walltime; promote to +huge so the MPI_MAX below trips the
+         ! blow-up on every rank
+         if (any(ieee_is_nan(f%eta(lp%ib:lp%ie, lp%jb:lp%je)))) &
+            max_abs_eta = huge(1.0_SP)
       end associate
       call MPI_Allreduce(MPI_IN_PLACE, max_abs_eta, 1, MPI_SP, MPI_MAX, &
                          this%grid%cart_comm, ierr)
