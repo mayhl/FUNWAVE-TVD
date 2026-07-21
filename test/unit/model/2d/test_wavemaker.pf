@@ -219,12 +219,11 @@ contains
    end subroutine test_data2d_phase_dropped_last
 
    ! ----------------------------------------------------------------
-   ! WK_DATA2D phase pairing, CHARACTERIZATION of ledger A7d: with the
-   ! dropped direction FIRST, the phase columns are NOT remapped through
-   ! the direction filter (legacy Phase2D is never compacted), so the
-   ! survivors pick up the dropped direction's phases and the field
-   ! DIFFERS from the pre-compacted ground truth.  The spectrum-pipeline
-   ! refactor fixes the pairing — flip this assert to assertEqual then.
+   ! WK_DATA2D phase pairing (ledger A7d, fixed at rung 3): with the
+   ! dropped direction FIRST, the tuple filter keeps each phase column
+   ! paired with its own direction, so the 3-direction file must
+   ! reproduce the pre-compacted ground truth bitwise (legacy never
+   ! compacted Phase2D — survivors picked up the dropped phases).
    ! ----------------------------------------------------------------
    @test(npes=[1])
    subroutine test_data2d_phase_mispair_characterization(this)
@@ -246,8 +245,8 @@ contains
       call init_data2d(this, wm3, 'wk_d2d_first3.txt')
       call init_data2d(this, wm2, 'wk_d2d_first2.txt')
 
-      ! amps compact correctly, so any difference is pure phase mis-pairing
-      @assertTrue(maxval(abs(wm3%Cm - wm2%Cm)) > 100.0_SP*TOL_SP)
+      @assertEqual(0.0_SP, maxval(abs(wm3%Cm - wm2%Cm)), TOL_SP)
+      @assertEqual(0.0_SP, maxval(abs(wm3%Sm - wm2%Sm)), TOL_SP)
 
       call dummy_fix_lint()
    end subroutine test_data2d_phase_mispair_characterization

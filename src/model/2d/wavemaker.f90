@@ -1435,12 +1435,11 @@ contains
    !   NumFreq NumDir / PeakPeriod / freq rows / dir rows /
    !   amp(1:NumFreq) per dir / [phase(1:NumFreq) per dir, degrees]
    ! Directions with |dir| >= 60 deg are dropped (SWAN-conversion
-   ! guard).  Legacy quirks kept: input phase columns are NOT
-   ! remapped through the direction filter (legacy Phase2D is never
-   ! compacted — column k pairs with the k-th SURVIVING direction
-   ! only when nothing before it was dropped); the input phase unit
-   ! conversion is 0.005555555555556*pi.  FreqPeak (ramp scale) =
-   ! 1/PeakPeriod from the file.
+   ! guard); the filter runs on (dir, amp, phase) tuples, so an input
+   ! phase column stays paired with its own direction (legacy never
+   ! compacted Phase2D — the ledger A7d mis-pair, fixed here).  The
+   ! input phase unit conversion is the legacy 0.005555555555556*pi.
+   ! FreqPeak (ramp scale) = 1/PeakPeriod from the file.
    ! ----------------------------------------------------------------
    subroutine data2d_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
@@ -1454,7 +1453,7 @@ contains
       real(SP), parameter :: alpha = -0.39_SP
       type(type_component_set) :: cs
       real(SP), allocatable :: freq(:), dire(:), amp(:, :), phase(:, :)
-      real(SP), allocatable :: dire_flt(:), amp_flt(:, :)
+      real(SP), allocatable :: dire_flt(:), amp_flt(:, :), phase_flt(:, :)
       real(SP), allocatable :: dire_rad(:), dir2d(:, :)
       real(SP), allocatable :: D_gen(:), rlamda(:), beta_gen(:)
       real(SP) :: alpha1, omgn, tb, tc, wkn_snap, width_last
@@ -1491,14 +1490,17 @@ contains
       end do
       close (unit)
 
-      ! drop out-of-range directions, order-preserving (|dir| < 60)
-      allocate (dire_flt(ndir_in), amp_flt(nfreq, ndir_in))
+      ! drop out-of-range directions, order-preserving (|dir| < 60);
+      ! (dir, amp, phase) move as a tuple
+      allocate (dire_flt(ndir_in), amp_flt(nfreq, ndir_in), &
+                phase_flt(nfreq, ndir_in))
       ndir = 0
       do i = 1, ndir_in
          if (abs(dire(i)) < 60.0_SP) then
             ndir = ndir + 1
             dire_flt(ndir) = dire(i)
             amp_flt(:, ndir) = amp(:, i)
+            phase_flt(:, ndir) = phase(:, i)
          end if
       end do
 
@@ -1511,15 +1513,15 @@ contains
          ! legacy unit conversion literal (0.00555... * pi, not /180)
          do j = 1, nfreq
             do i = 1, ndir
-               phase(j, i) = phase(j, i)*0.005555555555556_SP*PI
+               phase_flt(j, i) = phase_flt(j, i)*0.005555555555556_SP*PI
             end do
          end do
       else
          if (BUILD_ZERO_PHASE) then
-            phase(:, 1:ndir) = 0.0_SP
+            phase_flt(:, 1:ndir) = 0.0_SP
          else
-            call random_number(phase(:, 1:ndir))
-            phase(:, 1:ndir) = phase(:, 1:ndir)*2.0_SP*PI
+            call random_number(phase_flt(:, 1:ndir))
+            phase_flt(:, 1:ndir) = phase_flt(:, 1:ndir)*2.0_SP*PI
          end if
       end if
 
@@ -1559,9 +1561,7 @@ contains
          end do
       end if
 
-      ! flat component set, theta-fastest; the phase column index runs
-      ! over the SURVIVOR position into the UNCOMPACTED phase matrix —
-      ! the A7d mis-pair quirk, kept bug-for-bug
+      ! flat component set, theta-fastest
       call component_set_alloc(cs, nfreq*ndir)
       c = 0
       do kf = 1, nfreq
@@ -1572,7 +1572,7 @@ contains
             cs%Tperiod(c) = 1.0_SP/freq(kf)
             cs%theta(c) = dir2d(kf, kt)
             cs%amp(c) = amp_flt(kf, kt)
-            cs%phase(c) = phase(kf, kt)
+            cs%phase(c) = phase_flt(kf, kt)
             cs%slot(c) = kf
          end do
       end do
