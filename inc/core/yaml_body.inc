@@ -153,9 +153,6 @@
                     dim, &
 #endif
                     val)
-      !----------------------------------------------------------
-      ! IO node reads from YAML; all nodes receive via bcast.
-      !----------------------------------------------------------
       class(type_yaml_reader), intent(inout) :: this
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
@@ -167,38 +164,20 @@
 #endif
       _CLASS, intent(inout) :: val
       logical, optional, intent(out) :: silent
-      logical :: p_silent
 
-      p_silent = .false.
-      if (this%comm%is_io_node()) then
-         if (present(silent)) then
-            call this%_READ_NODE(key, default=default, &
-                                 silent=p_silent, &
+      ! Every rank parses the bcast deck bytes at init, so reads are plain
+      ! local lookups -- no io-node gate, no per-value bcast (absent optionals
+      ! forward as absent)
+      call this%_READ_NODE(key, default=default, &
+                           silent=silent, &
 #ifdef _HAS_RANGE
-                                 required_range=required_range, &
-                                 recommend_range=recommend_range, &
+                           required_range=required_range, &
+                           recommend_range=recommend_range, &
 #endif
 #ifdef _HAS_UNITS
-                                 dim=dim, &
+                           dim=dim, &
 #endif
-                                 val=val)
-         else
-            call this%_READ_NODE(key, default=default, &
-#ifdef _HAS_RANGE
-                                 required_range=required_range, &
-                                 recommend_range=recommend_range, &
-#endif
-#ifdef _HAS_UNITS
-                                 dim=dim, &
-#endif
-                                 val=val)
-         end if
-      end if
-      call this%comm%bcast(val)
-      if (present(silent)) then
-         call this%comm%bcast(p_silent)
-         silent = p_silent
-      end if
+                           val=val)
 
    end subroutine _READ
 

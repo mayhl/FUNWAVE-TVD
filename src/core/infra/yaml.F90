@@ -95,29 +95,58 @@ contains
       character(:), allocatable, intent(in) :: path_str
       type(type_comm), target, intent(inout):: comm
 
-      character(:), allocatable :: err
+      character(:), allocatable :: err, content, tmp_path
       class(type_node), pointer :: root
       type(type_path) :: path
       character(MESSAGE_SIZE) :: message
-      logical :: file_exist
+      character(1024) :: tmp_dir
+      integer :: unit_, n, tmp_stat
 
       log_buff = comm%get_logger(log_label)
       this%log => log_buff
       this%comm => comm
 
-      path = type_path(path_str)
+      ! Serial read + bcast of the RAW BYTES, then every rank parses an
+      ! identical node-local copy.  One shared-filesystem read instead of N,
+      ! and every rank owns a full tree -- parsing on the io node alone left
+      ! null roots on the other ranks, and any structural query segfaulted
+      ! (the failure that killed the first serial-read attempt).
+      if (comm%is_io_node()) then
+         path = type_path(path_str)
 
-      if (.not. path%is_file()) then
-         message = "Input file does not exists, got: "//trim(path_str)
-         call this%log%exit_on_error(message)
+         if (.not. path%is_file()) then
+            message = "Input file does not exists, got: "//trim(path_str)
+            call this%log%exit_on_error(message)
+         end if
+
+         if (path%file_size() .eq. 0) then
+            message = "Input file is empty: "//trim(path_str)
+            call this%log%exit_on_error(message)
+         end if
+
+         n = path%file_size()
+         allocate (character(n) :: content)
+         open (newunit=unit_, file=path_str, access="stream", form="unformatted", status="old")
+         read (unit_) content
+         close (unit_)
       end if
+      call comm%bcast(content)
 
-      if (path%file_size() .eq. 0) then
-         message = "Input file is empty: "//trim(path_str)
-         call this%log%exit_on_error(message)
-      end if
+      call get_environment_variable("TMPDIR", tmp_dir, status=tmp_stat)
+      if (tmp_stat /= 0 .or. len_trim(tmp_dir) == 0) tmp_dir = "/tmp"
+      block
+         character(32) :: rank_tag
+         write (rank_tag, "(i0)") comm%rank_id
+         tmp_path = trim(tmp_dir)//"/funwave_deck_"//trim(rank_tag)//".yaml"
+      end block
+      open (newunit=unit_, file=tmp_path, access="stream", form="unformatted", status="replace")
+      write (unit_) content
+      close (unit_)
 
-      call this%file%parse(path%root, err)
+      call this%file%parse(tmp_path, err)
+
+      open (newunit=unit_, file=tmp_path, status="old")
+      close (unit_, status="delete")
 
       if (allocated(err)) then
          call this%log%exit_on_error(err)
@@ -585,47 +614,39 @@ contains
       type(type_list_item), pointer :: item
       class(type_scalar), pointer :: item_scalar
       integer :: n, i
-      logical :: p_silent
 
-      p_silent = .false.
-      if (this%comm%is_io_node()) then
-         node => this%root%get(key)
-         if (.not. associated(node)) then
-            if (present(silent)) then
-               p_silent = .true.
-            else
-               call this%log%exit_on_error(trim(this%root%path)//' does not contain key "'//trim(key)//'".')
-            end if
+      node => this%root%get(key)
+      if (.not. associated(node)) then
+         if (present(silent)) then
+            silent = .true.
          else
-            select type (node)
-            class is (type_list)
-               list_node => node
-               n = list_node%size()
-               if (allocated(val)) deallocate (val)
-               allocate (val(n))
-               i = 1
-               item => list_node%first
-               do while (associated(item))
-                  select type (node_item => item%node)
-                  class is (type_scalar)
-                     item_scalar => node_item
-                     val(i)%s = item_scalar%string
-                  class default
-                     call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
-                  end select
-                  i = i + 1
-                  item => item%next
-               end do
-            class default
-               call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
-            end select
+            call this%log%exit_on_error(trim(this%root%path)//' does not contain key "'//trim(key)//'".')
          end if
+         return
       end if
-      if (present(silent)) then
-         call this%comm%bcast(p_silent)
-         silent = p_silent
-      end if
-      if (.not. p_silent) call this%comm%bcast(val)
+      if (present(silent)) silent = .false.
+      select type (node)
+      class is (type_list)
+         list_node => node
+         n = list_node%size()
+         if (allocated(val)) deallocate (val)
+         allocate (val(n))
+         i = 1
+         item => list_node%first
+         do while (associated(item))
+            select type (node_item => item%node)
+            class is (type_scalar)
+               item_scalar => node_item
+               val(i)%s = item_scalar%string
+            class default
+               call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
+            end select
+            i = i + 1
+            item => item%next
+         end do
+      class default
+         call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
+      end select
    end subroutine read_string_array
 
    subroutine read_integer_array(this, key, silent, val)
@@ -638,48 +659,40 @@ contains
       type(type_list_item), pointer :: item
       class(type_scalar), pointer :: item_scalar
       integer :: n, i, stat
-      logical :: p_silent
 
-      p_silent = .false.
-      if (this%comm%is_io_node()) then
-         node => this%root%get(key)
-         if (.not. associated(node)) then
-            if (present(silent)) then
-               p_silent = .true.
-            else
-               call this%log%exit_on_error(trim(this%root%path)//' does not contain key "'//trim(key)//'".')
-            end if
+      node => this%root%get(key)
+      if (.not. associated(node)) then
+         if (present(silent)) then
+            silent = .true.
          else
-            select type (node)
-            class is (type_list)
-               list_node => node
-               n = list_node%size()
-               if (allocated(val)) deallocate (val)
-               allocate (val(n))
-               i = 1
-               item => list_node%first
-               do while (associated(item))
-                  select type (node_item => item%node)
-                  class is (type_scalar)
-                     item_scalar => node_item
-                     call str2int(item_scalar%string, val(i), stat)
-                     if (stat /= 0) call this%log%exit_on_error("Value '"//trim(item_scalar%string)//"' is not a valid integer.")
-                  class default
-                     call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
-                  end select
-                  i = i + 1
-                  item => item%next
-               end do
-            class default
-               call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
-            end select
+            call this%log%exit_on_error(trim(this%root%path)//' does not contain key "'//trim(key)//'".')
          end if
+         return
       end if
-      if (present(silent)) then
-         call this%comm%bcast(p_silent)
-         silent = p_silent
-      end if
-      if (.not. p_silent) call this%comm%bcast(val)
+      if (present(silent)) silent = .false.
+      select type (node)
+      class is (type_list)
+         list_node => node
+         n = list_node%size()
+         if (allocated(val)) deallocate (val)
+         allocate (val(n))
+         i = 1
+         item => list_node%first
+         do while (associated(item))
+            select type (node_item => item%node)
+            class is (type_scalar)
+               item_scalar => node_item
+               call str2int(item_scalar%string, val(i), stat)
+               if (stat /= 0) call this%log%exit_on_error("Value '"//trim(item_scalar%string)//"' is not a valid integer.")
+            class default
+               call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
+            end select
+            i = i + 1
+            item => item%next
+         end do
+      class default
+         call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
+      end select
    end subroutine read_integer_array
 
    subroutine read_real_array(this, key, silent, val)
@@ -692,48 +705,40 @@ contains
       type(type_list_item), pointer :: item
       class(type_scalar), pointer :: item_scalar
       integer :: n, i, stat
-      logical :: p_silent
 
-      p_silent = .false.
-      if (this%comm%is_io_node()) then
-         node => this%root%get(key)
-         if (.not. associated(node)) then
-            if (present(silent)) then
-               p_silent = .true.
-            else
-               call this%log%exit_on_error(trim(this%root%path)//' does not contain key "'//trim(key)//'".')
-            end if
+      node => this%root%get(key)
+      if (.not. associated(node)) then
+         if (present(silent)) then
+            silent = .true.
          else
-            select type (node)
-            class is (type_list)
-               list_node => node
-               n = list_node%size()
-               if (allocated(val)) deallocate (val)
-               allocate (val(n))
-               i = 1
-               item => list_node%first
-               do while (associated(item))
-                  select type (node_item => item%node)
-                  class is (type_scalar)
-                     item_scalar => node_item
-                     call str2real(item_scalar%string, val(i), stat)
-                     if (stat /= 0) call this%log%exit_on_error("Value '"//trim(item_scalar%string)//"' is not a valid real.")
-                  class default
-                     call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
-                  end select
-                  i = i + 1
-                  item => item%next
-               end do
-            class default
-               call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
-            end select
+            call this%log%exit_on_error(trim(this%root%path)//' does not contain key "'//trim(key)//'".')
          end if
+         return
       end if
-      if (present(silent)) then
-         call this%comm%bcast(p_silent)
-         silent = p_silent
-      end if
-      if (.not. p_silent) call this%comm%bcast(val)
+      if (present(silent)) silent = .false.
+      select type (node)
+      class is (type_list)
+         list_node => node
+         n = list_node%size()
+         if (allocated(val)) deallocate (val)
+         allocate (val(n))
+         i = 1
+         item => list_node%first
+         do while (associated(item))
+            select type (node_item => item%node)
+            class is (type_scalar)
+               item_scalar => node_item
+               call str2real(item_scalar%string, val(i), stat)
+               if (stat /= 0) call this%log%exit_on_error("Value '"//trim(item_scalar%string)//"' is not a valid real.")
+            class default
+               call this%log%exit_on_error("List item at index "//key//" is not a scalar.")
+            end select
+            i = i + 1
+            item => item%next
+         end do
+      class default
+         call this%log%exit_on_error("Key '"//trim(key)//"' is not a list.")
+      end select
    end subroutine read_real_array
 
    subroutine finalize(this)
