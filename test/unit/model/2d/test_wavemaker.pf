@@ -5,6 +5,8 @@ module test_wavemaker
    use pFUnit
    use core_comm_mod,       only: type_comm, new_comm
    use core_constants_mod,  only: SP, N_GHOST, GRAV
+   use core_env_mod,        only: type_env
+   use core_log_io_mod,     only: new_log_writer
    use core_grid_mod,       only: type_grid_2d
    use model_wavemaker_mod, only: type_model_wavemaker, solitary_coefficients
 
@@ -129,5 +131,125 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_apply_ic_noop_for_source_types
+
+   ! Minimal env (log only) — new_env would re-init MPI and clash with
+   ! the pFUnit-provided communicator (test_checkpoint pattern)
+   subroutine open_env(this, env, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env), intent(inout) :: env
+      type(type_comm), intent(inout) :: comm
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      allocate (env%log)
+      env%log = new_log_writer("test_wm", comm%is_io_node())
+   end subroutine open_env
+
+   ! WK_DATA2D file: nfreq=2, phases in the optional block.  Rows of
+   ! dirs/amps/phases come from the caller so the same writer builds
+   ! the 3-direction and pre-compacted 2-direction variants.
+   subroutine write_data2d_file(fname, ndir, dirs, amps, phases)
+      character(*), intent(in) :: fname
+      integer,      intent(in) :: ndir
+      real(SP),     intent(in) :: dirs(ndir), amps(2, ndir), phases(2, ndir)
+      integer :: unit, i
+      open (newunit=unit, file=fname, status='replace', action='write')
+      write (unit, '(I0,1X,I0)') 2, ndir
+      write (unit, '(F6.2)') 10.0_SP
+      write (unit, '(F6.3)') 0.10_SP
+      write (unit, '(F6.3)') 0.12_SP
+      do i = 1, ndir
+         write (unit, '(F8.2)') dirs(i)
+      end do
+      do i = 1, ndir
+         write (unit, '(2F8.4)') amps(:, i)
+      end do
+      do i = 1, ndir
+         write (unit, '(2F8.2)') phases(:, i)
+      end do
+      close (unit)
+   end subroutine write_data2d_file
+
+   subroutine init_data2d(this, wm, fname)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker), intent(inout) :: wm
+      character(*), intent(in) :: fname
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(type_env)     :: env
+      call open_env(this, env, comm)
+      grid%M = TEST_M;  grid%N = TEST_N
+      grid%nx_proc = 1;  grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+      wm%wavemaker_type = 'WK_DATA2D'
+      wm%WaveCompFile = fname
+      wm%Xc_WK  = XWM_SP
+      wm%DEP_WK = DEP_SP
+      call wm%init_compute(grid, .false., env, -0.531_SP)
+   end subroutine init_data2d
+
+   ! ----------------------------------------------------------------
+   ! WK_DATA2D phase pairing, positive control: when the dropped
+   ! |dir| >= 60 direction is LAST, nothing shifts and the 3-direction
+   ! file must reproduce the pre-compacted 2-direction file bitwise.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_data2d_phase_dropped_last(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm3, wm2
+      real(SP) :: amps(2, 3), phases(2, 3)
+
+      amps(:, 1) = [0.10_SP, 0.08_SP]
+      amps(:, 2) = [0.06_SP, 0.09_SP]
+      amps(:, 3) = [0.05_SP, 0.05_SP]
+      phases(:, 1) = [90.0_SP, 120.0_SP]
+      phases(:, 2) = [150.0_SP, 210.0_SP]
+      phases(:, 3) = [11.0_SP, 22.0_SP]
+      call write_data2d_file('wk_d2d_last3.txt', 3, &
+                             [0.0_SP, 30.0_SP, 70.0_SP], amps, phases)
+      call write_data2d_file('wk_d2d_last2.txt', 2, &
+                             [0.0_SP, 30.0_SP], amps(:, 1:2), phases(:, 1:2))
+
+      call init_data2d(this, wm3, 'wk_d2d_last3.txt')
+      call init_data2d(this, wm2, 'wk_d2d_last2.txt')
+
+      @assertEqual(0.0_SP, maxval(abs(wm3%Cm - wm2%Cm)), TOL_SP)
+      @assertEqual(0.0_SP, maxval(abs(wm3%Sm - wm2%Sm)), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_data2d_phase_dropped_last
+
+   ! ----------------------------------------------------------------
+   ! WK_DATA2D phase pairing, CHARACTERIZATION of ledger A7d: with the
+   ! dropped direction FIRST, the phase columns are NOT remapped through
+   ! the direction filter (legacy Phase2D is never compacted), so the
+   ! survivors pick up the dropped direction's phases and the field
+   ! DIFFERS from the pre-compacted ground truth.  The spectrum-pipeline
+   ! refactor fixes the pairing — flip this assert to assertEqual then.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_data2d_phase_mispair_characterization(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm3, wm2
+      real(SP) :: amps(2, 3), phases(2, 3)
+
+      amps(:, 1) = [0.05_SP, 0.05_SP]
+      amps(:, 2) = [0.10_SP, 0.08_SP]
+      amps(:, 3) = [0.06_SP, 0.09_SP]
+      phases(:, 1) = [30.0_SP, 60.0_SP]
+      phases(:, 2) = [90.0_SP, 120.0_SP]
+      phases(:, 3) = [150.0_SP, 210.0_SP]
+      call write_data2d_file('wk_d2d_first3.txt', 3, &
+                             [-70.0_SP, 0.0_SP, 30.0_SP], amps, phases)
+      call write_data2d_file('wk_d2d_first2.txt', 2, &
+                             [0.0_SP, 30.0_SP], amps(:, 2:3), phases(:, 2:3))
+
+      call init_data2d(this, wm3, 'wk_d2d_first3.txt')
+      call init_data2d(this, wm2, 'wk_d2d_first2.txt')
+
+      ! amps compact correctly, so any difference is pure phase mis-pairing
+      @assertTrue(maxval(abs(wm3%Cm - wm2%Cm)) > 100.0_SP*TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_data2d_phase_mispair_characterization
 
 end module test_wavemaker
