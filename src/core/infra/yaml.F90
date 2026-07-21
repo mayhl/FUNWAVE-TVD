@@ -336,23 +336,30 @@ contains
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: silent
-      real(SP), intent(out) :: val
+      real(SP), intent(inout) :: val
       type(type_yaml_reader) :: child
       character(:), allocatable :: unit
       character(len=5), dimension(4) :: utypes
+      logical :: missed
       data utypes/"sec", "min", "hour", "hertz"/
       if (this%is_dictionary(key)) then
          child = this%cast_dictionary(key)
          call child%read_enum("units", utypes, val=unit)
          call child%read_positive_real("value", default=default, silent=silent, val=val)
-         select case (unit)
-         case ("min")
-            val = val*60_SP
-         case ("hour")
-            val = val*3600_SP
-         case ("hertz")
-            val = 1.0_SP/val
-         end select
+         ! Convert only a value actually read -- a silent miss with no default
+         ! leaves val as the caller's initializer, which must not be rescaled
+         missed = .false.
+         if (present(silent) .and. .not. present(default)) missed = silent
+         if (.not. missed) then
+            select case (unit)
+            case ("min")
+               val = val*60_SP
+            case ("hour")
+               val = val*3600_SP
+            case ("hertz")
+               val = 1.0_SP/val
+            end select
+         end if
          if (allocated(unit)) deallocate (unit)
       else
          call this%read_positive_real(key, default=default, silent=silent, val=val)
@@ -367,9 +374,13 @@ contains
       logical, optional, intent(out) :: silent
       character(:), allocatable, intent(inout) :: val
       integer :: len, i
-      logical :: is_found
+      logical :: is_found, missed
       character(len=:), allocatable :: msg
       call this%read_string_node(key, default, silent, val)
+      ! A silent miss with no default leaves val untouched -- nothing to check
+      missed = .false.
+      if (present(silent) .and. .not. present(default)) missed = silent
+      if (missed) return
       len = size(values)
       is_found = .false.
       do i = 1, len
@@ -401,9 +412,15 @@ contains
       logical :: is_found, p_silent
       character(len=:), allocatable :: msg
 
+      ! Forward `silent` only when the caller passed it: always handing our
+      ! local to read_string made every missing enum non-fatal, required or not
       p_silent = .false.
-      call this%read_string(key, default=default, silent=p_silent, val=val)
-      if (present(silent)) silent = p_silent
+      if (present(silent)) then
+         call this%read_string(key, default=default, silent=silent, val=val)
+         p_silent = silent .and. .not. present(default)
+      else
+         call this%read_string(key, default=default, val=val)
+      end if
       if (.not. p_silent) then
          n = size(values)
          is_found = .false.
@@ -437,8 +454,12 @@ contains
       logical :: p_silent
 
       p_silent = .false.
-      call this%read_string(key, default=default, silent=p_silent, val=val_buff)
-      if (present(silent)) silent = p_silent
+      if (present(silent)) then
+         call this%read_string(key, default=default, silent=silent, val=val_buff)
+         p_silent = silent .and. .not. present(default)
+      else
+         call this%read_string(key, default=default, val=val_buff)
+      end if
       if (.not. p_silent) then
          val = type_path(val_buff)
          if (.not. val%is_file()) then
@@ -459,6 +480,10 @@ contains
       class(type_node), pointer:: node
       character(STRING_SIZE) :: buff
       integer :: err_id
+      ! `silent` reports key absence in EVERY branch, orthogonal to whether a
+      ! default filled the value -- leaving it unwritten when default is also
+      ! present was the bug that deadened the flag at ~90 combo call sites
+      if (present(silent)) silent = .false.
       if (.not. allocated(io_err)) then
          is_default = .false.
          buff = " read value '"//this%root%get_string(key, error=io_err)//"'."
@@ -468,6 +493,7 @@ contains
       if (present(default)) then
          if (is_no_key_err(io_err)) then
             is_default = .true.
+            if (present(silent)) silent = .true.
             buff = " not found, using default value "//trim(default)//"."
             call this%log%info(this%prep_msg(key, buff))
             call this%root%set_string(key, default)

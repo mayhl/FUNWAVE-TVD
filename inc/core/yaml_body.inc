@@ -17,7 +17,10 @@
 #ifdef _HAS_UNITS
       character(*), optional, intent(in) :: dim
 #endif
-      _CLASS, intent(out) :: val
+      ! NOTE: intent(inout), never intent(out) -- a silent miss must leave the
+      ! caller's initializer untouched (intent(out) wiping it is the trap that
+      ! bit slope_cap, nx_proc, and the gamma overrides)
+      _CLASS, intent(inout) :: val
       logical, optional, intent(out) :: silent
 #ifdef _HAS_RANGE
       type(_RANGE) :: rq_range, rd_range
@@ -29,6 +32,7 @@
       character(:), allocatable :: unit, err
       type(type_yaml_reader) :: child
       character(16), allocatable :: units(:)
+      logical :: has_dict, no_node
 #endif
 
 #ifdef _HAS_RANGE
@@ -50,55 +54,52 @@
 #endif
 
 #ifdef _HAS_UNITS
-      if (present(dim)) then
+      has_dict = .false.
+      if (present(dim)) has_dict = this%is_dictionary_node(key, silent=no_node)
+      if (has_dict) then
 
-         if (this%is_dictionary_node(key)) then
+         child = this%cast_dictionary(key)
 
-            child = this%cast_dictionary(key)
+         call get_units_by_dim(dim, units, err)
 
-            call get_units_by_dim(dim, units, err)
-
-            if (allocated(err)) then
-               call this%log%exit_on_fatal(this%prep_msg(key, err))
-               return ! Testing bypass
-            end if
-
-            call child%read_enum_node("units", units, val=unit)
-            val = child%root%_GET("value", error=io_err)
-            call apply_unit_conversion(val, unit, dim, val, err)
-
-            if (allocated(err)) then
-               ! NOTE: Bypass for testing
-               ! 'get_units_by_dim' guards 'apply_unit_conversion'
-               return
-            end if
-
-            if (allocated(unit)) deallocate (unit)
-
-            is_default = .false.
-         else
-            val = this%root%_GET(key, error=io_err)
-            is_default = this%parse_error_message(key, io_err, default, silent)
+         if (allocated(err)) then
+            call this%log%exit_on_fatal(this%prep_msg(key, err))
+            return ! Testing bypass
          end if
 
-      else
-         val = this%root%_GET(key, error=io_err)
-         is_default = this%parse_error_message(key, io_err, default, silent)
-      end if
+         call child%read_enum_node("units", units, val=unit)
+         if (.not. associated(child%root%get("value"))) then
+            call this%log%exit_on_error(this%prep_msg(key, " unit dictionary requires a 'value' key."))
+         end if
+         val = child%root%_GET("value", error=io_err)
+         call apply_unit_conversion(val, unit, dim, val, err)
 
-#else
-      ! Pre-check key existence before calling _GET. On ifx, allocatable
-      ! error dummy args without explicit intent do not propagate back through
-      ! the fortran-yaml-c call chain, so io_err may stay unallocated for a
-      ! missing key. For character(:) return types this causes a crash when
-      ! parse_error_message tries to concatenate the unallocated result.
-      if (associated(this%root%get(key))) then
-         val = this%root%_GET(key, error=io_err)
+         if (allocated(err)) then
+            ! NOTE: Bypass for testing
+            ! 'get_units_by_dim' guards 'apply_unit_conversion'
+            return
+         end if
+
+         if (allocated(unit)) deallocate (unit)
+
+         is_default = .false.
+         if (present(silent)) silent = .false.
       else
-         allocate(io_err)
-         io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+#endif
+         ! Pre-check key existence before calling _GET: _GET assigns its result
+         ! even on a missing key (wiping val with garbage), and on ifx the
+         ! allocatable error dummy may stay unallocated through the
+         ! fortran-yaml-c call chain -- for character(:) results that crashes
+         ! parse_error_message on the unallocated concat
+         if (associated(this%root%get(key))) then
+            val = this%root%_GET(key, error=io_err)
+         else
+            allocate (io_err)
+            io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+         end if
+         is_default = this%parse_error_message(key, io_err, default, silent)
+#ifdef _HAS_UNITS
       end if
-      is_default = this%parse_error_message(key, io_err, default, silent)
 #endif
 
 ! Parsing default value string
@@ -164,7 +165,7 @@
 #ifdef _HAS_UNITS
       character(*), optional, intent(in) :: dim
 #endif
-      _CLASS, intent(out) :: val
+      _CLASS, intent(inout) :: val
       logical, optional, intent(out) :: silent
       logical :: p_silent
 
@@ -208,9 +209,14 @@
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: silent
-      _CLASS, intent(out) :: val
+      _CLASS, intent(inout) :: val
 
       call this%_READ(key, default=default, silent=silent, val=val)
+
+      ! A silent miss with no default leaves val untouched -- nothing to check
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
 
       if (.not. (val > 0)) then
          call this%log%exit_on_error(this%prep_msg_val(key, "which must be positive."))
@@ -224,9 +230,13 @@
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: silent
-      _CLASS, intent(out) :: val
+      _CLASS, intent(inout) :: val
 
       call this%_READ(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
 
       if (.not. (val >= 0)) then
          call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-negative."))
@@ -240,9 +250,13 @@
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: silent
-      _CLASS, intent(out) :: val
+      _CLASS, intent(inout) :: val
 
       call this%_READ(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
 
       if (.not. (val < 0)) then
          call this%log%exit_on_error(this%prep_msg_val(key, "which must be negative."))
@@ -256,9 +270,13 @@
       character(*), intent(in) :: key
       character(*), optional, intent(in) :: default
       logical, optional, intent(out) :: silent
-      _CLASS, intent(out) :: val
+      _CLASS, intent(inout) :: val
 
       call this%_READ(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
 
       if (.not. (val <= 0)) then
          call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-positive."))

@@ -620,5 +620,84 @@ contains
       call dummy_fix_lint()
    end subroutine test_read_real_units
 
+   @test
+   subroutine test_silent_contract()
+
+      ! Pins the silent/default contract: silent reports key absence in every
+      ! branch, a silent miss with no default leaves val untouched, and
+      ! constraint checks are skipped only when val was never assigned
+
+      type(type_yaml_reader) :: reader
+      type(type_comm) :: comm
+      integer :: val_int
+      real(SP) :: val_real
+      logical :: val_log, miss
+      character(:), allocatable :: val_str
+      character(len=6), dimension(3) :: words
+
+      data words/'item1', 'item2', 'item3'/
+      call open_yaml(reader, comm)
+
+      ! Silent miss preserves the caller's initializer
+      val_int = 42
+      call reader%read('missing_int', silent=miss, val=val_int)
+      @assertTrue(miss)
+      @assertEqual(42, val_int)
+
+      val_real = 1.5_SP
+      call reader%read('missing_real', silent=miss, val=val_real)
+      @assertTrue(miss)
+      @assertEqual(1.5_SP, val_real)
+
+      val_log = .true.
+      call reader%read('missing_log', silent=miss, val=val_log)
+      @assertTrue(miss)
+      @assertTrue(val_log)
+
+      val_str = 'keep'
+      call reader%read('missing_str', silent=miss, val=val_str)
+      @assertTrue(miss)
+      @assertEqual('keep', val_str)
+
+      ! default + silent combo: default fills val AND silent reports the miss
+      val_int = 1
+      call reader%read('missing_int_dflt', silent=miss, default="10", val=val_int)
+      @assertTrue(miss)
+      @assertEqual(10, val_int)
+
+      ! Present key: silent is false whether or not a default is offered
+      call reader%read('integer', silent=miss, val=val_int)
+      @assertFalse(miss)
+      @assertEqual(1, val_int)
+
+      call reader%read('integer', silent=miss, default="10", val=val_int)
+      @assertFalse(miss)
+      @assertEqual(1, val_int)
+
+      ! Sign constraints skip a never-assigned val (sentinel initializers
+      ! must not be validated) but do validate an applied default
+      val_int = -5
+      call reader%read_positive('missing_pos', silent=miss, val=val_int)
+      @assertTrue(miss)
+      @assertEqual(-5, val_int)
+
+      val_int = -5
+      call reader%read_positive('missing_pos_dflt', silent=miss, default="7", val=val_int)
+      @assertTrue(miss)
+      @assertEqual(7, val_int)
+
+      ! Enum membership is skipped on a silent miss, checked on a default
+      val_str = 'stale'
+      call reader%read('missing_enum', words, silent=miss, val=val_str)
+      @assertTrue(miss)
+      @assertEqual('stale', val_str)
+
+      call reader%read('missing_enum_dflt', words, silent=miss, default='item3', val=val_str)
+      @assertTrue(miss)
+      @assertEqual('item3', val_str)
+
+      call dummy_fix_lint()
+   end subroutine test_silent_contract
+
 end module test_yaml_serial
 
