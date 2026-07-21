@@ -59,6 +59,7 @@ module core_grid_mod
       procedure, public :: decompose
       procedure, public :: setup
       procedure, public :: halo_exchange
+      procedure, public :: halo_accumulate
       procedure, public :: init_spacing_uniform
       procedure, public :: init_spacing_variable
       procedure, public :: init_spacing_spherical
@@ -261,6 +262,131 @@ contains
 
    end subroutine halo_exchange
 
+   ! Reverse of halo_exchange: ship ghost-cell CONTRIBUTIONS back to the
+   ! owning rank's interior and add them there (kernels that scatter across
+   ! a subdomain edge, e.g. avalanche flux, write into ghosts they do not
+   ! own).  Phase order is the exchange mirrored — y first, then x — so a
+   ! corner contribution rides two hops: the y-strip carries the full
+   ! ghost-inclusive width into the neighbour's x-ghost columns, and the
+   ! x-phase then delivers it to the diagonal owner.  Sent ghost strips are
+   ! zeroed after packing, so each contribution lands exactly once; ghosts
+   ! at a physical (neighbourless) wall are left untouched for the caller.
+   subroutine halo_accumulate(this, field)
+      class(type_grid_2d), intent(in)    :: this
+      real(SP), intent(inout) :: field(:, :)
+
+      integer :: nx, ny, ng, mloc_g, nloc_g
+      integer :: nreq, ierr, i, j
+      type(MPI_Request) :: req(4)
+      type(MPI_Status)  :: stat(4)
+
+      ! persistent strip buffers: y-phase (mloc_g, ng), x-phase (nloc_g, ng)
+      real(SP), pointer :: sbuf_right(:, :), rbuf_right(:, :)
+      real(SP), pointer :: sbuf_left(:, :), rbuf_left(:, :)
+      real(SP), pointer :: sbuf_back(:, :), rbuf_back(:, :)
+      real(SP), pointer :: sbuf_shore(:, :), rbuf_shore(:, :)
+
+      nx = this%local_nx
+      ny = this%local_ny
+      ng = N_GHOST
+      mloc_g = nx + 2*ng
+      nloc_g = ny + 2*ng
+
+      sbuf_right => this%hx_sbuf_right; rbuf_right => this%hx_rbuf_right
+      sbuf_left => this%hx_sbuf_left; rbuf_left => this%hx_rbuf_left
+      sbuf_back => this%hx_sbuf_back; rbuf_back => this%hx_rbuf_back
+      sbuf_shore => this%hx_sbuf_shore; rbuf_shore => this%hx_rbuf_shore
+
+      ! ---- Phase 1: y-direction (right / left) ----
+
+      ! Pack: low-y ghost rows → their owner (right_rank's high-y interior),
+      ! high-y ghost rows → left_rank's low-y interior; full ghost-inclusive
+      ! width so corner blocks travel with the strip
+      do j = 1, ng
+         do i = 1, mloc_g
+            sbuf_right(i, j) = field(i, j)
+            sbuf_left(i, j) = field(i, ny + ng + j)
+         end do
+      end do
+      if (this%right_rank /= MPI_PROC_NULL) field(:, 1:ng) = 0.0_SP
+      if (this%left_rank /= MPI_PROC_NULL) field(:, ny + ng + 1:nloc_g) = 0.0_SP
+
+      nreq = 0
+      if (this%left_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_left, mloc_g*ng, MPI_SP, this%left_rank, 4, this%cart_comm, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_left, mloc_g*ng, MPI_SP, this%left_rank, 5, this%cart_comm, req(nreq), ierr)
+      end if
+      if (this%right_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 5, this%cart_comm, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_right, mloc_g*ng, MPI_SP, this%right_rank, 4, this%cart_comm, req(nreq), ierr)
+      end if
+      if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+
+      ! Accumulate: left neighbour's low ghosts land in the high-y interior
+      ! edge rows, right neighbour's high ghosts in the low-y edge rows
+      if (this%left_rank /= MPI_PROC_NULL) then
+         do j = 1, ng
+            do i = 1, mloc_g
+               field(i, ny + j) = field(i, ny + j) + rbuf_left(i, j)
+            end do
+         end do
+      end if
+      if (this%right_rank /= MPI_PROC_NULL) then
+         do j = 1, ng
+            do i = 1, mloc_g
+               field(i, ng + j) = field(i, ng + j) + rbuf_right(i, j)
+            end do
+         end do
+      end if
+
+      ! ---- Phase 2: x-direction (back / shore) ----
+      ! After phase 1, corner contributions received from y-neighbours sit
+      ! in the x-ghost columns' interior rows and forward with the strip.
+
+      do i = 1, ng
+         do j = 1, nloc_g
+            sbuf_back(j, i) = field(i, j)
+            sbuf_shore(j, i) = field(nx + ng + i, j)
+         end do
+      end do
+      if (this%back_rank /= MPI_PROC_NULL) field(1:ng, :) = 0.0_SP
+      if (this%shore_rank /= MPI_PROC_NULL) field(nx + ng + 1:mloc_g, :) = 0.0_SP
+
+      nreq = 0
+      if (this%back_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_back, nloc_g*ng, MPI_SP, this%back_rank, 7, this%cart_comm, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_back, nloc_g*ng, MPI_SP, this%back_rank, 6, this%cart_comm, req(nreq), ierr)
+      end if
+      if (this%shore_rank /= MPI_PROC_NULL) then
+         nreq = nreq + 1
+         call MPI_Irecv(rbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 6, this%cart_comm, req(nreq), ierr)
+         nreq = nreq + 1
+         call MPI_Isend(sbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 7, this%cart_comm, req(nreq), ierr)
+      end if
+      if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+
+      if (this%shore_rank /= MPI_PROC_NULL) then
+         do i = 1, ng
+            do j = 1, nloc_g
+               field(nx + i, j) = field(nx + i, j) + rbuf_shore(j, i)
+            end do
+         end do
+      end if
+      if (this%back_rank /= MPI_PROC_NULL) then
+         do i = 1, ng
+            do j = 1, nloc_g
+               field(ng + i, j) = field(ng + i, j) + rbuf_back(j, i)
+            end do
+         end do
+      end if
+
+   end subroutine halo_accumulate
 
    subroutine decompose(this, nprocs)
       class(type_grid_2d), intent(inout) :: this

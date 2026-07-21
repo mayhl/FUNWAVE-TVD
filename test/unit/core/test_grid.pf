@@ -317,6 +317,95 @@ contains
    end subroutine test_halo_exchange_y
 
    ! ----------------------------------------------------------------
+   ! halo_accumulate: 2 ranks in x — ghost contributions add into the
+   ! neighbour's interior edge columns and the sent ghosts are zeroed.
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_halo_accumulate_x(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)  :: grid
+      type(type_comm)     :: comm
+      real(SP), allocatable :: field(:,:)
+      integer :: i, j, ng, mloc_g, nloc_g
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+
+      ng     = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+
+      ! Interior base 1; rank 0 loads its high-x ghosts with 10+k
+      ! (destined for rank 1's low interior columns)
+      field(ng+1:ng+grid%local_nx, ng+1:ng+grid%local_ny) = 1.0_SP
+      if (grid%iproc == 0) then
+         do i = 1, ng
+            do j = ng + 1, ng + grid%local_ny
+               field(ng + grid%local_nx + i, j) = real(10 + i, SP)
+            end do
+         end do
+      end if
+
+      call grid%halo_accumulate(field)
+
+      if (grid%iproc == 1) then
+         ! low interior columns received rank 0's contributions
+         do i = 1, ng
+            @assertEqual(real(11 + i - 1, SP) + 1.0_SP, field(ng + i, ng + 1), tolerance=1e-6_SP)
+         end do
+      end if
+      if (grid%iproc == 0) then
+         ! sent ghosts are consumed; untouched interior unchanged
+         do i = 1, ng
+            @assertEqual(0.0_SP, field(ng + grid%local_nx + i, ng + 1), tolerance=1e-6_SP)
+         end do
+         @assertEqual(1.0_SP, field(ng + 1, ng + 1), tolerance=1e-6_SP)
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_halo_accumulate_x
+
+   ! ----------------------------------------------------------------
+   ! halo_accumulate: 2x2 ranks — a CORNER ghost contribution reaches
+   ! the diagonal owner via the two-hop y-then-x route.
+   !   Rank (iproc=0, jproc=0) global patch x=1..5, y=1..4 writes 7 into
+   !   its high-x/high-y corner ghost = global (6, 5), owned by rank
+   !   (iproc=1, jproc=1) at local (ng+1, ng+1).
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_halo_accumulate_corner(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d)  :: grid
+      type(type_comm)     :: comm
+      real(SP), allocatable :: field(:,:)
+      integer :: ng, mloc_g, nloc_g
+
+      call open_grid(this, grid, comm, nx_proc=2, ny_proc=2)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+
+      ng     = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+
+      if (grid%iproc == 0 .and. grid%jproc == 0) then
+         field(ng + grid%local_nx + 1, ng + grid%local_ny + 1) = 7.0_SP
+      end if
+
+      call grid%halo_accumulate(field)
+
+      if (grid%iproc == 1 .and. grid%jproc == 1) then
+         @assertEqual(7.0_SP, field(ng + 1, ng + 1), tolerance=1e-6_SP)
+      else
+         ! nothing anywhere else — incl. the sender's zeroed corner
+         @assertEqual(0.0_SP, maxval(abs(field)), tolerance=1e-6_SP)
+      end if
+
+      call dummy_fix_lint()
+   end subroutine test_halo_accumulate_corner
+
+   ! ----------------------------------------------------------------
    ! init_spacing_spherical: dx varies with latitude, dy constant,
    ! x/y coordinates consistent with flat-earth approximation.
    ! ----------------------------------------------------------------
