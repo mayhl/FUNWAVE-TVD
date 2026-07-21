@@ -3,7 +3,7 @@
 # ==============================================================================
 
 # Macro: my_fetch_package Purpose: Wraps FetchContent to clone, register, and
-# link external dependencies like 'face' or 'fortran-yaml-c' into the project
+# link external dependencies like 'fortran-yaml-c' into the project
 # build system.
 macro("my_fetch_package" package url rev)
 

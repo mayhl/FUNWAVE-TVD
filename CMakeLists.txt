@@ -78,7 +78,6 @@ enable_language(Fortran)
 
 find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
-find_package("face" REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
 set(all_targets ${project_targets} ${ext_targets} probe)

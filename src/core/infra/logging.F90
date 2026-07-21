@@ -2,10 +2,12 @@
 !! Replaces external flogging dependency with a native implementation.
 module core_log_io_mod
    use, intrinsic :: iso_fortran_env, only: output_unit, error_unit
-   use face, only: colorize
    use core_throw_mod, only: throw_exception, set_error_code
    implicit none
    private
+
+   ! ANSI escape character for terminal coloring
+   character(len=1), parameter :: ESC = achar(27)
 
    public :: new_log_writer, format_log_line
 
@@ -118,7 +120,7 @@ contains
       call date_and_time(date, time, zone)
       timestamp = date(1:4)//"-"//date(5:6)//"-"//date(7:8)//" "//time(1:2)//":"//time(3:4)//":"//time(5:6)
 
-      ! Apply colors using FACE
+      ! Apply ANSI colors
       select case (level)
       case (log_level_info); colored_prefix = colorize(prefix, color_fg="green")
       case (log_level_debug); colored_prefix = colorize(prefix, color_fg="blue")
@@ -131,6 +133,39 @@ contains
       write (output_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
       if (this%file_unit /= -1) write (this%file_unit, *) trim(format_log_line(this, timestamp, prefix, msg))
    end subroutine write_log
+
+   !> @brief Wrap text in ANSI SGR escape codes (ECMA-48).
+   !! Inline replacement for the external FACE dependency; supports only the
+   !! foreground colors and inverse style used by write_log (codes: 31 red,
+   !! 32 green, 33 yellow, 34 blue; 7 inverse; 0 reset).
+   function colorize(string, color_fg, style) result(colorized)
+      character(len=*), intent(in) :: string
+      character(len=*), intent(in), optional :: color_fg, style
+      character(len=:), allocatable :: colorized
+      character(len=:), allocatable :: codes
+
+      codes = ""
+      if (present(color_fg)) then
+         select case (color_fg)
+         case ("red"); codes = "31"
+         case ("green"); codes = "32"
+         case ("yellow"); codes = "33"
+         case ("blue"); codes = "34"
+         end select
+      end if
+      if (present(style)) then
+         if (style == "inverse_on") then
+            if (len(codes) > 0) codes = codes//";"
+            codes = codes//"7"
+         end if
+      end if
+
+      if (len(codes) == 0) then
+         colorized = string
+      else
+         colorized = ESC//"["//codes//"m"//string//ESC//"[0m"
+      end if
+   end function colorize
 
    !> @brief Format log line
   !! Format: YYYY-MM-DD HH:MM:SS [LABEL] PREFIX: MSG
