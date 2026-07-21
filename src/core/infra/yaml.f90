@@ -96,29 +96,21 @@ contains
       character(:), allocatable, intent(in) :: path_str
       type(type_comm), target, intent(inout):: comm
 
-      character(:), allocatable :: err, content, tmp_path
+      character(:), allocatable :: err, content
       class(type_node), pointer :: root
       type(type_path) :: path
       character(MESSAGE_SIZE) :: message
-      character(1024) :: tmp_dir
-      integer :: unit_, n, tmp_stat
-
-      interface
-         function c_getpid() bind(c, name="getpid") result(pid)
-            use iso_c_binding, only: c_int
-            integer(c_int) :: pid
-         end function c_getpid
-      end interface
+      integer :: unit_, n
 
       log_buff = comm%get_logger(log_label)
       this%log => log_buff
       this%comm => comm
 
-      ! Serial read + bcast of the RAW BYTES, then every rank parses an
-      ! identical node-local copy.  One shared-filesystem read instead of N,
-      ! and every rank owns a full tree -- parsing on the io node alone left
-      ! null roots on the other ranks, and any structural query segfaulted
-      ! (the failure that killed the first serial-read attempt).
+      ! Serial read + bcast of the RAW BYTES, then every rank parses its own
+      ! tree straight from the buffer.  One shared-filesystem read instead of
+      ! N (the metadata storm at O(10^3+) ranks), and every rank owns a full
+      ! tree -- parsing on the io node alone left null roots on the other
+      ! ranks, and any structural query segfaulted.
       if (comm%is_io_node()) then
          path = type_path(path_str)
 
@@ -140,24 +132,7 @@ contains
       end if
       call comm%bcast(content)
 
-      call get_environment_variable("TMPDIR", tmp_dir, status=tmp_stat)
-      if (tmp_stat /= 0 .or. len_trim(tmp_dir) == 0) tmp_dir = "/tmp"
-      block
-         character(64) :: tag
-         ! pid + rank keeps names unique when concurrent runs share one
-         ! TMPDIR (batch boards pack sims per node; rank alone collided and
-         ! runs deleted each other's decks mid-parse)
-         write (tag, "(i0,a,i0)") c_getpid(), "_", comm%rank_id
-         tmp_path = trim(tmp_dir)//"/funwave_deck_"//trim(tag)//".yaml"
-      end block
-      open (newunit=unit_, file=tmp_path, access="stream", form="unformatted", status="replace")
-      write (unit_) content
-      close (unit_)
-
-      call this%file%parse(tmp_path, err)
-
-      open (newunit=unit_, file=tmp_path, status="old", iostat=tmp_stat)
-      if (tmp_stat == 0) close (unit_, status="delete")
+      call this%file%parse_string(content, err)
 
       if (allocated(err)) then
          call this%log%exit_on_error(err)
