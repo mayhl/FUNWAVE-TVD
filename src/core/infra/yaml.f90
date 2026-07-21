@@ -46,9 +46,10 @@ module core_yaml_file_mod
       procedure, public :: is_dictionary_node
       procedure, public :: read_time
 
-      ! Integers
+      ! Integers (the *_node names alias the same implementations: reads
+      ! became rank-local at the serial-read change, so the split is gone)
       procedure, public :: read_integer
-      procedure, public :: read_integer_node
+      procedure, public :: read_integer_node => read_integer
       procedure, public :: read_positive_integer
       procedure, public :: read_negative_integer
       procedure, public :: read_nonnegative_integer
@@ -56,7 +57,7 @@ module core_yaml_file_mod
 
       ! Real
       procedure, public :: read_real
-      procedure, public :: read_real_node
+      procedure, public :: read_real_node => read_real
       procedure, public :: read_positive_real
       procedure, public :: read_negative_real
       procedure, public :: read_nonnegative_real
@@ -64,11 +65,11 @@ module core_yaml_file_mod
 
       ! Bool/Logical
       procedure, public :: read_logical
-      procedure, public :: read_logical_node
+      procedure, public :: read_logical_node => read_logical
 
       ! Strings
       procedure, public :: read_string
-      procedure, public :: read_string_node
+      procedure, public :: read_string_node => read_string
       procedure, public :: read_string_array
       procedure, public :: read_integer_array
       procedure, public :: read_real_array
@@ -101,6 +102,13 @@ contains
       character(MESSAGE_SIZE) :: message
       character(1024) :: tmp_dir
       integer :: unit_, n, tmp_stat
+
+      interface
+         function c_getpid() bind(c, name="getpid") result(pid)
+            use iso_c_binding, only: c_int
+            integer(c_int) :: pid
+         end function c_getpid
+      end interface
 
       log_buff = comm%get_logger(log_label)
       this%log => log_buff
@@ -135,9 +143,12 @@ contains
       call get_environment_variable("TMPDIR", tmp_dir, status=tmp_stat)
       if (tmp_stat /= 0 .or. len_trim(tmp_dir) == 0) tmp_dir = "/tmp"
       block
-         character(32) :: rank_tag
-         write (rank_tag, "(i0)") comm%rank_id
-         tmp_path = trim(tmp_dir)//"/funwave_deck_"//trim(rank_tag)//".yaml"
+         character(64) :: tag
+         ! pid + rank keeps names unique when concurrent runs share one
+         ! TMPDIR (batch boards pack sims per node; rank alone collided and
+         ! runs deleted each other's decks mid-parse)
+         write (tag, "(i0,a,i0)") c_getpid(), "_", comm%rank_id
+         tmp_path = trim(tmp_dir)//"/funwave_deck_"//trim(tag)//".yaml"
       end block
       open (newunit=unit_, file=tmp_path, access="stream", form="unformatted", status="replace")
       write (unit_) content
@@ -145,8 +156,8 @@ contains
 
       call this%file%parse(tmp_path, err)
 
-      open (newunit=unit_, file=tmp_path, status="old")
-      close (unit_, status="delete")
+      open (newunit=unit_, file=tmp_path, status="old", iostat=tmp_stat)
+      if (tmp_stat == 0) close (unit_, status="delete")
 
       if (allocated(err)) then
          call this%log%exit_on_error(err)
@@ -294,71 +305,405 @@ contains
       end select
    end function cast_dictionary_list
 
-   ! ... (rest of the file unchanged)
-#include "core/prep.inc"
-#define _NAME integer
-#define _CLASS integer
-#define _GET get_integer
-#define _RANGE type_integer_range
-#define _HAS_RANGE 1
-#define _STR2VAL str2int
-#define _READ _PASTE(read_,_NAME)
-#define _READ_NODE _PASTE(_READ,_node)
-#define _READ_POSITIVE _PASTE(read_positive_,_NAME)
-#define _READ_NEGATIVE _PASTE(read_negative_,_NAME)
-#define _READ_NONNEGATIVE _PASTE(read_nonnegative_,_NAME)
-#define _READ_NONPOSITIVE _PASTE(read_nonpositive_,_NAME)
-#include "core/yaml_body.inc"
-#undef _READ
-#undef _READ_NODE
-#undef _READ_POSITIVE
-#undef _READ_NEGATIVE
-#undef _READ_NONNEGATIVE
-#undef _READ_NONPOSITIVE
-#undef _HAS_RANGE
-#undef _STR2VAL
+   !----------------------------------------------------------------------
+   ! Typed read implementations, expanded from the retired yaml_body.inc
+   ! template: one body per type, sign-constraint wrappers for the numeric
+   ! types; the *_node names bind to the same implementations
+   !----------------------------------------------------------------------
 
-#define _NAME real
-#define _CLASS real(SP)
-#define _GET get_real
-#define _RANGE type_real_range
-#define _HAS_RANGE 1
-#define _HAS_UNITS 1
-#define _STR2VAL str2real
-#define _READ _PASTE(read_,_NAME)
-#define _READ_NODE _PASTE(_READ,_node)
-#define _READ_POSITIVE _PASTE(read_positive_,_NAME)
-#define _READ_NEGATIVE _PASTE(read_negative_,_NAME)
-#define _READ_NONNEGATIVE _PASTE(read_nonnegative_,_NAME)
-#define _READ_NONPOSITIVE _PASTE(read_nonpositive_,_NAME)
-#include "core/yaml_body.inc"
-#undef _READ
-#undef _READ_NODE
-#undef _READ_POSITIVE
-#undef _READ_NEGATIVE
-#undef _READ_NONNEGATIVE
-#undef _READ_NONPOSITIVE
-#undef _HAS_RANGE
-#undef _HAS_UNITS
-#undef _STR2VAL
+   subroutine read_integer(this, key, default, silent, required_range, recommend_range, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      character(*), optional, intent(in) :: required_range, recommend_range
+      ! NOTE: intent(inout), never intent(out) -- a silent miss must leave the
+      ! caller's initializer untouched (intent(out) wiping it is the trap that
+      ! bit slope_cap, nx_proc, and the gamma overrides)
+      integer, intent(inout) :: val
+      logical, optional, intent(out) :: silent
 
-#define _NAME logical
-#define _CLASS logical
-#define _GET get_logical
-#define _READ _PASTE(read_,_NAME)
-#define _READ_NODE _PASTE(_READ,_node)
-#include "core/yaml_body.inc"
-#undef _READ
-#undef _READ_NODE
+      type(type_integer_range) :: rq_range, rd_range
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+      character(len=:), allocatable :: msg
 
-#define _NAME string
-#define _CLASS character(:), allocatable
-#define _GET get_string
-#define _READ _PASTE(read_,_NAME)
-#define _READ_NODE _PASTE(_READ,_node)
-#include "core/yaml_body.inc"
-#undef _READ
-#undef _READ_NODE
+      if (present(required_range)) then
+         rq_range = type_integer_range(required_range)
+         if (.not. rq_range%is_valid()) then
+            msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'required_range': "//required_range//"."
+            call this%log%exit_on_fatal(msg)
+         end if
+      end if
+
+      if (present(recommend_range)) then
+         rd_range = type_integer_range(recommend_range)
+         if (.not. rd_range%is_valid()) then
+            msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'recommend_range': "//recommend_range//"."
+            call this%log%exit_on_fatal(msg)
+         end if
+      end if
+
+      ! Pre-check key existence before the typed getter: it assigns its result
+      ! even on a missing key (wiping val with garbage), and on ifx the
+      ! allocatable error dummy may stay unallocated through the
+      ! fortran-yaml-c call chain
+      if (associated(this%root%get(key))) then
+         val = this%root%get_integer(key, error=io_err)
+      else
+         allocate (io_err)
+         io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+      end if
+      is_default = this%parse_error_message(key, io_err, default, silent)
+
+      if (is_default) then
+         ! Validate the default string with str2int directly: both gfortran
+         ! and ifx silently partially-parse "10.5" into an integer (ios=0),
+         ! so the library getter cannot be relied upon here
+         block
+            integer :: ios_dflt
+            call str2int(default, val, ios_dflt)
+            if (ios_dflt /= 0) then
+               msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
+               call this%log%exit_on_fatal(msg)
+            end if
+         end block
+      end if
+
+      if (rq_range%is_set) then
+         if (.not. rq_range%in_range(val)) then
+            msg = "which is out of the required range: "//required_range//"."
+            call this%log%exit_on_error(this%prep_msg_val(key, msg))
+         end if
+      end if
+
+      if (rd_range%is_set) then
+         if (.not. rd_range%in_range(val)) then
+            msg = "which is out of the recommended range: "//recommend_range//"."
+            call this%log%warning(this%prep_msg_val(key, msg))
+         end if
+      end if
+
+   end subroutine read_integer
+
+   subroutine read_positive_integer(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      integer, intent(inout) :: val
+
+      call this%read_integer(key, default=default, silent=silent, val=val)
+
+      ! A silent miss with no default leaves val untouched -- nothing to check
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val > 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be positive."))
+      end if
+
+   end subroutine read_positive_integer
+
+   subroutine read_negative_integer(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      integer, intent(inout) :: val
+
+      call this%read_integer(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val < 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be negative."))
+      end if
+
+   end subroutine read_negative_integer
+
+   subroutine read_nonnegative_integer(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      integer, intent(inout) :: val
+
+      call this%read_integer(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val >= 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-negative."))
+      end if
+
+   end subroutine read_nonnegative_integer
+
+   subroutine read_nonpositive_integer(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      integer, intent(inout) :: val
+
+      call this%read_integer(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val <= 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-positive."))
+      end if
+
+   end subroutine read_nonpositive_integer
+
+   subroutine read_real(this, key, default, silent, required_range, recommend_range, dim, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      character(*), optional, intent(in) :: required_range, recommend_range
+      character(*), optional, intent(in) :: dim
+      real(SP), intent(inout) :: val
+      logical, optional, intent(out) :: silent
+
+      type(type_real_range) :: rq_range, rd_range
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+      character(len=:), allocatable :: msg
+      character(:), allocatable :: unit, err
+      type(type_yaml_reader) :: child
+      character(16), allocatable :: units(:)
+      logical :: has_dict, no_node
+
+      if (present(required_range)) then
+         rq_range = type_real_range(required_range)
+         if (.not. rq_range%is_valid()) then
+            msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'required_range': "//required_range//"."
+            call this%log%exit_on_fatal(msg)
+         end if
+      end if
+
+      if (present(recommend_range)) then
+         rd_range = type_real_range(recommend_range)
+         if (.not. rd_range%is_valid()) then
+            msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'recommend_range': "//recommend_range//"."
+            call this%log%exit_on_fatal(msg)
+         end if
+      end if
+
+      has_dict = .false.
+      if (present(dim)) has_dict = this%is_dictionary_node(key, silent=no_node)
+      if (has_dict) then
+
+         child = this%cast_dictionary(key)
+
+         call get_units_by_dim(dim, units, err)
+
+         if (allocated(err)) then
+            call this%log%exit_on_fatal(this%prep_msg(key, err))
+            return ! Testing bypass
+         end if
+
+         call child%read_enum_node("units", units, val=unit)
+         if (.not. associated(child%root%get("value"))) then
+            call this%log%exit_on_error(this%prep_msg(key, " unit dictionary requires a 'value' key."))
+         end if
+         ! raw temp: apply_unit_conversion's in/out args must not alias (the
+         ! intent(out) undefines val before the intent(in) copy is read --
+         ! latent in the old template, expressed by the flag reorg)
+         block
+            real(SP) :: raw
+            raw = child%root%get_real("value", error=io_err)
+            call apply_unit_conversion(raw, unit, dim, val, err)
+         end block
+
+         if (allocated(err)) then
+            ! NOTE: Bypass for testing
+            ! 'get_units_by_dim' guards 'apply_unit_conversion'
+            return
+         end if
+
+         if (allocated(unit)) deallocate (unit)
+
+         is_default = .false.
+         if (present(silent)) silent = .false.
+      else
+         if (associated(this%root%get(key))) then
+            val = this%root%get_real(key, error=io_err)
+         else
+            allocate (io_err)
+            io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+         end if
+         is_default = this%parse_error_message(key, io_err, default, silent)
+      end if
+
+      if (is_default) then
+         block
+            integer :: ios_dflt
+            call str2real(default, val, ios_dflt)
+            if (ios_dflt /= 0) then
+               msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
+               call this%log%exit_on_fatal(msg)
+            end if
+         end block
+      end if
+
+      if (rq_range%is_set) then
+         if (.not. rq_range%in_range(val)) then
+            msg = "which is out of the required range: "//required_range//"."
+            call this%log%exit_on_error(this%prep_msg_val(key, msg))
+         end if
+      end if
+
+      if (rd_range%is_set) then
+         if (.not. rd_range%in_range(val)) then
+            msg = "which is out of the recommended range: "//recommend_range//"."
+            call this%log%warning(this%prep_msg_val(key, msg))
+         end if
+      end if
+
+   end subroutine read_real
+
+   subroutine read_positive_real(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      real(SP), intent(inout) :: val
+
+      call this%read_real(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val > 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be positive."))
+      end if
+
+   end subroutine read_positive_real
+
+   subroutine read_negative_real(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      real(SP), intent(inout) :: val
+
+      call this%read_real(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val < 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be negative."))
+      end if
+
+   end subroutine read_negative_real
+
+   subroutine read_nonnegative_real(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      real(SP), intent(inout) :: val
+
+      call this%read_real(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val >= 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-negative."))
+      end if
+
+   end subroutine read_nonnegative_real
+
+   subroutine read_nonpositive_real(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, optional, intent(out) :: silent
+      real(SP), intent(inout) :: val
+
+      call this%read_real(key, default=default, silent=silent, val=val)
+
+      if (present(silent) .and. .not. present(default)) then
+         if (silent) return
+      end if
+
+      if (.not. (val <= 0)) then
+         call this%log%exit_on_error(this%prep_msg_val(key, "which must be non-positive."))
+      end if
+
+   end subroutine read_nonpositive_real
+
+   subroutine read_logical(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      logical, intent(inout) :: val
+      logical, optional, intent(out) :: silent
+
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+      character(len=:), allocatable :: msg
+
+      if (associated(this%root%get(key))) then
+         val = this%root%get_logical(key, error=io_err)
+      else
+         allocate (io_err)
+         io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+      end if
+      is_default = this%parse_error_message(key, io_err, default, silent)
+
+      if (is_default) then
+         ! parse_error_message wrote the default into the tree; re-read it
+         ! through the typed getter so it is validated the same way
+         val = this%root%get_logical(key, error=io_err)
+         if (allocated(io_err)) then
+            msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
+            call this%log%exit_on_fatal(msg)
+         end if
+      end if
+
+   end subroutine read_logical
+
+   subroutine read_string(this, key, default, silent, val)
+      class(type_yaml_reader), intent(inout) :: this
+      character(*), intent(in) :: key
+      character(*), optional, intent(in) :: default
+      character(:), allocatable, intent(inout) :: val
+      logical, optional, intent(out) :: silent
+
+      type(type_error), allocatable :: io_err
+      logical :: is_default
+      character(len=:), allocatable :: msg
+
+      if (associated(this%root%get(key))) then
+         val = this%root%get_string(key, error=io_err)
+      else
+         allocate (io_err)
+         io_err%message = trim(this%root%path)//' does not contain key "'//trim(key)//'".'
+      end if
+      is_default = this%parse_error_message(key, io_err, default, silent)
+
+      if (is_default) then
+         val = this%root%get_string(key, error=io_err)
+         if (allocated(io_err)) then
+            msg = "Read method for '"//this%sanitize_path(key)//"' has an invalid 'default': "//default//"."
+            call this%log%exit_on_fatal(msg)
+         end if
+      end if
+
+   end subroutine read_string
 
    subroutine read_time(this, key, default, silent, val)
       class(type_yaml_reader), intent(inout) :: this

@@ -1,6 +1,6 @@
 # libcore_infra: Infrastructure — MPI comm, logging, YAML, env, range
 add_library(libcore_infra STATIC comm.f90 env.f90 logging.F90 range.f90
-                                 yaml.F90)
+                                 yaml.f90)
 
 set_target_properties(
   libcore_infra PROPERTIES Fortran_MODULE_DIRECTORY
