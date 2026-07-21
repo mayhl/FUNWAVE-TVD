@@ -47,6 +47,14 @@ module core_grid_mod
       real(SP), allocatable :: dx(:, :), dy(:, :)
       real(SP), allocatable :: inv_dx(:, :), inv_dy(:, :)  ! precomputed 1/dx, 1/dy
       real(SP), allocatable :: x(:, :), y(:, :)       ! physical coordinates (local metres)
+      ! Persistent halo strip buffers (allocated at setup) — halo_exchange
+      ! runs tens of fields per stage, so per-call heap churn is measurable.
+      ! Pointer (not allocatable) components so the intent(in) grid dummies
+      ! of the exchange routines may define their targets.
+      real(SP), pointer :: hx_sbuf_back(:, :) => null(), hx_rbuf_back(:, :) => null()
+      real(SP), pointer :: hx_sbuf_shore(:, :) => null(), hx_rbuf_shore(:, :) => null()
+      real(SP), pointer :: hx_sbuf_right(:, :) => null(), hx_rbuf_right(:, :) => null()
+      real(SP), pointer :: hx_sbuf_left(:, :) => null(), hx_rbuf_left(:, :) => null()
    contains
       procedure, public :: decompose
       procedure, public :: setup
@@ -123,6 +131,17 @@ contains
       this%lp%mloc = this%local_nx + 2*N_GHOST
       this%lp%nloc = this%local_ny + 2*N_GHOST
 
+      ! halo strip buffers live for the grid's lifetime
+      if (associated(this%hx_sbuf_back)) &
+         deallocate (this%hx_sbuf_back, this%hx_rbuf_back, &
+                     this%hx_sbuf_shore, this%hx_rbuf_shore, &
+                     this%hx_sbuf_right, this%hx_rbuf_right, &
+                     this%hx_sbuf_left, this%hx_rbuf_left)
+      allocate (this%hx_sbuf_back(this%lp%nloc, N_GHOST), this%hx_rbuf_back(this%lp%nloc, N_GHOST))
+      allocate (this%hx_sbuf_shore(this%lp%nloc, N_GHOST), this%hx_rbuf_shore(this%lp%nloc, N_GHOST))
+      allocate (this%hx_sbuf_right(this%lp%mloc, N_GHOST), this%hx_rbuf_right(this%lp%mloc, N_GHOST))
+      allocate (this%hx_sbuf_left(this%lp%mloc, N_GHOST), this%hx_rbuf_left(this%lp%mloc, N_GHOST))
+
    end subroutine setup
 
    ! Ghost-cell exchange for a ghost-inclusive field.
@@ -137,12 +156,11 @@ contains
       type(MPI_Request) :: req(4)
       type(MPI_Status)  :: stat(4)
 
-      ! x-direction send/recv buffers: (nloc_g, ng) — contiguous in memory
-      real(SP), allocatable :: sbuf_back(:, :), rbuf_back(:, :)
-      real(SP), allocatable :: sbuf_shore(:, :), rbuf_shore(:, :)
-      ! y-direction send/recv buffers: (mloc_g, ng)
-      real(SP), allocatable :: sbuf_right(:, :), rbuf_right(:, :)
-      real(SP), allocatable :: sbuf_left(:, :), rbuf_left(:, :)
+      ! persistent strip buffers: x-phase (nloc_g, ng), y-phase (mloc_g, ng)
+      real(SP), pointer :: sbuf_back(:, :), rbuf_back(:, :)
+      real(SP), pointer :: sbuf_shore(:, :), rbuf_shore(:, :)
+      real(SP), pointer :: sbuf_right(:, :), rbuf_right(:, :)
+      real(SP), pointer :: sbuf_left(:, :), rbuf_left(:, :)
 
       nx = this%local_nx
       ny = this%local_ny
@@ -150,9 +168,12 @@ contains
       mloc_g = nx + 2*ng
       nloc_g = ny + 2*ng
 
+      sbuf_back => this%hx_sbuf_back; rbuf_back => this%hx_rbuf_back
+      sbuf_shore => this%hx_sbuf_shore; rbuf_shore => this%hx_rbuf_shore
+      sbuf_right => this%hx_sbuf_right; rbuf_right => this%hx_rbuf_right
+      sbuf_left => this%hx_sbuf_left; rbuf_left => this%hx_rbuf_left
+
       ! ---- Phase 1: x-direction (back / shore) ----
-      allocate (sbuf_back(nloc_g, ng), rbuf_back(nloc_g, ng))
-      allocate (sbuf_shore(nloc_g, ng), rbuf_shore(nloc_g, ng))
 
       ! Pack: low-x interior strip → send to back_rank
       do i = 1, ng
@@ -198,12 +219,8 @@ contains
          end do
       end if
 
-      deallocate (sbuf_back, rbuf_back, sbuf_shore, rbuf_shore)
-
       ! ---- Phase 2: y-direction (right / left) ----
       ! After phase 1, x ghost cells are filled — y-sends include correct corner data.
-      allocate (sbuf_right(mloc_g, ng), rbuf_right(mloc_g, ng))
-      allocate (sbuf_left(mloc_g, ng), rbuf_left(mloc_g, ng))
 
       do j = 1, ng
          do i = 1, mloc_g
@@ -242,8 +259,8 @@ contains
          end do
       end if
 
-      deallocate (sbuf_right, rbuf_right, sbuf_left, rbuf_left)
    end subroutine halo_exchange
+
 
    subroutine decompose(this, nprocs)
       class(type_grid_2d), intent(inout) :: this
@@ -337,7 +354,7 @@ contains
       ox = 0.0_SP; if (present(x0)) ox = x0
       oy = 0.0_SP; if (present(y0)) oy = y0
 
-      call grid_finalize(this)
+      call clear_spacing(this)
 
       allocate (this%dx(this%local_nx, this%local_ny), source=dx0)
       allocate (this%dy(this%local_nx, this%local_ny), source=dy0)
@@ -367,7 +384,7 @@ contains
       this%dx0 = 0.0_SP
       this%dy0 = 0.0_SP
 
-      call grid_finalize(this)
+      call clear_spacing(this)
 
       allocate (this%dx, source=dx)
       allocate (this%dy, source=dy)
@@ -430,7 +447,7 @@ contains
       this%crs%origin_y = lat0
       this%crs%theta = 0.0_SP
 
-      call grid_finalize(this)
+      call clear_spacing(this)
 
       dlon_r = dlon*PI/180.0_SP
       dlat_r = dlat*PI/180.0_SP
@@ -458,7 +475,9 @@ contains
       end do
    end subroutine init_spacing_spherical
 
-   subroutine grid_finalize(this)
+   ! Spacing arrays only — init_spacing_* re-allocate after this, so the
+   ! halo buffers (grid-lifetime, owned by setup) must survive
+   subroutine clear_spacing(this)
       class(type_grid_2d), intent(inout) :: this
       if (allocated(this%dx)) deallocate (this%dx)
       if (allocated(this%dy)) deallocate (this%dy)
@@ -466,6 +485,21 @@ contains
       if (allocated(this%inv_dy)) deallocate (this%inv_dy)
       if (allocated(this%x)) deallocate (this%x)
       if (allocated(this%y)) deallocate (this%y)
+   end subroutine clear_spacing
+
+   subroutine grid_finalize(this)
+      class(type_grid_2d), intent(inout) :: this
+      call clear_spacing(this)
+      if (associated(this%hx_sbuf_back)) then
+         deallocate (this%hx_sbuf_back, this%hx_rbuf_back, &
+                     this%hx_sbuf_shore, this%hx_rbuf_shore, &
+                     this%hx_sbuf_right, this%hx_rbuf_right, &
+                     this%hx_sbuf_left, this%hx_rbuf_left)
+         nullify (this%hx_sbuf_back, this%hx_rbuf_back, &
+                  this%hx_sbuf_shore, this%hx_rbuf_shore, &
+                  this%hx_sbuf_right, this%hx_rbuf_right, &
+                  this%hx_sbuf_left, this%hx_rbuf_left)
+      end if
    end subroutine grid_finalize
 
 end module core_grid_mod
