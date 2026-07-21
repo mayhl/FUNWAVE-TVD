@@ -225,7 +225,6 @@ module model_wavemaker_mod
       logical  :: spectral_source = .false.
       real(SP), allocatable :: Cm(:, :, :), Sm(:, :, :)
       real(SP), allocatable :: omgn_ir(:)             ! component frequencies 2 pi f
-      real(SP) :: T_brk = 0.0_SP                      ! breaking-age override 1/FreqMax; 0 = none
 
       ! Multi-component time-series internal source (WK_TIME): per-
       ! component (period, amplitude, phase) from WaveCompFile plus the
@@ -1276,8 +1275,6 @@ contains
    !      \alpha_s = \frac{H_{m0}^2}{16\,E} $$
    ! then the shared solve (full-pi rI, peak-frequency phase speed,
    ! scratch-carrying periodic snap) and the dense-mode collapse.
-   ! T_brk override 1/FreqMax matches the legacy SHOW_BREAKING
-   ! assignment.
    ! ----------------------------------------------------------------
    subroutine spectral_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
@@ -1378,8 +1375,6 @@ contains
 
       call calc_cm_sm(this, cs, D_gen, beta_gen, rlamda)
 
-      this%T_brk = 1.0_SP/this%FreqMax
-
    end subroutine spectral_init_compute
 
    ! ----------------------------------------------------------------
@@ -1387,8 +1382,7 @@ contains
    ! WAVEMAKER_INITIALIZATION + WK_WAVEMAKER_TIME_SERIES).  Reads
    ! NumWaveComp rows of (period, amplitude, phase) from WaveCompFile,
    ! solves the per-component Wei & Kirby source magnitude, and takes
-   ! the shared width from PeakPeriod.  T_brk override is the LAST
-   ! component's period (legacy SHOW_BREAKING assignment).
+   ! the shared width from PeakPeriod.
    ! ----------------------------------------------------------------
    subroutine time_series_init_compute(this)
       class(type_model_wavemaker), intent(inout) :: this
@@ -1432,8 +1426,6 @@ contains
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
 
-      this%T_brk = this%wave_comp(this%NumWaveComp, 1)
-
    end subroutine time_series_init_compute
 
    ! ----------------------------------------------------------------
@@ -1447,11 +1439,8 @@ contains
    ! remapped through the direction filter (legacy Phase2D is never
    ! compacted — column k pairs with the k-th SURVIVING direction
    ! only when nothing before it was dropped); the input phase unit
-   ! conversion is 0.005555555555556*pi.  Legacy SHOW_BREAKING reads
-   ! WAVE_COMP(NumWaveComp,1) with NumWaveComp belonging to WK_TIME —
-   ! never set on this path (uninitialized) — so T_brk stays at the
-   ! stepper default here.  FreqPeak (ramp scale) = 1/PeakPeriod from
-   ! the file.
+   ! conversion is 0.005555555555556*pi.  FreqPeak (ramp scale) =
+   ! 1/PeakPeriod from the file.
    ! ----------------------------------------------------------------
    subroutine data2d_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
@@ -1615,9 +1604,8 @@ contains
    ! Component-list WaveCompFile layout (one direction per component):
    !   NumFreq / PeakPeriod / freqs / dirs / amps / [phases, degrees]
    ! Components with |dir| > 90 deg are dropped; here the phase list
-   ! IS compacted with its component (unlike WK_DATA2D).  T_brk quirk
-   ! kept bug-for-bug: legacy assigns the last component's FREQUENCY
-   ! (not period).  FreqPeak = 1/PeakPeriod from the file.
+   ! IS compacted with its component (unlike WK_DATA2D).  FreqPeak =
+   ! 1/PeakPeriod from the file.
    ! ----------------------------------------------------------------
    subroutine new_data2d_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
@@ -1746,10 +1734,6 @@ contains
       call wk_merge_slots(cs, env)
       call calc_cm_sm(this, cs, d_gen, beta_gen, rlamda)
 
-      ! legacy: T_brk = Freq(FreqCount) — the last FREQUENCY, not a
-      ! period; kept bug-for-bug (parity ledger)
-      this%T_brk = freq_flt(nfreq)
-
    end subroutine new_data2d_init_compute
 
    ! ----------------------------------------------------------------
@@ -1798,8 +1782,6 @@ contains
 
       call wk_merge_slots(cs, env)
       call calc_cm_sm(this, cs, d_gen, beta_gen, rlamda)
-
-      this%T_brk = 1.0_SP/this%FreqMax
 
    end subroutine new_irr_init_compute
 

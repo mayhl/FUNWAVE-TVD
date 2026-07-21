@@ -297,8 +297,8 @@ contains
       this%bc%exch_age = physics%viscosity_breaking
       this%bc%exch_nu = physics%viscosity_breaking .or. breaking%WAVEMAKER_VIS
 
-      ! wavemaker%T_brk is deliberately NOT consumed (dead in legacy;
-      ! see the T_BRK_LEGACY note)
+      ! the legacy per-wavemaker T_brk assignments were dead (see the
+      ! T_BRK_LEGACY note) — 20 is the only threshold
       this%t_brk = T_BRK_LEGACY
 
       this%west_dirichlet = grid%is_back_boundary &
