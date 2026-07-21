@@ -165,7 +165,12 @@ class RegressionRunner(BaseRunner):
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
             config_task = progress.add_task(f"cmake  {tag}  configuring...", total=None)
-            subprocess.run(cmake_cmd, check=True, capture_output=True, env=env)
+            try:
+                subprocess.run(cmake_cmd, check=True, capture_output=True, env=env)
+            except subprocess.CalledProcessError as exc:
+                # captured output is invisible on a headless board otherwise
+                print(f"cmake configure failed for {tag}:\n{exc.stdout}\n{exc.stderr}")
+                raise
             progress.remove_task(config_task)
 
             build_task = progress.add_task(f"make   {tag}  compiling...  [dim]0%[/dim]", total=100)
