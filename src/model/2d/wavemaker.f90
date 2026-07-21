@@ -1311,7 +1311,8 @@ contains
                                     this%GammaTMA, freq, energy_bin, Ef)
       end if
 
-      call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, ag)
+      call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, &
+                                 ag, env)
 
       alpha_spec = this%Hmo**2/16.0_SP/Ef
 
@@ -1909,7 +1910,8 @@ contains
                                     this%GammaTMA, freq, energy_bin, Ef)
       end if
 
-      call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, ag)
+      call directional_spreading(this%Ntheta, this%ThetaPeak, this%Sigma_Theta, &
+                                 ag, env)
 
       alpha_spec = this%Hmo**2/16.0_SP/Ef
       alpha1 = alpha + 1.0_SP/3.0_SP
@@ -2474,6 +2476,8 @@ contains
       real(SP) :: energy_bin(this%Nfreq), hmo_each(this%Nfreq)
       real(SP) :: df, sigma_theta, ktheta_temp, sign_kf, alpha_c
       real(SP) :: Ef, alpha_spec, correction_coeff
+      logical :: valid(this%Nfreq)
+      character(96) :: msg
       integer :: kf, k_n, n_spec, idx_theta, displace(1), nfreq, ntheta
 
       nfreq = this%Nfreq
@@ -2491,6 +2495,7 @@ contains
       sigma_theta = this%Sigma_Theta*PI/180.0_SP
       idx_theta = 0
 
+      valid = .true.
       if (ntheta == 1) then
          ! legacy fills theta(1)/AG(1) only and reads the rest
          ! uninitialized — UB; the peak angle everywhere is the
@@ -2516,6 +2521,10 @@ contains
                                  + PI*real(floor(ktheta_temp/2.0_SP - 0.5_SP), SP) &
                                  /(real(ntheta, SP) - 1.0_SP))
             theta(kf) = theta(kf) + this%ThetaPeak*PI/180.0_SP
+            ! components beyond +-90 deg are dropped (zero weight, angle
+            ! clamped for the solve); the energy calibration below
+            ! renormalizes over the survivors
+            valid(kf) = abs(theta(kf)) <= 0.5_SP*PI
             if (theta(kf) > 0.5_SP*PI) theta(kf) = 0.5_SP*PI
             if (theta(kf) < -0.5_SP*PI) theta(kf) = -0.5_SP*PI
             ag(kf) = 1.0_SP/(2.0_SP*PI)
@@ -2526,6 +2535,14 @@ contains
             end do
          end do
          ag = abs(ag)
+         if (.not. any(valid)) call env%log%exit_on_error( &
+            "wavemaker: every WK_NEW_IRR component lies beyond +-90 deg (check peak)")
+         if (.not. all(valid)) then
+            where (.not. valid) ag = 0.0_SP
+            write (msg, '(A,I0,A)') "WK_NEW_IRR: ", count(.not. valid), &
+               " components beyond +-90 deg dropped; energy renormalized"
+            call env%log%warning(trim(msg))
+         end if
       end if
 
       ! coherence shuffle: move components onto host frequencies until
@@ -2849,23 +2866,30 @@ contains
 
    ! ----------------------------------------------------------------
    ! Private: wrapped-normal directional spreading (Borgman 1984;
-   ! legacy ykchoi 11/07/2016 block).  Bins span $\theta_p \pm \pi/3$,
-   ! clamped to $\pm\pi/2$:
+   ! legacy ykchoi 11/07/2016 block).  Bins span $\theta_p \pm \pi/3$:
    !   $$ G(\theta) = \frac{1}{2\pi} + \frac{1}{\pi}\sum_{n=1}^{N}
    !      e^{-\frac{(n\sigma_\theta)^2}{2}}\cos\!\big(n(\theta-\theta_p)\big),
    !      \qquad N = \lfloor 20/\sigma_\theta \rfloor $$
    ! normalized by the (signed) sum then made positive (legacy ABS).
+   ! Bins landing beyond $\pm\pi/2$ are DROPPED (zero weight) and the
+   ! normalization runs over the survivors, so the excluded weight
+   ! redistributes instead of piling at the clamp where the source is
+   ! inert (legacy clamped the angle and silently lost the energy);
+   ! the excluded fraction is warned.
    ! N is computed inside the ntheta > 1 branch — legacy evaluates
    ! 20/sigma before its 1D branch, dividing by zero when sigma = 0;
    ! the value is unused there, so the guard is unobservable.
    ! ----------------------------------------------------------------
-   subroutine directional_spreading(ntheta, theta_peak, sigma_theta_deg, ag)
+   subroutine directional_spreading(ntheta, theta_peak, sigma_theta_deg, ag, env)
       integer, intent(in)  :: ntheta
       real(SP), intent(in) :: theta_peak, sigma_theta_deg
       real(SP), intent(out) :: ag(ntheta)
+      type(type_env), intent(inout) :: env
 
-      real(SP) :: sigma_theta, theta, sum_ag
+      real(SP) :: sigma_theta, theta, sum_ag, sum_all
+      logical :: valid(ntheta)
       integer :: ktheta, k_n, n_spec
+      character(96) :: msg
 
       if (ntheta == 1) then
          ag(1) = 1.0_SP
@@ -2876,12 +2900,12 @@ contains
       n_spec = int(20.0_SP/sigma_theta)
 
       sum_ag = 0.0_SP
+      sum_all = 0.0_SP
       do ktheta = 1, ntheta
          theta = -PI/3.0_SP + theta_peak*PI/180.0_SP &
                  + 2.0_SP/3.0_SP*PI/(real(ntheta, SP) - 1.0_SP) &
                  *(real(ktheta, SP) - 1.0_SP)
-         if (theta > 0.5_SP*PI) theta = 0.5_SP*PI
-         if (theta < -0.5_SP*PI) theta = -0.5_SP*PI
+         valid(ktheta) = abs(theta) <= 0.5_SP*PI
 
          ag(ktheta) = 1.0_SP/(2.0_SP*PI)
          do k_n = 1, n_spec
@@ -2889,8 +2913,20 @@ contains
                          + (1.0_SP/PI)*exp(-0.5_SP*(real(k_n, SP)*sigma_theta)**2) &
                          *cos(real(k_n, SP)*(theta - theta_peak*PI/180.0_SP))
          end do
-         sum_ag = sum_ag + ag(ktheta)
+         sum_all = sum_all + ag(ktheta)
+         if (valid(ktheta)) sum_ag = sum_ag + ag(ktheta)
       end do
+
+      if (.not. any(valid)) call env%log%exit_on_error( &
+         "wavemaker: every directional bin lies beyond +-90 deg (check peak)")
+      if (.not. all(valid)) then
+         where (.not. valid) ag = 0.0_SP
+         write (msg, '(A,I0,A,F5.1,A)') "wavemaker: ", count(.not. valid), &
+            " directional bins beyond +-90 deg dropped (", &
+            (sum_all - sum_ag)/sum_all*100.0_SP, &
+            " % of spread weight); renormalized"
+         call env%log%warning(trim(msg))
+      end if
       ! small bins can go negative; integral of G must be 1
       ag = abs(ag/sum_ag)
 
