@@ -229,4 +229,4 @@ simulations:
     postprocess:
       spectral_fidelity: test.validation.oracles.spectral_fidelity
     tolerances:
-      spectral_fidelity: { hm0_error_pct: 35.0 }
+      spectral_fidelity: { hm0_error_pct: 25.0 }

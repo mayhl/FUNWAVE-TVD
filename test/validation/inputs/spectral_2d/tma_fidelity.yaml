@@ -7,18 +7,18 @@
 # reflected contamination below the station-spread diagnostic.
 #
 # FIRST LIGHT (2026-07-21): measured Hm0 = 0.141 m — a 29.6 % deficit, per-bin
-# lock-in decomposition:
-#   1. source-box truncation (ledger A7c): Width_WK from the LAST (0.3 Hz)
-#      component clips the low-frequency Gaussians to ~4.3 m half-width
-#      (erf-curve verified per bin: 0.53 at 0.05 Hz -> 1.0 above ~0.19 Hz);
+# lock-in decomposition (as of rung 3 — A7c fixed, width now peak-based):
+#   1. ~~source-box truncation (ledger A7c)~~ FIXED at rung 3: Width_WK comes
+#      from the PEAK period, so the low-frequency Gaussians are no longer
+#      clipped (Hm0 error dropped 29.3 % -> 19.8 % on the wheat board);
 #   2. kh-dependent Wei-Kirby delivery: REGULAR waves in this flume radiate
 #      ~0.80 of nominal at kh 0.5-0.9 (measured 30 m from the source; the CG
 #      runup case saw 0.986 at kh 0.2) — inherited, not spectral-specific;
 #   3. transport dissipation ~1.2 %/lambda at ppw 29, collapsing the ppw < 12
 #      high band (0.010 measured vs 0.062 theory band fraction).
-# The 35 % gate is a CHARACTERIZATION bound on today's behaviour; tighten when
-# the spectrum-pipeline refactor fixes A7c (rung 3) and the validate pass
-# addresses the kh transfer curve.
+# The 25 % gate is a CHARACTERIZATION bound on today's behaviour (19.8 %
+# measured + margin); tighten again when the validate pass addresses the kh
+# transfer curve.
 grid:
   cell_size: [2.0, 2.0]
   grid_size: [450, 5]
