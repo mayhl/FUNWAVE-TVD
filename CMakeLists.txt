@@ -90,7 +90,10 @@ if(USE_NETCDF)
     set(NETCDF_F_LINK ${NETCDF_F_LDFLAGS})
     set(FUNWAVE_HAS_NETCDF TRUE)
   else()
-    find_program(NF_CONFIG_EXECUTABLE nf-config)
+    # HINTS: the install_deps.sh extern build (pFUnit-style prefix)
+    find_program(
+      NF_CONFIG_EXECUTABLE nf-config
+      HINTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/netcdf-fortran/installed/bin")
     if(NF_CONFIG_EXECUTABLE)
       execute_process(
         COMMAND ${NF_CONFIG_EXECUTABLE} --includedir
