@@ -75,4 +75,65 @@ contains
       call dummy_fix_lint()
    end subroutine test_setup_solitary_flat
 
+   ! ----------------------------------------------------------------
+   ! output.geometries:/channels: reader — named point sets resolve,
+   ! transects expand to n_points, statistics presence derives the
+   ! channel kind, t_start defaults are tracked
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_setup_point_channels(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_main) :: model
+      type(type_env)        :: env
+
+      call new_env(env, label='test_channels', yaml_path='test_setup.yaml', &
+                   log_path='test_channels.log')
+      call model%init_from_env(env)
+
+      associate (out => model%output)
+
+      ! geometries: station verbatim, transect expanded (entry 3 is the
+      ! inline one appended by channel wg3, asserted below)
+      @assertEqual('station', out%geometries(1)%geom_type)
+      @assertEqual(10.5_SP, out%geometries(1)%x(1), TOL_SP)
+      @assertEqual(2.0_SP, out%geometries(1)%y(2), TOL_SP)
+      @assertEqual('transect', out%geometries(2)%geom_type)
+      @assertEqual(5, size(out%geometries(2)%x))
+      @assertEqual(9.75_SP, out%geometries(2)%x(2), TOL_SP)
+      @assertEqual(1.5_SP, out%geometries(2)%y(4), TOL_SP)
+
+      ! channels: geometry refs resolved by name
+      @assertEqual(4, out%n_channels)
+      @assertEqual(1, out%channels(1)%geom_idx)
+      @assertEqual(1, out%channels(2)%geom_idx)
+      @assertEqual(2, out%channels(3)%geom_idx)
+
+      ! inline geometry: appended to the list under the channel's name
+      @assertEqual(3, size(out%geometries))
+      @assertEqual(3, out%channels(4)%geom_idx)
+      @assertEqual('wg3', out%geometries(3)%name)
+      @assertEqual('station', out%geometries(3)%geom_type)
+      @assertEqual(25.0_SP, out%geometries(3)%x(1), TOL_SP)
+
+      ! snapshot channel: no statistics key
+      @assertTrue(out%channels(1)%snapshot)
+      @assertEqual(0, out%channels(1)%n_stats)
+      @assertEqual(2, size(out%channels(1)%variables))
+      @assertEqual('u', trim(out%channels(1)%variables(2)))
+
+      ! windowed channel: statistics presence flips snapshot off
+      @assertFalse(out%channels(2)%snapshot)
+      @assertEqual(2, out%channels(2)%n_stats)
+      @assertEqual('mean', trim(out%channels(2)%statistics(2)))
+
+      ! t_start: explicit on profile, defaulted elsewhere
+      @assertFalse(out%channels(1)%has_t_start)
+      @assertTrue(out%channels(3)%has_t_start)
+      @assertEqual(0.25_SP, out%channels(3)%t_start, TOL_SP)
+
+      end associate
+
+      call dummy_fix_lint()
+   end subroutine test_setup_point_channels
+
 end module test_model_setup

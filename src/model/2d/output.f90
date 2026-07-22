@@ -38,7 +38,24 @@
 !                                temporary flat list; maps each name → OUT_* flag.
 !                                Unknown names are rejected loudly.
 !                                Will be replaced by per-channel variable lists.
-!    channels: (list of channel dicts — stub, not yet parsed)
+!    geometries:                 named point sets shared by channels
+!      - name: <string>          referenced by channels.geometry,  REQUIRED
+!        type: station|transect                                    REQUIRED
+!        x/y: [<real>, ...]      station query coords (m), equal length
+!        start/end: [x, y]       transect endpoints (m)
+!        n_points: <int>         transect sample count (>= 2)
+!    channels:                   point output streams (registry-name vars)
+!      - name: <string>          file-name stem <name>_<var>.dat,  REQUIRED
+!        geometry: <string>      geometries: entry name; OR inline
+!                                type:/x:/y:/start:/end:/n_points: keys
+!                                (joins the geometry list under the
+!                                channel's name)
+!        variables: [eta, ...]   field-registry names,             REQUIRED
+!        interval: <real>        flush cadence (s),                REQUIRED
+!        statistics: [max, ...]  presence => windowed channel (min/max/
+!                                mean/rms over each interval, no snapshots);
+!                                absence => instantaneous snapshot channel
+!        t_start: <real>         default: simulation t_start
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -67,32 +84,37 @@ module model_output_mod
    implicit none
 
    private
-   public :: type_channel_config, type_model_output
+   public :: type_output_geometry, type_channel_config, type_model_output
 
-   character(len=10), parameter :: GEOM_TYPES(3) = &
-                                   [character(len=10) :: "field", "station", "transect"]
+   character(len=10), parameter :: GEOM_TYPES(2) = &
+                                   [character(len=10) :: "station", "transect"]
    character(len=8), parameter :: STAT_TYPES(4) = &
                                   [character(len=8) :: "min", "max", "mean", "rms"]
-   character(len=8), parameter :: FORMAT_TYPES(1) = &
-                                  [character(len=8) :: "ascii"]
+
+   ! Named point set: station coords verbatim, transect expanded to its
+   ! n_points samples at read time (channels only see resolved coords)
+   type :: type_output_geometry
+      character(:), allocatable :: name
+      character(:), allocatable :: geom_type   ! 'station' or 'transect'
+      real(SP), allocatable :: x(:), y(:)      ! global query coords (m)
+   end type type_output_geometry
 
    type :: type_channel_config
-      character(:), allocatable :: id
-      character(:), allocatable :: geom_type
-      character(:), allocatable :: format
-      character(:), allocatable :: variables(:)
-      character(:), allocatable :: statistics(:)
+      character(:), allocatable :: name
+      integer :: geom_idx = 0
+      character(32), allocatable :: variables(:)
+      character(8), allocatable :: statistics(:)
+      integer :: n_stats = 0
+      ! statistics presence derives the channel kind: windowed channels
+      ! never write snapshots (uniform time meaning per file)
       logical :: snapshot = .true.
-      real(SP) :: t_start = 0.0_SP
       real(SP) :: interval = 0.0_SP
-      integer :: buffer_size = 1000
-      character(:), allocatable :: coords_file
-      real(SP) :: start_coord(2) = 0.0_SP
-      real(SP) :: end_coord(2) = 0.0_SP
-      integer :: n_points = 0
+      real(SP) :: t_start = 0.0_SP
+      logical :: has_t_start = .false.
    end type type_channel_config
 
    type, extends(type_model_base) :: type_model_output
+      type(type_output_geometry), allocatable :: geometries(:)
       type(type_channel_config), allocatable :: channels(:)
       integer :: n_channels = 0
 
@@ -216,6 +238,7 @@ contains
       this%is_activated = .not. is_empty
       this%n_channels = 0
       if (allocated(this%channels)) deallocate (this%channels)
+      if (allocated(this%geometries)) deallocate (this%geometries)
       if (is_empty) call env%log%exit_on_error( &
          "output: section is required -- at minimum set interval:")
 
@@ -273,6 +296,11 @@ contains
          call blk_yaml%read("min_height", silent=no_key, val=this%arr_time_min_h, &
                             default=DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT)
       end if
+
+      ! geometries: + channels: point output streams (successor of the
+      ! legacy stations: block, which stays for parity)
+      call read_geometries(this, sub_env)
+      call read_channels(this, sub_env)
 
       ! Retired key spellings: loud rejection beats silent acceptance
       call reject_moved_key(sub_env, "EtaBlowVal", "blowup_threshold")
@@ -336,6 +364,200 @@ contains
       end if
 
    end subroutine output_read_input
+
+   subroutine read_geometries(this, sub_env)
+      type(type_model_output), intent(inout) :: this
+      type(type_env), intent(inout) :: sub_env
+
+      type(type_yaml_reader), allocatable :: entries(:)
+      integer :: k, kk
+      logical :: no_blk, no_key
+
+      entries = sub_env%yaml%cast_dictionary_list("geometries", no_blk)
+      if (no_blk) then
+         allocate (this%geometries(0))
+         return
+      end if
+
+      allocate (this%geometries(size(entries)))
+      do k = 1, size(entries)
+         associate (g => this%geometries(k))
+            call entries(k)%read("name", silent=no_key, val=g%name)
+            if (no_key .or. len(g%name) == 0) call sub_env%log%exit_on_error( &
+               "output: geometries: every entry needs a name:")
+            call parse_geometry(entries(k), "geometries: '"//g%name//"'", sub_env, g)
+         end associate
+      end do
+
+      do k = 2, size(this%geometries)
+         do kk = 1, k - 1
+            if (this%geometries(k)%name == this%geometries(kk)%name) &
+               call sub_env%log%exit_on_error("output: geometries: duplicate name '"// &
+                                              this%geometries(k)%name//"'")
+         end do
+      end do
+
+   end subroutine read_geometries
+
+   ! Shared by named geometries: entries and channel-inline geometry
+   ! (ctx prefixes error messages with the owning entry)
+   subroutine parse_geometry(entry, ctx, sub_env, g)
+      type(type_yaml_reader), intent(inout) :: entry
+      character(*), intent(in) :: ctx
+      type(type_env), intent(inout) :: sub_env
+      type(type_output_geometry), intent(inout) :: g
+
+      real(SP), allocatable :: p0(:), p1(:)
+      character(:), allocatable :: gtype
+      real(SP) :: frac
+      integer :: np, i
+      logical :: no_key
+
+      call entry%read_enum("type", GEOM_TYPES, val=gtype)
+      g%geom_type = gtype
+
+      select case (gtype)
+      case ("station")
+         call entry%read_real_array("x", silent=no_key, val=g%x)
+         if (no_key) call sub_env%log%exit_on_error("output: "//ctx// &
+                                                    ": station needs x:")
+         call entry%read_real_array("y", silent=no_key, val=g%y)
+         if (no_key) call sub_env%log%exit_on_error("output: "//ctx// &
+                                                    ": station needs y:")
+         if (size(g%x) /= size(g%y) .or. size(g%x) == 0) &
+            call sub_env%log%exit_on_error("output: "//ctx// &
+                                           ": x: and y: must be equal-length and non-empty")
+
+      case ("transect")
+         call entry%read_real_array("start", silent=no_key, val=p0)
+         if (no_key .or. size(p0) /= 2) call sub_env%log%exit_on_error( &
+            "output: "//ctx//": transect needs start: [x, y]")
+         call entry%read_real_array("end", silent=no_key, val=p1)
+         if (no_key .or. size(p1) /= 2) call sub_env%log%exit_on_error( &
+            "output: "//ctx//": transect needs end: [x, y]")
+         call entry%read("n_points", silent=no_key, val=np)
+         if (no_key .or. np < 2) call sub_env%log%exit_on_error( &
+            "output: "//ctx//": transect needs n_points: >= 2")
+
+         allocate (g%x(np), g%y(np))
+         do i = 1, np
+            frac = real(i - 1, SP)/real(np - 1, SP)
+            g%x(i) = p0(1) + frac*(p1(1) - p0(1))
+            g%y(i) = p0(2) + frac*(p1(2) - p0(2))
+         end do
+      end select
+
+   end subroutine parse_geometry
+
+   subroutine read_channels(this, sub_env)
+      type(type_model_output), intent(inout) :: this
+      type(type_env), intent(inout) :: sub_env
+
+      type(type_yaml_reader), allocatable :: entries(:)
+      type(type_string), allocatable :: names(:)
+      character(:), allocatable :: gname, valid
+      integer :: k, kk, iv, g
+      logical :: no_blk, no_key, no_stats
+
+      entries = sub_env%yaml%cast_dictionary_list("channels", no_blk)
+      if (no_blk) then
+         allocate (this%channels(0))
+         return
+      end if
+
+      allocate (this%channels(size(entries)))
+      this%n_channels = size(entries)
+      do k = 1, size(entries)
+         associate (cfg => this%channels(k))
+            call entries(k)%read("name", silent=no_key, val=cfg%name)
+            if (no_key .or. len(cfg%name) == 0) call sub_env%log%exit_on_error( &
+               "output: channels: every entry needs a name:")
+
+            ! geometry: reference XOR inline geometry keys; an inline
+            ! geometry joins the list under the channel's own name
+            call entries(k)%read("geometry", silent=no_key, val=gname)
+            if (.not. no_key .and. entries(k)%has_key("type")) &
+               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                              "': give geometry: OR an inline type:, not both")
+            if (no_key) then
+               if (.not. entries(k)%has_key("type")) &
+                  call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                 "': needs geometry: <name> or an inline type:")
+               do g = 1, size(this%geometries)
+                  if (this%geometries(g)%name == cfg%name) &
+                     call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                    "': inline geometry collides with the"// &
+                                                    " geometries: entry of the same name")
+               end do
+               block
+                  type(type_output_geometry) :: g_inline
+                  g_inline%name = cfg%name
+                  call parse_geometry(entries(k), "channels: '"//cfg%name//"'", &
+                                      sub_env, g_inline)
+                  this%geometries = [this%geometries, g_inline]
+               end block
+               cfg%geom_idx = size(this%geometries)
+            else
+               do g = 1, size(this%geometries)
+                  if (this%geometries(g)%name == gname) cfg%geom_idx = g
+               end do
+               if (cfg%geom_idx == 0) then
+                  valid = ""
+                  do g = 1, size(this%geometries)
+                     valid = valid//" "//this%geometries(g)%name
+                  end do
+                  call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                 "': unknown geometry '"//gname// &
+                                                 "' -- defined:"//valid)
+               end if
+            end if
+
+            call entries(k)%read_string_array("variables", silent=no_key, val=names)
+            if (no_key .or. size(names) == 0) call sub_env%log%exit_on_error( &
+               "output: channels: '"//cfg%name//"': variables: is required")
+            allocate (cfg%variables(size(names)))
+            do iv = 1, size(names)
+               if (len_trim(names(iv)%s) > len(cfg%variables)) &
+                  call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                 "': variable name too long: "//trim(names(iv)%s))
+               cfg%variables(iv) = trim(names(iv)%s)
+            end do
+
+            call entries(k)%read_positive("interval", val=cfg%interval)
+            call entries(k)%read("t_start", silent=no_key, val=cfg%t_start)
+            cfg%has_t_start = .not. no_key
+
+            ! statistics presence derives the channel kind (windowed vs
+            ! snapshot); validated against the accumulator's stat set
+            call entries(k)%read_string_array("statistics", silent=no_stats, val=names)
+            if (no_stats) then
+               allocate (cfg%statistics(0))
+            else
+               if (size(names) == 0) call sub_env%log%exit_on_error( &
+                  "output: channels: '"//cfg%name//"': statistics: must not be empty")
+               allocate (cfg%statistics(size(names)))
+               do iv = 1, size(names)
+                  if (.not. any(STAT_TYPES == trim(names(iv)%s))) &
+                     call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                    "': unknown statistic '"//trim(names(iv)%s)// &
+                                                    "' -- valid: min max mean rms")
+                  cfg%statistics(iv) = trim(names(iv)%s)
+               end do
+               cfg%n_stats = size(names)
+               cfg%snapshot = .false.
+            end if
+         end associate
+      end do
+
+      do k = 2, size(this%channels)
+         do kk = 1, k - 1
+            if (this%channels(k)%name == this%channels(kk)%name) &
+               call sub_env%log%exit_on_error("output: channels: duplicate name '"// &
+                                              this%channels(k)%name//"'")
+         end do
+      end do
+
+   end subroutine read_channels
 
    subroutine reject_moved_key(sub_env, old_key, new_home)
       type(type_env), intent(inout) :: sub_env

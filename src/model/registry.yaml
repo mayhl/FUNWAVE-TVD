@@ -574,3 +574,17 @@ sections:
       stations.interval: {legacy: PLOT_INTV_STATION, default: 1.0, units: s, doc: Station-output cadence.}
       stations.buffer: {legacy: StationOutputBuffer, default: 1000, units: ~, doc: Station time-series buffer length (rows).}
       vessel.interval: {legacy: PLOT_INTV_VESSEL, default: ~, units: s, doc: Vessel resistance-series output cadence.}
+      # geometries:/channels: are lists of named entries (keys below are per entry)
+      geometries.name: {legacy: ~, default: ~, units: ~, doc: Point-set name (referenced by channels.geometry).}
+      geometries.type: {legacy: ~, default: ~, units: ~, values: [station, transect], doc: Point-set kind.}
+      geometries.x: {legacy: ~, default: ~, units: m, doc: Station x-coordinates (equal length with y).}
+      geometries.y: {legacy: ~, default: ~, units: m, doc: Station y-coordinates.}
+      geometries.start: {legacy: ~, default: ~, units: m, doc: "Transect start point [x, y]."}
+      geometries.end: {legacy: ~, default: ~, units: m, doc: "Transect end point [x, y]."}
+      geometries.n_points: {legacy: ~, default: ~, units: ~, doc: Transect sample count (>= 2).}
+      channels.name: {legacy: ~, default: ~, units: ~, doc: Channel name (file stem <name>_<var>.dat).}
+      channels.geometry: {legacy: ~, default: ~, units: ~, doc: Name of the geometries entry to sample (or inline the geometry keys on the channel instead).}
+      channels.variables: {legacy: ~, default: ~, units: ~, doc: Field-registry variable names to output.}
+      channels.interval: {legacy: ~, default: ~, units: s, doc: Channel flush cadence.}
+      channels.statistics: {legacy: ~, default: ~, units: ~, values: [min, max, mean, rms], doc: Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous.}
+      channels.t_start: {legacy: ~, default: ~, units: s, doc: Channel start time (default simulation t_start).}

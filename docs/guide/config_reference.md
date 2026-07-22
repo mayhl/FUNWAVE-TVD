@@ -373,4 +373,17 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `stations.interval` | `1.0` | `PLOT_INTV_STATION` | s | Station-output cadence. |
 | `stations.buffer` | `1000` | `StationOutputBuffer` | — | Station time-series buffer length (rows). |
 | `vessel.interval` | — | `PLOT_INTV_VESSEL` | s | Vessel resistance-series output cadence. |
+| `geometries.name` | — | — | — | Point-set name (referenced by channels.geometry). |
+| `geometries.type` | — | — | — | Point-set kind. One of `station` \| `transect`. |
+| `geometries.x` | — | — | m | Station x-coordinates (equal length with y). |
+| `geometries.y` | — | — | m | Station y-coordinates. |
+| `geometries.start` | — | — | m | Transect start point [x, y]. |
+| `geometries.end` | — | — | m | Transect end point [x, y]. |
+| `geometries.n_points` | — | — | — | Transect sample count (>= 2). |
+| `channels.name` | — | — | — | Channel name (file stem \<name>_\<var>.dat). |
+| `channels.geometry` | — | — | — | Name of the geometries entry to sample (or inline the geometry keys on the channel instead). |
+| `channels.variables` | — | — | — | Field-registry variable names to output. |
+| `channels.interval` | — | — | s | Channel flush cadence. |
+| `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics One of `min` \| `max` \| `mean` \| `rms`. |
+| `channels.t_start` | — | — | s | Channel start time (default simulation t_start). |
 

@@ -943,7 +943,7 @@ contains
             vmeta(iv) = field_meta(trim(vars(iv)))
          end do
 
-         allocate (mgr%channels(1))
+         allocate (mgr%channels(1 + this%output%n_channels))
          mgr%n_channels = 1
          call mgr%channels(1)%init(id="field", geom_type="field", &
                                    variables=vars, n_vars=nv, &
@@ -984,7 +984,74 @@ contains
 
       end associate
 
+      call build_point_channels(this, mgr, folder)
+
    end subroutine build_field_channel
+
+   ! ----------------------------------------------------------------
+   ! Deck-defined point channels (output.channels: on geometries:).
+   ! Variables are registry names validated against the field registry;
+   ! a point falling in no rank's subdomain is a config error.
+   ! ----------------------------------------------------------------
+   subroutine build_point_channels(this, mgr, folder)
+      use mpi_f08
+      use core_output_channel_mod, only: type_var_meta
+      use model_field_metadata_mod, only: field_meta
+      class(type_model_main), intent(inout), target :: this
+      type(type_output_manager), intent(inout) :: mgr
+      character(*), intent(in) :: folder
+
+      type(type_var_meta), allocatable :: vmeta(:)
+      integer :: k, iv, kc, n_owned, ierr
+      character(16) :: owned_str, total_str
+
+      do k = 1, this%output%n_channels
+         associate (cfg => this%output%channels(k), &
+                    geom => this%output%geometries(this%output%channels(k)%geom_idx))
+
+            do iv = 1, size(cfg%variables)
+               if (.not. this%registry%has(trim(cfg%variables(iv)))) &
+                  call this%env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                  "': '"//trim(cfg%variables(iv))// &
+                                                  "' is not a registered output field")
+            end do
+            allocate (vmeta(size(cfg%variables)))
+            do iv = 1, size(cfg%variables)
+               vmeta(iv) = field_meta(trim(cfg%variables(iv)))
+            end do
+
+            kc = mgr%n_channels + 1
+            call mgr%channels(kc)%init(id=cfg%name, geom_type=geom%geom_type, &
+                                       variables=cfg%variables, &
+                                       n_vars=size(cfg%variables), &
+                                       statistics=cfg%statistics, &
+                                       n_stats=cfg%n_stats, &
+                                       snapshot=cfg%snapshot, &
+                                       t_start=merge(cfg%t_start, &
+                                                     this%simulation%t_start, &
+                                                     cfg%has_t_start), &
+                                       interval=cfg%interval, &
+                                       result_folder=folder, format="ascii", &
+                                       coords_x=geom%x, coords_y=geom%y, &
+                                       n_coords=size(geom%x), grid=this%grid, &
+                                       comm=this%env%comm, var_meta=vmeta)
+            mgr%n_channels = kc
+            deallocate (vmeta)
+
+            call MPI_Allreduce(mgr%channels(kc)%n_local, n_owned, 1, &
+                               MPI_INTEGER, MPI_SUM, this%env%comm%id, ierr)
+            if (n_owned /= size(geom%x)) then
+               write (owned_str, '(I0)') n_owned
+               write (total_str, '(I0)') size(geom%x)
+               call this%env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                               "': only "//trim(owned_str)//" of "// &
+                                               trim(total_str)//" points of geometry '"// &
+                                               geom%name//"' fall inside the domain")
+            end if
+         end associate
+      end do
+
+   end subroutine build_point_channels
 
    ! Gather one registry field and write it as a static (non-series)
    ! file — legacy dep.out.  Reuses the field channel's gatherer.

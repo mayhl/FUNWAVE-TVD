@@ -26,3 +26,34 @@ numerics:
 output:
   interval: 1.0
   variables: [ETA]
+  geometries:
+    - name: gauge_pair
+      type: station
+      x: [10.5, 30.0]
+      y: [1.5, 2.0]
+    - name: centerline
+      type: transect
+      start: [0.0, 1.5]
+      end: [39.0, 1.5]
+      n_points: 5
+  channels:
+    - name: gauges
+      geometry: gauge_pair
+      variables: [eta, u]
+      interval: 0.5
+    - name: wave_stats
+      geometry: gauge_pair
+      variables: [eta]
+      interval: 1.0
+      statistics: [max, mean]
+    - name: profile
+      geometry: centerline
+      variables: [eta]
+      interval: 0.5
+      t_start: 0.25
+    - name: wg3
+      type: station
+      x: [25.0]
+      y: [1.0]
+      variables: [eta]
+      interval: 0.5
