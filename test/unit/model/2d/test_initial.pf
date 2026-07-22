@@ -1,0 +1,133 @@
+! allow(E001)
+module test_initial
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod,      only: type_comm, new_comm
+   use core_constants_mod, only: SP, GRAV
+   use core_grid_mod,      only: type_grid_2d
+   use model_initial_mod,  only: type_model_initial, solitary_coefficients
+
+   implicit none
+
+   ! 40 columns across 4 ranks in x; 4 rows; dx = 1
+   integer, parameter :: TEST_M = 40
+   integer, parameter :: TEST_N = 4
+
+   ! Module-level SP literals (gfortran 15 kind-suffix quirk, see test_sponge)
+   real(SP), parameter :: DX_SP   = 1.0_SP
+   real(SP), parameter :: AMP_SP  = 0.5_SP
+   real(SP), parameter :: DEP_SP  = 10.0_SP
+   real(SP), parameter :: XWM_SP  = 20.0_SP
+   real(SP), parameter :: TOL_SP  = 1.0e-6_SP
+   real(SP), parameter :: TOL2PCT = 0.02_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   subroutine open_grid(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      grid%M = TEST_M;  grid%N = TEST_N
+      grid%nx_proc = 4;  grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+   end subroutine open_grid
+
+   ! ----------------------------------------------------------------
+   ! Coefficients: wave speed slightly supercritical, sech^2 dominant
+   ! amplitude close to a0, decay scale positive.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_solitary_coefficients()
+      real(SP) :: c_ph, b, a1, a2, au, c0
+
+      call solitary_coefficients(AMP_SP, DEP_SP, c_ph, b, a1, a2, au)
+
+      c0 = sqrt(GRAV * DEP_SP)
+      ! supercritical: c0 < C_ph, and below the full amplitude bound
+      @assertTrue(c_ph > c0)
+      @assertTrue(c_ph < c0 * (1.0_SP + AMP_SP/DEP_SP))
+      @assertTrue(b > 0.0_SP)
+      @assertTrue(au > 0.0_SP)
+      ! crest amplitude a1 + a2 within 2% of a0
+      @assertEqual(AMP_SP, a1 + a2, TOL2PCT * AMP_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_solitary_coefficients
+
+   ! ----------------------------------------------------------------
+   ! apply_ic INI_SOLITARY across a 4-rank x-decomposition: every rank
+   ! reproduces the analytic profile at its global indices (legacy
+   ! crest at global ghost-inclusive index xwm/dx + 1).
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_apply_ic_solitary_profile(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(type_model_initial) :: ini
+      real(SP), allocatable :: eta(:,:), u(:,:), v(:,:)
+      real(SP) :: c_ph, b, a1, a2, au, sc, xi
+      integer  :: i, j, gi
+
+      call open_grid(this, grid, comm)
+      allocate(eta(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(u  (grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate(v  (grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
+      ini%ic_type = 'INI_SOLITARY'
+      ini%AMP_SOLI   = AMP_SP
+      ini%DEP_SOLI   = DEP_SP
+      ini%XWAVEMAKER = XWM_SP
+      ini%SolitaryPositiveDirection = .true.
+
+      call ini%apply_ic(grid, eta, u, v)
+
+      call solitary_coefficients(AMP_SP, DEP_SP, c_ph, b, a1, a2, au)
+
+      do j = 1, grid%lp%nloc
+         do i = 1, grid%lp%mloc
+            gi = grid%ibegin - 1 + i
+            xi = (real(gi, SP) - XWM_SP/DX_SP - 1.0_SP) * DX_SP
+            sc = 1.0_SP / cosh(b * xi)
+            @assertEqual(a1*sc*sc + a2*sc**4, eta(i,j), TOL_SP)
+            @assertEqual(au*sc*sc, u(i,j), TOL_SP)
+         end do
+      end do
+      @assertEqual(0.0_SP, maxval(abs(v)), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_apply_ic_solitary_profile
+
+   ! ----------------------------------------------------------------
+   ! No initial: block leaves still water.
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_apply_ic_noop_without_block(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(type_model_initial) :: ini
+      real(SP), allocatable :: eta(:,:), u(:,:), v(:,:)
+
+      call open_grid(this, grid, comm)
+      allocate(eta(grid%lp%mloc, grid%lp%nloc), source=1.0_SP)
+      allocate(u  (grid%lp%mloc, grid%lp%nloc), source=1.0_SP)
+      allocate(v  (grid%lp%mloc, grid%lp%nloc), source=1.0_SP)
+
+      ini%ic_type = 'none'
+      call ini%apply_ic(grid, eta, u, v)
+
+      @assertEqual(0.0_SP, maxval(abs(eta)), TOL_SP)
+      @assertEqual(0.0_SP, maxval(abs(u)),   TOL_SP)
+      @assertEqual(0.0_SP, maxval(abs(v)),   TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_apply_ic_noop_without_block
+
+end module test_initial

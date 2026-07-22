@@ -18,6 +18,9 @@ target_link_libraries(test_model_setup libfunwave_model)
 qadd_pfunit_ctest(test_wavemaker 4)
 target_link_libraries(test_wavemaker libfunwave_model)
 
+qadd_pfunit_ctest(test_initial 4)
+target_link_libraries(test_initial libfunwave_model)
+
 qadd_pfunit_ctest(test_geometry 4)
 target_link_libraries(test_geometry libfunwave_model)
 

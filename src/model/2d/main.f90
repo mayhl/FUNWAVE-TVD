@@ -27,6 +27,7 @@ module model_main_mod
    use model_geometry_mod, only: type_model_geometry, read_field_ascii, stagger_depth
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
+   use model_initial_mod, only: type_model_initial
    use model_checkpoint_mod, only: write_checkpoint_core, read_checkpoint_core
    use model_wavemaker_mod, only: type_model_wavemaker
    use model_sponge_mod, only: type_model_sponge
@@ -74,6 +75,7 @@ module model_main_mod
       type(type_model_geometry)   :: geometry
       type(type_model_simulation) :: simulation
       type(type_model_hot_start)  :: hot_start
+      type(type_model_initial)    :: initial
       type(type_model_wavemaker)  :: wavemaker
       type(type_model_sponge)     :: sponge
       type(type_model_obstacle)   :: obstacle
@@ -130,6 +132,7 @@ contains
       call this%geometry%read_input(this%env)
       call this%simulation%read_input(this%env)
       call this%hot_start%read_input(this%env)
+      call this%initial%read_input(this%env)
       call this%wavemaker%read_input(this%env)
       call this%obstacle%read_input(this%env)
       call this%friction%read_input(this%env)
@@ -177,6 +180,7 @@ contains
       call this%geometry%read_input(this%env)
       call this%simulation%read_input(this%env)
       call this%hot_start%read_input(this%env)
+      call this%initial%read_input(this%env)
       call this%wavemaker%read_input(this%env)
       call this%obstacle%read_input(this%env)
       call this%friction%read_input(this%env)
@@ -263,8 +267,8 @@ contains
       ! deformation never refreshes DepthX/DepthY).  Solitary IC plus
       ! hot start would resolve the other way in legacy — pathological,
       ! not supported here.
-      call this%wavemaker%apply_ic(this%grid, this%fields%eta, &
-                                   this%fields%u, this%fields%v)
+      call this%initial%apply_ic(this%grid, this%fields%eta, &
+                                 this%fields%u, this%fields%v)
       if (this%hot_start%use_checkpoint) then
          call load_checkpoint(this)   ! seeds eta,p,q,mask + hot_start%time
       else if (this%hot_start%is_activated) then
