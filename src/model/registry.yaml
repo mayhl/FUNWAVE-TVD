@@ -564,7 +564,8 @@ sections:
       checkpoint: {legacy: ~, default: ~, units: ~, doc: Directory to write the hot-start checkpoint set (core.bin) at run end.}
       depth_out: {legacy: OUT_DEPTH, default: false, units: ~, doc: Write the still-water depth field.}
       field_io_type: {legacy: FIELD_IO_TYPE, default: ASCII, units: ~, values: [ASCII, BINARY, NETCDF], doc: Field output format (NETCDF needs a netcdf-fortran build).}
-      output_res: {legacy: OUTPUT_RES, default: 1, units: ~, doc: Output spatial subsampling stride.}
+      layout: {legacy: ~, default: chunked, units: ~, values: [single, per_stream, chunked], doc: NetCDF file topology; single = one output.nc with streams as groups, per_stream = data.nc + diagnostics.nc, chunked = field files split in time with a size-derived window.}
+      max_file_size: {legacy: ~, default: 50.0, units: GB, doc: Chunk roll-over size; also the predicted-size warning threshold for single/per_stream.}
       result_folder: {legacy: RESULT_FOLDER, default: ./output/, units: ~, doc: Directory for output files.}
       stations.file: {legacy: STATIONS_FILE, default: ~, units: ~, doc: Gauge-station coordinate file (presence enables station output).}
       means.steady_time: {legacy: STEADY_TIME, default: 0.0, units: s, latex: '$T_{\mathrm{steady}}$', doc: Time to begin time-averaging.}

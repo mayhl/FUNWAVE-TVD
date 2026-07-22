@@ -820,10 +820,12 @@ contains
       character(len=16) :: vars(40), prefs(40)
       character(len=8) :: stats(1)
       character(:), allocatable :: folder, fmt
+      character(len=160) :: msg
       real(SP) :: dummy_coord(1)
       type(type_path) :: outdir
       type(type_var_meta) :: vmeta(40)
-      integer :: nv, iv, unit
+      real(SP) :: cap_bytes, rate, duration, chunk_win
+      integer :: nv, iv, unit, field_root, n_win
       logical :: ok
 
       associate (out => this%output)
@@ -935,6 +937,41 @@ contains
             fmt = "ascii"
          end select
 
+         ! layout: netcdf file topology for the field stream (points
+         ! always group into the shared root; ascii/binary field files
+         ! are per-flush and ignore the knob)
+         field_root = -1
+         chunk_win = 0.0_SP
+         if (fmt == "netcdf") then
+            cap_bytes = out%max_file_size*1024.0_SP**3
+            rate = real(nv, SP)*real(this%grid%M, SP)*real(this%grid%N, SP) &
+                   *8.0_SP/out%interval
+            duration = this%simulation%total_time - this%simulation%t_start
+            select case (out%layout)
+            case ("single")
+               call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
+               field_root = mgr%diag_ncid
+            case ("chunked")
+               ! size-derived window, rounded down to the flush cadence;
+               ! a window covering the whole run (final forced frame
+               ! included) collapses to one file
+               n_win = int(min(cap_bytes/rate, duration)/out%interval)
+               if (real(n_win, SP)*out%interval >= duration) n_win = n_win + 1
+               chunk_win = real(max(1, n_win), SP)*out%interval
+               write (msg, '(A,F0.1,A,F0.3,A)') &
+                  "output: chunked field files span ", chunk_win, &
+                  " s (~", rate*chunk_win/1024.0_SP**3, " GB each)"
+               call this%env%log%info(trim(msg))
+            end select
+            if (out%layout /= "chunked" .and. rate*duration > cap_bytes) then
+               write (msg, '(A,F0.1,A,F0.1,A)') &
+                  "output: predicted field stream size ", &
+                  rate*duration/1024.0_SP**3, " GB exceeds max_file_size ", &
+                  out%max_file_size, " GB -- consider layout: chunked"
+               call this%env%log%warning(trim(msg))
+            end if
+         end if
+
          stats(1) = " "
          dummy_coord(1) = 0.0_SP
 
@@ -959,7 +996,8 @@ contains
                                    icount_start=merge( &
                                    this%hot_start%output_start_number - 1, &
                                    -1, this%hot_start%is_activated), &
-                                   var_meta=vmeta)
+                                   var_meta=vmeta, diag_ncid=field_root, &
+                                   chunk_window=chunk_win)
 
          ! legacy PREVIEW first-frame block: OUT_DEPTH .OR. BREAKWATER
          ! writes BOTH dep.out and cd_breakwater.out (zeros when no
@@ -1006,11 +1044,16 @@ contains
       integer :: k, iv, kc, n_owned, ierr
       character(16) :: owned_str, total_str
 
-      ! Shared diagnostics.nc root: created once when any channel
-      ! resolves to netcdf (per-channel format:, else the deck default)
+      ! Shared root: created once when any channel resolves to netcdf
+      ! (per-channel format:, else the deck default).  Layout 'single'
+      ! shares output.nc with the field stream; otherwise diagnostics.nc.
       do k = 1, this%output%n_channels
          if (point_format(this, k) == "netcdf") then
-            call mgr%open_diagnostics(folder, this%env%comm)
+            if (this%output%layout == "single") then
+               call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
+            else
+               call mgr%open_diagnostics(folder, this%env%comm)
+            end if
             exit
          end if
       end do

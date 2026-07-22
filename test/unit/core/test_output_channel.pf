@@ -579,4 +579,140 @@ contains
       call dummy_fix_lint()
    end subroutine test_point_netcdf
 
+   ! ----------------------------------------------------------------
+   ! chunked field layout: chunk_window=1.0 rolls each flush into its
+   ! own time-aligned file named <id>_<t0>-<t1>.nc covering [t0, t1)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_chunked(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      character(*), parameter :: F2 = './chk_00000001.0-00000002.0.nc'
+      real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), tval(1)
+      integer  :: ncid, varid, dimid, nlen
+      logical  :: exists
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='chk', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='netcdf', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   chunk_window=1.0_SP)
+
+      eta = 3.0_SP
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = 5.0_SP
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+      eta = 7.0_SP
+      call ch%step(1.5_SP, 0.5_SP, reg, comm)
+      call ch%step(2.0_SP, 0.5_SP, reg, comm)
+      call ch%finalize()
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         inquire (file='./chk_00000000.0-00000001.0.nc', exist=exists)
+         @assertTrue(exists)
+         inquire (file='./chk_00000002.0-00000003.0.nc', exist=exists)
+         @assertTrue(exists)
+
+         ! middle chunk: exactly the t=1 frame with the then-current field
+         @assertEqual(NF90_NOERR, nf90_open(F2, NF90_NOWRITE, ncid))
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(ncid, 'time', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(ncid, dimid, len=nlen))
+         @assertEqual(1, nlen)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'time', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, tval))
+         @assertEqual(1.0_SP, tval(1), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'eta', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, glob, &
+                                               start=[1, 1, 1], &
+                                               count=[TEST_M, TEST_N, 1]))
+         @assertEqual(5.0_SP, glob(1, 1), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_close(ncid))
+
+         open (unit=99, file='./chk_00000000.0-00000001.0.nc', status='old')
+         close (99, status='delete')
+         open (unit=99, file=F2, status='old')
+         close (99, status='delete')
+         open (unit=99, file='./chk_00000002.0-00000003.0.nc', status='old')
+         close (99, status='delete')
+      end if
+
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_chunked
+
+   ! ----------------------------------------------------------------
+   ! single layout: the field stream becomes a group in the shared
+   ! root beside point-channel groups; closing the channel leaves the
+   ! root open (the manager owns it)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_single_root(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N)
+      integer  :: diag, ncid, grp, varid, dimid, nlen
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call reg%register('eta', eta)
+
+      diag = -1
+      if (comm%is_io_node()) diag = open_diagnostics_file('./output_root.nc')
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='fld', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='netcdf', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   diag_ncid=diag)
+
+      eta = 4.0_SP
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      call ch%finalize()
+      if (comm%is_io_node()) call close_diagnostics_file(diag)
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         @assertEqual(NF90_NOERR, nf90_open('./output_root.nc', NF90_NOWRITE, ncid))
+         @assertEqual(NF90_NOERR, nf90_inq_grp_ncid(ncid, 'fld', grp))
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(grp, 'x', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(grp, dimid, len=nlen))
+         @assertEqual(TEST_M, nlen)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'eta', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, glob, &
+                                               start=[1, 1, 1], &
+                                               count=[TEST_M, TEST_N, 1]))
+         @assertEqual(4.0_SP, glob(TEST_M, TEST_N), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_close(ncid))
+         open (unit=99, file='./output_root.nc', status='old')
+         close (99, status='delete')
+      end if
+
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_single_root
+
 end module test_output_channel

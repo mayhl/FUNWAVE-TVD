@@ -363,7 +363,8 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `checkpoint` | — | — | — | Directory to write the hot-start checkpoint set (core.bin) at run end. |
 | `depth_out` | `false` | `OUT_DEPTH` | — | Write the still-water depth field. |
 | `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format (NETCDF needs a netcdf-fortran build). One of `ASCII` \| `BINARY` \| `NETCDF`. |
-| `output_res` | `1` | `OUTPUT_RES` | — | Output spatial subsampling stride. |
+| `layout` | `chunked` | — | — | NetCDF file topology; single = one output.nc with streams as groups One of `single` \| `per_stream` \| `chunked`. |
+| `max_file_size` | `50.0` | — | GB | Chunk roll-over size; also the predicted-size warning threshold for single/per_stream. |
 | `result_folder` | `./output/` | `RESULT_FOLDER` | — | Directory for output files. |
 | `stations.file` | — | `STATIONS_FILE` | — | Gauge-station coordinate file (presence enables station output). |
 | `means.steady_time` | `0.0` | `STEADY_TIME` | s | Time to begin time-averaging. |

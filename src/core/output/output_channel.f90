@@ -31,8 +31,12 @@
 !  interior tile at its global subarray offset in one shared file (legacy
 !  PutFileBinary, Gropp lecture-33 pattern), no gather.  Both produce the
 !  same bytes: the raw real(SP) global interior array in Fortran order.
-!  'netcdf' gathers like ascii but appends every variable to one
-!  data.nc per channel (x, y, time-unlimited; core_netcdf_writer_mod).
+!  'netcdf' gathers like ascii but appends every variable to a netcdf
+!  stream (x, y, time-unlimited) whose file topology the caller picks
+!  at init: one data.nc per channel (default), time-chunked
+!  <id>_<t0>-<t1>.nc files spanning chunk_window seconds each (frames
+!  land in the chunk covering [t0, t1)), or a group named <id> inside
+!  a shared root file (diag_ncid; layout 'single').
 !  Point channels default to ASCII .dat files (truncated at init);
 !  format 'netcdf' instead writes a group named <id> inside the shared
 !  diagnostics.nc (root handle created by the output manager, passed in
@@ -94,6 +98,9 @@ module core_output_channel_mod
       character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
       integer, allocatable :: varids(:)
       logical :: is_open = .false.
+      ! .false. when the stream is a group in a shared root file
+      ! (layout 'single'): close() only forgets, the manager closes
+      logical :: owns_file = .true.
    contains
       procedure :: create => nc_create
       procedure :: begin_frame => nc_begin_frame
@@ -170,6 +177,16 @@ module core_output_channel_mod
       ! Previous flush time = the open window's start (time_bnds)
       real(SP) :: t_last_flush = 0.0_SP
 
+      ! Chunked field layout: roll to a fresh time-aligned file when a
+      ! frame crosses the window's right edge (0 = no chunking).  The
+      ! defined variable set is saved for re-creation at each roll-over.
+      real(SP) :: chunk_window = 0.0_SP
+      real(SP) :: t_chunk0 = 0.0_SP, t_chunk1 = 0.0_SP
+      real(SP) :: dx0 = 0.0_SP, dy0 = 0.0_SP
+      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: nc_names(:)
+      type(type_var_meta), allocatable :: nc_meta(:)
+      integer :: nc_n = 0
+
       ! Grid geometry (set at init for use in step/flush)
       integer :: local_nx = 0, local_ny = 0
       integer :: n_local = 0   ! local interp points (station/transect)
@@ -189,7 +206,8 @@ contains
                            statistics, n_stats, snapshot, t_start, interval, &
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
-                           file_prefixes, icount_start, var_meta, diag_ncid)
+                           file_prefixes, icount_start, var_meta, diag_ncid, &
+                           chunk_window)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -207,7 +225,11 @@ contains
       character(*), intent(in), optional :: file_prefixes(*)  ! per-var name overrides
       integer, intent(in), optional :: icount_start  ! pre-increment counter base
       type(type_var_meta), intent(in), optional :: var_meta(*)  ! per-var CF attrs
-      integer, intent(in), optional :: diag_ncid  ! diagnostics.nc root (netcdf points)
+      ! Shared root file handle: netcdf point channels always; the field
+      ! channel only under layout 'single' (stream becomes a group)
+      integer, intent(in), optional :: diag_ncid
+      ! Field netcdf layout 'chunked': time span per file (s)
+      real(SP), intent(in), optional :: chunk_window
 
       integer :: iv, is
       integer, allocatable :: pids(:)
@@ -297,10 +319,18 @@ contains
             end do
          end do
 
-         ! NetCDF backend: one data.nc per channel, every snapshot +
-         ! statistic variable defined up front (names fixed at init)
-         if (trim(format) == 'netcdf' .and. comm%is_io_node()) &
-            call init_netcdf_backend(this, grid)
+         ! NetCDF backend: every snapshot + statistic variable defined
+         ! up front (names fixed at init).  Layout: a shared-root group
+         ! (diag_ncid), time-chunked files (chunk_window), or one
+         ! data.nc per channel.
+         if (trim(format) == 'netcdf') then
+            this%dx0 = grid%dx0
+            this%dy0 = grid%dy0
+            if (present(chunk_window)) this%chunk_window = chunk_window
+            this%t_chunk0 = t_start
+            this%t_chunk1 = t_start + this%chunk_window
+            if (comm%is_io_node()) call init_netcdf_backend(this, grid, diag_ncid)
+         end if
 
       case default
          error stop 'type_output_channel: unknown geometry type: '//trim(geom_type)
@@ -331,6 +361,20 @@ contains
       if (present(force)) do_flush = do_flush .or. force
       if (do_flush) this%icount = this%icount + 1
       this%fired = do_flush
+
+      ! Chunked field stream: a frame at or past the window's right
+      ! edge rolls to the next time-aligned file first (chunks cover
+      ! [t0, t1); a frame at exactly t1 opens the next chunk)
+      if (do_flush .and. this%chunk_window > 0.0_SP .and. this%nc%is_open) then
+         if (t >= this%t_chunk1) then
+            call this%nc%close()
+            do while (t >= this%t_chunk1)
+               this%t_chunk0 = this%t_chunk1
+               this%t_chunk1 = this%t_chunk1 + this%chunk_window
+            end do
+            call create_chunk_file(this)
+         end if
+      end if
 
       ! One record per flush: stamp the time value before any variable
       ! lands (snapshot and statistics share the frame)
@@ -472,36 +516,73 @@ contains
       end if
    end subroutine channel_flush_field
 
-   ! Define the channel's data.nc: snapshot variables under their file
-   ! prefixes plus every <prefix>_<stat> combination.  IO rank only.
-   subroutine init_netcdf_backend(this, grid)
+   ! Define the channel's field stream: snapshot variables under their
+   ! file prefixes plus every <prefix>_<stat> combination.  The set is
+   ! saved on the channel so chunked roll-overs can re-create it.
+   ! IO rank only.
+   subroutine init_netcdf_backend(this, grid, diag_ncid)
       class(type_output_channel), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
+      integer, intent(in), optional :: diag_ncid
 
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
-      type(type_var_meta), allocatable :: vmeta(:)
-      integer :: iv, is, n
+      integer :: iv, is, n, root
+
+      root = -1
+      if (present(diag_ncid)) root = diag_ncid
 
       ! statistic variables inherit the base variable's attrs
-      allocate (names(this%n_vars*(1 + this%n_stats)))
-      allocate (vmeta(this%n_vars*(1 + this%n_stats)))
+      allocate (this%nc_names(this%n_vars*(1 + this%n_stats)))
+      allocate (this%nc_meta(this%n_vars*(1 + this%n_stats)))
       n = 0
       do iv = 1, this%n_vars
          if (this%snapshot) then
             n = n + 1
-            names(n) = trim(this%prefixes(iv))
-            vmeta(n) = this%meta(iv)
+            this%nc_names(n) = trim(this%prefixes(iv))
+            this%nc_meta(n) = this%meta(iv)
          end if
          do is = 1, this%n_stats
             n = n + 1
-            names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
-            vmeta(n) = this%meta(iv)
+            this%nc_names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
+            this%nc_meta(n) = this%meta(iv)
          end do
       end do
+      this%nc_n = n
 
-      call this%nc%create(this%result_folder//'data.nc', grid%M, grid%N, &
-                          grid%dx0, grid%dy0, names, vmeta, n)
+      if (root >= 0) then
+         ! layout 'single': the stream is a group in the shared root
+         call this%nc%create(trim(this%id), grid%M, grid%N, &
+                             grid%dx0, grid%dy0, this%nc_names, &
+                             this%nc_meta, n, root=root)
+      else if (this%chunk_window > 0.0_SP) then
+         call create_chunk_file(this)
+      else
+         call this%nc%create(this%result_folder//'data.nc', grid%M, grid%N, &
+                             grid%dx0, grid%dy0, this%nc_names, this%nc_meta, n)
+      end if
    end subroutine init_netcdf_backend
+
+   ! Open the chunk covering [t_chunk0, t_chunk1); the name carries the
+   ! window bounds (zero-padded seconds, deterministic and sortable)
+   subroutine create_chunk_file(this)
+      class(type_output_channel), intent(inout) :: this
+      call this%nc%create(this%result_folder//trim(this%id)//'_'// &
+                          chunk_stamp(this%t_chunk0)//'-'// &
+                          chunk_stamp(this%t_chunk1)//'.nc', &
+                          this%gatherer%M, this%gatherer%N, &
+                          this%dx0, this%dy0, this%nc_names, &
+                          this%nc_meta, this%nc_n)
+   end subroutine create_chunk_file
+
+   ! Zero-padded seconds (F edit descriptors cannot zero-fill)
+   pure function chunk_stamp(t) result(s)
+      real(SP), intent(in) :: t
+      character(10) :: s
+      integer :: i
+      write (s, '(F10.1)') t
+      do i = 1, len(s)
+         if (s(i:i) == ' ') s(i:i) = '0'
+      end do
+   end function chunk_stamp
 
    ! Define the channel's group in the shared diagnostics.nc: snapshot
    ! variables plus every <prefix>_<stat>, each tagged with its CF
@@ -691,8 +772,9 @@ contains
 
    ! Define the file: dims (x, y, time-unlimited), center coordinates,
    ! one SP-kind variable per name with its CF attrs.  Clobbers any
-   ! existing file.
-   subroutine nc_create(this, fname, M, N, dx, dy, names, meta, n_names)
+   ! existing file.  With root, fname names a GROUP defined in that
+   ! shared file instead (layout 'single'; the root owner closes).
+   subroutine nc_create(this, fname, M, N, dx, dy, names, meta, n_names, root)
       class(type_netcdf_field_writer), intent(inout) :: this
       character(*), intent(in) :: fname
       integer, intent(in) :: M, N
@@ -700,13 +782,20 @@ contains
       character(*), intent(in) :: names(:)
       type(type_var_meta), intent(in) :: meta(:)
       integer, intent(in) :: n_names
+      integer, intent(in), optional :: root
 
       integer :: x_dim, y_dim, t_dim, x_var, y_var
       integer :: i
       real(SP), allocatable :: coord(:)
 
-      call nc_check(nf90_create(fname, ior(NF90_CLOBBER, NF90_NETCDF4), &
-                                this%ncid), 'create '//fname)
+      this%owns_file = .not. present(root)
+      if (this%owns_file) then
+         call nc_check(nf90_create(fname, ior(NF90_CLOBBER, NF90_NETCDF4), &
+                                   this%ncid), 'create '//fname)
+      else
+         call nc_check(nf90_def_grp(root, fname, this%ncid), &
+                       'def group '//fname)
+      end if
 
       call nc_check(nf90_def_dim(this%ncid, 'x', M, x_dim), 'def x')
       call nc_check(nf90_def_dim(this%ncid, 'y', N, y_dim), 'def y')
@@ -747,11 +836,15 @@ contains
                           'att standard_name '//trim(names(i)))
       end do
 
-      call nc_check(nf90_put_att(this%ncid, NF90_GLOBAL, 'Conventions', &
-                                 'CF-1.8'), 'att Conventions')
-      call nc_check(nf90_put_att(this%ncid, NF90_GLOBAL, 'source', &
-                                 'FUNWAVE-TVD'), 'att source')
-      call nc_check(nf90_enddef(this%ncid), 'enddef')
+      ! group mode: the root already carries the global attrs, and a
+      ! NETCDF4 root needs no define/data mode juggling
+      if (this%owns_file) then
+         call nc_check(nf90_put_att(this%ncid, NF90_GLOBAL, 'Conventions', &
+                                    'CF-1.8'), 'att Conventions')
+         call nc_check(nf90_put_att(this%ncid, NF90_GLOBAL, 'source', &
+                                    'FUNWAVE-TVD'), 'att source')
+         call nc_check(nf90_enddef(this%ncid), 'enddef')
+      end if
 
       ! cell-center coordinates on the uniform spacing
       allocate (coord(max(M, N)))
@@ -801,8 +894,10 @@ contains
 
    subroutine nc_close(this)
       class(type_netcdf_field_writer), intent(inout) :: this
-      if (this%is_open) call nc_check(nf90_close(this%ncid), 'close')
+      if (this%is_open .and. this%owns_file) &
+         call nc_check(nf90_close(this%ncid), 'close')
       this%is_open = .false.
+      this%owns_file = .true.
       this%ncid = -1
       this%nrec = 0
       this%n_vars = 0
@@ -973,6 +1068,10 @@ contains
          deallocate (this%accum)
       end if
       if (allocated(this%result_folder)) deallocate (this%result_folder)
+      if (allocated(this%nc_names)) deallocate (this%nc_names)
+      if (allocated(this%nc_meta)) deallocate (this%nc_meta)
+      this%nc_n = 0
+      this%chunk_window = 0.0_SP
       this%n_vars = 0
       this%n_stats = 0
       this%icount = 0

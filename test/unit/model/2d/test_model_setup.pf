@@ -135,6 +135,10 @@ contains
       @assertEqual(0, len_trim(out%channels(1)%format))
       @assertEqual('netcdf', trim(out%channels(4)%format))
 
+      ! layout defaults (registry): chunked at the 50 GB cap
+      @assertEqual('chunked', out%layout)
+      @assertEqual(50.0_SP, out%max_file_size, TOL_SP)
+
       end associate
 
       call dummy_fix_lint()

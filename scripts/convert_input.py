@@ -791,7 +791,7 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
         op["stations"] = sta
     ores = pop_val("OUTPUT_RES")
     if ores is not None:
-        op["output_res"] = ores
+        unknown.append("OUTPUT_RES (the stride was never consumed) -- dropped")
     ebv = pop_val("EtaBlowVal")
     if ebv is not None:
         op["blowup_threshold"] = ebv

@@ -45,13 +45,20 @@ module core_output_manager_mod
 
 contains
 
-   ! Create the shared diagnostics.nc once (idempotent; IO rank only)
-   subroutine manager_open_diagnostics(this, folder, comm)
+   ! Create the shared root file once (idempotent; IO rank only).
+   ! Default diagnostics.nc; layout 'single' passes output.nc so field
+   ! and point streams share one file.
+   subroutine manager_open_diagnostics(this, folder, comm, fname)
       class(type_output_manager), intent(inout) :: this
       character(*), intent(in) :: folder  ! must include trailing separator
       type(type_comm), intent(inout) :: comm
+      character(*), intent(in), optional :: fname
+
+      character(:), allocatable :: name
+      name = 'diagnostics.nc'
+      if (present(fname)) name = fname
       if (comm%is_io_node() .and. this%diag_ncid < 0) &
-         this%diag_ncid = open_diagnostics_file(folder//'diagnostics.nc')
+         this%diag_ncid = open_diagnostics_file(folder//name)
    end subroutine manager_open_diagnostics
 
    ! Called every timestep. Dispatches to each active channel.

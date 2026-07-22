@@ -10,7 +10,14 @@
 !                                (nee simulation.output_interval)
 !    result_folder:   <string>   output directory,             default './output/'
 !    field_io_type:   <string>   parallel field I/O format,    default 'ASCII'
-!    output_res:      <int>      field sub-sampling factor,    default 1
+!    layout:          <string>   netcdf file topology,         default 'chunked'
+!                                single (one output.nc, streams as groups) |
+!                                per_stream (data.nc + diagnostics.nc) |
+!                                chunked (field files split in time,
+!                                <id>_<t0>-<t1>.nc, size-derived window)
+!    max_file_size:   <real>     chunk roll-over size (GB),    default 50.0
+!                                also the single/per_stream predicted-size
+!                                warning threshold
 !    blowup_threshold: <real>    blow-up |eta| threshold (m),  default derived
 !                                100*max|Depth| (nee EtaBlowVal)
 !    depth_out:       <bool>     output bathymetry (static),   default NO
@@ -78,8 +85,9 @@ module model_output_mod
    use model_config_defaults_mod, only: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT, &
                                         DEF_OUTPUT_DEPTH_OUT, &
                                         DEF_OUTPUT_FIELD_IO_TYPE, &
+                                        DEF_OUTPUT_LAYOUT, &
+                                        DEF_OUTPUT_MAX_FILE_SIZE, &
                                         DEF_OUTPUT_MEANS_STEADY_TIME, &
-                                        DEF_OUTPUT_OUTPUT_RES, &
                                         DEF_OUTPUT_RESULT_FOLDER, &
                                         DEF_OUTPUT_STATIONS_BUFFER, &
                                         DEF_OUTPUT_STATIONS_INTERVAL
@@ -130,7 +138,11 @@ module model_output_mod
       ! Bridge fields for legacy io.F use
       character(:), allocatable :: result_folder
       character(:), allocatable :: field_io_type
-      integer  :: output_res = 1
+
+      ! NetCDF file topology (single/per_stream/chunked) + the chunk
+      ! roll-over size, doubling as the predicted-size warning cap (GB)
+      character(:), allocatable :: layout
+      real(SP) :: max_file_size = 50.0_SP
 
       ! Checkpoint (hot-start) write dir; empty => none.  Presence => write the
       ! checkpoint set (core.bin now, later per-module bins) at run end.
@@ -253,7 +265,13 @@ contains
       call sub_env%yaml%read("checkpoint", silent=no_key, val=this%checkpoint, default="")
       this%write_checkpoint = .not. no_key
       call sub_env%yaml%read("field_io_type", val=this%field_io_type, default=DEF_OUTPUT_FIELD_IO_TYPE)
-      call sub_env%yaml%read("output_res", val=this%output_res, default=DEF_OUTPUT_OUTPUT_RES)
+      call sub_env%yaml%read("layout", val=this%layout, default=DEF_OUTPUT_LAYOUT)
+      if (this%layout /= "single" .and. this%layout /= "per_stream" .and. &
+          this%layout /= "chunked") &
+         call env%log%exit_on_error("output: unknown layout '"//this%layout// &
+                                    "' -- valid: single per_stream chunked")
+      call sub_env%yaml%read_positive("max_file_size", val=this%max_file_size, &
+                                      default=DEF_OUTPUT_MAX_FILE_SIZE)
       ! NOTE: no `default=` here on purpose -- yaml%read only assigns `silent`
       ! when `default` is ABSENT, so asking for both hands back an unwritten
       ! flag.  Absent key -> blowup_threshold is WIPED (val intent(out)); safety
@@ -314,6 +332,8 @@ contains
       call reject_moved_key(sub_env, "STEADY_TIME", "means: steady_time")
       call reject_moved_key(sub_env, "number_stations", "stations: (count = file line count)")
       call reject_moved_key(sub_env, "stations_file", "stations: file")
+      call reject_moved_key(sub_env, "output_res", &
+                            "nothing -- the stride was never consumed; subsample downstream")
 
       call sub_env%yaml%read_string_array("variables", silent=no_vars, val=var_list)
       if (.not. no_vars) then
