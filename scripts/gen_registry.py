@@ -35,6 +35,10 @@ REPO = Path(__file__).resolve().parent.parent
 REGISTRY = REPO / "src" / "model" / "registry.yaml"
 OUTPUT = REPO / "src" / "model" / "2d" / "config_defaults.f90"
 DOCS_OUTPUT = REPO / "docs" / "guide" / "config_reference.md"
+META_OUTPUT = REPO / "src" / "model" / "field_metadata.f90"
+
+# character component length of type_var_meta (core output_channel.f90)
+META_LEN = 64
 
 HEADER = """\
 ! allow(E001)
@@ -130,6 +134,14 @@ def validate(reg: dict) -> list[str]:
     for v in reg.get("variables", []):
         if not v.get("standard_name") and not v.get("funwave_name"):
             errors.append(f"variable {v.get('name')}: needs standard_name or funwave_name")
+        for field in ("units", "long_name", "standard_name"):
+            s = v.get(field)
+            if s is None:
+                errors.append(f"variable {v.get('name')}: missing field {field!r}")
+            elif len(str(s)) > META_LEN:
+                errors.append(f"variable {v.get('name')}: {field} exceeds META_LEN ({META_LEN})")
+            elif '"' in str(s):
+                errors.append(f"variable {v.get('name')}: {field} contains a double quote")
     return errors
 
 
@@ -148,6 +160,54 @@ def generate(reg: dict) -> str:
         name = const_name(p["yaml_path"])
         lines.append(f'   character(*), parameter :: {name} = "{default}"\n')
     lines.append(FOOTER)
+    return "".join(lines)
+
+
+META_HEADER = """\
+! allow(E001)
+! =================================================================
+!  GENERATED FILE — DO NOT EDIT.
+!  Source:    src/model/registry.yaml
+!  Generator: scripts/gen_registry.py   (rerun after registry edits)
+!  Sync test: scripts/gen_registry.py --check
+! =================================================================
+!> @file field_metadata.f90
+!> @brief Generated CF attribute catalog for output field variables.
+module model_field_metadata_mod
+   use core_output_channel_mod, only: type_var_meta
+   implicit none
+   public
+
+contains
+
+   !> To look up CF variable attributes by registry field name; an
+   !> uncataloged name returns blank meta, which the writer renders
+   !> as no attrs.
+   pure function field_meta(name) result(m)
+      character(*), intent(in) :: name
+      type(type_var_meta) :: m
+
+      select case (trim(name))
+"""
+
+META_FOOTER = """\
+      end select
+   end function field_meta
+
+end module model_field_metadata_mod
+"""
+
+
+def generate_metadata(reg: dict) -> str:
+    """Render the variables catalog as the field_meta lookup (registry order)."""
+    lines = [META_HEADER]
+    for v in reg.get("variables", []):
+        lines.append(f'      case ("{v["name"]}")\n')
+        lines.append(f'         m%units = "{v["units"]}"\n')
+        lines.append(f'         m%long_name = "{v["long_name"]}"\n')
+        if v.get("standard_name"):
+            lines.append(f'         m%standard_name = "{v["standard_name"]}"\n')
+    lines.append(META_FOOTER)
     return "".join(lines)
 
 
@@ -302,15 +362,19 @@ def main() -> int:
 
     new = generate(reg)
     new_docs = generate_docs(reg)
+    new_meta = generate_metadata(reg)
     if args.check:
         ok = _check_one(OUTPUT, new)
         ok = _check_one(DOCS_OUTPUT, new_docs) and ok
+        ok = _check_one(META_OUTPUT, new_meta) and ok
         return 0 if ok else 1
 
     OUTPUT.write_text(new)
     print(f"wrote {OUTPUT.relative_to(REPO)}")
     DOCS_OUTPUT.write_text(new_docs)
     print(f"wrote {DOCS_OUTPUT.relative_to(REPO)}")
+    META_OUTPUT.write_text(new_meta)
+    print(f"wrote {META_OUTPUT.relative_to(REPO)}")
     return 0
 
 

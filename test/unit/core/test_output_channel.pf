@@ -8,7 +8,7 @@ module test_output_channel
    use core_comm_mod,            only: type_comm, new_comm
    use core_grid_mod,            only: type_grid_2d
    use core_field_registry_mod,  only: type_field_registry
-   use core_output_channel_mod,  only: type_output_channel
+   use core_output_channel_mod,  only: type_output_channel, type_var_meta
    implicit none
 
    integer, parameter :: TEST_M = 8
@@ -250,6 +250,8 @@ contains
       real(SP), allocatable, target :: eta(:,:)
       character(32) :: vars(1)
       character(8)  :: stats(1)
+      character(64) :: att
+      type(type_var_meta) :: vmeta(1)
       real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), tvals(2), x, y
       integer  :: i, j, ncid, varid, dimid, nlen
 
@@ -259,12 +261,15 @@ contains
       call reg%register('eta', eta)
 
       vars(1) = 'eta';  stats(1) = ''
+      vmeta(1)%units = 'm'
+      vmeta(1)%standard_name = 'sea_surface_height_above_mean_sea_level'
       cx = 0.0_SP;  cy = 0.0_SP
       call ch%init(id='snap_nc', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
                    result_folder='./', format='netcdf', &
-                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm)
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   var_meta=vmeta)
 
       ! dt-accumulator trigger: interval=1.0 needs 1.0 s of accumulated
       ! dt between flushes, so walk t in dt steps (flushes at 0.0, 1.0)
@@ -287,6 +292,14 @@ contains
          @assertEqual(1.0_SP, tvals(2), tolerance=1e-12_SP)
 
          @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'eta', varid))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(ncid, varid, 'units', att))
+         @assertEqual('m', trim(att))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(ncid, varid, 'standard_name', att))
+         @assertEqual('sea_surface_height_above_mean_sea_level', trim(att))
+         ! blank long_name must not have been written
+         @assertFalse(NF90_NOERR == nf90_inquire_attribute(ncid, varid, 'long_name'))
          @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, glob, &
                                                start=[1, 1, 2], &
                                                count=[TEST_M, TEST_N, 1]))

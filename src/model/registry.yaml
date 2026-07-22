@@ -41,7 +41,9 @@ variables:
     fill_value:     -9999.0
     latex:          "$v$"
 
-  - name:           p
+  # NOTE: field-registry names (code p/q = Ubar); legacy P/Q are the
+  # interface fluxes the output layer registers as p_flux/q_flux
+  - name:           p_flux
     legacy_name:    P
     long_name:      "x-component of depth-integrated volume flux"
     standard_name:  ""
@@ -50,7 +52,7 @@ variables:
     fill_value:     -9999.0
     latex:          "$P = Hu$"
 
-  - name:           q
+  - name:           q_flux
     legacy_name:    Q
     long_name:      "y-component of depth-integrated volume flux"
     standard_name:  ""

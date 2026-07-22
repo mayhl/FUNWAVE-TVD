@@ -56,13 +56,22 @@ module core_output_channel_mod
    implicit none
 
    private
-   public :: type_output_channel, write_field_file
+   public :: type_output_channel, type_var_meta, write_field_file
 
    integer, parameter :: VARNAME_LEN = 32
    integer, parameter :: STATNAME_LEN = 8
    integer, parameter :: ID_LEN = 64
    integer, parameter :: VARS_MAX = 32
    integer, parameter :: STATS_MAX = 4
+   integer, parameter :: META_LEN = 64
+
+   ! CF attributes for one variable; a blank component writes no attr.
+   ! Filled by the model from the registry catalog (field_metadata.f90)
+   type :: type_var_meta
+      character(META_LEN) :: units = ''
+      character(META_LEN) :: long_name = ''
+      character(META_LEN) :: standard_name = ''
+   end type type_var_meta
 
    ! Serial NetCDF backend state: one data.nc per channel, every channel
    ! variable as <var>(x, y, time) — C order (time, y, x) per the CF
@@ -91,6 +100,7 @@ module core_output_channel_mod
       ! writes legacy hmax_NNNNN); default to the registry names.
       character(VARNAME_LEN)         :: prefixes(VARS_MAX) = ''
       character(STATNAME_LEN)        :: statistics(STATS_MAX) = ''
+      type(type_var_meta)            :: meta(VARS_MAX)
       integer                        :: n_vars = 0
       integer                        :: n_stats = 0
       logical                        :: snapshot = .true.
@@ -138,7 +148,7 @@ contains
                            statistics, n_stats, snapshot, t_start, interval, &
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
-                           file_prefixes, icount_start)
+                           file_prefixes, icount_start, var_meta)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -155,6 +165,7 @@ contains
       type(type_comm), intent(inout) :: comm
       character(*), intent(in), optional :: file_prefixes(*)  ! per-var name overrides
       integer, intent(in), optional :: icount_start  ! pre-increment counter base
+      type(type_var_meta), intent(in), optional :: var_meta(*)  ! per-var CF attrs
 
       integer :: iv, is
       integer, allocatable :: pids(:)
@@ -185,6 +196,7 @@ contains
          this%prefixes(1:n_vars) = variables(1:n_vars)
       end if
       this%statistics(1:n_stats) = statistics(1:n_stats)
+      if (present(var_meta)) this%meta(1:n_vars) = var_meta(1:n_vars)
 
       ! Timing control
       this%trigger%t_start = t_start
@@ -407,23 +419,28 @@ contains
       type(type_grid_2d), intent(in) :: grid
 
       character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      type(type_var_meta), allocatable :: vmeta(:)
       integer :: iv, is, n
 
+      ! statistic variables inherit the base variable's attrs
       allocate (names(this%n_vars*(1 + this%n_stats)))
+      allocate (vmeta(this%n_vars*(1 + this%n_stats)))
       n = 0
       do iv = 1, this%n_vars
          if (this%snapshot) then
             n = n + 1
             names(n) = trim(this%prefixes(iv))
+            vmeta(n) = this%meta(iv)
          end if
          do is = 1, this%n_stats
             n = n + 1
             names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
+            vmeta(n) = this%meta(iv)
          end do
       end do
 
       call this%nc%create(this%result_folder//'data.nc', grid%M, grid%N, &
-                          grid%dx0, grid%dy0, names, n)
+                          grid%dx0, grid%dy0, names, vmeta, n)
    end subroutine init_netcdf_backend
 
    ! Collective MPI-IO twin of write_field_file's binary branch (legacy
@@ -555,13 +572,15 @@ contains
    end subroutine nc_check
 
    ! Define the file: dims (x, y, time-unlimited), center coordinates,
-   ! one SP-kind variable per name.  Clobbers any existing file.
-   subroutine nc_create(this, fname, M, N, dx, dy, names, n_names)
+   ! one SP-kind variable per name with its CF attrs.  Clobbers any
+   ! existing file.
+   subroutine nc_create(this, fname, M, N, dx, dy, names, meta, n_names)
       class(type_netcdf_field_writer), intent(inout) :: this
       character(*), intent(in) :: fname
       integer, intent(in) :: M, N
       real(SP), intent(in) :: dx, dy
       character(*), intent(in) :: names(:)
+      type(type_var_meta), intent(in) :: meta(:)
       integer, intent(in) :: n_names
 
       integer :: x_dim, y_dim, t_dim, x_var, y_var
@@ -596,6 +615,18 @@ contains
          call nc_check(nf90_def_var(this%ncid, trim(names(i)), NF90_DOUBLE, &
                                     [x_dim, y_dim, t_dim], this%varids(i)), &
                        'def var '//trim(names(i)))
+         if (len_trim(meta(i)%units) > 0) &
+            call nc_check(nf90_put_att(this%ncid, this%varids(i), 'units', &
+                                       trim(meta(i)%units)), &
+                          'att units '//trim(names(i)))
+         if (len_trim(meta(i)%long_name) > 0) &
+            call nc_check(nf90_put_att(this%ncid, this%varids(i), 'long_name', &
+                                       trim(meta(i)%long_name)), &
+                          'att long_name '//trim(names(i)))
+         if (len_trim(meta(i)%standard_name) > 0) &
+            call nc_check(nf90_put_att(this%ncid, this%varids(i), 'standard_name', &
+                                       trim(meta(i)%standard_name)), &
+                          'att standard_name '//trim(names(i)))
       end do
 
       call nc_check(nf90_put_att(this%ncid, NF90_GLOBAL, 'Conventions', &

@@ -812,6 +812,8 @@ contains
    ! interface fluxes ride the stepper's register_output entries.
    ! ----------------------------------------------------------------
    subroutine build_field_channel(this, mgr)
+      use core_output_channel_mod, only: type_var_meta
+      use model_field_metadata_mod, only: field_meta
       class(type_model_main), intent(inout), target :: this
       type(type_output_manager), intent(inout) :: mgr
 
@@ -820,7 +822,8 @@ contains
       character(:), allocatable :: folder, fmt
       real(SP) :: dummy_coord(1)
       type(type_path) :: outdir
-      integer :: nv, unit
+      type(type_var_meta) :: vmeta(40)
+      integer :: nv, iv, unit
       logical :: ok
 
       associate (out => this%output)
@@ -935,6 +938,11 @@ contains
          stats(1) = " "
          dummy_coord(1) = 0.0_SP
 
+         ! CF attrs from the registry catalog; uncataloged names stay blank
+         do iv = 1, nv
+            vmeta(iv) = field_meta(trim(vars(iv)))
+         end do
+
          allocate (mgr%channels(1))
          mgr%n_channels = 1
          call mgr%channels(1)%init(id="field", geom_type="field", &
@@ -950,7 +958,8 @@ contains
                                    file_prefixes=prefs, &
                                    icount_start=merge( &
                                    this%hot_start%output_start_number - 1, &
-                                   -1, this%hot_start%is_activated))
+                                   -1, this%hot_start%is_activated), &
+                                   var_meta=vmeta)
 
          ! legacy PREVIEW first-frame block: OUT_DEPTH .OR. BREAKWATER
          ! writes BOTH dep.out and cd_breakwater.out (zeros when no
