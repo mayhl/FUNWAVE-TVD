@@ -341,9 +341,6 @@ contains
    ! wk_peak_width — one peak-based width for every path (the legacy
    ! last-component width was ledger A7c, fixed at rung 3).
    ! Legacy float sequences are selected per path, not unified:
-   !  * ri_pi — the sqrt(pi/beta) constant, now uniformly PI on every
-   !    path (legacy truncated 3.14159 for REG/TIME/DATA2D was an
-   !    accident, un-reproduced; parameter kept pending signature drop)
    !  * use_peak_cphase — wavelength through the peak frequency with the
    !    legacy wkn = 0 guard (analytic-spectrum family) vs through the
    !    component period with the legacy in-loop depth/period error stop
@@ -352,12 +349,12 @@ contains
    !    SNAP_NEW logs under snap_label); the DATA2D family snaps in a
    !    pre-pass and passes SNAP_NONE
    ! ----------------------------------------------------------------
-   subroutine wk_solve_components(cs, h_gen, delta, ri_pi, fm, use_peak_cphase, &
+   subroutine wk_solve_components(cs, h_gen, delta, fm, use_peak_cphase, &
                                   D_gen, rlamda, beta_gen, snap_mode, &
                                   dy, nglob, env, snap_label)
       use core_constants_mod, only: GRAV, SMALL
       type(type_component_set), intent(inout) :: cs
-      real(SP), intent(in) :: h_gen, delta, ri_pi, fm
+      real(SP), intent(in) :: h_gen, delta, fm
       logical, intent(in) :: use_peak_cphase
       real(SP), intent(out) :: D_gen(:), rlamda(:), beta_gen(:)
       integer, intent(in), optional :: snap_mode, nglob
@@ -424,7 +421,7 @@ contains
          rlamda(c) = wkn*sin(cs%theta(c))
          beta_gen(c) = 80.0_SP/delta**2/wave_length**2
          rl_gen = wkn*cos(cs%theta(c))
-         ri = sqrt(ri_pi/beta_gen(c))*exp(-rl_gen**2/4.0_SP/beta_gen(c))
+         ri = sqrt(PI/beta_gen(c))*exp(-rl_gen**2/4.0_SP/beta_gen(c))
 
          D_gen(c) = 2.0_SP*cs%amp(c)*cos(cs%theta(c)) &
                     *(omgn**2 - alpha1*GRAV*wkn**4*h_gen**3) &
@@ -1336,7 +1333,7 @@ contains
       call wk_build_component_set(this, spec, spread, disc, env, cs)
 
       allocate (D_gen(cs%n), rlamda(cs%n), beta_gen(cs%n))
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                this%FreqPeak, .true., D_gen, rlamda, beta_gen, &
                                snap_mode=disc%snap_mode, &
                                dy=grid%dy0, nglob=grid%N, env=env, &
@@ -1592,7 +1589,7 @@ contains
          cs%amp(kf) = this%wave_comp(kf, 2)
       end do
 
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                0.0_SP, .false., this%D_genS, rlamda, &
                                this%Beta_genS)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
@@ -1751,7 +1748,7 @@ contains
       end do
 
       allocate (D_gen(cs%n), rlamda(cs%n), beta_gen(cs%n))
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                0.0_SP, .false., D_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
@@ -1888,7 +1885,7 @@ contains
       end do
 
       allocate (d_gen(nfreq), rlamda(nfreq), beta_gen(nfreq))
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                0.0_SP, .false., d_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
@@ -2388,7 +2385,7 @@ contains
       cs%theta(1) = theta_deg*PI/180.0_SP
       cs%amp(1) = amp
 
-      call wk_solve_components(cs, h_gen, delta, PI, 0.0_SP, .false., &
+      call wk_solve_components(cs, h_gen, delta, 0.0_SP, .false., &
                                D1, rl1, b1)
       call wk_peak_width(Tperiod, h_gen, delta, width)
       D_gen = D1(1)
