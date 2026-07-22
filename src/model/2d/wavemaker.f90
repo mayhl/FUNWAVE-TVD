@@ -1475,6 +1475,7 @@ contains
       real(SP) :: theta_arr(disc%nfreq), agf(disc%nfreq), ag(disc%ntheta)
       real(SP) :: Ef, alpha_spec, theta, df
       real(SP) :: ktheta_temp, sign_kf, alpha_c, correction_coeff
+      real(SP) :: w_sum, theta_mean
       logical :: valid(disc%nfreq)
       character(96) :: msg
       integer :: kf, ktheta, c, idx_theta, displace(1)
@@ -1608,6 +1609,29 @@ contains
             end do
          end do
 
+      end if
+
+      ! init invariants (info only): the discrete realization vs the
+      ! spectral targets.  sum(a^2)/2 is the component variance; under
+      ! normalize: band it must reproduce the deck Hm0 up to dropped
+      ! bins, under normalize: total the band's natural share.  The
+      ! spread is the amp^2-weighted directional std, pre-snap.
+      write (msg, '(A,F8.4,A,F8.4,A)') "wavemaker: realized Hm0 ", &
+         4.0_SP*sqrt(0.5_SP*sum(cs%amp**2)), " m (deck ", this%Hmo, " m)"
+      call env%log%info(trim(msg))
+      if (disc%ntheta > 1) then
+         w_sum = sum(cs%amp**2)
+         theta_mean = dot_product(cs%amp**2, cs%theta)/w_sum
+         write (msg, '(A,F7.2,A,F7.2,A)') "wavemaker: realized spread ", &
+            sqrt(dot_product(cs%amp**2, (cs%theta - theta_mean)**2)/w_sum) &
+            *180.0_SP/PI, " deg (deck ", this%Sigma_Theta, " deg)"
+         call env%log%info(trim(msg))
+      end if
+      if (.not. disc%equal_energy) then
+         df = (disc%fmax - disc%fmin)/(real(disc%nfreq, SP) - 1.0_SP)
+         write (msg, '(A,F8.1,A)') "wavemaker: equal-df repeat period ", &
+            1.0_SP/df, " s"
+         call env%log%info(trim(msg))
       end if
 
    end subroutine wk_build_component_set
