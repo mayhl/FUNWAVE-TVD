@@ -23,6 +23,7 @@ target_sources(
           vessel.f90
           sediment.f90
           meteo.f90
+          field_input.f90
           initial.f90
           wavemaker.f90
           sponge.f90

@@ -21,6 +21,9 @@ target_link_libraries(test_wavemaker libfunwave_model)
 qadd_pfunit_ctest(test_initial 4)
 target_link_libraries(test_initial libfunwave_model)
 
+qadd_pfunit_ctest(test_field_input 1)
+target_link_libraries(test_field_input libfunwave_model)
+
 qadd_pfunit_ctest(test_geometry 4)
 target_link_libraries(test_geometry libfunwave_model)
 

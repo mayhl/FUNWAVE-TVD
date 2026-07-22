@@ -1,0 +1,137 @@
+! allow(E001)
+module test_field_input
+
+   use mpi_f08
+   use pFUnit
+   use core_comm_mod,          only: type_comm, new_comm
+   use core_constants_mod,     only: SP
+   use core_env_mod,           only: type_env
+   use core_log_io_mod,        only: new_log_writer
+   use core_grid_mod,          only: type_grid_2d
+   use model_field_input_mod,  only: type_file_spec, parse_file_spec, read_field
+
+   implicit none
+
+   integer, parameter :: TEST_M = 8
+   integer, parameter :: TEST_N = 4
+
+   real(SP), parameter :: DX_SP  = 1.0_SP
+   real(SP), parameter :: TOL_SP = 0.0_SP
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! Minimal env (log only) — new_env would re-init MPI and clash with
+   ! the pFUnit-provided communicator (test_checkpoint pattern)
+   subroutine open_env_grid(this, env, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env),       intent(inout) :: env
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
+      allocate (env%log)
+      env%log = new_log_writer("test_fi", comm%is_io_node())
+      grid%M = TEST_M;  grid%N = TEST_N
+      grid%nx_proc = 1;  grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+   end subroutine open_env_grid
+
+   ! ----------------------------------------------------------------
+   ! Grammar: loose paths pick the format from the extension;
+   ! container refs split at '#' and imply netcdf.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_parse_grammar(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env)       :: env
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_file_spec) :: spec
+
+      call open_env_grid(this, env, grid, comm)
+
+      call parse_file_spec(env, "test", "depth.txt", spec)
+      @assertEqual("depth.txt", spec%path)
+      @assertEqual("", spec%container)
+      @assertEqual("ascii", spec%format)
+
+      call parse_file_spec(env, "test", "depth.bin", spec)
+      @assertEqual("binary", spec%format)
+
+      call parse_file_spec(env, "test", "depth.nc", spec)
+      @assertEqual("netcdf", spec%format)
+
+      call parse_file_spec(env, "test", "root#/bathymetry/depth", spec)
+      @assertEqual("root", spec%container)
+      @assertEqual("/bathymetry/depth", spec%group_path)
+      @assertEqual("netcdf", spec%format)
+
+      call parse_file_spec(env, "test", "forcing.nc#/west/eta", spec)
+      @assertEqual("forcing.nc", spec%container)
+      @assertEqual("/west/eta", spec%group_path)
+
+      call parse_file_spec(env, "test", "depth.dat", spec, &
+                           format_override="binary")
+      @assertEqual("binary", spec%format)
+
+      call dummy_fix_lint()
+   end subroutine test_parse_grammar
+
+   ! ----------------------------------------------------------------
+   ! ascii and binary round-trip the same global row layout to the
+   ! same interior values.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_ascii_binary_round_trip(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env)       :: env
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_file_spec) :: spec
+      real(SP), allocatable :: arr_a(:,:), arr_b(:,:), row(:)
+      integer :: unit, gi, gj
+
+      call open_env_grid(this, env, grid, comm)
+      allocate (arr_a(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (arr_b(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (row(TEST_M))
+
+      ! field value 100*j + i, both encodings
+      open (newunit=unit, file="fi_field.txt", status="replace", action="write")
+      do gj = 1, TEST_N
+         do gi = 1, TEST_M
+            row(gi) = real(100*gj + gi, SP)
+         end do
+         write (unit, *) row
+      end do
+      close (unit)
+      open (newunit=unit, file="fi_field.bin", status="replace", &
+            action="write", access="stream", form="unformatted")
+      do gj = 1, TEST_N
+         do gi = 1, TEST_M
+            row(gi) = real(100*gj + gi, SP)
+         end do
+         write (unit) row
+      end do
+      close (unit)
+
+      call parse_file_spec(env, "test", "fi_field.txt", spec)
+      call read_field(env, spec, grid, arr_a)
+      call parse_file_spec(env, "test", "fi_field.bin", spec)
+      call read_field(env, spec, grid, arr_b)
+
+      ! interior slice matches the analytic fill, encodings agree exactly
+      do gj = 1, TEST_N
+         do gi = 1, TEST_M
+            @assertEqual(real(100*gj + gi, SP), arr_a(grid%lp%ib + gi - 1, grid%lp%jb + gj - 1), TOL_SP)
+         end do
+      end do
+      @assertEqual(0.0_SP, maxval(abs(arr_a - arr_b)), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_ascii_binary_round_trip
+
+end module test_field_input
