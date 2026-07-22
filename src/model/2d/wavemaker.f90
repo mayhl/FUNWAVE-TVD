@@ -341,8 +341,9 @@ contains
    ! wk_peak_width — one peak-based width for every path (the legacy
    ! last-component width was ledger A7c, fixed at rung 3).
    ! Legacy float sequences are selected per path, not unified:
-   !  * ri_pi — the sqrt(pi/beta) constant: PI for the WK_IRR/WK_NEW_IRR
-   !    family, the truncated 3.14159 literal for REG/TIME/DATA2D
+   !  * ri_pi — the sqrt(pi/beta) constant, now uniformly PI on every
+   !    path (legacy truncated 3.14159 for REG/TIME/DATA2D was an
+   !    accident, un-reproduced; parameter kept pending signature drop)
    !  * use_peak_cphase — wavelength through the peak frequency with the
    !    legacy wkn = 0 guard (analytic-spectrum family) vs through the
    !    component period with the legacy in-loop depth/period error stop
@@ -1591,7 +1592,7 @@ contains
          cs%amp(kf) = this%wave_comp(kf, 2)
       end do
 
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, 3.14159_SP, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
                                0.0_SP, .false., this%D_genS, rlamda, &
                                this%Beta_genS)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
@@ -1609,7 +1610,8 @@ contains
    ! guard); the filter runs on (dir, amp, phase) tuples, so an input
    ! phase column stays paired with its own direction (legacy never
    ! compacted Phase2D — the ledger A7d mis-pair, fixed here).  The
-   ! input phase unit conversion is the legacy 0.005555555555556*pi.
+   ! input phase converts degrees -> radians via DEG2RAD (legacy used a
+   ! truncated 0.005555555555556*pi literal).
    ! FreqPeak (ramp scale) = 1/PeakPeriod from the file.
    ! ----------------------------------------------------------------
    subroutine data2d_init_compute(this, grid, periodic, env)
@@ -1681,10 +1683,10 @@ contains
 
       if (input_phase) then
          call env%log%info("WK_DATA2D: using input phase info")
-         ! legacy unit conversion literal (0.00555... * pi, not /180)
+         ! degrees -> radians (legacy used a truncated 0.00555*pi literal)
          do j = 1, nfreq
             do i = 1, ndir
-               phase_flt(j, i) = phase_flt(j, i)*0.005555555555556_SP*PI
+               phase_flt(j, i) = phase_flt(j, i)*DEG2RAD
             end do
          end do
       else
@@ -1749,7 +1751,7 @@ contains
       end do
 
       allocate (D_gen(cs%n), rlamda(cs%n), beta_gen(cs%n))
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, 3.14159_SP, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
                                0.0_SP, .false., D_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
@@ -1886,7 +1888,7 @@ contains
       end do
 
       allocate (d_gen(nfreq), rlamda(nfreq), beta_gen(nfreq))
-      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, 3.14159_SP, &
+      call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, PI, &
                                0.0_SP, .false., d_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
                          this%Width_WK)
@@ -2157,7 +2159,7 @@ contains
       close (unit)
 
       if (input_phase) then
-         phase_left = phase_left*3.1415926/180.0_SP
+         phase_left = phase_left*DEG2RAD
       elseif (BUILD_ZERO_PHASE) then
          phase_left = 0.0_SP
       else
@@ -2386,7 +2388,7 @@ contains
       cs%theta(1) = theta_deg*PI/180.0_SP
       cs%amp(1) = amp
 
-      call wk_solve_components(cs, h_gen, delta, 3.14159_SP, 0.0_SP, .false., &
+      call wk_solve_components(cs, h_gen, delta, PI, 0.0_SP, .false., &
                                D1, rl1, b1)
       call wk_peak_width(Tperiod, h_gen, delta, width)
       D_gen = D1(1)
