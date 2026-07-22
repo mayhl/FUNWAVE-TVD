@@ -110,9 +110,29 @@ contains
       call dummy_fix_lint()
    end subroutine test_field_snapshot_ascii
 
+   ! 8x4 global grid split 2x2: 4x2 tiles, offsets in BOTH directions
+   ! (the MPI-IO subarray view must place j-offset tiles correctly).
+   subroutine open_grid_2x2(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M       = TEST_M
+      grid%N       = TEST_N
+      grid%nx_proc = 2
+      grid%ny_proc = 2
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+   end subroutine open_grid_2x2
+
    ! ----------------------------------------------------------------
    ! field snapshot, binary: raw real(SP) stream of the (M, N) global
-   ! interior array in Fortran order
+   ! interior array in Fortran order.  Written via collective MPI-IO
+   ! (each rank puts its tile at its subarray offset), read back with
+   ! a plain stream read — the bytes must match the gathered layout.
    ! ----------------------------------------------------------------
    @test(npes=[2])
    subroutine test_field_snapshot_binary(this)
@@ -160,6 +180,59 @@ contains
       call reg%finalize()
       call dummy_fix_lint()
    end subroutine test_field_snapshot_binary
+
+   ! ----------------------------------------------------------------
+   ! binary MPI-IO with a 2x2 decomposition: tiles carry non-zero
+   ! offsets in BOTH i and j, so a misplaced subarray view scrambles
+   ! the read-back values
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_field_snapshot_binary_2x2(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), x, y
+      integer  :: i, j, unit
+
+      call open_grid_2x2(this, grid, comm)
+      call alloc_field(grid, eta)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='snap_b4', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='binary', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm)
+
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         open (newunit=unit, file='./eta_00001', access='stream', &
+               form='unformatted', status='old', action='read')
+         read (unit) glob
+         close (unit, status='delete')
+         do j = 1, TEST_N
+            do i = 1, TEST_M
+               x = real(i - 1, SP)
+               y = real(j - 1, SP)
+               @assertEqual(2.0_SP*x + 3.0_SP*y, glob(i,j), tolerance=1e-6_SP)
+            end do
+         end do
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_snapshot_binary_2x2
 
    ! ----------------------------------------------------------------
    ! station snapshot: values land in point order (point 1 lives on

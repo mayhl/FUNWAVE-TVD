@@ -23,4 +23,4 @@ target_link_libraries(test_time libcore_engine libcore_infra libcore_base)
 
 qadd_pfunit_ctest(test_field_registry)
 qadd_pfunit_ctest(test_gatherer 2)
-qadd_pfunit_ctest(test_output_channel 2)
+qadd_pfunit_ctest(test_output_channel 4)

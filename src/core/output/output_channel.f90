@@ -22,9 +22,12 @@
 !   field statistic  <var>_<stat>_NNNNN      flush counter starting at 1)
 !   point snapshot   <id>_<var>.dat          one row per flush: t, v(1..n)
 !   point statistic  <id>_<var>_<stat>.dat   in point order
-!  Field format follows the 'format' setting: 'ascii' writes one row of
-!  M E16.6 values per J (legacy PutFileASCII layout); 'binary' writes the
-!  raw real(SP) global interior array as a stream (Fortran order).
+!  Field format follows the 'format' setting: 'ascii' gathers to the IO
+!  rank and writes one row of M E16.6 values per J (legacy PutFileASCII
+!  layout); 'binary' is a collective MPI-IO write — every rank puts its
+!  interior tile at its global subarray offset in one shared file (legacy
+!  PutFileBinary, Gropp lecture-33 pattern), no gather.  Both produce the
+!  same bytes: the raw real(SP) global interior array in Fortran order.
 !  Point files are always ASCII and are truncated at init.
 !
 !  Call order:
@@ -38,7 +41,7 @@
 !-------------------------------------------------
 
 module core_output_channel_mod
-   use core_constants_mod, only: SP, N_GHOST
+   use core_constants_mod, only: SP, MPI_SP, N_GHOST
    use core_comm_mod, only: type_comm
    use core_grid_mod, only: type_grid_2d
    use core_accumulators_mod, only: type_accumulator
@@ -46,6 +49,7 @@ module core_output_channel_mod
    use core_time_utils_mod, only: type_timing_control
    use core_field_registry_mod, only: type_field_registry
    use core_output_gatherer_mod, only: type_output_gatherer
+   use mpi_f08
    implicit none
 
    private
@@ -95,6 +99,8 @@ module core_output_channel_mod
       integer :: local_nx = 0, local_ny = 0
       integer :: n_local = 0   ! local interp points (station/transect)
       integer :: n_global = 0   ! total global output points
+      ! 0-based global start of this rank's interior tile (MPI-IO subarray)
+      integer :: i0 = 0, j0 = 0
 
    contains
       procedure :: init => channel_init
@@ -190,6 +196,8 @@ contains
       case ('field')
          this%n_local = grid%local_nx*grid%local_ny
          this%n_global = grid%M*grid%N
+         this%i0 = grid%ibegin - 1
+         this%j0 = grid%jbegin - 1
          call this%gatherer%init_field(grid, comm)
 
          ! Accumulators: (local_nx, local_ny)
@@ -321,7 +329,9 @@ contains
       end do
    end subroutine channel_write_stats
 
-   ! Gather one field-geometry interior array and write <name>_NNNNN on IO rank.
+   ! Write one field-geometry interior array as <name>_NNNNN.
+   ! binary: collective MPI-IO, every rank writes its tile in place;
+   ! ascii: gather to the IO rank, serial formatted write.
    subroutine channel_flush_field(this, vals, name, comm)
       class(type_output_channel), intent(inout) :: this
       real(SP), intent(in)    :: vals(:, :)   ! (local_nx, local_ny)
@@ -331,6 +341,15 @@ contains
       real(SP), allocatable :: glob(:, :)
       character(5) :: cnt
 
+      write (cnt, '(I5.5)') this%icount
+
+      if (trim(this%format) == 'binary') then
+         call write_field_file_mpiio(this%result_folder//name//'_'//cnt, &
+                                     vals, this%gatherer%M, this%gatherer%N, &
+                                     this%i0, this%j0, comm)
+         return
+      end if
+
       if (comm%is_io_node()) then
          allocate (glob(this%gatherer%M, this%gatherer%N))
       else
@@ -339,11 +358,45 @@ contains
       call this%gatherer%gather_field(vals, glob, comm)
 
       if (comm%is_io_node()) then
-         write (cnt, '(I5.5)') this%icount
          call write_field_file(this%result_folder//name//'_'//cnt, &
                                glob, trim(this%format))
       end if
    end subroutine channel_flush_field
+
+   ! Collective MPI-IO twin of write_field_file's binary branch (legacy
+   ! PutFileBinary, after Gropp lecture 33): the file view maps each
+   ! rank's (local_nx, local_ny) interior tile to its 0-based (i0, j0)
+   ! subarray offset in the global (M, N) array, then one write_all puts
+   ! every tile concurrently — byte-identical to the gathered stream.
+   subroutine write_field_file_mpiio(fname, vals, M, N, i0, j0, comm)
+      character(*), intent(in) :: fname
+      real(SP), intent(in) :: vals(:, :)   ! interior tile, ghost-free
+      integer, intent(in) :: M, N, i0, j0
+      type(type_comm), intent(inout) :: comm
+
+      type(MPI_Datatype) :: ftype
+      type(MPI_File) :: fh
+      integer(MPI_OFFSET_KIND) :: zero_off
+      integer :: ierr
+
+      call MPI_Type_create_subarray(2, [M, N], shape(vals), [i0, j0], &
+                                    MPI_ORDER_FORTRAN, MPI_SP, ftype, ierr)
+      call MPI_Type_commit(ftype, ierr)
+
+      call MPI_File_open(comm%id, fname, MPI_MODE_WRONLY + MPI_MODE_CREATE, &
+                         MPI_INFO_NULL, fh, ierr)
+      ! MPI_MODE_CREATE does not truncate: a rerun over a larger stale
+      ! file (e.g. prior ASCII output) would keep a garbage tail
+      zero_off = 0
+      call MPI_File_set_size(fh, zero_off, ierr)
+      call MPI_Barrier(comm%id, ierr)
+      call MPI_File_set_view(fh, zero_off, MPI_SP, ftype, 'native', &
+                             MPI_INFO_NULL, ierr)
+      call MPI_File_write_all(fh, vals, size(vals), MPI_SP, &
+                              MPI_STATUS_IGNORE, ierr)
+      call MPI_File_close(fh, ierr)
+      call MPI_Type_free(ftype, ierr)
+   end subroutine write_field_file_mpiio
 
    ! Gather one point-geometry value set and append a "t, v(1..n)" row
    ! (in point order) to <id>_<name>.dat on the IO rank.
