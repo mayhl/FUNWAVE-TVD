@@ -131,6 +131,10 @@ contains
       @assertTrue(out%channels(3)%has_t_start)
       @assertEqual(0.25_SP, out%channels(3)%t_start, TOL_SP)
 
+      ! format: explicit on wg3, inherit sentinel elsewhere
+      @assertEqual(0, len_trim(out%channels(1)%format))
+      @assertEqual('netcdf', trim(out%channels(4)%format))
+
       end associate
 
       call dummy_fix_lint()

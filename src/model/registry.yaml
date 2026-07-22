@@ -588,3 +588,4 @@ sections:
       channels.interval: {legacy: ~, default: ~, units: s, doc: Channel flush cadence.}
       channels.statistics: {legacy: ~, default: ~, units: ~, values: [min, max, mean, rms], doc: Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous.}
       channels.t_start: {legacy: ~, default: ~, units: s, doc: Channel start time (default simulation t_start).}
+      channels.format: {legacy: ~, default: ~, units: ~, values: [ascii, netcdf], doc: Point file format; default follows field_io_type (NETCDF selects a netcdf group in diagnostics.nc, anything else ascii .dat files).}

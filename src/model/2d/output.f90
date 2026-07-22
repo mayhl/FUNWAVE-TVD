@@ -56,6 +56,9 @@
 !                                mean/rms over each interval, no snapshots);
 !                                absence => instantaneous snapshot channel
 !        t_start: <real>         default: simulation t_start
+!        format: ascii|netcdf    default follows field_io_type (NETCDF
+!                                => netcdf group in diagnostics.nc,
+!                                else per-variable <name>_<var>.dat)
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -111,6 +114,9 @@ module model_output_mod
       real(SP) :: interval = 0.0_SP
       real(SP) :: t_start = 0.0_SP
       logical :: has_t_start = .false.
+      ! '' inherits the deck default: netcdf when field_io_type is
+      ! NETCDF, ascii otherwise
+      character(8) :: format = ''
    end type type_channel_config
 
    type, extends(type_model_base) :: type_model_output
@@ -455,7 +461,7 @@ contains
 
       type(type_yaml_reader), allocatable :: entries(:)
       type(type_string), allocatable :: names(:)
-      character(:), allocatable :: gname, valid
+      character(:), allocatable :: gname, valid, fmt
       integer :: k, kk, iv, g
       logical :: no_blk, no_key, no_stats
 
@@ -526,6 +532,16 @@ contains
             call entries(k)%read_positive("interval", val=cfg%interval)
             call entries(k)%read("t_start", silent=no_key, val=cfg%t_start)
             cfg%has_t_start = .not. no_key
+
+            ! optional format: absence inherits the field_io_type default
+            call entries(k)%read("format", silent=no_key, val=fmt)
+            if (.not. no_key) then
+               if (fmt /= "ascii" .and. fmt /= "netcdf") &
+                  call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                 "': unknown format '"//fmt// &
+                                                 "' -- valid: ascii netcdf")
+               cfg%format = fmt
+            end if
 
             ! statistics presence derives the channel kind (windowed vs
             ! snapshot); validated against the accumulator's stat set

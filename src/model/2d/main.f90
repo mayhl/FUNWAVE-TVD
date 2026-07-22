@@ -1002,8 +1002,18 @@ contains
       character(*), intent(in) :: folder
 
       type(type_var_meta), allocatable :: vmeta(:)
+      character(:), allocatable :: pfmt
       integer :: k, iv, kc, n_owned, ierr
       character(16) :: owned_str, total_str
+
+      ! Shared diagnostics.nc root: created once when any channel
+      ! resolves to netcdf (per-channel format:, else the deck default)
+      do k = 1, this%output%n_channels
+         if (point_format(this, k) == "netcdf") then
+            call mgr%open_diagnostics(folder, this%env%comm)
+            exit
+         end if
+      end do
 
       do k = 1, this%output%n_channels
          associate (cfg => this%output%channels(k), &
@@ -1021,6 +1031,7 @@ contains
             end do
 
             kc = mgr%n_channels + 1
+            pfmt = point_format(this, k)
             call mgr%channels(kc)%init(id=cfg%name, geom_type=geom%geom_type, &
                                        variables=cfg%variables, &
                                        n_vars=size(cfg%variables), &
@@ -1031,10 +1042,11 @@ contains
                                                      this%simulation%t_start, &
                                                      cfg%has_t_start), &
                                        interval=cfg%interval, &
-                                       result_folder=folder, format="ascii", &
+                                       result_folder=folder, format=pfmt, &
                                        coords_x=geom%x, coords_y=geom%y, &
                                        n_coords=size(geom%x), grid=this%grid, &
-                                       comm=this%env%comm, var_meta=vmeta)
+                                       comm=this%env%comm, var_meta=vmeta, &
+                                       diag_ncid=mgr%diag_ncid)
             mgr%n_channels = kc
             deallocate (vmeta)
 
@@ -1052,6 +1064,25 @@ contains
       end do
 
    end subroutine build_point_channels
+
+   ! Point-channel format: the explicit format: key, else the deck
+   ! default derived from field_io_type (NETCDF => netcdf, else ascii)
+   function point_format(this, k) result(fmt)
+      class(type_model_main), intent(in) :: this
+      integer, intent(in) :: k
+      character(:), allocatable :: fmt
+
+      if (len_trim(this%output%channels(k)%format) > 0) then
+         fmt = trim(this%output%channels(k)%format)
+      else
+         select case (this%output%field_io_type(1:1))
+         case ("N", "n")
+            fmt = "netcdf"
+         case default
+            fmt = "ascii"
+         end select
+      end if
+   end function point_format
 
    ! Gather one registry field and write it as a static (non-series)
    ! file — legacy dep.out.  Reuses the field channel's gatherer.

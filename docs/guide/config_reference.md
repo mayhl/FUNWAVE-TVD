@@ -386,4 +386,5 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `channels.interval` | — | — | s | Channel flush cadence. |
 | `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics One of `min` \| `max` \| `mean` \| `rms`. |
 | `channels.t_start` | — | — | s | Channel start time (default simulation t_start). |
+| `channels.format` | — | — | — | Point file format; default follows field_io_type (NETCDF selects a netcdf group in diagnostics.nc One of `ascii` \| `netcdf`. |
 

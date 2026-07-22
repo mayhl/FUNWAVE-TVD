@@ -57,3 +57,4 @@ output:
       y: [1.0]
       variables: [eta]
       interval: 0.5
+      format: netcdf
