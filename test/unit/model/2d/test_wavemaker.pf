@@ -5,10 +5,11 @@ module test_wavemaker
    use pFUnit
    use core_comm_mod,       only: type_comm, new_comm
    use core_constants_mod,  only: SP
-   use core_env_mod,        only: type_env
+   use core_env_mod,        only: type_env, new_env
    use core_log_io_mod,     only: new_log_writer
    use core_grid_mod,       only: type_grid_2d
-   use model_wavemaker_mod, only: type_model_wavemaker
+   use model_initial_mod,   only: type_model_initial
+   use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers
 
    implicit none
 
@@ -192,5 +193,39 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_single_dir_matches_wk_new_irr
+
+   ! ----------------------------------------------------------------
+   ! Rung-5 reader coverage: initial: coexists with a multi-entry
+   ! wavemaker: sequence; entries keep their roles and the seed
+   ! default derives from the entry index (entry 1 = plain 66).
+   ! npes=[4]: new_env's collectives run over MPI_COMM_WORLD, so every
+   ! rank of the executable must participate (test_model_setup pattern).
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_read_coexist_multi_entry(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env) :: env
+      type(type_model_initial) :: ini
+      type(type_model_wavemaker), allocatable :: wms(:)
+
+      call new_env(env, label='test_coexist', yaml_path='test_coexist.yaml', &
+                   log_path='test_coexist.log')
+
+      call ini%read_input(env)
+      @assertTrue(ini%is_activated)
+      @assertEqual('INI_SOLITARY', ini%ic_type)
+
+      call read_wavemakers(env, wms)
+      @assertEqual(2, size(wms))
+      @assertTrue(wms(1)%boundary_candidate)
+      @assertEqual('PENDING_BOUNDARY', wms(1)%wavemaker_type)
+      @assertEqual('swell', wms(1)%name)
+      @assertEqual(66, wms(1)%seed)
+      @assertFalse(wms(2)%boundary_candidate)
+      @assertEqual('WK_REG', wms(2)%wavemaker_type)
+      @assertEqual(67, wms(2)%seed)
+
+      call dummy_fix_lint()
+   end subroutine test_read_coexist_multi_entry
 
 end module test_wavemaker
