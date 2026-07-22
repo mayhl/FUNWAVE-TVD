@@ -25,7 +25,7 @@ module netcdf
    public :: NF90_NOERR, NF90_CLOBBER, NF90_NETCDF4, NF90_UNLIMITED
    public :: NF90_DOUBLE, NF90_GLOBAL
    public :: nf90_create, nf90_def_dim, nf90_def_var, nf90_put_att
-   public :: nf90_enddef, nf90_put_var, nf90_close, nf90_strerror
+   public :: nf90_def_grp, nf90_enddef, nf90_put_var, nf90_close, nf90_strerror
 
    integer, parameter :: NF90_NOERR = 0
    integer, parameter :: NF90_CLOBBER = 0
@@ -80,6 +80,16 @@ contains
       end associate
       status = STUB_ERR
    end function nf90_put_att
+
+   integer function nf90_def_grp(ncid, name, grpid) result(status)
+      integer, intent(in) :: ncid
+      character(*), intent(in) :: name
+      integer, intent(out) :: grpid
+      associate (i => ncid, n => name)
+      end associate
+      grpid = -1
+      status = STUB_ERR
+   end function nf90_def_grp
 
    integer function nf90_enddef(ncid) result(status)
       integer, intent(in) :: ncid

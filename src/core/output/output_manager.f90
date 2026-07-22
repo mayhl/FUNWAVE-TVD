@@ -24,7 +24,8 @@ module core_output_manager_mod
    use core_comm_mod, only: type_comm
    use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
-   use core_output_channel_mod, only: type_output_channel
+   use core_output_channel_mod, only: type_output_channel, &
+                                      open_diagnostics_file, close_diagnostics_file
    implicit none
 
    private
@@ -33,12 +34,25 @@ module core_output_manager_mod
    type :: type_output_manager
       type(type_output_channel), allocatable :: channels(:)
       integer :: n_channels = 0
+      ! diagnostics.nc root handle (IO rank only; each netcdf point
+      ! channel defines one group inside it)
+      integer :: diag_ncid = -1
    contains
+      procedure :: open_diagnostics => manager_open_diagnostics
       procedure :: step => manager_step
       procedure :: finalize => manager_finalize
    end type type_output_manager
 
 contains
+
+   ! Create the shared diagnostics.nc once (idempotent; IO rank only)
+   subroutine manager_open_diagnostics(this, folder, comm)
+      class(type_output_manager), intent(inout) :: this
+      character(*), intent(in) :: folder  ! must include trailing separator
+      type(type_comm), intent(inout) :: comm
+      if (comm%is_io_node() .and. this%diag_ncid < 0) &
+         this%diag_ncid = open_diagnostics_file(folder//'diagnostics.nc')
+   end subroutine manager_open_diagnostics
 
    ! Called every timestep. Dispatches to each active channel.
    ! force=.true. (after-loop final flush) fires every started channel
@@ -66,6 +80,8 @@ contains
          deallocate (this%channels)
       end if
       this%n_channels = 0
+      if (this%diag_ncid >= 0) call close_diagnostics_file(this%diag_ncid)
+      this%diag_ncid = -1
    end subroutine manager_finalize
 
 end module core_output_manager_mod

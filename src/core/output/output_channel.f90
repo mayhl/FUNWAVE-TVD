@@ -33,7 +33,13 @@
 !  same bytes: the raw real(SP) global interior array in Fortran order.
 !  'netcdf' gathers like ascii but appends every variable to one
 !  data.nc per channel (x, y, time-unlimited; core_netcdf_writer_mod).
-!  Point files are always ASCII and are truncated at init.
+!  Point channels default to ASCII .dat files (truncated at init);
+!  format 'netcdf' instead writes a group named <id> inside the shared
+!  diagnostics.nc (root handle created by the output manager, passed in
+!  as diag_ncid) — per-group point/time dims keep channel cadences
+!  independent in one file.  Snapshot variables carry cell_methods
+!  "time: point"; statistic variables their reduction; windowed groups
+!  a time_bnds pair spanning each closed window (start, end].
 !
 !  Call order:
 !   1. init(config, grid, comm)   — after grid%setup()
@@ -60,6 +66,7 @@ module core_output_channel_mod
 
    private
    public :: type_output_channel, type_var_meta, write_field_file
+   public :: open_diagnostics_file, close_diagnostics_file
 
    integer, parameter :: VARNAME_LEN = 32
    integer, parameter :: STATNAME_LEN = 8
@@ -93,6 +100,26 @@ module core_output_channel_mod
       procedure :: put => nc_put
       procedure :: close => nc_close
    end type type_netcdf_field_writer
+
+   ! Serial NetCDF point backend: one group per channel inside the
+   ! shared diagnostics.nc (root handle owned by the output manager —
+   ! the channel only defines and fills its own group, never closes)
+   type :: type_netcdf_point_writer
+      integer :: grpid = -1
+      integer :: time_varid = -1
+      integer :: bnds_varid = -1
+      integer :: nrec = 0
+      integer :: n_vars = 0
+      logical :: windowed = .false.
+      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      integer, allocatable :: varids(:)
+      logical :: is_open = .false.
+   contains
+      procedure :: create_group => ncp_create_group
+      procedure :: begin_frame => ncp_begin_frame
+      procedure :: put => ncp_put
+      procedure :: reset => ncp_reset
+   end type type_netcdf_point_writer
 
    type :: type_output_channel
       character(ID_LEN)              :: id = ''
@@ -137,6 +164,12 @@ module core_output_channel_mod
       ! NetCDF backend (field geometry, format='netcdf'; IO rank only)
       type(type_netcdf_field_writer) :: nc
 
+      ! NetCDF point backend (station/transect, format='netcdf')
+      type(type_netcdf_point_writer) :: ncp
+
+      ! Previous flush time = the open window's start (time_bnds)
+      real(SP) :: t_last_flush = 0.0_SP
+
       ! Grid geometry (set at init for use in step/flush)
       integer :: local_nx = 0, local_ny = 0
       integer :: n_local = 0   ! local interp points (station/transect)
@@ -156,7 +189,7 @@ contains
                            statistics, n_stats, snapshot, t_start, interval, &
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
-                           file_prefixes, icount_start, var_meta)
+                           file_prefixes, icount_start, var_meta, diag_ncid)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -166,7 +199,7 @@ contains
       logical, intent(in) :: snapshot
       real(SP), intent(in) :: t_start, interval
       character(*), intent(in) :: result_folder  ! must include trailing separator
-      character(*), intent(in) :: format         ! 'ascii' or 'binary' (field only)
+      character(*), intent(in) :: format         ! field: ascii/binary/netcdf; points: ascii/netcdf
       real(SP), intent(in) :: coords_x(*), coords_y(*)  ! global query coords
       integer, intent(in) :: n_coords   ! n_stations or n_transect_points (0 for field)
       type(type_grid_2d), intent(in)    :: grid
@@ -174,6 +207,7 @@ contains
       character(*), intent(in), optional :: file_prefixes(*)  ! per-var name overrides
       integer, intent(in), optional :: icount_start  ! pre-increment counter base
       type(type_var_meta), intent(in), optional :: var_meta(*)  ! per-var CF attrs
+      integer, intent(in), optional :: diag_ncid  ! diagnostics.nc root (netcdf points)
 
       integer :: iv, is
       integer, allocatable :: pids(:)
@@ -225,8 +259,18 @@ contains
          end if
          call this%gatherer%init_points(n_coords, this%n_local, comm, local_ids=pids)
 
-         ! Point files append per flush; start each run from empty files.
-         if (comm%is_io_node()) call truncate_point_files(this)
+         if (trim(format) == 'netcdf') then
+            this%t_last_flush = t_start
+            if (comm%is_io_node()) then
+               if (.not. present(diag_ncid)) &
+                  error stop 'output_channel: netcdf point channel needs diag_ncid'
+               call init_netcdf_points(this, diag_ncid, &
+                                       coords_x(1:n_coords), coords_y(1:n_coords))
+            end if
+         else
+            ! Point files append per flush; start each run from empty files.
+            if (comm%is_io_node()) call truncate_point_files(this)
+         end if
 
          ! Accumulators: (n_local, 1)
          allocate (this%accum(n_vars))
@@ -291,6 +335,11 @@ contains
       ! One record per flush: stamp the time value before any variable
       ! lands (snapshot and statistics share the frame)
       if (do_flush .and. this%nc%is_open) call this%nc%begin_frame(t)
+      ! Point groups: a windowed channel's first flush writes nothing
+      ! (degenerate window) — advance the record only once primed
+      if (do_flush .and. this%ncp%is_open .and. &
+          (this%snapshot .or. this%stats_primed)) &
+         call this%ncp%begin_frame(t, this%t_last_flush)
 
       ! --- Snapshot: write current field directly from registry ---
       if (do_flush .and. this%snapshot) then
@@ -334,6 +383,7 @@ contains
          end do
       end if
       if (do_flush) this%stats_primed = .true.
+      if (do_flush) this%t_last_flush = t
 
    end subroutine channel_step
 
@@ -453,6 +503,59 @@ contains
                           grid%dx0, grid%dy0, names, vmeta, n)
    end subroutine init_netcdf_backend
 
+   ! Define the channel's group in the shared diagnostics.nc: snapshot
+   ! variables plus every <prefix>_<stat>, each tagged with its CF
+   ! cell_methods.  IO rank only.
+   subroutine init_netcdf_points(this, diag_ncid, x, y)
+      class(type_output_channel), intent(inout) :: this
+      integer, intent(in) :: diag_ncid
+      real(SP), intent(in) :: x(:), y(:)
+
+      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(32), allocatable :: methods(:)
+      type(type_var_meta), allocatable :: vmeta(:)
+      integer :: iv, is, n
+
+      ! statistic variables inherit the base variable's attrs
+      allocate (names(this%n_vars*(1 + this%n_stats)))
+      allocate (methods(this%n_vars*(1 + this%n_stats)))
+      allocate (vmeta(this%n_vars*(1 + this%n_stats)))
+      n = 0
+      do iv = 1, this%n_vars
+         if (this%snapshot) then
+            n = n + 1
+            names(n) = trim(this%prefixes(iv))
+            methods(n) = 'time: point'
+            vmeta(n) = this%meta(iv)
+         end if
+         do is = 1, this%n_stats
+            n = n + 1
+            names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
+            methods(n) = stat_cell_method(trim(this%statistics(is)))
+            vmeta(n) = this%meta(iv)
+         end do
+      end do
+
+      call this%ncp%create_group(diag_ncid, trim(this%id), x, y, &
+                                 names, vmeta, methods, n, this%n_stats > 0)
+   end subroutine init_netcdf_points
+
+   ! CF cell_methods label for one accumulator statistic
+   pure function stat_cell_method(stat) result(cm)
+      character(*), intent(in) :: stat
+      character(:), allocatable :: cm
+      select case (stat)
+      case ('min')
+         cm = 'time: minimum'
+      case ('max')
+         cm = 'time: maximum'
+      case ('mean')
+         cm = 'time: mean'
+      case default   ! 'rms'
+         cm = 'time: root_mean_square'
+      end select
+   end function stat_cell_method
+
    ! Collective MPI-IO twin of write_field_file's binary branch (legacy
    ! PutFileBinary, after Gropp lecture 33): the file view maps each
    ! rank's (local_nx, local_ny) interior tile to its 0-based (i0, j0)
@@ -509,10 +612,15 @@ contains
          do k = 1, this%n_global
             sorted(this%gatherer%point_ids(k)) = gathered(k)
          end do
-         open (newunit=unit, file=point_file_name(this, name), &
-               status='unknown', position='append', action='write')
-         write (unit, '(*(E16.6))') t, sorted
-         close (unit)
+         if (this%ncp%is_open) then
+            ! Time already stamped by the frame the step opened
+            call this%ncp%put(name, sorted)
+         else
+            open (newunit=unit, file=point_file_name(this, name), &
+                  status='unknown', position='append', action='write')
+            write (unit, '(*(E16.6))') t, sorted
+            close (unit)
+         end if
       end if
    end subroutine channel_flush_points
 
@@ -702,12 +810,162 @@ contains
       if (allocated(this%varids)) deallocate (this%varids)
    end subroutine nc_close
 
+   ! Create/close the shared diagnostics.nc root (owned by the output
+   ! manager; each netcdf point channel defines one group).  IO rank only.
+   function open_diagnostics_file(fname) result(ncid)
+      character(*), intent(in) :: fname
+      integer :: ncid
+      call nc_check(nf90_create(fname, ior(NF90_CLOBBER, NF90_NETCDF4), &
+                                ncid), 'create '//fname)
+      call nc_check(nf90_put_att(ncid, NF90_GLOBAL, 'Conventions', &
+                                 'CF-1.8'), 'att Conventions')
+      call nc_check(nf90_put_att(ncid, NF90_GLOBAL, 'source', &
+                                 'FUNWAVE-TVD'), 'att source')
+   end function open_diagnostics_file
+
+   subroutine close_diagnostics_file(ncid)
+      integer, intent(in) :: ncid
+      call nc_check(nf90_close(ncid), 'close diagnostics.nc')
+   end subroutine close_diagnostics_file
+
+   ! Define the group: dims (point, time-unlimited), the resolved query
+   ! coords once, one variable per name with its CF attrs; windowed
+   ! groups add time_bnds(bnds, time) spanning each closed window.
+   ! NETCDF4 files need no define/data mode juggling across groups.
+   subroutine ncp_create_group(this, root, id, x, y, names, meta, &
+                               methods, n_names, windowed)
+      class(type_netcdf_point_writer), intent(inout) :: this
+      integer, intent(in) :: root
+      character(*), intent(in) :: id
+      real(SP), intent(in) :: x(:), y(:)
+      character(*), intent(in) :: names(:)
+      type(type_var_meta), intent(in) :: meta(:)
+      character(*), intent(in) :: methods(:)
+      integer, intent(in) :: n_names
+      logical, intent(in) :: windowed
+
+      integer :: p_dim, t_dim, b_dim, x_var, y_var
+      integer :: i
+
+      call nc_check(nf90_def_grp(root, id, this%grpid), 'def group '//id)
+
+      call nc_check(nf90_def_dim(this%grpid, 'point', size(x), p_dim), &
+                    'def point '//id)
+      call nc_check(nf90_def_dim(this%grpid, 'time', NF90_UNLIMITED, &
+                                 t_dim), 'def time '//id)
+
+      call nc_check(nf90_def_var(this%grpid, 'x', NF90_DOUBLE, [p_dim], &
+                                 x_var), 'def var x '//id)
+      call nc_check(nf90_put_att(this%grpid, x_var, 'units', 'm'), &
+                    'att x units '//id)
+      call nc_check(nf90_def_var(this%grpid, 'y', NF90_DOUBLE, [p_dim], &
+                                 y_var), 'def var y '//id)
+      call nc_check(nf90_put_att(this%grpid, y_var, 'units', 'm'), &
+                    'att y units '//id)
+      call nc_check(nf90_def_var(this%grpid, 'time', NF90_DOUBLE, [t_dim], &
+                                 this%time_varid), 'def var time '//id)
+      call nc_check(nf90_put_att(this%grpid, this%time_varid, 'units', &
+                                 'seconds since start'), 'att time units '//id)
+
+      this%windowed = windowed
+      if (windowed) then
+         call nc_check(nf90_def_dim(this%grpid, 'bnds', 2, b_dim), &
+                       'def bnds '//id)
+         call nc_check(nf90_def_var(this%grpid, 'time_bnds', NF90_DOUBLE, &
+                                    [b_dim, t_dim], this%bnds_varid), &
+                       'def var time_bnds '//id)
+         call nc_check(nf90_put_att(this%grpid, this%time_varid, 'bounds', &
+                                    'time_bnds'), 'att time bounds '//id)
+      end if
+
+      this%n_vars = n_names
+      allocate (this%names(n_names), this%varids(n_names))
+      do i = 1, n_names
+         this%names(i) = names(i)
+         call nc_check(nf90_def_var(this%grpid, trim(names(i)), NF90_DOUBLE, &
+                                    [p_dim, t_dim], this%varids(i)), &
+                       'def var '//trim(names(i)))
+         call nc_check(nf90_put_att(this%grpid, this%varids(i), &
+                                    'cell_methods', trim(methods(i))), &
+                       'att cell_methods '//trim(names(i)))
+         if (len_trim(meta(i)%units) > 0) &
+            call nc_check(nf90_put_att(this%grpid, this%varids(i), 'units', &
+                                       trim(meta(i)%units)), &
+                          'att units '//trim(names(i)))
+         if (len_trim(meta(i)%long_name) > 0) &
+            call nc_check(nf90_put_att(this%grpid, this%varids(i), 'long_name', &
+                                       trim(meta(i)%long_name)), &
+                          'att long_name '//trim(names(i)))
+         if (len_trim(meta(i)%standard_name) > 0) &
+            call nc_check(nf90_put_att(this%grpid, this%varids(i), 'standard_name', &
+                                       trim(meta(i)%standard_name)), &
+                          'att standard_name '//trim(names(i)))
+      end do
+
+      call nc_check(nf90_put_var(this%grpid, x_var, x), 'put x '//id)
+      call nc_check(nf90_put_var(this%grpid, y_var, y), 'put y '//id)
+
+      this%nrec = 0
+      this%is_open = .true.
+   end subroutine ncp_create_group
+
+   ! Advance the group's record, stamp its time and, for windowed
+   ! channels, the closed window (t0, t]
+   subroutine ncp_begin_frame(this, t, t0)
+      class(type_netcdf_point_writer), intent(inout) :: this
+      real(SP), intent(in) :: t, t0
+      this%nrec = this%nrec + 1
+      call nc_check(nf90_put_var(this%grpid, this%time_varid, [t], &
+                                 start=[this%nrec]), 'put point time')
+      if (this%windowed) &
+         call nc_check(nf90_put_var(this%grpid, this%bnds_varid, &
+                                    reshape([t0, t], [2, 1]), &
+                                    start=[1, this%nrec]), 'put time_bnds')
+   end subroutine ncp_begin_frame
+
+   ! Write one variable's point-ordered values at the current record.
+   subroutine ncp_put(this, name, vals)
+      class(type_netcdf_point_writer), intent(inout) :: this
+      character(*), intent(in) :: name
+      real(SP), intent(in) :: vals(:)
+
+      integer :: i, id
+
+      id = -1
+      do i = 1, this%n_vars
+         if (trim(this%names(i)) == trim(name)) then
+            id = this%varids(i)
+            exit
+         end if
+      end do
+      if (id < 0) &
+         error stop 'output_channel: netcdf put of undefined variable '//name
+
+      call nc_check(nf90_put_var(this%grpid, id, vals, &
+                                 start=[1, this%nrec]), 'put '//trim(name))
+   end subroutine ncp_put
+
+   ! Forget the group; the manager owns and closes the root file
+   subroutine ncp_reset(this)
+      class(type_netcdf_point_writer), intent(inout) :: this
+      this%is_open = .false.
+      this%grpid = -1
+      this%time_varid = -1
+      this%bnds_varid = -1
+      this%nrec = 0
+      this%n_vars = 0
+      this%windowed = .false.
+      if (allocated(this%names)) deallocate (this%names)
+      if (allocated(this%varids)) deallocate (this%varids)
+   end subroutine ncp_reset
+
    subroutine channel_finalize(this)
       class(type_output_channel), intent(inout) :: this
       integer :: iv
       call this%interp%finalize()
       call this%gatherer%finalize()
       call this%nc%close()
+      call this%ncp%reset()
       if (allocated(this%accum)) then
          do iv = 1, size(this%accum)
             call this%accum(iv)%finalize()

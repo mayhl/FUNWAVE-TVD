@@ -8,7 +8,8 @@ module test_output_channel
    use core_comm_mod,            only: type_comm, new_comm
    use core_grid_mod,            only: type_grid_2d
    use core_field_registry_mod,  only: type_field_registry
-   use core_output_channel_mod,  only: type_output_channel, type_var_meta
+   use core_output_channel_mod,  only: type_output_channel, type_var_meta, &
+                                       open_diagnostics_file, close_diagnostics_file
    implicit none
 
    integer, parameter :: TEST_M = 8
@@ -432,5 +433,150 @@ contains
       call reg%finalize()
       call dummy_fix_lint()
    end subroutine test_field_mean
+
+   ! ----------------------------------------------------------------
+   ! netcdf point channels: two groups share one diagnostics.nc — the
+   ! snapshot group records every flush with cell_methods "time: point";
+   ! the windowed group drops its degenerate first flush and carries
+   ! time_bnds spanning each closed window
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_point_netcdf(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: snap, win
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      character(64) :: att
+      type(type_var_meta) :: vmeta(1)
+      real(SP) :: cx(2), cy(2), t3(3), t2(2), vals(2), bnds(2,2)
+      integer  :: diag, ncid, grp, dimid, varid, nlen
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      diag = -1
+      if (comm%is_io_node()) diag = open_diagnostics_file('./diagnostics.nc')
+
+      ! point 1 at (5, 2) -> rank 1; point 2 at (2, 1) -> rank 0
+      cx = [5.0_SP, 2.0_SP]
+      cy = [2.0_SP, 1.0_SP]
+      vars(1) = 'eta'
+      vmeta(1)%units = 'm'
+      stats(1) = ''
+      call snap%init(id='snap_p', geom_type='station', variables=vars, n_vars=1, &
+                     statistics=stats, n_stats=0, snapshot=.true., &
+                     t_start=0.0_SP, interval=1.0_SP, &
+                     result_folder='./', format='netcdf', &
+                     coords_x=cx, coords_y=cy, n_coords=2, grid=grid, comm=comm, &
+                     var_meta=vmeta, diag_ncid=diag)
+      stats(1) = 'max'
+      call win%init(id='win_p', geom_type='station', variables=vars, n_vars=1, &
+                    statistics=stats, n_stats=1, snapshot=.false., &
+                    t_start=0.0_SP, interval=1.0_SP, &
+                    result_folder='./', format='netcdf', &
+                    coords_x=cx, coords_y=cy, n_coords=2, grid=grid, comm=comm, &
+                    var_meta=vmeta, diag_ncid=diag)
+
+      ! walk t in dt steps (flushes at 0.0, 1.0, 2.0); eta rises by 1
+      ! per step so each window's max is its last sample
+      call snap%step(0.0_SP, 0.5_SP, reg, comm)
+      call win%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = eta + 1.0_SP
+      call snap%step(0.5_SP, 0.5_SP, reg, comm)
+      call win%step(0.5_SP, 0.5_SP, reg, comm)
+      eta = eta + 1.0_SP
+      call snap%step(1.0_SP, 0.5_SP, reg, comm)
+      call win%step(1.0_SP, 0.5_SP, reg, comm)
+      eta = eta + 1.0_SP
+      call snap%step(1.5_SP, 0.5_SP, reg, comm)
+      call win%step(1.5_SP, 0.5_SP, reg, comm)
+      eta = eta + 1.0_SP
+      call snap%step(2.0_SP, 0.5_SP, reg, comm)
+      call win%step(2.0_SP, 0.5_SP, reg, comm)
+
+      call snap%finalize()
+      call win%finalize()
+      if (comm%is_io_node()) call close_diagnostics_file(diag)
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         @assertEqual(NF90_NOERR, nf90_open('./diagnostics.nc', NF90_NOWRITE, ncid))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(ncid, NF90_GLOBAL, 'Conventions', att))
+         @assertEqual('CF-1.8', trim(att))
+
+         ! snapshot group: 3 records, coords in point order, "time: point"
+         @assertEqual(NF90_NOERR, nf90_inq_grp_ncid(ncid, 'snap_p', grp))
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(grp, 'point', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(grp, dimid, len=nlen))
+         @assertEqual(2, nlen)
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(grp, 'time', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(grp, dimid, len=nlen))
+         @assertEqual(3, nlen)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'x', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, vals))
+         @assertEqual(5.0_SP, vals(1), tolerance=1e-12_SP)
+         @assertEqual(2.0_SP, vals(2), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'time', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, t3))
+         @assertEqual(0.0_SP, t3(1), tolerance=1e-12_SP)
+         @assertEqual(2.0_SP, t3(3), tolerance=1e-12_SP)
+         ! snapshot channels carry no window bounds
+         @assertFalse(NF90_NOERR == nf90_inq_varid(grp, 'time_bnds', varid))
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'eta', varid))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(grp, varid, 'cell_methods', att))
+         @assertEqual('time: point', trim(att))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(grp, varid, 'units', att))
+         @assertEqual('m', trim(att))
+         ! record 3 at t=2: linear field + 4 increments
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, vals, &
+                                               start=[1, 3], count=[2, 1]))
+         @assertEqual(2.0_SP*5.0_SP + 3.0_SP*2.0_SP + 4.0_SP, vals(1), tolerance=1e-4_SP)
+         @assertEqual(2.0_SP*2.0_SP + 3.0_SP*1.0_SP + 4.0_SP, vals(2), tolerance=1e-4_SP)
+
+         ! windowed group: first flush dropped -> 2 records with bounds
+         @assertEqual(NF90_NOERR, nf90_inq_grp_ncid(ncid, 'win_p', grp))
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(grp, 'time', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(grp, dimid, len=nlen))
+         @assertEqual(2, nlen)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'time', varid))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(grp, varid, 'bounds', att))
+         @assertEqual('time_bnds', trim(att))
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, t2))
+         @assertEqual(1.0_SP, t2(1), tolerance=1e-12_SP)
+         @assertEqual(2.0_SP, t2(2), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'time_bnds', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, bnds))
+         @assertEqual(0.0_SP, bnds(1,1), tolerance=1e-12_SP)
+         @assertEqual(1.0_SP, bnds(2,1), tolerance=1e-12_SP)
+         @assertEqual(1.0_SP, bnds(1,2), tolerance=1e-12_SP)
+         @assertEqual(2.0_SP, bnds(2,2), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'eta_max', varid))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(grp, varid, 'cell_methods', att))
+         @assertEqual('time: maximum', trim(att))
+         ! window (0, 1]: samples at +1 and +2 -> max = linear + 2
+         @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, vals, &
+                                               start=[1, 1], count=[2, 1]))
+         @assertEqual(2.0_SP*5.0_SP + 3.0_SP*2.0_SP + 2.0_SP, vals(1), tolerance=1e-4_SP)
+         @assertEqual(2.0_SP*2.0_SP + 3.0_SP*1.0_SP + 2.0_SP, vals(2), tolerance=1e-4_SP)
+
+         @assertEqual(NF90_NOERR, nf90_close(ncid))
+         open (unit=99, file='./diagnostics.nc', status='old')
+         close (99, status='delete')
+      end if
+
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_point_netcdf
 
 end module test_output_channel
