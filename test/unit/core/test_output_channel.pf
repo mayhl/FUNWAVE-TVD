@@ -412,11 +412,12 @@ contains
       call ch%step(1.0_SP, 0.5_SP, reg, comm)
 
       if (comm%is_io_node()) then
-         ! window 1: single sample at t=0
-         open (newunit=unit, file='./eta_mean_00001', status='old', action='read')
-         read (unit, *) row
-         close (unit, status='delete')
-         @assertEqual(2.0_SP, row(1), tolerance=1e-4_SP)
+         ! window 1 (degenerate single sample at t=0) is dropped
+         block
+            logical :: exists
+            inquire (file='./eta_mean_00001', exist=exists)
+            @assertFalse(exists)
+         end block
 
          ! window 2: samples 4 and 8 with equal dt
          open (newunit=unit, file='./eta_mean_00002', status='old', action='read')

@@ -22,6 +22,9 @@
 !   field statistic  <var>_<stat>_NNNNN      flush counter starting at 1)
 !   point snapshot   <id>_<var>.dat          one row per flush: t, v(1..n)
 !   point statistic  <id>_<var>_<stat>.dat   in point order
+!  A statistic value covers the window ending at its stamped t.  The
+!  first flush (at t_start) closes a degenerate single-step window and
+!  is dropped: stat output starts at the second flush (fields: _00002).
 !  Field format follows the 'format' setting: 'ascii' gathers to the IO
 !  rank and writes one row of M E16.6 values per J (legacy PutFileASCII
 !  layout); 'binary' is a collective MPI-IO write — every rank puts its
@@ -113,6 +116,11 @@ module core_output_channel_mod
 
       ! Whether the last step() call flushed (loop-top time_dt.out hook)
       logical                   :: fired = .false.
+
+      ! Whether a flush has closed a full window yet: the first flush
+      ! fires at t_start with a single accumulated step, so its
+      ! statistics window is degenerate and is dropped, not written
+      logical                   :: stats_primed = .false.
 
       ! Timing
       type(type_timing_control) :: trigger
@@ -317,13 +325,15 @@ contains
          end select
       end if
 
-      ! --- Flush statistics at interval ---
+      ! --- Flush statistics at interval (first flush closes a
+      !     degenerate single-step window: reset without writing) ---
       if (do_flush .and. this%n_stats > 0) then
          do iv = 1, this%n_vars
-            call channel_write_stats(this, iv, t, comm)
+            if (this%stats_primed) call channel_write_stats(this, iv, t, comm)
             call this%accum(iv)%reset()
          end do
       end if
+      if (do_flush) this%stats_primed = .true.
 
    end subroutine channel_step
 
