@@ -140,11 +140,15 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 
 ## `initial:`
 
-Initial condition — block presence selects the type (solitary/sine_mode/hump/n_wave) + still-water level.
+Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave) + still-water level.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `water_level` | `0.0` | `WaterLevel` | m | Uniform still-water level offset (non-zero init-gated pending). |
+| `fields.eta` | — | — | — | Initial surface-elevation field ref (path, or container#/group/var once NetCDF input lands). |
+| `fields.format` | — | — | — | Field-file format override (default from the extension). One of `ascii` \| `binary` \| `netcdf`. |
+| `fields.u` | — | — | — | Initial x-velocity field ref (with fields.v; absent = still). |
+| `fields.v` | — | — | — | Initial y-velocity field ref (with fields.u). |
 | `hump.amplitude` | — | `AMP_SOLI` | m | Hump amplitude. |
 | `hump.radius` | — | `GauRadius` | m | Gaussian hump radius. |
 | `hump.shape` | — | — | — | Hump shape. One of `rect` \| `gaussian` \| `dipole`. |

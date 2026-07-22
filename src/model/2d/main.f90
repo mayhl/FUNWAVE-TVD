@@ -269,6 +269,7 @@ contains
       ! not supported here.
       call this%initial%apply_ic(this%grid, this%fields%eta, &
                                  this%fields%u, this%fields%v)
+      if (this%initial%has_fields) call load_initial_fields(this)
       if (this%hot_start%use_checkpoint) then
          call load_checkpoint(this)   ! seeds eta,p,q,mask + hot_start%time
       else if (this%hot_start%is_activated) then
@@ -496,6 +497,31 @@ contains
    ! deformation subtracts eta from the still-water depth (cell
    ! centres only, matching legacy).
    ! ----------------------------------------------------------------
+   ! ----------------------------------------------------------------
+   ! t=0 fields from file (initial: fields, the IC-flavored
+   ! INITIAL_UVZ): eta (+u/v) through the file_spec reader, ghosts
+   ! replicated like the hot-start path.  No bed handling — a
+   ! deformed bed is a grid.bathymetry concern.
+   ! ----------------------------------------------------------------
+   subroutine load_initial_fields(this)
+      use model_field_input_mod, only: read_field
+      class(type_model_main), intent(inout) :: this
+
+      associate (ini => this%initial, f => this%fields, g => this%grid)
+
+         call read_field(this%env, ini%eta_spec, g, f%eta)
+         call ghost_fill_replicate(this, f%eta)
+         if (.not. ini%fields_no_uv) then
+            call read_field(this%env, ini%u_spec, g, f%u)
+            call read_field(this%env, ini%v_spec, g, f%v)
+            call ghost_fill_replicate(this, f%u)
+            call ghost_fill_replicate(this, f%v)
+         end if
+
+      end associate
+
+   end subroutine load_initial_fields
+
    subroutine load_hot_start(this)
       class(type_model_main), intent(inout) :: this
 

@@ -14,6 +14,10 @@
 !    solitary:  {amplitude, depth, x_center, direction: +x|-x,
 !                angle, y_center}
 !    sine_mode: {amplitude, depth, mode_x (default 1), mode_y (default 0)}
+!    fields:    {eta, u, v, format} — t=0 fields from file (file_spec
+!               refs; the IC-flavored INITIAL_UVZ, the restart-flavored
+!               twin stays in hot_start:).  A deformed bed belongs to
+!               grid.bathymetry, not here.
 !    hump:      pending (INI_REC/GAU/DIP not in apply_ic yet)
 !    n_wave:    pending
 !
@@ -26,6 +30,7 @@ module model_initial_mod
    use core_constants_mod, only: SP, PI, DEG2RAD
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
+   use model_field_input_mod, only: type_file_spec, parse_file_spec
 
    use model_config_defaults_mod, only: DEF_INITIAL_SINE_MODE_AMPLITUDE, &
                                         DEF_INITIAL_SINE_MODE_DEPTH, &
@@ -79,6 +84,14 @@ module model_initial_mod
       real(SP) :: a0_Nwave = 0.0_SP
       real(SP) :: gamma_Nwave = 0.0_SP
       real(SP) :: dep_Nwave = 0.0_SP
+
+      ! t=0 fields from file — INI_FIELDS.  main loads them after
+      ! apply_ic's zeroing (apply_ic itself stays analytic-only)
+      logical :: has_fields = .false.
+      logical :: fields_no_uv = .true.
+      type(type_file_spec) :: eta_spec
+      type(type_file_spec) :: u_spec
+      type(type_file_spec) :: v_spec
 
    contains
       procedure :: read_input => initial_read_input
@@ -170,6 +183,16 @@ contains
                             default=DEF_INITIAL_SINE_MODE_MODE_Y)
       end if
 
+      blk_yaml = ini_env%yaml%cast_dictionary("fields", no_blk)
+      if (.not. no_blk) then
+         if (this%is_activated) call env%log%exit_on_error( &
+            "initial: only one initial-condition block allowed")
+         this%is_activated = .true.
+         this%ic_type = "INI_FIELDS"
+         this%has_fields = .true.
+         call read_fields_block(this, env, blk_yaml)
+      end if
+
       blk_yaml = ini_env%yaml%cast_dictionary("hump", no_blk)
       if (.not. no_blk) call env%log%exit_on_error( &
          "initial/hump: pending — INI_REC/GAU/DIP are not ported to apply_ic yet")
@@ -178,6 +201,51 @@ contains
          "initial/n_wave: pending — N_WAVE is not ported to apply_ic yet")
 
    end subroutine initial_read_input
+
+   ! ----------------------------------------------------------------
+   ! initial: fields: — eta required, u/v both-or-neither (absent =
+   ! still), format override optional (else per-extension).  Refs go
+   ! through the file_spec grammar.
+   ! ----------------------------------------------------------------
+   subroutine read_fields_block(this, env, blk_yaml)
+      use core_yaml_file_mod, only: type_yaml_reader
+      class(type_model_initial), intent(inout) :: this
+      type(type_env), intent(inout) :: env
+      type(type_yaml_reader), intent(inout) :: blk_yaml
+
+      character(:), allocatable :: ref, ref_u, ref_v, fmt
+      logical :: no_key, no_fmt, no_u, no_v
+
+      call blk_yaml%read_string("format", silent=no_fmt, val=fmt)
+
+      call blk_yaml%read_string("eta", silent=no_key, val=ref)
+      if (no_key) call env%log%exit_on_error("initial/fields: needs eta")
+      call parse_ref(env, "initial/fields/eta", ref, this%eta_spec)
+
+      call blk_yaml%read_string("u", silent=no_u, val=ref_u)
+      call blk_yaml%read_string("v", silent=no_v, val=ref_v)
+      if (no_u .neqv. no_v) call env%log%exit_on_error( &
+         "initial/fields: u and v come together (both or neither)")
+      this%fields_no_uv = no_u
+      if (.not. no_u) then
+         call parse_ref(env, "initial/fields/u", ref_u, this%u_spec)
+         call parse_ref(env, "initial/fields/v", ref_v, this%v_spec)
+      end if
+
+   contains
+
+      subroutine parse_ref(env_, key, ref_, spec)
+         type(type_env), intent(inout) :: env_
+         character(*), intent(in) :: key, ref_
+         type(type_file_spec), intent(out) :: spec
+         if (no_fmt) then
+            call parse_file_spec(env_, key, ref_, spec)
+         else
+            call parse_file_spec(env_, key, ref_, spec, format_override=fmt)
+         end if
+      end subroutine parse_ref
+
+   end subroutine read_fields_block
 
    ! ----------------------------------------------------------------
    ! Initial conditions: fill eta/u/v at t=0.

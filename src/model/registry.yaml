@@ -368,9 +368,13 @@ sections:
 
   # ── initial ──
   initial:
-    doc: "Initial condition — block presence selects the type (solitary/sine_mode/hump/n_wave) + still-water level."
+    doc: "Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave) + still-water level."
     keys:
       water_level: {legacy: WaterLevel, default: 0.0, units: m, latex: $\eta_0$, doc: Uniform still-water level offset (non-zero init-gated pending).}
+      fields.eta: {legacy: ~, default: ~, units: ~, doc: "Initial surface-elevation field ref (path, or container#/group/var once NetCDF input lands)."}
+      fields.format: {legacy: ~, default: ~, units: ~, values: [ascii, binary, netcdf], doc: Field-file format override (default from the extension).}
+      fields.u: {legacy: ~, default: ~, units: ~, doc: Initial x-velocity field ref (with fields.v; absent = still).}
+      fields.v: {legacy: ~, default: ~, units: ~, doc: Initial y-velocity field ref (with fields.u).}
       hump.amplitude: {legacy: AMP_SOLI, default: ~, units: m, doc: Hump amplitude.}
       hump.radius: {legacy: GauRadius, default: ~, units: m, doc: Gaussian hump radius.}
       hump.shape: {legacy: ~, default: ~, units: ~, values: [rect, gaussian, dipole], doc: Hump shape.}
