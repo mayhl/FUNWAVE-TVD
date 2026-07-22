@@ -561,7 +561,7 @@ sections:
       arrival_time.min_height: {legacy: ArrTimeMin, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
       checkpoint: {legacy: ~, default: ~, units: ~, doc: Directory to write the hot-start checkpoint set (core.bin) at run end.}
       depth_out: {legacy: OUT_DEPTH, default: false, units: ~, doc: Write the still-water depth field.}
-      field_io_type: {legacy: FIELD_IO_TYPE, default: ASCII, units: ~, values: [ASCII, BINARY], doc: Field output format.}
+      field_io_type: {legacy: FIELD_IO_TYPE, default: ASCII, units: ~, values: [ASCII, BINARY, NETCDF], doc: Field output format (NETCDF needs a netcdf-fortran build).}
       output_res: {legacy: OUTPUT_RES, default: 1, units: ~, doc: Output spatial subsampling stride.}
       result_folder: {legacy: RESULT_FOLDER, default: ./output/, units: ~, doc: Directory for output files.}
       stations.file: {legacy: STATIONS_FILE, default: ~, units: ~, doc: Gauge-station coordinate file (presence enables station output).}

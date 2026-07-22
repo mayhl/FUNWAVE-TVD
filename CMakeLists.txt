@@ -40,6 +40,7 @@ option(USE_SPHERICAL "Enable spherical coordinates" OFF)
 # Per-module 2D features are now runtime YAML switches (one binary does all);
 # USE_SEDIMENT is retained only because the 3D path still gates on -DSEDIMENT.
 option(USE_SEDIMENT "Enable sediment module (3D path only)" OFF)
+option(USE_NETCDF "Enable NetCDF output when netcdf-fortran is found" ON)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -74,6 +75,42 @@ enable_language(Fortran)
 find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
+
+# netcdf-fortran (optional): pkg-config first (brew + most HPC modules ship the
+# .pc), nf-config fallback (older module trees).  Absent -> the dummy `netcdf`
+# module compiles in and format: netcdf dies with a clear message at output
+# init; everything else builds and runs.
+set(FUNWAVE_HAS_NETCDF FALSE)
+if(USE_NETCDF)
+  find_package(PkgConfig QUIET)
+  if(PKG_CONFIG_FOUND)
+    pkg_check_modules(NETCDF_F QUIET netcdf-fortran)
+  endif()
+  if(NETCDF_F_FOUND)
+    set(NETCDF_F_LINK ${NETCDF_F_LDFLAGS})
+    set(FUNWAVE_HAS_NETCDF TRUE)
+  else()
+    find_program(NF_CONFIG_EXECUTABLE nf-config)
+    if(NF_CONFIG_EXECUTABLE)
+      execute_process(
+        COMMAND ${NF_CONFIG_EXECUTABLE} --includedir
+        OUTPUT_VARIABLE NETCDF_F_INCLUDE_DIRS
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+      execute_process(
+        COMMAND ${NF_CONFIG_EXECUTABLE} --flibs
+        OUTPUT_VARIABLE _nf_flibs
+        OUTPUT_STRIP_TRAILING_WHITESPACE)
+      separate_arguments(_nf_flibs UNIX_COMMAND "${_nf_flibs}")
+      set(NETCDF_F_LINK ${_nf_flibs})
+      set(FUNWAVE_HAS_NETCDF TRUE)
+    endif()
+  endif()
+endif()
+if(FUNWAVE_HAS_NETCDF)
+  message(STATUS "netcdf-fortran found -- NetCDF output enabled")
+else()
+  message(STATUS "netcdf-fortran not found -- NetCDF output stubbed out")
+endif()
 
 set(all_targets ${project_targets} ${ext_targets} probe)
 
@@ -132,6 +169,12 @@ option(ENABLE_DEV_MODE "Enable development mode (skip executable)" OFF)
 # Enable CTest when unit testing is on
 if(ENABLE_UNIT_TESTING)
   enable_testing()
+  # The output-channel round-trip test reads data.nc back through nf90 -- dev
+  # builds need the real library, only production builds may stub it
+  if(NOT FUNWAVE_HAS_NETCDF)
+    message(FATAL_ERROR "unit testing requires netcdf-fortran"
+                        " (brew install netcdf-fortran / module load)")
+  endif()
 endif()
 
 # Only require PFUNIT for unit testing

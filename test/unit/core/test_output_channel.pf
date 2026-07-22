@@ -3,6 +3,7 @@ module test_output_channel
 
    use mpi_f08
    use pFUnit
+   use netcdf
    use core_constants_mod,       only: SP, N_GHOST
    use core_comm_mod,            only: type_comm, new_comm
    use core_grid_mod,            only: type_grid_2d
@@ -233,6 +234,78 @@ contains
       call reg%finalize()
       call dummy_fix_lint()
    end subroutine test_field_snapshot_binary_2x2
+
+   ! ----------------------------------------------------------------
+   ! netcdf field snapshot: two flushes append two records of eta to
+   ! the channel's data.nc; read back dims, coordinates, times, and
+   ! the second frame through nf90
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_snapshot_netcdf(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), tvals(2), x, y
+      integer  :: i, j, ncid, varid, dimid, nlen
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='snap_nc', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='netcdf', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm)
+
+      ! dt-accumulator trigger: interval=1.0 needs 1.0 s of accumulated
+      ! dt between flushes, so walk t in dt steps (flushes at 0.0, 1.0)
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = 2.0_SP*eta
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+      call ch%finalize()
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         @assertEqual(NF90_NOERR, nf90_open('./data.nc', NF90_NOWRITE, ncid))
+
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(ncid, 'time', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(ncid, dimid, len=nlen))
+         @assertEqual(2, nlen)
+
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'time', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, tvals))
+         @assertEqual(1.0_SP, tvals(2), tolerance=1e-12_SP)
+
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'eta', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, glob, &
+                                               start=[1, 1, 2], &
+                                               count=[TEST_M, TEST_N, 1]))
+         do j = 1, TEST_N
+            do i = 1, TEST_M
+               x = real(i - 1, SP)
+               y = real(j - 1, SP)
+               @assertEqual(2.0_SP*(2.0_SP*x + 3.0_SP*y), glob(i,j), tolerance=1e-12_SP)
+            end do
+         end do
+
+         @assertEqual(NF90_NOERR, nf90_close(ncid))
+         open (unit=99, file='./data.nc', status='old')
+         close (99, status='delete')
+      end if
+
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_snapshot_netcdf
 
    ! ----------------------------------------------------------------
    ! station snapshot: values land in point order (point 1 lives on

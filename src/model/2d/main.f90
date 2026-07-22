@@ -926,6 +926,8 @@ contains
          select case (out%field_io_type(1:1))
          case ("B", "b")
             fmt = "binary"
+         case ("N", "n")
+            fmt = "netcdf"
          case default
             fmt = "ascii"
          end select

@@ -362,7 +362,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `arrival_time.min_height` | `0.001` | `ArrTimeMin` | m | Elevation threshold defining first wave arrival. |
 | `checkpoint` | — | — | — | Directory to write the hot-start checkpoint set (core.bin) at run end. |
 | `depth_out` | `false` | `OUT_DEPTH` | — | Write the still-water depth field. |
-| `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format. One of `ASCII` \| `BINARY`. |
+| `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format (NETCDF needs a netcdf-fortran build). One of `ASCII` \| `BINARY` \| `NETCDF`. |
 | `output_res` | `1` | `OUTPUT_RES` | — | Output spatial subsampling stride. |
 | `result_folder` | `./output/` | `RESULT_FOLDER` | — | Directory for output files. |
 | `stations.file` | — | `STATIONS_FILE` | — | Gauge-station coordinate file (presence enables station output). |
