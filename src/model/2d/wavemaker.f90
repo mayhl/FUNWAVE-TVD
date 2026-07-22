@@ -184,7 +184,11 @@ module model_wavemaker_mod
       real(SP) :: ThetaPeak = 0.0_SP
       integer  :: Ntheta = 1
       real(SP) :: Sigma_Theta = 0.0_SP
-      real(SP) :: alpha_c = 0.0_SP   ! WK_NEW_IRR only
+      ! single-dir discretization (nee WK_NEW_*): one direction per
+      ! frequency component; alpha_c coherence rides on its equal-df
+      ! ladder (regime rules enforced in read_input)
+      logical  :: single_dir = .false.
+      real(SP) :: alpha_c = 0.0_SP
       ! normalize: total — Hm0 refers to the full spectrum and the
       ! [min, max] band carries only its natural energy share; default
       ! band renormalizes the band to the full Hm0 (legacy)
@@ -655,9 +659,14 @@ contains
                             val=method, default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD)
          call blk%read("coherence_percent", silent=no_key, val=this%alpha_c, &
                        default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT)
-         if (method == "single_dir_per_freq") &
+         this%single_dir = method == "single_dir_per_freq"
+         ! regime rules: coherence hosts live on the single-dir equal-df ladder
+         if (this%alpha_c /= 0.0_SP .and. .not. this%single_dir) &
+            call env%log%exit_on_error("wavemaker/discretization: coherence_percent"// &
+                                       " requires method: single_dir_per_freq")
+         if (this%single_dir .and. this%EqualEnergy) &
             call env%log%exit_on_error("wavemaker/discretization: single_dir_per_freq"// &
-                                       " (nee WK_NEW_*) is pending the wavemaker refactor")
+                                       " uses the equal-df ladder — equal_energy does not apply")
       end if
 
       select case (stype)
@@ -734,11 +743,18 @@ contains
          this%wavemaker_type = "WK_DATA2D"
       end select
 
+      if (this%single_dir .and. stype /= "jonswap" .and. stype /= "tma") &
+         call env%log%exit_on_error("wavemaker/discretization: single_dir_per_freq"// &
+                                    " needs a density spectrum (jonswap or tma)")
+
       ! ── source — presence = Wei-Kirby internal source function;
       !    absence = boundary feed (nee ABS): a boundaries face must
       !    reference the entry by name, which resolves the type ────────
       blk = wm%cast_dictionary("source", no_blk)
       if (no_blk) then
+         if (this%single_dir) call env%log%exit_on_error( &
+            "wavemaker/discretization: single_dir_per_freq is internal-source"// &
+            " only (the boundary series modes are grid-based)")
          ! legacy keys the JONSWAP/DATA switch + directionality off
          ! WAVE_DATA_TYPE (io.F ABS block); spectrum_2d read its format
          ! into WAVE_DATA_TYPE above
@@ -1021,9 +1037,9 @@ contains
    ! each strip must draw the SAME phases) and (b) reproduced on a hotstart
    ! re-init (the seed lives in the shared input deck, so no checkpoint scalar is
    ! needed).  Filling every seed word with the scalar matches the legacy
-   ! WAVE_COHERENCE idiom.  Note: WK_NEW_IRR's coherence shuffle re-seeds to its
-   ! own fixed value mid-init; it stays deterministic (restart-coherent) but the
-   ! `seed:` knob does not vary its post-shuffle phases (FUTURE: thread it through).
+   ! WAVE_COHERENCE idiom.  Note: the single-dir coherence shuffle re-seeds the
+   ! stream mid-init with the same deck seed, so its draws and the post-shuffle
+   ! phases stay deterministic AND seed-varied.
    subroutine seed_wave_phases(seed_val)
       integer, intent(in) :: seed_val
 
@@ -1396,7 +1412,8 @@ contains
       disc%fmin = this%FreqMin
       disc%fmax = this%FreqMax
       disc%equal_energy = this%EqualEnergy
-      disc%single_dir_per_freq = this%wavemaker_type == "WK_NEW_IRR"
+      disc%single_dir_per_freq = this%wavemaker_type == "WK_NEW_IRR" &
+                                 .or. this%single_dir
       disc%alpha_c = this%alpha_c
       disc%zero_phase = BUILD_ZERO_PHASE
       if (periodic) disc%snap_mode = &
@@ -1519,7 +1536,7 @@ contains
          if (alpha_c < 0.0_SP) alpha_c = 0.0_SP
          if (alpha_c > 0.0_SP) &
             call wave_coherence(alpha_c, freq, disc%nfreq, disc%ntheta, &
-                                idx_theta, env)
+                                idx_theta, this%seed, env)
 
          ! densities on the (possibly moved) frequencies; spreading
          ! weights renormalize against the band energy instead of the
@@ -2627,14 +2644,16 @@ contains
    ! drawn non-host components move UP to the nearest host frequency
    ! until alpha_c percent of components share a frequency.  Legacy
    ! draws with C rand() at its default seed (deterministic per libc,
-   ! rank-consistent, even under ZERO_PHASE) — reproduced with a
-   ! fixed-seed RANDOM_SEED so runs stay bitwise reproducible and
-   ! rank-consistent; the legacy draw sequence itself is
+   ! rank-consistent, even under ZERO_PHASE) — reproduced by
+   ! re-seeding RANDOM_SEED with the deck seed (default 66, the legacy
+   ! convention) so runs stay bitwise reproducible, rank-consistent,
+   ! and seed-varied; the legacy draw sequence itself is
    ! compiler-specific, so alpha_c > 0 has no legacy parity.
    ! ----------------------------------------------------------------
-   subroutine wave_coherence(alpha_c, freq, nfreq, ntheta, idx_theta, env)
+   subroutine wave_coherence(alpha_c, freq, nfreq, ntheta, idx_theta, seed_val, &
+                             env)
       real(SP), intent(in) :: alpha_c
-      integer, intent(in) :: nfreq, ntheta, idx_theta
+      integer, intent(in) :: nfreq, ntheta, idx_theta, seed_val
       real(SP), intent(inout) :: freq(nfreq)
       type(type_env), intent(inout) :: env
 
@@ -2646,7 +2665,7 @@ contains
       integer :: kf, jj, cand_idx, hi, host_whole, seed_n
 
       call random_seed(size=seed_n)
-      allocate (seed(seed_n), source=66)
+      allocate (seed(seed_n), source=seed_val)
       call random_seed(put=seed)
 
       repetitions = 1

@@ -251,4 +251,51 @@ contains
       call dummy_fix_lint()
    end subroutine test_data2d_phase_mispair_characterization
 
+   subroutine init_single_dir(this, wm, wtype, flag)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker), intent(inout) :: wm
+      character(*), intent(in) :: wtype
+      logical, intent(in) :: flag
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(type_env)     :: env
+      call open_env(this, env, comm)
+      grid%M = TEST_M;  grid%N = TEST_N
+      grid%nx_proc = 1;  grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+      wm%wavemaker_type = wtype
+      wm%single_dir  = flag
+      wm%Xc_WK       = XWM_SP
+      wm%DEP_WK      = DEP_SP
+      wm%FreqPeak    = 0.1_SP
+      wm%FreqMin     = 0.05_SP
+      wm%FreqMax     = 0.2_SP
+      wm%Hmo         = 0.1_SP
+      wm%Nfreq       = 12
+      wm%ThetaPeak   = 10.0_SP
+      wm%Ntheta      = 5
+      wm%Sigma_Theta = 25.0_SP
+      call wm%init_compute(grid, .false., env, -0.531_SP)
+   end subroutine init_single_dir
+
+   ! ----------------------------------------------------------------
+   ! single_dir discretizer flag (rung 4): a TMA grid-family type with
+   ! single_dir set must reproduce the legacy WK_NEW_IRR path bitwise
+   ! (same density, ladder, direction interleave, and phase draw).
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_single_dir_matches_wk_new_irr(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm_new, wm_flag
+
+      call init_single_dir(this, wm_new, 'WK_NEW_IRR', .false.)
+      call init_single_dir(this, wm_flag, 'WK_IRR', .true.)
+
+      @assertEqual(0.0_SP, maxval(abs(wm_new%Cm - wm_flag%Cm)), TOL_SP)
+      @assertEqual(0.0_SP, maxval(abs(wm_new%Sm - wm_flag%Sm)), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_single_dir_matches_wk_new_irr
+
 end module test_wavemaker

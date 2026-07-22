@@ -194,7 +194,7 @@ sections:
       spectrum.discretization.freq_bins: { legacy: Nfreq, default: 45, units: ~, variant: [jonswap, tma], doc: "Frequency bin count." }
       spectrum.discretization.equal_energy: { legacy: EqualEnergy, default: false, units: ~, variant: [jonswap, tma], doc: "Equal-energy frequency binning." }
       spectrum.discretization.method:
-        { legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method (single_dir_per_freq init-gated pending)." }
+        { legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*)." }
       spectrum.discretization.coherence_percent: { legacy: alpha_c, default: 0.0, units: "%", variant: [jonswap, tma], doc: "Percent of components sharing a frequency." }
       spectrum.file: { legacy: WaveCompFile, default: ~, units: ~, variant: [components, spectrum_2d], doc: "Wave-component / 2D-spectrum data file." }
       spectrum.n: { legacy: NumWaveComp, default: 1, units: ~, variant: [components], doc: "Number of wave components." }

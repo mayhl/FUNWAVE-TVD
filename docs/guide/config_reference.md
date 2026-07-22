@@ -50,7 +50,7 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.directional.n_bins` | `1` | `Ntheta` | — | *(jonswap/tma)* Directional bin count (legacy 24 in directional branch; PENDING). |
 | `spectrum.discretization.freq_bins` | `45` | `Nfreq` | — | *(jonswap/tma)* Frequency bin count. |
 | `spectrum.discretization.equal_energy` | `false` | `EqualEnergy` | — | *(jonswap/tma)* Equal-energy frequency binning. |
-| `spectrum.discretization.method` | `grid` | — | — | *(jonswap/tma)* Discretization method (single_dir_per_freq init-gated pending). One of `grid` \| `single_dir_per_freq`. |
+| `spectrum.discretization.method` | `grid` | — | — | *(jonswap/tma)* Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*). One of `grid` \| `single_dir_per_freq`. |
 | `spectrum.discretization.coherence_percent` | `0.0` | `alpha_c` | % | *(jonswap/tma)* Percent of components sharing a frequency. |
 | `spectrum.file` | — | `WaveCompFile` | — | *(components/spectrum_2d)* Wave-component / 2D-spectrum data file. |
 | `spectrum.n` | `1` | `NumWaveComp` | — | *(components)* Number of wave components. |
