@@ -1,4 +1,5 @@
-target_sources(${main_lib}_model PRIVATE base.f90 field_metadata.f90 launcher.F90)
+target_sources(${main_lib}_model PRIVATE base.f90 config_defaults.f90
+                                        field_metadata.f90 launcher.F90)
 
 add_subdirectory(2d)
 add_subdirectory(3d)

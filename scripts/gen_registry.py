@@ -33,7 +33,7 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 REGISTRY = REPO / "src" / "model" / "registry.yaml"
-OUTPUT = REPO / "src" / "model" / "2d" / "config_defaults.f90"
+OUTPUT = REPO / "src" / "model" / "config_defaults.f90"
 DOCS_OUTPUT = REPO / "docs" / "guide" / "config_reference.md"
 META_OUTPUT = REPO / "src" / "model" / "field_metadata.f90"
 
