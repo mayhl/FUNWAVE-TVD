@@ -221,6 +221,7 @@ contains
       @assertEqual('PENDING_BOUNDARY', wms(1)%wavemaker_type)
       @assertEqual('swell', wms(1)%name)
       @assertEqual(66, wms(1)%seed)
+      @assertTrue(wms(1)%zero_phase)
       @assertFalse(wms(2)%boundary_candidate)
       @assertEqual('WK_REG', wms(2)%wavemaker_type)
       @assertEqual(67, wms(2)%seed)

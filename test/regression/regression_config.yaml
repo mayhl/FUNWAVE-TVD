@@ -19,8 +19,11 @@ refs:
 
 executables:
   # ── 2D  (ref: regression-ref/v4.0-modern @ ac15e8f — post-cord-cut baseline) ───────
+  # NOTE: the ZERO_PHASE build flag is retired — the seeded per-entry phase
+  # draw is deterministic per compiler, so refs carry the seeded realization
+  # (a deck may still set wavemaker zero_phase: for parity work).
   central:
-    cmake_flags: [ZERO_PHASE=ON]
+    cmake_flags: []
     ref: 2d
 
   # ── 3D  (ref: vendor/3d-fd) ───────────────────────────────────────────
@@ -28,10 +31,11 @@ executables:
     cmake_flags: []
     ref: 3d
 
-  # ── 2D, random phases (ZERO_PHASE off) — for the phase-seeding reproducibility
-  #     guard; no ref branch (self-compares two dev runs). ──────────────────
+  # ── 2D twin for the phase-seeding reproducibility guard; no ref branch
+  #    (self-compares two dev runs).  Build-identical to central now the
+  #    ZERO_PHASE flag is gone — merge candidate. ──────────────────
   central-random:
-    cmake_flags: [ZERO_PHASE=OFF]
+    cmake_flags: []
 
 simulations:
   # preprocess (optional): command run in dev run dir before simulation.

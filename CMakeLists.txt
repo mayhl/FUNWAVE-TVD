@@ -40,8 +40,6 @@ option(USE_SPHERICAL "Enable spherical coordinates" OFF)
 # Per-module 2D features are now runtime YAML switches (one binary does all);
 # USE_SEDIMENT is retained only because the 3D path still gates on -DSEDIMENT.
 option(USE_SEDIMENT "Enable sediment module (3D path only)" OFF)
-option(ZERO_PHASE
-       "Set all random wavemaker phases to zero (for regression testing)" OFF)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -55,9 +53,6 @@ if(NOT USE_SPHERICAL)
 endif()
 if(USE_SEDIMENT)
   list(APPEND MODULE_FLAGS "SEDIMENT")
-endif()
-if(ZERO_PHASE)
-  list(APPEND MODULE_FLAGS "ZERO_PHASE")
 endif()
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)

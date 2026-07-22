@@ -145,6 +145,10 @@ module model_wavemaker_mod
       ! band renormalizes the band to the full Hm0 (legacy)
       logical  :: normalize_total = .false.
 
+      ! Zero every component phase instead of the seeded draw — parity/
+      ! debug knob (replaces the retired ZERO_PHASE build flag, so one
+      ! binary serves production and A/B parity decks)
+      logical  :: zero_phase = .false.
       ! RNG seed for the random phase realization — see seed_wave_phases.
       ! Deterministic by default so runs are reproducible AND a hotstart
       ! restart reproduces the same realization (the seed rides the shared deck).
@@ -612,6 +616,7 @@ contains
       ! default (bitwise with the single-slot era)
       this%seed = DEFAULT_WAVE_PHASE_SEED + (idx - 1)
       call wm%read("seed", silent=no_key, val=this%seed)
+      call wm%read("zero_phase", silent=no_key, val=this%zero_phase)
 
       ! legacy-shaped escape hatch: LEF_SOL keeps its old spelling until
       ! the characteristic BC track; the rest reject loudly
@@ -1290,7 +1295,6 @@ contains
    ! ----------------------------------------------------------------
    subroutine parametric_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
-      use core_build_config_mod, only: BUILD_ZERO_PHASE
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
@@ -1326,7 +1330,7 @@ contains
       disc%single_dir_per_freq = this%wavemaker_type == "WK_NEW_IRR" &
                                  .or. this%single_dir
       disc%alpha_c = this%alpha_c
-      disc%zero_phase = BUILD_ZERO_PHASE
+      disc%zero_phase = this%zero_phase
       if (periodic) disc%snap_mode = &
          merge(SNAP_NEW, SNAP_SPECTRAL, disc%single_dir_per_freq)
 
@@ -1614,7 +1618,6 @@ contains
    subroutine data2d_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
       use core_constants_mod, only: GRAV, SMALL
-      use core_build_config_mod, only: BUILD_ZERO_PHASE
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
@@ -1687,7 +1690,7 @@ contains
             end do
          end do
       else
-         if (BUILD_ZERO_PHASE) then
+         if (this%zero_phase) then
             phase_flt(:, 1:ndir) = 0.0_SP
          else
             call random_number(phase_flt(:, 1:ndir))
@@ -1779,7 +1782,6 @@ contains
    subroutine new_data2d_init_compute(this, grid, periodic, env)
       use core_grid_mod, only: type_grid_2d
       use core_constants_mod, only: GRAV, SMALL
-      use core_build_config_mod, only: BUILD_ZERO_PHASE
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
@@ -1844,7 +1846,7 @@ contains
             phase_flt(i) = phase_flt(i)*PI/180.0_SP
          end do
       else
-         if (BUILD_ZERO_PHASE) then
+         if (this%zero_phase) then
             phase_flt(1:nfreq) = 0.0_SP
          else
             call random_number(phase_flt(1:nfreq))
@@ -1993,7 +1995,6 @@ contains
                                       beta_ref)
       use core_grid_mod, only: type_grid_2d
       use core_constants_mod, only: GRAV, SMALL
-      use core_build_config_mod, only: BUILD_ZERO_PHASE
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic, is_jonswap
@@ -2014,7 +2015,7 @@ contains
       if (h_ser == 0.0_SP .or. this%FreqPeak == 0.0_SP .or. this%FreqMax == 0.0_SP) &
          error stop "wavemaker: re-set DepthWaveMaker, FreqPeak, FreqMax for wavemaker"
 
-      if (BUILD_ZERO_PHASE) then
+      if (this%zero_phase) then
          this%Phase_Ser = 0.0_SP
       else
          call random_number(this%Phase_Ser)
@@ -2116,7 +2117,6 @@ contains
    ! ----------------------------------------------------------------
    subroutine read_boundary_2d_spectrum(this, num_dir, per_ser, theta_ser, &
                                         amp_ser, phase_left)
-      use core_build_config_mod, only: BUILD_ZERO_PHASE
       class(type_model_wavemaker), intent(inout) :: this
       integer, intent(out) :: num_dir
       real(SP), allocatable, intent(out) :: per_ser(:), theta_ser(:)
@@ -2157,7 +2157,7 @@ contains
 
       if (input_phase) then
          phase_left = phase_left*DEG2RAD
-      elseif (BUILD_ZERO_PHASE) then
+      elseif (this%zero_phase) then
          phase_left = 0.0_SP
       else
          call random_number(phase_left)
