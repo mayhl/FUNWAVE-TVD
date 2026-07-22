@@ -86,6 +86,7 @@ module model_wavemaker_mod
 
    private
    public :: type_model_wavemaker
+   public :: read_wavemakers
    public :: wk_regular_coefficients
 
    ! Default wavemaker phase-RNG seed — matches the legacy WAVE_COHERENCE
@@ -520,35 +521,99 @@ contains
       width = delta*wave_length/2.0_SP
    end subroutine wk_peak_width
 
+   ! ----------------------------------------------------------------
+   ! model_base contract — reads the FIRST wavemaker: entry only.  The
+   ! engine owns an array and calls read_wavemakers instead; this stays
+   ! for single-instance users (unit tests, legacy call shape).
+   ! ----------------------------------------------------------------
    subroutine wavemaker_read_input(this, env)
       use core_yaml_file_mod, only: type_yaml_reader
       class(type_model_wavemaker), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
       type(type_yaml_reader), allocatable :: entries(:)
-      type(type_yaml_reader) :: wm, spec_yaml, blk
-      character(:), allocatable :: stype, method, legacy_type, normalize
-      logical :: no_wm, no_key, has_dir
-      logical :: no_spec, no_blk, no_freq, no_per
-      real(SP) :: p_tmp
+      logical :: no_wm
 
       this%wavemaker_type = "nothing"
-
-      ! mapping or sequence — single-slot engine accepts one entry either way
       entries = env%yaml%cast_dictionary_list("wavemaker", no_wm)
       this%is_activated = .not. no_wm
       if (no_wm) return
 
       if (size(entries) > 1) &
-         call env%log%exit_on_error("wavemaker: multiple wavemakers are"// &
-                                    " pending the wavemaker refactor (single-slot engine)")
-      wm = entries(1)
+         call env%log%exit_on_error("wavemaker: the single-entry reader got"// &
+                                    " a multi-entry deck (engine bug — use read_wavemakers)")
+      call wavemaker_read_entry(this, env, entries(1), 1)
+
+   end subroutine wavemaker_read_input
+
+   ! ----------------------------------------------------------------
+   ! Engine reader: every wavemaker: entry into an array (mapping = one
+   ! entry, sequence = many).  Init gates that fall out of composition
+   ! not being built yet: at most ONE internal source (boundary-feed
+   ! entries are per-face, any number); names must be unique (faces
+   ! resolve by name).
+   ! ----------------------------------------------------------------
+   subroutine read_wavemakers(env, wms)
+      use core_yaml_file_mod, only: type_yaml_reader
+      type(type_env), intent(inout), target :: env
+      type(type_model_wavemaker), allocatable, intent(out) :: wms(:)
+
+      type(type_yaml_reader), allocatable :: entries(:)
+      logical :: no_wm
+      integer :: k, kk, n_internal
+
+      entries = env%yaml%cast_dictionary_list("wavemaker", no_wm)
+      if (no_wm) then
+         allocate (wms(0))
+         return
+      end if
+
+      allocate (wms(size(entries)))
+      n_internal = 0
+      do k = 1, size(wms)
+         wms(k)%wavemaker_type = "nothing"
+         wms(k)%is_activated = .true.
+         call wavemaker_read_entry(wms(k), env, entries(k), k)
+         if (.not. wms(k)%boundary_candidate .and. &
+             wms(k)%wavemaker_type /= "LEF_SOL") n_internal = n_internal + 1
+      end do
+
+      if (n_internal > 1) &
+         call env%log%exit_on_error("wavemaker: multiple internal-source"// &
+                                    " entries are pending source composition (one source:"// &
+                                    " block max; boundary-feed entries are unlimited)")
+      do k = 2, size(wms)
+         do kk = 1, k - 1
+            if (len(wms(k)%name) > 0 .and. wms(k)%name == wms(kk)%name) &
+               call env%log%exit_on_error("wavemaker: duplicate entry name '"// &
+                                          wms(k)%name//"' (faces resolve by name)")
+         end do
+      end do
+
+   end subroutine read_wavemakers
+
+   subroutine wavemaker_read_entry(this, env, wm, idx)
+      use core_yaml_file_mod, only: type_yaml_reader
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_env), intent(inout), target :: env
+      type(type_yaml_reader), intent(inout) :: wm
+      integer, intent(in) :: idx
+
+      type(type_yaml_reader) :: spec_yaml, blk
+      character(:), allocatable :: stype, method, legacy_type, normalize
+      logical :: no_key, has_dir
+      logical :: no_spec, no_blk, no_freq, no_per
+      real(SP) :: p_tmp
 
       call wm%read_string("name", silent=no_key, val=this%name)
       if (no_key) this%name = ""
 
-      ! phase-RNG seed (rides the shared deck -> reproducible + restart-coherent)
-      call wm%read("seed", silent=no_key, val=this%seed, default="66")
+      ! phase-RNG seed (rides the shared deck -> reproducible + restart-
+      ! coherent); the default derives from the entry index so multiple
+      ! entries never share a realization — entry 1 keeps the plain deck
+      ! default (bitwise with the single-slot era)
+      this%seed = DEFAULT_WAVE_PHASE_SEED + (idx - 1)
+      call wm%read("seed", silent=no_key, val=this%seed)
 
       ! legacy-shaped escape hatch: LEF_SOL keeps its old spelling until
       ! the characteristic BC track; the rest reject loudly
@@ -740,7 +805,7 @@ contains
          call blk%read("trough", val=this%TroughLimit)
       end if
 
-   end subroutine wavemaker_read_input
+   end subroutine wavemaker_read_entry
 
    ! ----------------------------------------------------------------
    ! Internal-source wavemaker setup (legacy WAVEMAKER_INITIALIZATION,

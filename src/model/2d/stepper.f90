@@ -97,7 +97,12 @@ module model_stepper_2d_mod
       type(type_model_friction), pointer :: friction => null()
       type(type_model_simulation), pointer :: simulation => null()
       type(type_model_output), pointer :: output => null()
-      type(type_model_wavemaker), pointer :: wavemaker => null()
+      ! all wavemaker: entries; wm_src = the single active internal
+      ! source (read_wavemakers gates n <= 1), wm_bc = the west-boundary
+      ! owner (ABS/LEFT_BC_IRR/LEF_SOL) — either may be null
+      type(type_model_wavemaker), pointer :: wavemakers(:) => null()
+      type(type_model_wavemaker), pointer :: wm_src => null()
+      type(type_model_wavemaker), pointer :: wm_bc => null()
       type(type_model_sponge), pointer :: sponge => null()
       type(type_model_obstacle), pointer :: obstacle => null()
       type(type_model_means), pointer :: means => null()
@@ -203,7 +208,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine stepper_init(this, env, grid, fields, physics, numerics, &
                            breaking, friction, simulation, output, &
-                           wavemaker, sponge, obstacle, means, tide, &
+                           wavemakers, sponge, obstacle, means, tide, &
                            precipitation, subgrid, foam, tracer, vessel, &
                            sediment, meteo, restart)
       class(type_model_stepper_2d), intent(inout) :: this
@@ -219,10 +224,10 @@ contains
       type(type_model_friction), intent(inout), target :: friction
       type(type_model_simulation), intent(inout), target :: simulation
       type(type_model_output), intent(inout), target :: output
-      ! wavemaker%init_compute must have run (source coefficients and
-      ! zone box feed the mass source and the breaker zone flags);
-      ! likewise sponge%init_compute (direct-sponge coeff)
-      type(type_model_wavemaker), intent(inout), target :: wavemaker
+      ! wavemaker init_compute must have run on every entry (source
+      ! coefficients and zone box feed the mass source and the breaker
+      ! zone flags); likewise sponge%init_compute (direct-sponge coeff)
+      type(type_model_wavemaker), intent(inout), target :: wavemakers(:)
       type(type_model_sponge), intent(inout), target :: sponge
       ! obstacle%init_compute must have run (breakwater drag map)
       type(type_model_obstacle), intent(inout), target :: obstacle
@@ -275,7 +280,16 @@ contains
       this%friction => friction
       this%simulation => simulation
       this%output => output
-      this%wavemaker => wavemaker
+      this%wavemakers => wavemakers
+      ! resolve the two roles the engine consumes point-wise; the loops
+      ! (update_source/apply_boundary) go over the whole array
+      this%wm_src => null()
+      this%wm_bc => null()
+      do i = 1, size(wavemakers)
+         if (wavemakers(i)%has_mass_source) this%wm_src => wavemakers(i)
+         if (wavemakers(i)%abs_source .or. wavemakers(i)%left_bc_source .or. &
+             wavemakers(i)%wavemaker_type == "LEF_SOL") this%wm_bc => wavemakers(i)
+      end do
       this%sponge => sponge
       this%obstacle => obstacle
       this%means => means
@@ -288,7 +302,11 @@ contains
       this%sediment => sediment
       this%meteo => meteo
 
-      call this%bc%init(grid, wavemaker%wavemaker_type)
+      if (associated(this%wm_bc)) then
+         call this%bc%init(grid, this%wm_bc%wavemaker_type)
+      else
+         call this%bc%init(grid, "nothing")
+      end if
 
       ! legacy EXCHANGE ghost gates (old/bc.F:441-449): AGE_BREAKING
       ! travels only under VISCOSITY_BREAKING, nu_break also under
@@ -301,8 +319,9 @@ contains
       ! T_BRK_LEGACY note) — 20 is the only threshold
       this%t_brk = T_BRK_LEGACY
 
-      this%west_dirichlet = grid%is_back_boundary &
-                            .and. wavemaker%wavemaker_type == "LEFT_BC_IRR"
+      this%west_dirichlet = .false.
+      if (grid%is_back_boundary .and. associated(this%wm_bc)) &
+         this%west_dirichlet = this%wm_bc%wavemaker_type == "LEFT_BC_IRR"
 
       this%b1 = physics%Beta_ref*physics%Beta_ref
       this%b2 = physics%Beta_ref
@@ -420,7 +439,8 @@ contains
       end if
       if (this%run_breaker .or. this%breaking%WAVEMAKER_VIS) then
          allocate (this%in_wm_zone(mloc, nloc))
-         call wavemaker%fill_in_zone(this%in_wm_zone)
+         this%in_wm_zone = .false.
+         if (associated(this%wm_src)) call this%wm_src%fill_in_zone(this%in_wm_zone)
       end if
       ! Legacy assembles nu_vis as
       !     nu_vis = nu_break [+ VisVessel_2D]   under VISCOSITY_BREAKING/WAVEMAKER_VIS
@@ -510,6 +530,8 @@ contains
       integer, intent(in) :: istage
       real(SP), intent(in) :: dt, time
 
+      integer :: i
+
       associate (f => this%fields, lp => this%grid%lp, &
                  phy => this%physics, num => this%numerics)
 
@@ -571,8 +593,11 @@ contains
          ! Manning drag from current H (legacy evaluates inside SourceTerms)
          call this%friction%update_cd(f%h, num%MinDepthFrc)
 
-         ! wavemaker mass source at the stage TIME (legacy SourceTerms head)
-         call this%wavemaker%update_source(time)
+         ! wavemaker mass source at the stage TIME (legacy SourceTerms head);
+         ! every entry guards internally on its own role
+         do i = 1, size(this%wavemakers)
+            call this%wavemakers(i)%update_source(time)
+         end do
 
          ! combined eddy viscosity, assembled in legacy's order (sources.F
          ! head): nu_break, then the deep-draft hull, then the sponge
@@ -681,9 +706,11 @@ contains
 
          call this%bc%exchange_state(this%grid, f)
 
-         call this%wavemaker%apply_boundary(this%grid, istage, dt, time, &
-                                            f%eta, f%u, f%v, f%hu, f%hv, &
-                                            f%depth)
+         do i = 1, size(this%wavemakers)
+            call this%wavemakers(i)%apply_boundary(this%grid, istage, dt, time, &
+                                                   f%eta, f%u, f%v, f%hu, f%hv, &
+                                                   f%depth)
+         end do
 
          call this%sponge%apply(f, this%grid)
 
@@ -1094,8 +1121,8 @@ contains
       class(type_model_stepper_2d), intent(in), target :: this
       real(SP), pointer :: m(:, :)
 
-      if (this%wavemaker%has_mass_source) then
-         m => this%wavemaker%mass
+      if (associated(this%wm_src)) then
+         m => this%wm_src%mass
       else
          m => this%zeros
       end if
@@ -1160,10 +1187,9 @@ contains
       class(type_model_stepper_2d), intent(in), target :: this
       real(SP), pointer :: c(:, :)
 
-      if (allocated(this%wavemaker%cd_current)) then
-         c => this%wavemaker%cd_current
-      else
-         c => this%zeros
+      c => this%zeros
+      if (associated(this%wm_src)) then
+         if (allocated(this%wm_src%cd_current)) c => this%wm_src%cd_current
       end if
    end function wm_cd
 
@@ -1454,7 +1480,9 @@ contains
       this%friction => null()
       this%simulation => null()
       this%output => null()
-      this%wavemaker => null()
+      this%wavemakers => null()
+      this%wm_src => null()
+      this%wm_bc => null()
       this%sponge => null()
       this%obstacle => null()
       this%means => null()

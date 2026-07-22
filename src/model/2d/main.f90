@@ -29,7 +29,7 @@ module model_main_mod
    use model_hot_start_mod, only: type_model_hot_start
    use model_initial_mod, only: type_model_initial
    use model_checkpoint_mod, only: write_checkpoint_core, read_checkpoint_core
-   use model_wavemaker_mod, only: type_model_wavemaker
+   use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers
    use model_sponge_mod, only: type_model_sponge
    use model_boundaries_mod, only: boundaries_read_input
    use model_obstacle_mod, only: type_model_obstacle
@@ -76,7 +76,9 @@ module model_main_mod
       type(type_model_simulation) :: simulation
       type(type_model_hot_start)  :: hot_start
       type(type_model_initial)    :: initial
-      type(type_model_wavemaker)  :: wavemaker
+      ! wavemaker: entries (mapping = one, sequence = many); at most one
+      ! internal source until composition lands (read_wavemakers gates)
+      type(type_model_wavemaker), allocatable :: wavemakers(:)
       type(type_model_sponge)     :: sponge
       type(type_model_obstacle)   :: obstacle
       type(type_model_friction)   :: friction
@@ -133,7 +135,7 @@ contains
       call this%simulation%read_input(this%env)
       call this%hot_start%read_input(this%env)
       call this%initial%read_input(this%env)
-      call this%wavemaker%read_input(this%env)
+      call read_wavemakers(this%env, this%wavemakers)
       call this%obstacle%read_input(this%env)
       call this%friction%read_input(this%env)
       call this%numerics%read_input(this%env)
@@ -141,7 +143,7 @@ contains
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
       call boundaries_read_input(this%env, this%sponge, this%tide, this%physics, &
-                                 this%wavemaker)
+                                 this%wavemakers)
       call this%coupling%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
@@ -181,7 +183,7 @@ contains
       call this%simulation%read_input(this%env)
       call this%hot_start%read_input(this%env)
       call this%initial%read_input(this%env)
-      call this%wavemaker%read_input(this%env)
+      call read_wavemakers(this%env, this%wavemakers)
       call this%obstacle%read_input(this%env)
       call this%friction%read_input(this%env)
       call this%numerics%read_input(this%env)
@@ -189,7 +191,7 @@ contains
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
       call boundaries_read_input(this%env, this%sponge, this%tide, this%physics, &
-                                 this%wavemaker)
+                                 this%wavemakers)
       call this%coupling%read_input(this%env)
       call this%precipitation%read_input(this%env)
       call this%subgrid%read_input(this%env)
@@ -645,6 +647,7 @@ contains
       type(type_output_manager), target :: output_mgr
       type(type_output_monitor) :: monitor
       real(SP), pointer :: pf(:, :), qf(:, :)
+      integer :: i
 
       call this%setup()
       call this%friction%init_compute(this%grid)
@@ -659,7 +662,9 @@ contains
       call this%tide%init_compute(this%grid)
       ! GEN_ABS rides the ABS wavemaker relaxation (legacy sponge.F
       ! reads TIDE_MODULE state)
-      this%wavemaker%tide => this%tide
+      do i = 1, size(this%wavemakers)
+         this%wavemakers(i)%tide => this%tide
+      end do
       ! legacy PRECIPITATION_INITIAL runs after INITIALIZATION — index
       ! file open, first frame into the high bracket
       call this%precipitation%init_compute(this%grid)
@@ -694,15 +699,17 @@ contains
       ! legacy METEO_INITIAL: builds the ghost-inclusive pressure lattice and
       ! opens the storm-track file, so the grid must already be spaced
       call this%meteo%init_compute(this%grid)
-      call this%wavemaker%init_compute(this%grid, this%physics%periodic, &
-                                       this%env, this%physics%Beta_ref)
+      do i = 1, size(this%wavemakers)
+         call this%wavemakers(i)%init_compute(this%grid, this%physics%periodic, &
+                                              this%env, this%physics%Beta_ref)
+      end do
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
                                       this%geometry%dy, this%env)
       call this%means%init_compute(this%grid, this%env%comm, this%output)
 
       call stepper%init(this%env, this%grid, this%fields, this%physics, &
                         this%numerics, this%breaking, this%friction, &
-                        this%simulation, this%output, this%wavemaker, &
+                        this%simulation, this%output, this%wavemakers, &
                         this%sponge, this%obstacle, this%means, this%tide, &
                         this%precipitation, this%subgrid, this%foam, &
                         this%tracer, this%vessel, this%sediment, this%meteo, &

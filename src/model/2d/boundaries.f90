@@ -93,12 +93,12 @@ module model_boundaries_mod
 
 contains
 
-   subroutine boundaries_read_input(env, sponge, tide, physics, wavemaker)
+   subroutine boundaries_read_input(env, sponge, tide, physics, wavemakers)
       type(type_env), intent(inout), target :: env
       type(type_model_sponge), intent(inout) :: sponge
       type(type_model_tide), intent(inout) :: tide
       type(type_model_physics), intent(inout) :: physics
-      type(type_model_wavemaker), intent(inout) :: wavemaker
+      type(type_model_wavemaker), intent(inout) :: wavemakers(:)
 
       type(type_env) :: bnd_env
       type(type_yaml_reader) :: face_yaml
@@ -106,7 +106,7 @@ contains
       character(:), allocatable :: assert_val
       logical :: no_bnd, no_face, no_key
       logical :: forced(4), wm_forced(4), has_file(4), has_const(4)
-      integer :: derived(4)
+      integer :: derived(4), wm_idx(4)
       integer :: f, i
 
       derived = BC_WALL
@@ -114,6 +114,7 @@ contains
       wm_forced = .false.
       has_file = .false.
       has_const = .false.
+      wm_idx = 0
 
       bnd_env = get_sub_env(env, "boundaries", is_empty=no_bnd)
       if (no_bnd) return
@@ -148,14 +149,15 @@ contains
             call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
                                        ": face block on a periodic axis")
 
-         call read_face_forcing(env, face_yaml, tide, wavemaker, f, &
-                                forced(f), wm_forced(f), has_file(f), has_const(f))
+         call read_face_forcing(env, face_yaml, tide, wavemakers, f, &
+                                forced(f), wm_forced(f), wm_idx(f), &
+                                has_file(f), has_const(f))
 
          if (wm_forced(f)) then
             ! wavemaker-fed face: the sponge block IS the relaxation strip
             ! (nee WidthWaveMaker/R_,A_sponge_wavemaker) — routed to the
-            ! wavemaker, NOT the sponge model
-            call read_wavemaker_strip(env, face_yaml, wavemaker, f, &
+            ! resolved wavemaker entry, NOT the sponge model
+            call read_wavemaker_strip(env, face_yaml, wavemakers(wm_idx(f)), f, &
                                       tide%tidal_bc_gen_abs)
             derived(f) = BC_RELAX
          else
@@ -186,7 +188,7 @@ contains
 
          if (wm_forced(f)) then
             call env%log%info("boundaries: "//trim(FACE_KEY(f))//" = relaxation"// &
-                              " (wavemaker '"//wavemaker%name//"')")
+                              " (wavemaker '"//wavemakers(wm_idx(f))%name//"')")
          else
             call env%log%info("boundaries: "//trim(FACE_KEY(f))//" = "// &
                               trim(DERIVED_NAME(derived(f))))
@@ -267,25 +269,28 @@ contains
 
    end subroutine read_face_sponge
 
-   subroutine read_face_forcing(env, face_yaml, tide, wavemaker, f, &
-                                forced, wm_forced, has_file, has_const)
+   subroutine read_face_forcing(env, face_yaml, tide, wavemakers, f, &
+                                forced, wm_forced, wm_idx, has_file, has_const)
       type(type_env), intent(inout) :: env
       type(type_yaml_reader), intent(inout) :: face_yaml
       type(type_model_tide), intent(inout) :: tide
-      type(type_model_wavemaker), intent(inout) :: wavemaker
+      type(type_model_wavemaker), intent(inout) :: wavemakers(:)
       integer, intent(in) :: f
       logical, intent(out) :: forced, wm_forced, has_file, has_const
+      integer, intent(out) :: wm_idx
 
       type(type_yaml_reader) :: frc_yaml
       type(type_path) :: file
       real(SP) :: eta, u, v
       logical :: no_frc, no_eta, no_u, no_v, no_file, no_key
       character(:), allocatable :: wm_name
+      integer :: k
 
       forced = .false.
       wm_forced = .false.
       has_file = .false.
       has_const = .false.
+      wm_idx = 0
 
       frc_yaml = face_yaml%cast_dictionary("forcing", no_frc)
       if (no_frc) return
@@ -295,8 +300,18 @@ contains
       call frc_yaml%read_string("wavemaker", silent=no_key, val=wm_name)
       if (.not. no_key) then
          wm_forced = .true.
-         call bind_face_wavemaker(env, frc_yaml, tide, wavemaker, f, wm_name, &
-                                  has_file, has_const)
+         do k = 1, size(wavemakers)
+            if (wavemakers(k)%boundary_candidate .and. &
+                len(wavemakers(k)%name) > 0) then
+               if (wavemakers(k)%name == wm_name) wm_idx = k
+            end if
+         end do
+         if (wm_idx == 0) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/forcing: wavemaker '"//wm_name//"' does not name a"// &
+                                       " spectrum-only wavemaker entry (check name:)")
+         call bind_face_wavemaker(env, frc_yaml, tide, wavemakers(wm_idx), f, &
+                                  wm_name, has_file, has_const)
          return
       end if
       forced = .true.
