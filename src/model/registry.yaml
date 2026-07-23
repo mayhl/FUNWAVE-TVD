@@ -191,9 +191,9 @@ sections:
       spectrum.period.min: { legacy: ~, default: ~, units: s, variant: [jonswap, tma], doc: "Alt to freq.max (note the min<->max swap)." }
       spectrum.period.max: { legacy: ~, default: ~, units: s, variant: [jonswap, tma], doc: "Alt to freq.min." }
       spectrum.directional.peak: { legacy: ThetaPeak, default: 0.0, units: deg, variant: [jonswap, tma], doc: "Mean direction (presence => 2D spreading)." }
-      spectrum.directional.spread: { legacy: Sigma_Theta, default: 0.0, units: deg, variant: [jonswap, tma], doc: "Directional spread (legacy 10.0 in directional branch; PENDING)." }
-      spectrum.directional.n_bins: { legacy: Ntheta, default: 1, units: ~, variant: [jonswap, tma], doc: "Directional bin count (legacy 24 in directional branch; PENDING)." }
+      spectrum.directional.spread: { legacy: Sigma_Theta, default: ~, units: deg, variant: [jonswap, tma], doc: "Directional spread (required -- the block's presence means spreading is wanted)." }
       spectrum.discretization.freq_bins: { legacy: Nfreq, default: 45, units: ~, variant: [jonswap, tma], doc: "Frequency bin count." }
+      spectrum.discretization.theta_bins: { legacy: Ntheta, default: 24, units: ~, variant: [jonswap, tma], doc: "Directional bin count (requires a directional: block; 1D runs force 1)." }
       spectrum.discretization.equal_energy: { legacy: EqualEnergy, default: false, units: ~, variant: [jonswap, tma], doc: "Equal-energy frequency binning." }
       spectrum.discretization.method:
         { legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*)." }

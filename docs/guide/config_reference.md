@@ -46,9 +46,9 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.period.min` | — | — | s | *(jonswap/tma)* Alt to freq.max (note the min\<->max swap). |
 | `spectrum.period.max` | — | — | s | *(jonswap/tma)* Alt to freq.min. |
 | `spectrum.directional.peak` | `0.0` | `ThetaPeak` | deg | *(jonswap/tma)* Mean direction (presence => 2D spreading). |
-| `spectrum.directional.spread` | `0.0` | `Sigma_Theta` | deg | *(jonswap/tma)* Directional spread (legacy 10.0 in directional branch; PENDING). |
-| `spectrum.directional.n_bins` | `1` | `Ntheta` | — | *(jonswap/tma)* Directional bin count (legacy 24 in directional branch; PENDING). |
+| `spectrum.directional.spread` | — | `Sigma_Theta` | deg | *(jonswap/tma)* Directional spread (required -- the block's presence means spreading is wanted). |
 | `spectrum.discretization.freq_bins` | `45` | `Nfreq` | — | *(jonswap/tma)* Frequency bin count. |
+| `spectrum.discretization.theta_bins` | `24` | `Ntheta` | — | *(jonswap/tma)* Directional bin count (requires a directional: block; 1D runs force 1). |
 | `spectrum.discretization.equal_energy` | `false` | `EqualEnergy` | — | *(jonswap/tma)* Equal-energy frequency binning. |
 | `spectrum.discretization.method` | `grid` | — | — | *(jonswap/tma)* Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*). One of `grid` \| `single_dir_per_freq`. |
 | `spectrum.discretization.coherence_percent` | `0.0` | `alpha_c` | % | *(jonswap/tma)* Percent of components sharing a frequency. |

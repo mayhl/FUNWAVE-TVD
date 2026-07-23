@@ -276,13 +276,15 @@ def _convert_abs(pop_val):
             for k in ("ThetaPeak", "Sigma_Theta", "Ntheta"):
                 pop_val(k)  # legacy forces 1D (Ntheta = 1); consume silently
         else:
-            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread"), ("Ntheta", "n_bins")):
+            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread")):
                 _put(spec, "directional", yk, pop_val(k))
-            # legacy 2D defaults (io.F ABS block) differ from the reader's
+            # legacy 2D defaults (io.F ABS block) differ from the reader's;
+            # spread is a required key now, so always emit it
             d = spec.setdefault("directional", {})
             d.setdefault("peak", 0.0)
             d.setdefault("spread", 10.0)
-            d.setdefault("n_bins", 24)
+            _put(spec, "discretization", "theta_bins", pop_val("Ntheta"))
+            spec.setdefault("discretization", {}).setdefault("theta_bins", 24)
         _put(spec, "discretization", "freq_bins", pop_val("Nfreq"))
         spec.setdefault("discretization", {}).setdefault("freq_bins", 45)
         eq = pop_val("EqualEnergy")
@@ -381,10 +383,13 @@ def _convert_wavemaker(wm_type: str, pop_val):
         for k, yk in (("FreqPeak", "peak"), ("FreqMin", "min"), ("FreqMax", "max")):
             _put(spec, "freq", yk, pop_val(k))
         if directional:
-            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread"), ("Ntheta", "n_bins")):
+            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread")):
                 _put(spec, "directional", yk, pop_val(k))
-            # legacy directional default (io.F) differs from the reader default
-            spec.setdefault("directional", {}).setdefault("n_bins", 24)
+            # legacy directional defaults (io.F) differ from the reader;
+            # spread is a required key now, so always emit it
+            spec.setdefault("directional", {}).setdefault("spread", 10.0)
+            _put(spec, "discretization", "theta_bins", pop_val("Ntheta"))
+            spec.setdefault("discretization", {}).setdefault("theta_bins", 24)
         else:
             pop_val("Ntheta")  # consume a stray 1D Ntheta silently, like before
         _put(spec, "discretization", "freq_bins", pop_val("Nfreq"))

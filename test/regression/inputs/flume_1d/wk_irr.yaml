@@ -27,9 +27,9 @@ wavemaker:
     directional:
       peak: 0.0
       spread: 10.0
-      n_bins: 24
     discretization:
       freq_bins: 45
+      theta_bins: 24
   source:
     x_center: 150.0
     y_center: 0.0

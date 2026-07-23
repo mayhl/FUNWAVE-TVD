@@ -31,8 +31,9 @@
 !                        period: {peak, min, max} (reciprocal, non-bitwise)
 !      --- spectrum_2d:  file, format (nee WaveCompFile/WAVE_DATA_TYPE)
 !      --- components:   n, period_peak, file
-!      directional: {peak, spread, n_bins}   presence = 2D spreading
-!      discretization: {freq_bins, equal_energy, method, coherence_percent}
+!      directional: {peak, spread}    presence = 2D spreading; spread REQUIRED
+!      discretization: {freq_bins, theta_bins, equal_energy, method,
+!                       coherence_percent}    theta_bins needs directional:
 !    source:                    presence = Wei-Kirby internal source box
 !      x_center, y_center, depth, delta, y_width, time_ramp, current_cd
 !    limiter: {crest, trough}   presence = eta limiter (nee ETA_LIMITER)
@@ -64,13 +65,12 @@ module model_wavemaker_mod
                                         DEF_WAVEMAKER_SOURCE_Y_WIDTH, &
                                         DEF_WAVEMAKER_SPECTRUM_AMPLITUDE, &
                                         DEF_WAVEMAKER_SPECTRUM_DIRECTION, &
-                                        DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_N_BINS, &
                                         DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK, &
-                                        DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_SPREAD, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD, &
+                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS, &
                                         DEF_WAVEMAKER_SPECTRUM_FORMAT, &
                                         DEF_WAVEMAKER_SPECTRUM_FREQ_MAX, &
                                         DEF_WAVEMAKER_SPECTRUM_FREQ_MIN, &
@@ -603,6 +603,7 @@ contains
 
       type(type_yaml_reader) :: spec_yaml, blk
       character(:), allocatable :: stype, method, legacy_type, normalize
+      character(8) :: def_bins
       logical :: no_key, has_dir
       logical :: no_spec, no_blk, no_freq, no_per
       real(SP) :: p_tmp
@@ -647,22 +648,30 @@ contains
                                         "tma", "spectrum_2d", "components"], val=stype)
 
       ! directional: presence = 2D spreading (kills Ntheta/Sigma_Theta
-      ! leaking into 1D configs)
+      ! leaking into 1D configs).  spread is required -- the block's presence
+      ! means spreading is wanted; a silent 0 (or legacy's hidden 10) is the
+      ! degenerate-block trap
       blk = spec_yaml%cast_dictionary("directional", no_blk)
       has_dir = .not. no_blk
       if (has_dir) then
          call blk%read("peak", silent=no_key, val=this%ThetaPeak, &
                        default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK)
-         call blk%read("spread", silent=no_key, val=this%Sigma_Theta, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_SPREAD)
-         call blk%read("n_bins", silent=no_key, val=this%Ntheta, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_N_BINS)
+         call blk%read("spread", val=this%Sigma_Theta)
+         call blk%read("n_bins", silent=no_key, val=this%Ntheta)
+         if (.not. no_key) call env%log%exit_on_error( &
+            "wavemaker/directional: n_bins moved -- set discretization: theta_bins")
       end if
 
       blk = spec_yaml%cast_dictionary("discretization", no_blk)
       if (.not. no_blk) then
          call blk%read("freq_bins", silent=no_key, val=this%Nfreq, &
                        default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS)
+         ! theta_bins is the directional-axis resolution: defaulted only
+         ! when directional: is present, meaningless without it
+         call blk%read("theta_bins", silent=no_key, val=this%Ntheta, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS)
+         if (.not. no_key .and. .not. has_dir) call env%log%exit_on_error( &
+            "wavemaker/discretization: theta_bins requires a directional: block")
          call blk%read("equal_energy", val=this%EqualEnergy, &
                        default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY)
          call blk%read_enum("method", [character(19) :: "grid", "single_dir_per_freq"], &
@@ -677,7 +686,12 @@ contains
          if (this%single_dir .and. this%EqualEnergy) &
             call env%log%exit_on_error("wavemaker/discretization: single_dir_per_freq"// &
                                        " uses the equal-df ladder — equal_energy does not apply")
+      else if (has_dir) then
+         ! no discretization: block -- directional resolution falls to default
+         def_bins = DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS
+         read (def_bins, *) this%Ntheta
       end if
+      if (.not. has_dir) this%Ntheta = 1
 
       select case (stype)
       case ("regular")
