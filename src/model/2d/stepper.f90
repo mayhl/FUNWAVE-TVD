@@ -1099,8 +1099,8 @@ contains
          ! checkpoint restart cannot reproduce it); exchange so ghost
          ! etat = exchange(interior), same ring continuous or restarted
          call this%bc%exchange_scalar(g, this%etat)
-         call this%bc%exchange_dispersion(g, phy%Gamma2, this%dws, this%ut, &
-                                          this%vt, this%etax, this%etay)
+         call this%bc%exchange_dispersion(g, phy%Gamma2, this%dws, &
+                                          this%etax, this%etay)
          call cal_dispersion_assemble(lp, this%dws, f%eta, f%depth, f%u, f%v, &
                                       f%mask9, this%inv_dx, this%inv_dy, &
                                       this%beta1, this%beta2, phy%Gamma2, &
