@@ -232,7 +232,7 @@ contains
       real(SP) :: txp1, txp2, txp3, dvp1, dvp2, dvp3
       real(SP) :: van1, van2, rat, tmp1, tmp2
       integer  :: i, j
-      din = 0.0_SP
+      ! no din zero-fill: every read row below is written first
       do j = lp%jb, lp%je
          do i = lp%ib - 1, lp%ie + 2
             txp1 = vin(i - 1, j) - vin(i - 2, j)
@@ -290,7 +290,7 @@ contains
       real(SP) :: typ1, typ2, typ3, dvp1, dvp2, dvp3
       real(SP) :: van1, van2, rat, tmp1, tmp2
       integer  :: i, j
-      din = 0.0_SP
+      ! no din zero-fill: every read row below is written first
       ! two j-outer nests like the minmod sibling — the fused per-i
       ! form walked both inner loops at stride mloc (perf audit item 2)
       do j = lp%jb - 1, lp%je + 2
@@ -352,7 +352,7 @@ contains
       real(SP) :: din(lp%mloc, lp%nloc)
       real(SP) :: txp1, txp2, txp3, txp4, dvp1, dvp2, dvp3
       integer  :: i, j
-      din = 0.0_SP
+      ! no din zero-fill: every read row below is written first
       do j = lp%jb, lp%je
          do i = lp%ib - 1, lp%ie + 2
             txp1 = vin(i - 1, j) - vin(i - 2, j)
@@ -411,7 +411,7 @@ contains
       real(SP) :: din(lp%mloc, lp%nloc)
       real(SP) :: typ1, typ2, typ3, typ4, dvp1, dvp2, dvp3
       integer  :: i, j
-      din = 0.0_SP
+      ! no din zero-fill: every read row below is written first
       do j = lp%jb - 1, lp%je + 2
          do i = lp%ib, lp%ie
             typ1 = vin(i, j - 1) - vin(i, j - 2)
