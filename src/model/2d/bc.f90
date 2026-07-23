@@ -27,7 +27,7 @@
 !-------------------------------------------------
 
 module model_bc_mod
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, N_GHOST
    use core_grid_mod, only: type_grid_2d, type_halo_field
    use model_fields_2d_mod, only: type_fields_2d
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR, SIGN_ANTI
@@ -66,6 +66,11 @@ module model_bc_mod
       logical :: exch_nu = .false.
       ! Shared exchange list — exchange_batch() flushes and resets it
       type(type_halo_batch) :: batch
+      ! Persistent real mirror of the wet/dry mask (integer fields
+      ! can't ride the SP batch).  Only the 2*N_GHOST frame is kept
+      ! current — the exchange never reads deeper, so the bulk sits
+      ! stale by design
+      real(SP), allocatable :: rmask(:, :)
    contains
       procedure :: init => bc_init
       procedure :: exchange_state => bc_exchange_state
@@ -97,6 +102,9 @@ contains
       this%fill_south = grid%is_right_boundary
       this%fill_north = grid%is_left_boundary
 
+      if (allocated(this%rmask)) deallocate (this%rmask)
+      allocate (this%rmask(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
    end subroutine bc_init
 
    ! ----------------------------------------------------------------
@@ -115,19 +123,29 @@ contains
    ! them here was a ~2e-2 runup u deviation on flume_1d_wk_reg.
    ! ----------------------------------------------------------------
    subroutine bc_exchange_state(this, grid, fields)
-      class(type_model_bc), intent(inout) :: this
+      class(type_model_bc), intent(inout), target :: this
       type(type_grid_2d), intent(in) :: grid
       type(type_fields_2d), intent(inout), target :: fields
 
-      real(SP), allocatable, target :: rmask(:, :)
+      integer :: ml, nl, ng
 
-      allocate (rmask, source=real(fields%mask, SP))
+      ml = grid%lp%mloc
+      nl = grid%lp%nloc
+      ng = N_GHOST
+
+      ! Refreshing the 2*ng frame of the mask mirror: the pack strips
+      ! are ghost-inclusive, so the frame is exactly the read set —
+      ! whole-array int->real 4x/step was pure overhead
+      this%rmask(1:2*ng, :) = real(fields%mask(1:2*ng, :), SP)
+      this%rmask(ml - 2*ng + 1:ml, :) = real(fields%mask(ml - 2*ng + 1:ml, :), SP)
+      this%rmask(:, 1:2*ng) = real(fields%mask(:, 1:2*ng), SP)
+      this%rmask(:, nl - 2*ng + 1:nl) = real(fields%mask(:, nl - 2*ng + 1:nl), SP)
 
       ! One packed message per neighbor per phase for the whole state
       ! (fields are independent during exchange — values identical to
       ! the per-field sequence); wall fills stay per-field in the flush
       call this%batch%add(fields%eta, SIGN_MIRROR, SIGN_MIRROR)
-      call this%batch%add(rmask, SIGN_MIRROR, SIGN_MIRROR)
+      call this%batch%add(this%rmask, SIGN_MIRROR, SIGN_MIRROR)
       call this%batch%add(fields%u, SIGN_ANTI, SIGN_MIRROR)
       call this%batch%add(fields%p, SIGN_ANTI, SIGN_MIRROR)
       call this%batch%add(fields%hu, SIGN_ANTI, SIGN_MIRROR)
@@ -139,8 +157,14 @@ contains
 
       call this%exchange_batch(grid)
 
-      fields%mask = nint(rmask)
-      deallocate (rmask)
+      ! Exchange and wall fills write ghosts only, so only the ghost
+      ! bands carry news; a face nothing wrote (wavemaker-owned west)
+      ! writes back its own refresh = identity, as the whole-array
+      ! nint did
+      fields%mask(1:ng, :) = nint(this%rmask(1:ng, :))
+      fields%mask(ml - ng + 1:ml, :) = nint(this%rmask(ml - ng + 1:ml, :))
+      fields%mask(:, 1:ng) = nint(this%rmask(:, 1:ng))
+      fields%mask(:, nl - ng + 1:nl) = nint(this%rmask(:, nl - ng + 1:nl))
 
       fields%u = fields%u*fields%mask
       fields%v = fields%v*fields%mask
