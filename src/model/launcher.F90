@@ -23,6 +23,8 @@
 
 module model_launcher_mod
    use core_env_mod, only: type_env, new_env, get_sub_env
+   use core_log_io_mod, only: log_level_debug, log_level_off, &
+                              set_default_log_levels
    use model_main_mod, only: type_model_main
 # if defined (ENABLE_3D)
    use model_3d_mod, only: type_model_3d
@@ -35,21 +37,46 @@ module model_launcher_mod
 contains
 
    subroutine launch()
-      character(2048)          :: yaml_path
+      character(2048)          :: yaml_path, arg
       type(type_env)           :: env, grid_env
       integer, allocatable     :: dims(:)
-      integer                  :: ndim
-      logical                  :: missing, no_grid
+      integer                  :: ndim, i
+      logical                  :: missing, no_grid, quiet, dbg
       type(type_model_main)    :: model_2d
 # if defined (ENABLE_3D)
       type(type_model_3d)      :: model_3d
 # endif
 
-      call get_command_argument(1, yaml_path)
+      ! CLI: flags anywhere, first non-flag argument is the deck
+      quiet = .false.
+      dbg = .false.
+      yaml_path = ""
+      do i = 1, command_argument_count()
+         call get_command_argument(i, arg)
+         select case (trim(arg))
+         case ("-q", "--quiet"); quiet = .true.
+         case ("-d", "--debug"); dbg = .true.
+         case default
+            ! one deck argument; anything dash-led here is an unknown flag
+            if (arg(1:1) == "-" .or. len_trim(yaml_path) > 0) then
+               write (*, "(a)") "Usage: funwave [-q] [-d] <input.yaml>"
+               stop 1
+            end if
+            yaml_path = arg
+         end select
+      end do
       if (len_trim(yaml_path) == 0) then
-         write (*, "(a)") "Usage: funwave <input.yaml>"
+         write (*, "(a)") "Usage: funwave [-q] [-d] <input.yaml>"
          stop 1
       end if
+
+      ! -d opens both sinks to the debug config-resolution trace; -q turns
+      ! the console off (errors fall through to stderr).  Defaults are set
+      ! BEFORE new_env so every writer (incl. the yaml [config] logger)
+      ! inherits them.
+      if (dbg) call set_default_log_levels(stdout_level=log_level_debug, &
+                                           file_level=log_level_debug)
+      if (quiet) call set_default_log_levels(stdout_level=log_level_off)
 
       ! Initialise environment once — owns MPI, YAML, and logging for this run.
       call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path="funwave.log")
