@@ -862,7 +862,13 @@ contains
          end if
       else
          is_default = .false.
-         buff = this%prep_extern_msg(key, io_err%message)
+         if (is_no_key_err(io_err)) then
+            ! pre-check no-key messages lack the /key prefix prep_extern_msg
+            ! strips (it mangled them) -- a required key reads better anyway
+            buff = this%sanitize_path(key)//" is required."
+         else
+            buff = this%prep_extern_msg(key, io_err%message)
+         end if
          call this%log%exit_on_error(buff)
       end if
       deallocate (io_err)
