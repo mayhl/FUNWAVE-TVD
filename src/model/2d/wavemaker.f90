@@ -994,11 +994,11 @@ contains
    !                 + S_{m,k}\sin(\omega_k t)\big], \qquad
    !      r(t) = \tanh\!\Big(\frac{\pi f_p\,t}{\tau}\Big) $$
    ! Cells outside the source box stay zero, which makes the
-   ! unconditional adds in cal_rk_update/cal_sources identical to the
+   ! whole-domain adds in cal_rk_update/cal_sources identical to the
    ! legacy per-cell zone tests.  time is constant across RK stages
-   ! (legacy TIME advances in ESTIMATE_DT), so the per-stage call
-   ! recomputes the same values — kept legacy-shaped.
-   ! FUTURE: hoist to once per step
+   ! (legacy TIME advances in ESTIMATE_DT), so the stepper calls this
+   ! once per step at istage 1 (legacy recomputed the same values
+   ! per stage).
    ! ----------------------------------------------------------------
    subroutine wavemaker_update_source(this, time)
       class(type_model_wavemaker), intent(inout) :: this

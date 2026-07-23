@@ -644,6 +644,9 @@ contains
                             this%fws%p, this%fws%q, this%fws%fx, this%fws%fy, &
                             this%fws%gx, this%fws%gy, &
                             this%src_x, this%src_y, &
+                            associated(this%wm_src), &
+                            this%precipitation%is_activated, &
+                            this%vessel%is_activated, &
                             wm_mass(this), prec_rate(this), ves_flux(this), &
                             this%subgrid%is_activated, porosity(this), &
                             this%sediment%mass_source, this%sediment%moment_dc, &

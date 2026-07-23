@@ -101,10 +101,11 @@ contains
    !      \bar V \leftarrow \alpha\,\bar V^n + \beta(\bar V + \Delta t R_3) $$
    ! pflx/qflx/fx/fy/gx/gy are the interface fluxes from
    ! type_flux_workspace, face-aligned with cell index i (face i =
-   ! low side of cell i).  wavemaker_mass is the WK_* mass source
-   ! (zero array when no wavemaker); prec_rate is the rainfall mass
-   ! source appended AFTER it like legacy R1 += PrecRateModel (zero
-   ! array when inactive).  subgrid_on divides the mass residual by the
+   ! low side of cell i).  wavemaker_mass is the WK_* mass source;
+   ! prec_rate is the rainfall mass source appended AFTER it like
+   ! legacy R1 += PrecRateModel.  Each rides its _on switch — the
+   ! arrays are zeros when off, so legacy's unconditional adds were
+   ! streaming zeros (perf audit item 3).  subgrid_on divides the mass residual by the
    ! sub-cell porosity in between the two, legacy's exact operand order
    ! (porosity is never zero — the dry clamp lifts it to 1 — so legacy's
    ! guard branch there is dead).  Legacy ETA_LIMITER (default off) is
@@ -119,7 +120,8 @@ contains
    ! ----------------------------------------------------------------
    pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
                                  pflx, qflx, fx, fy, gx, gy, &
-                                 src_x, src_y, wavemaker_mass, prec_rate, &
+                                 src_x, src_y, wm_on, prec_on, ves_on, &
+                                 wavemaker_mass, prec_rate, &
                                  ves_flux, subgrid_on, porosity, &
                                  sed_mass_on, sed_dc_on, sed_exg_on, &
                                  sed_mass, sed_dc_x, sed_dc_y, &
@@ -130,6 +132,7 @@ contains
       real(SP), intent(in) :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in) :: pflx(:, :), qflx(:, :)
       real(SP), intent(in) :: fx(:, :), fy(:, :), gx(:, :), gy(:, :)
+      logical, intent(in) :: wm_on, prec_on, ves_on
       real(SP), intent(in) :: src_x(:, :), src_y(:, :), wavemaker_mass(:, :)
       real(SP), intent(in) :: prec_rate(:, :)
       real(SP), intent(in) :: ves_flux(:, :)
@@ -147,14 +150,14 @@ contains
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             r1 = -(pflx(i + 1, j) - pflx(i, j))*inv_dx(i, j) &
-                 - (qflx(i, j + 1) - qflx(i, j))*inv_dy(i, j) &
-                 + wavemaker_mass(i, j)
+                 - (qflx(i, j + 1) - qflx(i, j))*inv_dy(i, j)
+            if (wm_on) r1 = r1 + wavemaker_mass(i, j)
             ! slender-body mass flux (legacy R1 = R1 + VesselFluxGradient,
-            ! added straight after the divergence); zeros when no vessel
-            r1 = r1 + ves_flux(i, j)
+            ! added straight after the divergence)
+            if (ves_on) r1 = r1 + ves_flux(i, j)
             if (subgrid_on) r1 = r1/porosity(i, j)
             if (sed_mass_on) r1 = r1 + sed_mass(i, j)
-            r1 = r1 + prec_rate(i, j)
+            if (prec_on) r1 = r1 + prec_rate(i, j)
             eta(i, j) = alpha*eta0(i, j) + beta*(eta(i, j) + dt*r1)
 
             r2 = -(fx(i + 1, j) - fx(i, j))*inv_dx(i, j) &
