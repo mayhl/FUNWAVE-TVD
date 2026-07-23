@@ -37,36 +37,47 @@ module model_launcher_mod
 contains
 
    subroutine launch()
-      character(2048)          :: yaml_path, arg
+      character(2048)          :: yaml_path, log_path, arg
       type(type_env)           :: env, grid_env
       integer, allocatable     :: dims(:)
       integer                  :: ndim, i
-      logical                  :: missing, no_grid, quiet, dbg
+      logical                  :: missing, no_grid, quiet, dbg, want_log, have_deck
       type(type_model_main)    :: model_2d
 # if defined (ENABLE_3D)
       type(type_model_3d)      :: model_3d
 # endif
 
       ! CLI: flags anywhere, first non-flag argument is the deck
+      ! (default input.yaml); -l redirects the log (default funwave.log)
       quiet = .false.
       dbg = .false.
-      yaml_path = ""
+      want_log = .false.
+      have_deck = .false.
+      yaml_path = "input.yaml"
+      log_path = "funwave.log"
       do i = 1, command_argument_count()
          call get_command_argument(i, arg)
+         if (want_log) then
+            log_path = arg
+            want_log = .false.
+            cycle
+         end if
          select case (trim(arg))
          case ("-q", "--quiet"); quiet = .true.
          case ("-d", "--debug"); dbg = .true.
+         case ("-l", "--log"); want_log = .true.
          case default
             ! one deck argument; anything dash-led here is an unknown flag
-            if (arg(1:1) == "-" .or. len_trim(yaml_path) > 0) then
-               write (*, "(a)") "Usage: funwave [-q] [-d] <input.yaml>"
+            if (arg(1:1) == "-" .or. have_deck) then
+               write (*, "(a)") "Usage: funwave [-q] [-d] [-l <log path>] [input.yaml]"
                stop 1
             end if
             yaml_path = arg
+            have_deck = .true.
          end select
       end do
-      if (len_trim(yaml_path) == 0) then
-         write (*, "(a)") "Usage: funwave [-q] [-d] <input.yaml>"
+      if (want_log) then
+         write (*, "(a)") "Usage: funwave [-q] [-d] [-l <log path>] [input.yaml]"
          stop 1
       end if
 
@@ -79,7 +90,7 @@ contains
       if (quiet) call set_default_log_levels(stdout_level=log_level_off)
 
       ! Initialise environment once — owns MPI, YAML, and logging for this run.
-      call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path="funwave.log")
+      call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path=trim(log_path))
 
       ! Peek at grid_size to decide dimensionality: 2 elements → 2D path,
       ! 3 elements → 3D path.  The 2D schema owns grid:; the 3D schema
