@@ -593,11 +593,17 @@ contains
          ! Manning drag from current H (legacy evaluates inside SourceTerms)
          call this%friction%update_cd(f%h, num%MinDepthFrc)
 
-         ! wavemaker mass source at the stage TIME (legacy SourceTerms head);
-         ! every entry guards internally on its own role
-         do i = 1, size(this%wavemakers)
-            call this%wavemakers(i)%update_source(time)
-         end do
+         ! wavemaker mass source (legacy SourceTerms head); every entry
+         ! guards internally on its own role.  TIME is frozen across the
+         ! 3 stages (engine advances the clock before the RK loop), so
+         ! legacy's per-stage recompute produced identical values — once
+         ! per step suffices.  A future state-dependent source (active
+         ! absorption) must move back inside the stage cadence.
+         if (istage == 1) then
+            do i = 1, size(this%wavemakers)
+               call this%wavemakers(i)%update_source(time)
+            end do
+         end if
 
          ! combined eddy viscosity, assembled in legacy's order (sources.F
          ! head): nu_break, then the deep-draft hull, then the sponge
