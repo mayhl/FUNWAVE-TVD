@@ -157,8 +157,9 @@ contains
       integer  :: i, j, m, n
       real(SP) :: tmp1, tmp2
       m = size(din, 1); n = size(din, 2)
-      do i = 1, m
-         do j = 2, n - 1
+      ! j-outer keeps the inner loop stride-1 (perf audit item 2)
+      do j = 2, n - 1
+         do i = 1, m
             tmp1 = (din(i, j + 1) - din(i, j))*inv_dy(i, j)
             tmp2 = (din(i, j) - din(i, j - 1))*inv_dy(i, j - 1)
             if (abs(tmp1) + abs(tmp2) < SMALL) then
@@ -167,6 +168,8 @@ contains
                dout(i, j) = (tmp1*abs(tmp2) + abs(tmp1)*tmp2)/(abs(tmp1) + abs(tmp2))
             end if
          end do
+      end do
+      do i = 1, m
          dout(i, 1) = (din(i, 2) - din(i, 1))*inv_dy(i, 1)
          dout(i, n) = (din(i, n) - din(i, n - 1))*inv_dy(i, n)
       end do
@@ -201,11 +204,14 @@ contains
       real(SP), intent(out) :: outl(:, :), outr(:, :)
       integer :: i, j, m, n
       m = size(vin, 1); n = size(vin, 2)
-      do i = 1, m
-         do j = 2, n
+      ! j-outer keeps the inner loop stride-1 (perf audit item 2)
+      do j = 2, n
+         do i = 1, m
             outl(i, j) = vin(i, j - 1) + 0.5_SP*dy(i, j - 1)*din(i, j - 1)
             outr(i, j) = vin(i, j) - 0.5_SP*dy(i, j)*din(i, j)
          end do
+      end do
+      do i = 1, m
          outl(i, n + 1) = vin(i, n) + 0.5_SP*dy(i, n)*din(i, n)
          outr(i, 1) = vin(i, 1) - 0.5_SP*dy(i, 1)*din(i, 1)
          outl(i, 1) = outr(i, 1)
@@ -285,8 +291,10 @@ contains
       real(SP) :: van1, van2, rat, tmp1, tmp2
       integer  :: i, j
       din = 0.0_SP
-      do i = lp%ib, lp%ie
-         do j = lp%jb - 1, lp%je + 2
+      ! two j-outer nests like the minmod sibling — the fused per-i
+      ! form walked both inner loops at stride mloc (perf audit item 2)
+      do j = lp%jb - 1, lp%je + 2
+         do i = lp%ib, lp%ie
             typ1 = vin(i, j - 1) - vin(i, j - 2)
             typ2 = vin(i, j) - vin(i, j - 1)
             typ3 = vin(i, j + 1) - vin(i, j)
@@ -305,7 +313,9 @@ contains
             end if
             din(i, j) = typ2 - (1.0_SP/6.0_SP)*(dvp3 - 2.0_SP*dvp2 + dvp1)
          end do
-         do j = lp%jb, lp%je + 1
+      end do
+      do j = lp%jb, lp%je + 1
+         do i = lp%ib, lp%ie
             tmp1 = din(i, j - 1); tmp2 = din(i, j)
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
@@ -508,8 +518,9 @@ contains
       real(SP) :: delsol, tanth1, tanth2, gamrth2, gamlth1
       real(SP) :: alphin, alph, slope
       integer  :: i, j
-      do i = lp%ib, lp%ie
-         do j = lp%jb - 1, lp%je + 2
+      ! j-outer keeps the inner loop stride-1 (perf audit item 2)
+      do j = lp%jb - 1, lp%je + 2
+         do i = lp%ib, lp%ie
             typ1 = vin(i, j - 1) - vin(i, j - 2)
             typ2 = vin(i, j) - vin(i, j - 1)
             typ3 = vin(i, j + 1) - vin(i, j)
