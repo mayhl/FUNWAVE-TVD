@@ -162,6 +162,10 @@ class RegressionRunner(BaseRunner):
             env.setdefault("FC", "mpif90")
         cmake_cmd = ["cmake", "-S", source_dir, "-B", build_dir]
         cmake_cmd += [f"-D{flag}" for flag in (cmake_flags or [])]
+        # BUILD_TYPE opt-in mirrors runners.py; NOTE: also retypes ref builds,
+        # so leave unset on regression boards (refs are pinned RelWithDebInfo)
+        if os.environ.get("BUILD_TYPE"):
+            cmake_cmd += [f"-DCMAKE_BUILD_TYPE={os.environ['BUILD_TYPE']}"]
 
         with Progress(SpinnerColumn(), TextColumn("[progress.description]{task.description}"), transient=True) as progress:
             config_task = progress.add_task(f"cmake  {tag}  configuring...", total=None)
@@ -190,6 +194,9 @@ class RegressionRunner(BaseRunner):
                         pass
 
             if make_proc.returncode != 0:
+                # captured stderr is invisible on a headless board otherwise
+                err = make_proc.stderr.read() if make_proc.stderr else ""
+                print(f"make failed for {tag}:\n{err[-3000:]}")
                 raise subprocess.CalledProcessError(make_proc.returncode, "make")
 
         self._write_stamp(build_dir, source_dir)
