@@ -278,7 +278,13 @@ class RegressionRunner(BaseRunner):
             )
 
         cmd = [subst(a) for a in sim["preprocess"]]
-        subprocess.run(cmd, cwd=run_dir, check=True, capture_output=True)
+        try:
+            subprocess.run(cmd, cwd=run_dir, check=True, capture_output=True)
+        except subprocess.CalledProcessError as e:
+            # captured stderr is invisible on a headless board otherwise
+            err = (e.stderr or b"").decode(errors="replace")
+            print(f"preprocess failed: {' '.join(cmd)}\n{err[-2000:]}")
+            raise
 
     def _resolve_cmake_flags(self, flags):
         return [f.replace("{repo_root}", self.repo_root) for f in flags]
