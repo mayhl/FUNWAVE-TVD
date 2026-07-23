@@ -16,9 +16,11 @@
 #      runup case saw 0.986 at kh 0.2) — inherited, not spectral-specific;
 #   3. transport dissipation ~1.2 %/lambda at ppw 29, collapsing the ppw < 12
 #      high band (0.010 measured vs 0.062 theory band fraction).
-# The 25 % gate is a CHARACTERIZATION bound on today's behaviour (19.8 %
-# measured + margin); tighten again when the validate pass addresses the kh
-# transfer curve.
+# The 25 % gate is a CHARACTERIZATION bound on today's behaviour; tighten
+# again when the validate pass addresses the kh transfer curve.  Measured
+# 19.8 % via legacy stations, 8.7 % (local) once the gauges moved to a point
+# channel -- the station file's (TOTAL_TIME, 0, 0, 0) tail-pad rows sat
+# inside the oracle's variance window and deflated Hm0.
 grid:
   cell_size: [2.0, 2.0]
   grid_size: [450, 5]
@@ -72,8 +74,14 @@ breaking:
   Cbrk2: 0.35
 output:
   interval: 900.0
-  stations:
-    file: stations.txt
-    interval: 0.1
+  # 5 gauges ~2-3 lambda_p downwave of the source, spanning ~half a peak
+  # wavelength (nee stations.txt i = 175..203, j = 3 at dx = dy = 2 m)
+  channels:
+    - name: sta
+      type: station
+      x: [348.0, 362.0, 376.0, 390.0, 404.0]
+      y: [4.0, 4.0, 4.0, 4.0, 4.0]
+      variables: [eta]
+      interval: 0.1
   depth_out: true
   variables: [ETA]

@@ -41,7 +41,7 @@
 !            but it means the last interior point row/column is only covered
 !            when a neighbour rank supplies the far vertex.
 !    NOTE 4: the output cadence is the PLOT_COUNT dt-accumulator seeded at
-!            zero, so — unlike stations and the field preview — the tracker
+!            zero, so — unlike the field preview — the tracker
 !            files carry NO initial-condition row.
 !    NOTE 5: legacy builds Xco/Yco from DX(1,1) alone, so on a variable-
 !            spacing grid the tracker lattice is wrong.  Reproduced: xco/yco

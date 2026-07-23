@@ -355,7 +355,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 
 ## `output:`
 
-**Required.**  Output control — cadence, format, folder, plus stations/means/vessel/arrival-time sub-blocks.
+**Required.**  Output control — cadence, format, folder, plus means/vessel/arrival-time sub-blocks.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
@@ -366,13 +366,10 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `layout` | `chunked` | — | — | NetCDF file topology; single = one output.nc with streams as groups One of `single` \| `per_stream` \| `chunked`. |
 | `max_file_size` | `50.0` | — | GB | Chunk roll-over size; also the predicted-size warning threshold for single/per_stream. |
 | `result_folder` | `./output/` | `RESULT_FOLDER` | — | Directory for output files. |
-| `stations.file` | — | `STATIONS_FILE` | — | Gauge-station coordinate file (presence enables station output). |
 | `means.steady_time` | `0.0` | `STEADY_TIME` | s | Time to begin time-averaging. |
 | `means.interval` | — | `T_INTV_mean` | s | Averaging output cadence. |
 | `interval` | — | `PLOT_INTV` | s | Global field-output cadence. |
 | `blowup_threshold` | — | `EtaBlowVal` | m | Elevation above which the run aborts (absent = 100*max\|Depth\|). |
-| `stations.interval` | `1.0` | `PLOT_INTV_STATION` | s | Station-output cadence. |
-| `stations.buffer` | `1000` | `StationOutputBuffer` | — | Station time-series buffer length (rows). |
 | `vessel.interval` | — | `PLOT_INTV_VESSEL` | s | Vessel resistance-series output cadence. |
 | `geometries.name` | — | — | — | Point-set name (referenced by channels.geometry). |
 | `geometries.type` | — | — | — | Point-set kind. One of `station` \| `transect`. |

@@ -50,7 +50,6 @@ module model_main_mod
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_means_mod, only: type_model_means
-   use model_stations_mod, only: type_model_stations
    use model_stepper_2d_mod, only: type_model_stepper_2d
 
    implicit none
@@ -62,7 +61,6 @@ module model_main_mod
       type(type_output_manager), pointer :: mgr => null()
       type(type_field_registry), pointer :: registry => null()
       type(type_comm), pointer :: comm => null()
-      type(type_model_stations), pointer :: stations => null()
       type(type_model_tracer), pointer :: tracer => null()
       type(type_model_vessel), pointer :: vessel => null()
    contains
@@ -106,8 +104,6 @@ module model_main_mod
       ! Time-averaged statistics (legacy MIXING_STUFF port) — engine
       ! path only, initialised in run()
       type(type_model_means)    :: means
-      ! Station time series (legacy STATIONS port) — engine path only
-      type(type_model_stations) :: stations
    contains
       procedure :: init
       procedure :: init_from_env => model_init_from_env
@@ -730,17 +726,9 @@ contains
       end if
 
       call build_field_channel(this, output_mgr)
-      call this%stations%init_compute(this%grid, this%env, this%fields, &
-                                      this%output%stations_on, &
-                                      this%output%stations_file, &
-                                      this%output%result_folder, &
-                                      this%output%stations_interval, &
-                                      this%output%stations_buffer, &
-                                      this%simulation%total_time)
       monitor%mgr => output_mgr
       monitor%registry => this%registry
       monitor%comm => this%env%comm
-      monitor%stations => this%stations
       monitor%tracer => this%tracer
       monitor%vessel => this%vessel
 
@@ -754,12 +742,9 @@ contains
       if (this%output%write_checkpoint) &
          call write_checkpoint_set(this, engine%clock%current_time)
 
-      ! legacy calls STATIONS once after the loop (residual flush)
-      call this%stations%finish()
       call output_mgr%finalize()
       call stepper%free()
       call this%means%free()
-      call this%stations%free()
       call this%tide%free()
       call this%precipitation%free()
       call this%subgrid%free()
@@ -783,10 +768,9 @@ contains
       if (present(force)) forced = force
 
       call this%mgr%step(t, dt, this%registry, this%comm, force=forced)
-      ! the forced final flush covers field frames only: stations flush
-      ! their residual via finish(), tracer/vessel keep their cadence
+      ! the forced final flush covers field frames only: tracer/vessel
+      ! keep their cadence
       if (.not. forced) then
-         if (associated(this%stations)) call this%stations%update(t, dt)
          ! legacy OUTPUT_TRACKING: loop-top, on the PLOT_COUNT_TRACKING cadence
          if (associated(this%tracer)) call this%tracer%write_output(t, dt)
          ! legacy OUTPUT_VESSEL: resistance time series on the PLOT_COUNT_VESSEL cadence

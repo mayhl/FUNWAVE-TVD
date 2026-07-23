@@ -425,10 +425,11 @@ def _convert_wavemaker(wm_type: str, pop_val):
 # ---------------------------------------------------------------------------
 
 
-def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
+def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict, list[str]]:
     """
     Build the nested YAML dict from flat params.
     Returns (yaml_dict, unknown_keys).
+    deck_dir resolves relative side files (STATIONS_FILE) named by the deck.
     """
     consumed: set[str] = set()
     unknown: list[str] = []
@@ -777,18 +778,32 @@ def convert(params: dict[str, str]) -> tuple[dict, list[str]]:
     fio = pop_str("FIELD_IO_TYPE")
     if fio:
         op["field_io_type"] = fio
-    # stations: presence block; the count is the file line count now, so
+    # stations retired -> inline point channel: the "i j" pairs are global
+    # interior indices, mapped to cell-centre coords x = (i-1)*dx.
     # NumberStations only gates the block (legacy N < line count truncated;
     # the derived count reads every line)
     ns = pop_val("NumberStations")
     sf = pop_str("STATIONS_FILE")
     if sf and (ns is None or ns > 0):
-        sta: dict = {"file": sf}
-        if plot_intv_station is not None:
-            sta["interval"] = plot_intv_station
-        if station_buffer is not None:
-            sta["buffer"] = station_buffer
-        op["stations"] = sta
+        sta_path = (deck_dir / sf) if deck_dir is not None else Path(sf)
+        if dx is None or dy is None:
+            unknown.append(f"STATIONS_FILE = {sf} (no DX/DY to map i j to x y) -- port to output: channels: manually")
+        elif not sta_path.is_file():
+            unknown.append(f"STATIONS_FILE = {sf} (not found at convert time) -- port to output: channels: manually")
+        else:
+            pairs = [ln.split() for ln in sta_path.read_text().splitlines() if ln.strip()]
+            op["channels"] = [
+                {
+                    "name": "sta",
+                    "type": "station",
+                    "x": [(int(float(p[0])) - 1) * dx for p in pairs],
+                    "y": [(int(float(p[1])) - 1) * dy for p in pairs],
+                    "variables": ["eta", "u", "v"],
+                    "interval": plot_intv_station if plot_intv_station is not None else 1.0,
+                }
+            ]
+    if station_buffer is not None:
+        unknown.append("StationOutputBuffer (channels flush every interval, no buffer) -- dropped")
     ores = pop_val("OUTPUT_RES")
     if ores is not None:
         unknown.append("OUTPUT_RES (the stride was never consumed) -- dropped")
@@ -1123,6 +1138,12 @@ def _dump_yaml(d: dict, indent: int = 0) -> list[str]:
         if isinstance(v, dict):
             lines.append(f"{pad}{k}:")
             lines.extend(_dump_yaml(v, indent + 1))
+        elif isinstance(v, list) and v and all(isinstance(i, dict) for i in v):
+            lines.append(f"{pad}{k}:")
+            for item in v:
+                entry = _dump_yaml(item, indent + 2)
+                lines.append(f"{pad}  - " + entry[0].strip())
+                lines.extend(entry[1:])
         else:
             lines.append(f"{pad}{k}: {_yaml_value(v)}")
     return lines
@@ -1509,7 +1530,7 @@ def main():
         _convert_3d(args.input, args.output)
         return
 
-    yaml_dict, unknown = convert(params)
+    yaml_dict, unknown = convert(params, deck_dir=args.input.parent)
 
     header_lines: list[str] = [
         "# FUNWAVE-TVD input — converted from legacy input.txt",

@@ -29,8 +29,12 @@ breaking:
   model: shock_capturing
 output:
   interval: 50.0
-  stations:
-    file: stations.txt
-    interval: 0.05
+  channels:
+    - name: sta
+      type: station
+      x: [0.8]
+      y: [0.2]
+      variables: [eta]
+      interval: 0.05
   depth_out: true
   variables: [ETA]

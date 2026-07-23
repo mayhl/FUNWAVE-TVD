@@ -160,7 +160,7 @@ def run_seiche(
         capture_output=True,
         text=True,
     )
-    sta = out_dir / "sta_0001"
+    sta = out_dir / "sta_eta.dat"
     if run.returncode != 0 or not sta.exists():
         if verbose:
             print(f"  [{title}] run failed (rc={run.returncode}):\n{run.stdout[-400:]}\n{run.stderr[-400:]}", file=sys.stderr)

@@ -113,10 +113,8 @@ def _read_case(run_dir: Path) -> tuple[float, float, float, float, float, float,
 
 
 def _find_station_files(output_dir: Path) -> list[Path]:
-    import re
-
-    sta_re = re.compile(r"^sta_\d{4}$")
-    return sorted(p for p in output_dir.iterdir() if sta_re.match(p.name))
+    """Point-channel eta files (<name>_eta.dat: t, eta(1..n) per row)."""
+    return sorted(output_dir.glob("*_eta.dat"))
 
 
 # ---------------------------------------------------------------------------
@@ -138,24 +136,26 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         return SubsectionResult(kind="statistics", label="Spectral Fidelity", metrics=[])
     hm0_target, fp, fmin, fmax, gamma, depth, is_jonswap = case
 
-    # per-station variance Hm0 on the stationary window (last 2/3 of the record)
+    # per-station variance Hm0 on the stationary window (last 2/3 of the
+    # record); the channel file carries every gauge as a column
     hm0_sta: list[float] = []
     psd_sum: np.ndarray | None = None
     freq_axis: np.ndarray | None = None
-    for p in sta_files:
-        sta = np.loadtxt(p)
-        if sta.ndim == 1 or sta.shape[0] < 16:
-            continue
-        t, eta = sta[:, 0], sta[:, 1]
+    sta = np.loadtxt(sta_files[0])
+    if sta.ndim == 1:
+        sta = sta.reshape(1, -1)
+    if sta.shape[0] >= 16:
+        t = sta[:, 0]
         mask = t >= t[-1] / 3.0
-        eta_s = eta[mask] - eta[mask].mean()
-        hm0_sta.append(4.0 * float(np.sqrt(np.mean(eta_s**2))))
-
         dt = float(np.median(np.diff(t[mask])))
-        freq_axis = np.fft.rfftfreq(len(eta_s), d=dt)
-        psd = np.abs(np.fft.rfft(eta_s)) ** 2
-        psd[0] = 0.0
-        psd_sum = psd if psd_sum is None else psd_sum + psd
+        for col in range(1, sta.shape[1]):
+            eta_s = sta[mask, col] - sta[mask, col].mean()
+            hm0_sta.append(4.0 * float(np.sqrt(np.mean(eta_s**2))))
+
+            freq_axis = np.fft.rfftfreq(len(eta_s), d=dt)
+            psd = np.abs(np.fft.rfft(eta_s)) ** 2
+            psd[0] = 0.0
+            psd_sum = psd if psd_sum is None else psd_sum + psd
 
     if not hm0_sta:
         _console.print("[yellow]spectral_fidelity:[/yellow] station records too short — skipping")

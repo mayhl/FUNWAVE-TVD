@@ -75,8 +75,9 @@ contains
 
       ! Retired cadence keys: loud rejection beats silent acceptance
       call reject_moved_key(sub_env, "output_interval", "output: interval")
-      call reject_moved_key(sub_env, "plot_intv_station", "output: stations: interval")
-      call reject_moved_key(sub_env, "station_output_buffer", "output: stations: buffer")
+      call reject_moved_key(sub_env, "plot_intv_station", "output: channels: interval")
+      call reject_moved_key(sub_env, "station_output_buffer", &
+                            "nothing -- channels flush every interval, no buffer")
 
       ! Time stepping sub-block (optional)
       ts_yaml = sub_env%yaml%cast_dictionary("time_stepping", no_ts)

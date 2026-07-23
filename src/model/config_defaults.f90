@@ -92,8 +92,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_OUTPUT_MAX_FILE_SIZE = "50.0"
    character(*), parameter :: DEF_OUTPUT_MEANS_STEADY_TIME = "0.0"
    character(*), parameter :: DEF_OUTPUT_RESULT_FOLDER = "./output/"
-   character(*), parameter :: DEF_OUTPUT_STATIONS_BUFFER = "1000"
-   character(*), parameter :: DEF_OUTPUT_STATIONS_INTERVAL = "1.0"
    ! ── physics ──
    character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"

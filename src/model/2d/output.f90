@@ -21,11 +21,6 @@
 !    blowup_threshold: <real>    blow-up |eta| threshold (m),  default derived
 !                                100*max|Depth| (nee EtaBlowVal)
 !    depth_out:       <bool>     output bathymetry (static),   default NO
-!    stations:                   presence = station time series
-!      file:     <string>        one "i j" pair per line;      REQUIRED
-!                                station count = line count
-!      interval: <real>          station cadence (s),          default 1.0
-!      buffer:   <int>           station buffer size,          default 1000
 !    means:                      presence = wave-averaged output window
 !      interval:    <real>       averaging window (s),         REQUIRED
 !      steady_time: <real>       time to start averaging (s),  default 0
@@ -75,7 +70,6 @@
 module model_output_mod
    use core_constants_mod, only: SP, ZERO, SMALL, type_string, MPI_SP
    use core_env_mod, only: type_env, get_sub_env
-   use core_path_mod, only: type_path
    use core_grid_mod, only: type_grid_2d
    use model_base_mod, only: type_model_base
    use mpi_f08
@@ -88,9 +82,7 @@ module model_output_mod
                                         DEF_OUTPUT_LAYOUT, &
                                         DEF_OUTPUT_MAX_FILE_SIZE, &
                                         DEF_OUTPUT_MEANS_STEADY_TIME, &
-                                        DEF_OUTPUT_RESULT_FOLDER, &
-                                        DEF_OUTPUT_STATIONS_BUFFER, &
-                                        DEF_OUTPUT_STATIONS_INTERVAL
+                                        DEF_OUTPUT_RESULT_FOLDER
 
    implicit none
 
@@ -160,13 +152,6 @@ module model_output_mod
 
       ! Depth output — static (no time component) unless sediment is active
       logical :: depth_out = .false.
-
-      ! Station time series (nee number_stations/stations_file + the
-      ! simulation-section cadence pair); count derived from the file
-      logical :: stations_on = .false.
-      character(:), allocatable :: stations_file
-      real(SP) :: stations_interval = 1.0_SP
-      integer  :: stations_buffer = 1000
 
       ! Vessel resistance time series (nee OUT_VESSEL + PLOT_INTV_VESSEL);
       ! interval 0 maps to SMALL = legacy every-step default
@@ -243,14 +228,12 @@ contains
       type(type_env) :: sub_env
       type(type_yaml_reader) :: blk_yaml
       type(type_string), allocatable :: var_list(:)
-      type(type_path) :: sta_path
       integer :: iv
       logical :: is_empty, no_key, no_vars, no_blk
 
       ! Initialize string fields before possible early exit so io.F always gets valid values
       this%result_folder = "./output/"
       this%field_io_type = "ASCII"
-      this%stations_file = ""
 
       sub_env = get_sub_env(env, "output", is_empty)
       this%is_activated = .not. is_empty
@@ -281,19 +264,12 @@ contains
       this%has_blow_val = .not. no_key
       call sub_env%yaml%read("depth_out", val=this%depth_out, default=DEF_OUTPUT_DEPTH_OUT)
 
-      ! stations: block presence enables the station time series; the station
-      ! count is the file's line count (derive, don't duplicate)
+      ! stations: retired -- channels: supersedes it (x/y coords, not i j
+      ! indices; one <name>_<var>.dat per variable instead of sta_NNNN)
       blk_yaml = sub_env%yaml%cast_dictionary("stations", no_blk)
-      if (.not. no_blk) then
-         this%stations_on = .true.
-         call blk_yaml%read_input_path("file", silent=no_key, val=sta_path)
-         if (no_key) call env%log%exit_on_error("output: stations: file is required")
-         this%stations_file = sta_path%root
-         call blk_yaml%read("interval", silent=no_key, val=this%stations_interval, &
-                            default=DEF_OUTPUT_STATIONS_INTERVAL)
-         call blk_yaml%read("buffer", silent=no_key, val=this%stations_buffer, &
-                            default=DEF_OUTPUT_STATIONS_BUFFER)
-      end if
+      if (.not. no_blk) call env%log%exit_on_error( &
+         "output: stations: retired -- use channels: with a station geometry"// &
+         " (x/y in metres; legacy i j maps to x = (i-1)*dx, y = (j-1)*dy)")
 
       ! means: block presence enables the wave-averaged window
       blk_yaml = sub_env%yaml%cast_dictionary("means", no_blk)
@@ -321,8 +297,7 @@ contains
                             default=DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT)
       end if
 
-      ! geometries: + channels: point output streams (successor of the
-      ! legacy stations: block, which stays for parity)
+      ! geometries: + channels: point output streams
       call read_geometries(this, sub_env)
       call read_channels(this, sub_env)
 
@@ -330,8 +305,8 @@ contains
       call reject_moved_key(sub_env, "EtaBlowVal", "blowup_threshold")
       call reject_moved_key(sub_env, "T_INTV_mean", "means: interval")
       call reject_moved_key(sub_env, "STEADY_TIME", "means: steady_time")
-      call reject_moved_key(sub_env, "number_stations", "stations: (count = file line count)")
-      call reject_moved_key(sub_env, "stations_file", "stations: file")
+      call reject_moved_key(sub_env, "number_stations", "channels: (count = x/y list length)")
+      call reject_moved_key(sub_env, "stations_file", "channels: with x/y coordinate lists")
       call reject_moved_key(sub_env, "output_res", &
                             "nothing -- the stride was never consumed; subsample downstream")
 
