@@ -41,16 +41,18 @@ contains
       type(type_env)           :: env, grid_env
       integer, allocatable     :: dims(:)
       integer                  :: ndim, i
-      logical                  :: missing, no_grid, quiet, dbg, want_log, have_deck
+      logical                  :: missing, no_grid, quiet, dbg, want_log, have_deck, validate
       type(type_model_main)    :: model_2d
 # if defined (ENABLE_3D)
       type(type_model_3d)      :: model_3d
 # endif
 
       ! CLI: flags anywhere, first non-flag argument is the deck
-      ! (default input.yaml); -l redirects the log (default funwave.log)
+      ! (default input.yaml); -l redirects the log (default funwave.log);
+      ! --validate runs the full config read then stops before setup/run
       quiet = .false.
       dbg = .false.
+      validate = .false.
       want_log = .false.
       have_deck = .false.
       yaml_path = "input.yaml"
@@ -66,10 +68,11 @@ contains
          case ("-q", "--quiet"); quiet = .true.
          case ("-d", "--debug"); dbg = .true.
          case ("-l", "--log"); want_log = .true.
+         case ("--validate"); validate = .true.
          case default
             ! one deck argument; anything dash-led here is an unknown flag
             if (arg(1:1) == "-" .or. have_deck) then
-               write (*, "(a)") "Usage: funwave [-q] [-d] [-l <log path>] [input.yaml]"
+               write (*, "(a)") "Usage: funwave [-q] [-d] [--validate] [-l <log path>] [input.yaml]"
                stop 1
             end if
             yaml_path = arg
@@ -77,7 +80,7 @@ contains
          end select
       end do
       if (want_log) then
-         write (*, "(a)") "Usage: funwave [-q] [-d] [-l <log path>] [input.yaml]"
+         write (*, "(a)") "Usage: funwave [-q] [-d] [--validate] [-l <log path>] [input.yaml]"
          stop 1
       end if
 
@@ -110,10 +113,10 @@ contains
       if (.not. missing .and. allocated(dims)) ndim = size(dims)
 
       if (ndim < 3) then
-         call run_2d(model_2d, env)
+         call run_2d(model_2d, env, validate)
       else
 # if defined (ENABLE_3D)
-         call run_3d(model_3d, env)
+         call run_3d(model_3d, env, validate)
 # else
          write (*, "(a)") "ERROR: 3D grid detected but HYPRE not linked — rebuild with -DHYPRE_DIR=<path>."
          stop 1
@@ -124,12 +127,19 @@ contains
    ! ── 2D path ────────────────────────────────────────────────────────────
    ! Uses init_from_env so that the env created above is reused rather than
    ! constructing a second MPI/YAML environment inside type_model_main%init.
-   subroutine run_2d(model, env)
+   subroutine run_2d(model, env, validate)
       type(type_model_main), intent(inout) :: model
       type(type_env), intent(inout) :: env
+      logical, intent(in) :: validate
 
       call model%init_from_env(env)
-      call model%run()
+      ! --validate stops here: the full config read ran (schema, cross-rules,
+      ! input file paths) but nothing is allocated and no output is created
+      if (validate) then
+         call env%log%info("validation complete -- deck OK")
+      else
+         call model%run()
+      end if
       call model%finalize()
    end subroutine run_2d
 
@@ -137,14 +147,19 @@ contains
    ! ── 3D path ────────────────────────────────────────────────────────────
    ! read_input delegates to legacy READ_INPUT (reads input.txt from CWD).
    ! run seeds MODULE GLOBAL via INIT_3D_GLOBAL then runs the full lifecycle.
-   subroutine run_3d(model, env)
+   subroutine run_3d(model, env, validate)
       use mpi, only: MPI_FINALIZE
       type(type_model_3d), intent(inout)         :: model
       type(type_env), intent(inout), target :: env
+      logical, intent(in)                        :: validate
       integer                                    :: ier
 
       call model%read_input(env)
-      call model%run(env)
+      if (validate) then
+         call env%log%info("validation complete -- deck OK")
+      else
+         call model%run(env)
+      end if
       call MPI_FINALIZE(ier)
    end subroutine run_3d
 # endif
