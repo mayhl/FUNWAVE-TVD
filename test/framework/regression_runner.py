@@ -1068,3 +1068,5 @@ class RegressionRunner(BaseRunner):
             self.reporter.info(f"HTML report: file://{html_path}")
             if pdf_path is not None:
                 self.reporter.info(f"PDF  report: {pdf_path}")
+
+        return any_failed

@@ -63,7 +63,7 @@ def regression(
     reporter = ConsoleReporter()
     provider = LocalProvider()
     runner = RegressionRunner(reporter, provider)
-    runner.run(
+    any_failed = runner.run(
         filter_tags=tags or None,
         force=force,
         report=report,
@@ -73,6 +73,9 @@ def regression(
         fixed_dt=fixed_dt,
         ranks=jobs,
     )
+    # a failing board must exit red -- rc=0-on-FAIL let 310380 read green
+    if any_failed:
+        raise typer.Exit(code=1)
 
 
 @app.command()
