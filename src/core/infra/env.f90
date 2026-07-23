@@ -58,11 +58,13 @@ contains
       ! 1. Initialize Communicator
       this%comm = new_comm(io_rank_id=0)
 
-      ! 2. Initialize Logger
+      ! 2. Initialize Logger — thresholds inherit the process defaults (the
+      ! CLI verbosity flags); the log file is published so later writers
+      ! (e.g. the yaml [config] logger) share the sink
       if (present(log_path)) then
          log_fpath = log_path
          this%log = new_log_writer(label, this%comm%is_io_node(), path=log_fpath, &
-                                   std_err_threshold=0, std_out_threshold=0, logfile_threshold=100)
+                                   share_file=.true.)
       else
          this%log = new_log_writer(label, this%comm%is_io_node())
       end if

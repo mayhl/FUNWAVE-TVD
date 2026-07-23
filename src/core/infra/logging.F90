@@ -9,7 +9,7 @@ module core_log_io_mod
    ! ANSI escape character for terminal coloring
    character(len=1), parameter :: ESC = achar(27)
 
-   public :: new_log_writer, format_log_line
+   public :: new_log_writer, format_log_line, set_default_log_levels
 
    !> @brief Log levels
    integer, parameter, public :: log_level_debug = 1
@@ -17,6 +17,17 @@ module core_log_io_mod
    integer, parameter, public :: log_level_warn = 3
    integer, parameter, public :: log_level_error = 4
    integer, parameter, public :: log_level_fatal = 5
+   ! threshold above every level: a sink set to off never writes
+   integer, parameter, public :: log_level_off = 6
+
+   ! Process-wide state new writers inherit: the CLI verbosity flags set the
+   ! default levels once (before any writer exists), and the env's writer
+   ! publishes its log file so later writers (e.g. the yaml [config] logger)
+   ! share the sink instead of losing their lines
+   integer, save :: default_stdout_level = log_level_info
+   integer, save :: default_stderr_level = log_level_error
+   integer, save :: default_file_level = log_level_info
+   integer, save :: shared_file_unit = -1
 
    type, public :: type_log_writer
       private
@@ -24,7 +35,10 @@ module core_log_io_mod
       logical :: is_io_node = .false.
       integer :: min_stdout_level = log_level_info
       integer :: min_stderr_level = log_level_error
+      integer :: min_file_level = log_level_info
       integer :: file_unit = -1
+      ! an inherited (shared) unit is closed by its owner only
+      logical :: owns_file = .false.
    contains
       procedure, public :: debug, info, warning => warn, exit_on_error, exit_on_fatal, finalize => log_writer_finalize
       procedure, public :: set_levels => log_set_levels
@@ -39,33 +53,55 @@ module core_log_io_mod
 contains
 
    function type_log_writer_initialize(label, is_io_node, path, std_err_threshold, &
-                                       std_out_threshold, logfile_threshold) result(this)
+                                       std_out_threshold, logfile_threshold, &
+                                       share_file) result(this)
       character(*), intent(in) :: label
       logical, intent(in) :: is_io_node
       character(*), intent(in), optional :: path
       integer, optional, intent(in) :: std_err_threshold, std_out_threshold, logfile_threshold
+      logical, intent(in), optional :: share_file
       type(type_log_writer) :: this
 
       this%label = label
       this%is_io_node = is_io_node
+      this%min_stdout_level = default_stdout_level
+      this%min_stderr_level = default_stderr_level
+      this%min_file_level = default_file_level
       if (present(std_out_threshold)) this%min_stdout_level = std_out_threshold
       if (present(std_err_threshold)) this%min_stderr_level = std_err_threshold
+      if (present(logfile_threshold)) this%min_file_level = logfile_threshold
+      ! no file of its own -> write into the published process log (if any)
+      this%file_unit = shared_file_unit
       if (present(path)) call this%set_file(path)
+      if (present(share_file)) then
+         if (share_file) shared_file_unit = this%file_unit
+      end if
    end function type_log_writer_initialize
 
-   subroutine log_set_levels(this, stdout_level, stderr_level)
+   ! Process-wide defaults for writers created AFTER this call; the CLI
+   ! flags run this once before new_env creates the first writer
+   subroutine set_default_log_levels(stdout_level, stderr_level, file_level)
+      integer, intent(in), optional :: stdout_level, stderr_level, file_level
+      if (present(stdout_level)) default_stdout_level = stdout_level
+      if (present(stderr_level)) default_stderr_level = stderr_level
+      if (present(file_level)) default_file_level = file_level
+   end subroutine set_default_log_levels
+
+   subroutine log_set_levels(this, stdout_level, stderr_level, file_level)
       class(type_log_writer), intent(inout) :: this
-      integer, intent(in), optional :: stdout_level, stderr_level
+      integer, intent(in), optional :: stdout_level, stderr_level, file_level
       if (present(stdout_level)) this%min_stdout_level = stdout_level
       if (present(stderr_level)) this%min_stderr_level = stderr_level
+      if (present(file_level)) this%min_file_level = file_level
    end subroutine log_set_levels
 
    subroutine log_set_file(this, filename)
       class(type_log_writer), intent(inout) :: this
       character(len=*), intent(in) :: filename
       integer :: stat
-      if (this%file_unit /= -1) close (this%file_unit)
+      if (this%owns_file .and. this%file_unit /= -1) close (this%file_unit)
       open (newunit=this%file_unit, file=trim(filename), status="replace", action="write", iostat=stat)
+      this%owns_file = .true.
    end subroutine log_set_file
 
    subroutine debug(this, message)
@@ -91,6 +127,9 @@ contains
       character(len=*), intent(in) :: message
       integer, optional, intent(in) :: errcode
       call this%write_log(log_level_error, "ERROR", message)
+      ! the abort below skips normal unit finalization -- flush, or the log
+      ! file ends empty exactly when it matters
+      if (this%file_unit /= -1) flush (this%file_unit)
       if (present(errcode)) call set_error_code(errcode)
       if (this%is_io_node) call throw_exception(__FILE__, __LINE__, message=message)
    end subroutine exit_on_error
@@ -100,6 +139,7 @@ contains
       character(len=*), intent(in) :: message
       integer, optional, intent(in) :: errcode
       call this%write_log(log_level_fatal, "FATAL", message)
+      if (this%file_unit /= -1) flush (this%file_unit)
       if (present(errcode)) call set_error_code(errcode)
       if (this%is_io_node) call throw_exception(__FILE__, __LINE__, message=message)
    end subroutine exit_on_fatal
@@ -130,8 +170,15 @@ contains
       case default; colored_prefix = prefix
       end select
 
-      write (output_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
-      if (this%file_unit /= -1) write (this%file_unit, *) trim(format_log_line(this, timestamp, prefix, msg))
+      ! Per-sink thresholds; a quiet console (stdout off) still surfaces
+      ! errors on stderr so a failing batch run is never silent
+      if (level >= this%min_stdout_level) then
+         write (output_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
+      else if (level >= this%min_stderr_level) then
+         write (error_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
+      end if
+      if (this%file_unit /= -1 .and. level >= this%min_file_level) &
+         write (this%file_unit, *) trim(format_log_line(this, timestamp, prefix, msg))
    end subroutine write_log
 
    !> @brief Wrap text in ANSI SGR escape codes (ECMA-48).
@@ -178,7 +225,7 @@ contains
 
    subroutine log_writer_finalize(this)
       class(type_log_writer), intent(inout) :: this
-      if (this%file_unit /= -1) close (this%file_unit)
+      if (this%owns_file .and. this%file_unit /= -1) close (this%file_unit)
    end subroutine log_writer_finalize
 
 end module core_log_io_mod
