@@ -42,16 +42,20 @@ contains
       class(type_disp_workspace), intent(inout) :: ws
       integer, intent(in) :: m, n
       ws%m = m; ws%n = n
-      allocate (ws%du(m, n), ws%dv(m, n))
-      allocate (ws%dut(m, n), ws%dvt(m, n))
-      allocate (ws%uxx(m, n), ws%uxy(m, n), ws%vxy(m, n), ws%vyy(m, n))
-      allocate (ws%duxx(m, n), ws%duxy(m, n), ws%dvxy(m, n), ws%dvyy(m, n))
-      allocate (ws%ux(m, n), ws%vx(m, n), ws%uy(m, n), ws%vy(m, n))
-      allocate (ws%dux(m, n), ws%dvy(m, n))
-      allocate (ws%utx(m, n), ws%vty(m, n))
-      allocate (ws%utxx(m, n), ws%vtyy(m, n), ws%utxy(m, n), ws%vtxy(m, n))
-      allocate (ws%dutx(m, n), ws%dvty(m, n))
-      allocate (ws%dutxx(m, n), ws%dvtyy(m, n), ws%dutxy(m, n), ws%dvtxy(m, n))
+      ! zero-fill ONCE: the per-stage written set is topology-fixed
+      ! (deriv interiors, exchange seams, wall mirrors), so a cell
+      ! outside it keeps this zero forever — re-zeroing each stage
+      ! was pure overhead (perf audit item 3)
+      allocate (ws%du(m, n), ws%dv(m, n), source=0.0_SP)
+      allocate (ws%dut(m, n), ws%dvt(m, n), source=0.0_SP)
+      allocate (ws%uxx(m, n), ws%uxy(m, n), ws%vxy(m, n), ws%vyy(m, n), source=0.0_SP)
+      allocate (ws%duxx(m, n), ws%duxy(m, n), ws%dvxy(m, n), ws%dvyy(m, n), source=0.0_SP)
+      allocate (ws%ux(m, n), ws%vx(m, n), ws%uy(m, n), ws%vy(m, n), source=0.0_SP)
+      allocate (ws%dux(m, n), ws%dvy(m, n), source=0.0_SP)
+      allocate (ws%utx(m, n), ws%vty(m, n), source=0.0_SP)
+      allocate (ws%utxx(m, n), ws%vtyy(m, n), ws%utxy(m, n), ws%vtxy(m, n), source=0.0_SP)
+      allocate (ws%dutx(m, n), ws%dvty(m, n), source=0.0_SP)
+      allocate (ws%dutxx(m, n), ws%dvtyy(m, n), ws%dutxy(m, n), ws%dvtxy(m, n), source=0.0_SP)
    end subroutine dws_alloc
 
    subroutine dws_free(ws)
@@ -101,22 +105,9 @@ contains
       integer  :: i, j
       real(SP) :: inv_dt
 
-      ! zero workspace so ghost-cell neighbours of computed region are 0
-      ws%du = 0.0_SP; ws%dv = 0.0_SP
-      ws%dut = 0.0_SP; ws%dvt = 0.0_SP
-      ws%uxx = 0.0_SP; ws%uxy = 0.0_SP
-      ws%vxy = 0.0_SP; ws%vyy = 0.0_SP
-      ws%duxx = 0.0_SP; ws%duxy = 0.0_SP
-      ws%dvxy = 0.0_SP; ws%dvyy = 0.0_SP
-      ws%ux = 0.0_SP; ws%vx = 0.0_SP
-      ws%uy = 0.0_SP; ws%vy = 0.0_SP
-      ws%dux = 0.0_SP; ws%dvy = 0.0_SP
-      ws%utx = 0.0_SP; ws%vty = 0.0_SP
-      ws%utxx = 0.0_SP; ws%vtyy = 0.0_SP
-      ws%utxy = 0.0_SP; ws%vtxy = 0.0_SP
-      ws%dutx = 0.0_SP; ws%dvty = 0.0_SP
-      ws%dutxx = 0.0_SP; ws%dvtyy = 0.0_SP
-      ws%dutxy = 0.0_SP; ws%dvtxy = 0.0_SP
+      ! Ghost-cell neighbours of the computed region read 0 via the
+      ! one-time alloc zero-fill (dws_alloc) — nothing here writes
+      ! outside the fixed per-stage set, so those cells never change
 
       ! ---- second-order derivatives of u / v --------------------------
       call deriv_xx(lp, inv_dx, mask9, u, ws%uxx)
