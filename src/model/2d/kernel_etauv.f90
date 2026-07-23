@@ -61,7 +61,9 @@ contains
       class(type_etauv_workspace), intent(inout) :: ws
       integer, intent(in) :: m, n
       ws%m = m; ws%n = n
-      allocate (ws%a(m, n), ws%c(m, n), ws%d(m, n), ws%f(m, n))
+      ! zero-fill once: the assemblers write every interior cell and
+      ! the solvers read interior only, so ghosts keep this zero
+      allocate (ws%a(m, n), ws%c(m, n), ws%d(m, n), ws%f(m, n), source=0.0_SP)
    end subroutine ews_alloc
 
    subroutine ews_free(ws)
@@ -175,7 +177,8 @@ contains
 
    ! ----------------------------------------------------------------
    ! cal_etauv_assemble_x — x-sweep coefficients for U (Gamma1 only).
-   ! Fills ws%a/c/d (zeroed here); solve with trid_x into ws%f.
+   ! Fills ws%a/c/d over the full interior (degenerate rows get explicit
+   ! zeros); solve with trid_x into ws%f.
    ! west_dirichlet (LEFT_BC_IRR on the west-boundary rank): the ghost
    ! U written by the boundary wavemaker is a known value — fold it
    ! into the RHS at the first interior column (legacy etauv_solver
@@ -198,8 +201,6 @@ contains
       real(SP) :: idxsq, heff
       integer  :: i, j
 
-      ws%a = 0.0_SP; ws%c = 0.0_SP; ws%d = 0.0_SP
-
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             dep = max(depth(i, j), min_depth)
@@ -217,10 +218,16 @@ contains
             if (west_dirichlet .and. i == lp%ib) &
                tmp4 = tmp4 - tmp1*u(i - 1, j)
 
+            ! degenerate rows written explicitly (was a whole-array
+            ! memset per call — perf audit item 3)
             if (tmp2 /= 0.0_SP) then
                ws%a(i, j) = tmp1/tmp2
                ws%c(i, j) = tmp3/tmp2
                ws%d(i, j) = tmp4/tmp2
+            else
+               ws%a(i, j) = 0.0_SP
+               ws%c(i, j) = 0.0_SP
+               ws%d(i, j) = 0.0_SP
             end if
          end do
       end do
@@ -230,7 +237,8 @@ contains
    ! ----------------------------------------------------------------
    ! cal_etauv_assemble_y — y-sweep coefficients for V
    ! (Gamma1 + optional Gamma2 when disp_time_left).
-   ! Fills ws%a/c/d (zeroed here); solve with trid_y[_periodic] into ws%f.
+   ! Fills ws%a/c/d over the full interior (degenerate rows get explicit
+   ! zeros); solve with trid_y[_periodic] into ws%f.
    ! ----------------------------------------------------------------
    pure subroutine cal_etauv_assemble_y(lp, disp_time_left, gamma1, gamma2, &
                                         min_depth, b1, b2, inv_dy, mask, mask9, &
@@ -249,8 +257,6 @@ contains
       real(SP) :: idysq, heff
       real(SP) :: reta, retal, retar, etay_ij
       integer  :: i, j
-
-      ws%a = 0.0_SP; ws%c = 0.0_SP; ws%d = 0.0_SP
 
       if (disp_time_left) then
 
@@ -284,6 +290,10 @@ contains
                   ws%a(i, j) = tmp1/tmp2
                   ws%c(i, j) = tmp3/tmp2
                   ws%d(i, j) = tmp4/tmp2
+               else
+                  ws%a(i, j) = 0.0_SP
+                  ws%c(i, j) = 0.0_SP
+                  ws%d(i, j) = 0.0_SP
                end if
             end do
          end do
@@ -308,6 +318,10 @@ contains
                   ws%a(i, j) = tmp1/tmp2
                   ws%c(i, j) = tmp3/tmp2
                   ws%d(i, j) = tmp4/tmp2
+               else
+                  ws%a(i, j) = 0.0_SP
+                  ws%c(i, j) = 0.0_SP
+                  ws%d(i, j) = 0.0_SP
                end if
             end do
          end do
