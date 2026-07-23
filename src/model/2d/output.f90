@@ -44,8 +44,10 @@
 !      - name: <string>          referenced by channels.geometry,  REQUIRED
 !        type: station|transect                                    REQUIRED
 !        x/y: [<real>, ...]      station query coords (m), equal length
+!        file: <path>            OR one "x y" pair (m) per line
 !        start/end: [x, y]       transect endpoints (m)
-!        n_points: <int>         transect sample count (>= 2)
+!        n_points: <int>         transect sample count (>= 2),
+!                                default = sampled at min(dx, dy)
 !    channels:                   point output streams (registry-name vars)
 !      - name: <string>          file-name stem <name>_<var>.dat,  REQUIRED
 !        geometry: <string>      geometries: entry name; OR inline
@@ -70,6 +72,7 @@
 module model_output_mod
    use core_constants_mod, only: SP, ZERO, SMALL, type_string, MPI_SP
    use core_env_mod, only: type_env, get_sub_env
+   use core_path_mod, only: type_path
    use core_grid_mod, only: type_grid_2d
    use model_base_mod, only: type_model_base
    use mpi_f08
@@ -135,6 +138,11 @@ module model_output_mod
       ! roll-over size, doubling as the predicted-size warning cap (GB)
       character(:), allocatable :: layout
       real(SP) :: max_file_size = 50.0_SP
+
+      ! Finest grid spacing, min(dx, dy) -- set by main BEFORE read_input
+      ! (the deferred read_input(env) interface cannot carry it); the
+      ! default transect sample step
+      real(SP) :: min_spacing = 0.0_SP
 
       ! Checkpoint (hot-start) write dir; empty => none.  Presence => write the
       ! checkpoint set (core.bin now, later per-module bins) at run end.
@@ -298,8 +306,8 @@ contains
       end if
 
       ! geometries: + channels: point output streams
-      call read_geometries(this, sub_env)
-      call read_channels(this, sub_env)
+      call read_geometries(this, sub_env, this%min_spacing)
+      call read_channels(this, sub_env, this%min_spacing)
 
       ! Retired key spellings: loud rejection beats silent acceptance
       call reject_moved_key(sub_env, "EtaBlowVal", "blowup_threshold")
@@ -366,9 +374,10 @@ contains
 
    end subroutine output_read_input
 
-   subroutine read_geometries(this, sub_env)
+   subroutine read_geometries(this, sub_env, min_spacing)
       type(type_model_output), intent(inout) :: this
       type(type_env), intent(inout) :: sub_env
+      real(SP), intent(in) :: min_spacing
 
       type(type_yaml_reader), allocatable :: entries(:)
       integer :: k, kk
@@ -386,7 +395,8 @@ contains
             call entries(k)%read("name", silent=no_key, val=g%name)
             if (no_key .or. len(g%name) == 0) call sub_env%log%exit_on_error( &
                "output: geometries: every entry needs a name:")
-            call parse_geometry(entries(k), "geometries: '"//g%name//"'", sub_env, g)
+            call parse_geometry(entries(k), "geometries: '"//g%name//"'", &
+                                sub_env, g, min_spacing)
          end associate
       end do
 
@@ -402,32 +412,43 @@ contains
 
    ! Shared by named geometries: entries and channel-inline geometry
    ! (ctx prefixes error messages with the owning entry)
-   subroutine parse_geometry(entry, ctx, sub_env, g)
+   subroutine parse_geometry(entry, ctx, sub_env, g, min_spacing)
       type(type_yaml_reader), intent(inout) :: entry
       character(*), intent(in) :: ctx
       type(type_env), intent(inout) :: sub_env
       type(type_output_geometry), intent(inout) :: g
+      real(SP), intent(in) :: min_spacing
 
       real(SP), allocatable :: p0(:), p1(:)
       character(:), allocatable :: gtype
+      type(type_path) :: xy_path
       real(SP) :: frac
       integer :: np, i
-      logical :: no_key
+      logical :: no_key, no_file
 
       call entry%read_enum("type", GEOM_TYPES, val=gtype)
       g%geom_type = gtype
 
       select case (gtype)
       case ("station")
+         ! coords come from inline x:/y: lists XOR a coordinate file
+         ! (one "x y" pair per line, metres)
+         call entry%read_input_path("file", silent=no_file, val=xy_path)
          call entry%read_real_array("x", silent=no_key, val=g%x)
-         if (no_key) call sub_env%log%exit_on_error("output: "//ctx// &
-                                                    ": station needs x:")
-         call entry%read_real_array("y", silent=no_key, val=g%y)
-         if (no_key) call sub_env%log%exit_on_error("output: "//ctx// &
-                                                    ": station needs y:")
-         if (size(g%x) /= size(g%y) .or. size(g%x) == 0) &
-            call sub_env%log%exit_on_error("output: "//ctx// &
-                                           ": x: and y: must be equal-length and non-empty")
+         if (.not. no_file) then
+            if (.not. no_key) call sub_env%log%exit_on_error("output: "//ctx// &
+                                                             ": give file: or x:/y:, not both")
+            call read_station_coords(sub_env, ctx, xy_path%root, g)
+         else
+            if (no_key) call sub_env%log%exit_on_error("output: "//ctx// &
+                                                       ": station needs x:/y: lists or a file:")
+            call entry%read_real_array("y", silent=no_key, val=g%y)
+            if (no_key) call sub_env%log%exit_on_error("output: "//ctx// &
+                                                       ": station needs y:")
+            if (size(g%x) /= size(g%y) .or. size(g%x) == 0) &
+               call sub_env%log%exit_on_error("output: "//ctx// &
+                                              ": x: and y: must be equal-length and non-empty")
+         end if
 
       case ("transect")
          call entry%read_real_array("start", silent=no_key, val=p0)
@@ -437,8 +458,13 @@ contains
          if (no_key .or. size(p1) /= 2) call sub_env%log%exit_on_error( &
             "output: "//ctx//": transect needs end: [x, y]")
          call entry%read("n_points", silent=no_key, val=np)
-         if (no_key .or. np < 2) call sub_env%log%exit_on_error( &
-            "output: "//ctx//": transect needs n_points: >= 2")
+         if (no_key) then
+            ! sample at the finest grid spacing by default
+            np = max(2, nint(hypot(p1(1) - p0(1), p1(2) - p0(2))/min_spacing) + 1)
+         else if (np < 2) then
+            call sub_env%log%exit_on_error( &
+               "output: "//ctx//": transect n_points: must be >= 2")
+         end if
 
          allocate (g%x(np), g%y(np))
          do i = 1, np
@@ -450,9 +476,51 @@ contains
 
    end subroutine parse_geometry
 
-   subroutine read_channels(this, sub_env)
+   ! Station coordinate file: one "x y" pair per line (metres); a parse
+   ! failure before EOF is a malformed line, not a short count.
+   subroutine read_station_coords(sub_env, ctx, fname, g)
+      type(type_env), intent(inout) :: sub_env
+      character(*), intent(in) :: ctx, fname
+      type(type_output_geometry), intent(inout) :: g
+
+      character(12) :: line_str
+      real(SP) :: xv, yv
+      logical :: file_exist
+      integer :: funit, ios, n, i
+
+      inquire (file=fname, exist=file_exist)
+      if (.not. file_exist) call sub_env%log%exit_on_error( &
+         "output: "//ctx//": file cannot be found: "//fname)
+
+      open (newunit=funit, file=fname, status="old", action="read")
+      n = 0
+      do
+         read (funit, *, iostat=ios) xv, yv
+         if (ios /= 0) exit
+         n = n + 1
+      end do
+      if (ios > 0) then
+         write (line_str, '(I0)') n + 1
+         call sub_env%log%exit_on_error("output: "//ctx// &
+                                        ": cannot parse an 'x y' pair on line "// &
+                                        trim(line_str)//" of "//fname)
+      end if
+      if (n == 0) call sub_env%log%exit_on_error("output: "//ctx// &
+                                                 ": "//fname//" contains no points")
+
+      allocate (g%x(n), g%y(n))
+      rewind (funit)
+      do i = 1, n
+         read (funit, *) g%x(i), g%y(i)
+      end do
+      close (funit)
+
+   end subroutine read_station_coords
+
+   subroutine read_channels(this, sub_env, min_spacing)
       type(type_model_output), intent(inout) :: this
       type(type_env), intent(inout) :: sub_env
+      real(SP), intent(in) :: min_spacing
 
       type(type_yaml_reader), allocatable :: entries(:)
       type(type_string), allocatable :: names(:)
@@ -494,7 +562,7 @@ contains
                   type(type_output_geometry) :: g_inline
                   g_inline%name = cfg%name
                   call parse_geometry(entries(k), "channels: '"//cfg%name//"'", &
-                                      sub_env, g_inline)
+                                      sub_env, g_inline, min_spacing)
                   this%geometries = [this%geometries, g_inline]
                end block
                cfg%geom_idx = size(this%geometries)

@@ -136,6 +136,7 @@ contains
       call this%friction%read_input(this%env)
       call this%numerics%read_input(this%env)
       call this%breaking%read_input(this%env)
+      this%output%min_spacing = min(this%geometry%dx, this%geometry%dy)
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
       call boundaries_read_input(this%env, this%sponge, this%tide, this%physics, &
@@ -184,6 +185,7 @@ contains
       call this%friction%read_input(this%env)
       call this%numerics%read_input(this%env)
       call this%breaking%read_input(this%env)
+      this%output%min_spacing = min(this%geometry%dx, this%geometry%dy)
       call this%output%read_input(this%env)
       call this%physics%read_input(this%env)
       call boundaries_read_input(this%env, this%sponge, this%tide, this%physics, &

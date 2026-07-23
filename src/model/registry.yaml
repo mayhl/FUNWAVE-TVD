@@ -575,11 +575,12 @@ sections:
       # geometries:/channels: are lists of named entries (keys below are per entry)
       geometries.name: {legacy: ~, default: ~, units: ~, doc: Point-set name (referenced by channels.geometry).}
       geometries.type: {legacy: ~, default: ~, units: ~, values: [station, transect], doc: Point-set kind.}
+      geometries.file: {legacy: ~, default: ~, units: ~, doc: "Station coordinate file, one \"x y\" pair (m) per line -- exclusive with x:/y:."}
       geometries.x: {legacy: ~, default: ~, units: m, doc: Station x-coordinates (equal length with y).}
       geometries.y: {legacy: ~, default: ~, units: m, doc: Station y-coordinates.}
       geometries.start: {legacy: ~, default: ~, units: m, doc: "Transect start point [x, y]."}
       geometries.end: {legacy: ~, default: ~, units: m, doc: "Transect end point [x, y]."}
-      geometries.n_points: {legacy: ~, default: ~, units: ~, doc: Transect sample count (>= 2).}
+      geometries.n_points: {legacy: ~, default: ~, units: ~, doc: "Transect sample count >= 2 (absent = sampled at min(dx, dy))."}
       channels.name: {legacy: ~, default: ~, units: ~, doc: Channel name (file stem <name>_<var>.dat).}
       channels.geometry: {legacy: ~, default: ~, units: ~, doc: Name of the geometries entry to sample (or inline the geometry keys on the channel instead).}
       channels.variables: {legacy: ~, default: ~, units: ~, doc: Field-registry variable names to output.}

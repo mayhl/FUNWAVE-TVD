@@ -373,11 +373,12 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `vessel.interval` | — | `PLOT_INTV_VESSEL` | s | Vessel resistance-series output cadence. |
 | `geometries.name` | — | — | — | Point-set name (referenced by channels.geometry). |
 | `geometries.type` | — | — | — | Point-set kind. One of `station` \| `transect`. |
+| `geometries.file` | — | — | — | Station coordinate file, one "x y" pair (m) per line -- exclusive with x:/y:. |
 | `geometries.x` | — | — | m | Station x-coordinates (equal length with y). |
 | `geometries.y` | — | — | m | Station y-coordinates. |
 | `geometries.start` | — | — | m | Transect start point [x, y]. |
 | `geometries.end` | — | — | m | Transect end point [x, y]. |
-| `geometries.n_points` | — | — | — | Transect sample count (>= 2). |
+| `geometries.n_points` | — | — | — | Transect sample count >= 2 (absent = sampled at min(dx, dy)). |
 | `channels.name` | — | — | — | Channel name (file stem \<name>_\<var>.dat). |
 | `channels.geometry` | — | — | — | Name of the geometries entry to sample (or inline the geometry keys on the channel instead). |
 | `channels.variables` | — | — | — | Field-registry variable names to output. |
