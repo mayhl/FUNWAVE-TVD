@@ -36,7 +36,10 @@
 !  at init: one data.nc per channel (default), time-chunked
 !  <id>_<t0>-<t1>.nc files spanning chunk_window seconds each (frames
 !  land in the chunk covering [t0, t1)), or a group named <id> inside
-!  a shared root file (diag_ncid; layout 'single').
+!  a shared root file (diag_ncid; layout 'single').  'pnetcdf' writes
+!  the same field stream as classic CDF-5 with every rank putting its
+!  interior tile collectively (no gather) — no groups, so points stay
+!  serial and layout 'single' is rejected upstream.
 !  Point channels default to ASCII .dat files (truncated at init);
 !  format 'netcdf' instead writes a group named <id> inside the shared
 !  diagnostics.nc (root handle created by the output manager, passed in
@@ -65,6 +68,12 @@ module core_output_channel_mod
    use core_field_registry_mod, only: type_field_registry
    use core_output_gatherer_mod, only: type_output_gatherer
    use netcdf
+   ! shared NF90_* constants come from the netcdf module (PnetCDF's F90
+   ! layer mirrors the same values); only the CDF-5 cmode is PnetCDF-own
+   use pnetcdf, only: nf90mpi_create, nf90mpi_def_dim, nf90mpi_def_var, &
+                      nf90mpi_put_att, nf90mpi_enddef, nf90mpi_put_var_all, &
+                      nf90mpi_close, nf90mpi_strerror, &
+                      PNC_64BIT_DATA => NF90_64BIT_DATA
    use mpi_f08
    implicit none
 
@@ -128,6 +137,26 @@ module core_output_channel_mod
       procedure :: reset => ncp_reset
    end type type_netcdf_point_writer
 
+   ! Parallel PnetCDF field backend (classic CDF-5): every rank writes
+   ! its interior tile at its global subarray offset collectively — no
+   ! gather.  Field streams only (the classic format has no groups, so
+   ! points stay in the serial diagnostics.nc and layout 'single' is
+   ! rejected upstream).  All methods are COLLECTIVE over comm.
+   type :: type_pnetcdf_field_writer
+      integer :: ncid = -1
+      integer :: time_varid = -1
+      integer :: nrec = 0
+      integer :: n_vars = 0
+      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      integer, allocatable :: varids(:)
+      logical :: is_open = .false.
+   contains
+      procedure :: create => pnc_create
+      procedure :: begin_frame => pnc_begin_frame
+      procedure :: put => pnc_put
+      procedure :: close => pnc_close
+   end type type_pnetcdf_field_writer
+
    type :: type_output_channel
       character(ID_LEN)              :: id = ''
       character(ID_LEN)              :: geom_type = ''  ! 'field', 'station', 'transect'
@@ -174,6 +203,9 @@ module core_output_channel_mod
       ! NetCDF point backend (station/transect, format='netcdf')
       type(type_netcdf_point_writer) :: ncp
 
+      ! Parallel PnetCDF field backend (format='pnetcdf'; all ranks)
+      type(type_pnetcdf_field_writer) :: pnc
+
       ! Previous flush time = the open window's start (time_bnds)
       real(SP) :: t_last_flush = 0.0_SP
 
@@ -217,7 +249,7 @@ contains
       logical, intent(in) :: snapshot
       real(SP), intent(in) :: t_start, interval
       character(*), intent(in) :: result_folder  ! must include trailing separator
-      character(*), intent(in) :: format         ! field: ascii/binary/netcdf; points: ascii/netcdf
+      character(*), intent(in) :: format  ! field: ascii/binary/netcdf/pnetcdf; points: ascii/netcdf
       real(SP), intent(in) :: coords_x(*), coords_y(*)  ! global query coords
       integer, intent(in) :: n_coords   ! n_stations or n_transect_points (0 for field)
       type(type_grid_2d), intent(in)    :: grid
@@ -319,17 +351,29 @@ contains
             end do
          end do
 
-         ! NetCDF backend: every snapshot + statistic variable defined
+         ! NetCDF backends: every snapshot + statistic variable defined
          ! up front (names fixed at init).  Layout: a shared-root group
          ! (diag_ncid), time-chunked files (chunk_window), or one
-         ! data.nc per channel.
-         if (trim(format) == 'netcdf') then
+         ! data.nc per channel.  'netcdf' is serial on the IO rank;
+         ! 'pnetcdf' creates collectively on every rank.
+         if (trim(format) == 'netcdf' .or. trim(format) == 'pnetcdf') then
             this%dx0 = grid%dx0
             this%dy0 = grid%dy0
             if (present(chunk_window)) this%chunk_window = chunk_window
             this%t_chunk0 = t_start
             this%t_chunk1 = t_start + this%chunk_window
+         end if
+         if (trim(format) == 'netcdf') then
             if (comm%is_io_node()) call init_netcdf_backend(this, grid, diag_ncid)
+         else if (trim(format) == 'pnetcdf') then
+            call build_nc_varlist(this)
+            if (this%chunk_window > 0.0_SP) then
+               call create_chunk_file(this, comm)
+            else
+               call this%pnc%create(this%result_folder//'data.nc', &
+                                    grid%M, grid%N, grid%dx0, grid%dy0, &
+                                    this%nc_names, this%nc_meta, this%nc_n, comm)
+            end if
          end if
 
       case default
@@ -364,21 +408,26 @@ contains
 
       ! Chunked field stream: a frame at or past the window's right
       ! edge rolls to the next time-aligned file first (chunks cover
-      ! [t0, t1); a frame at exactly t1 opens the next chunk)
-      if (do_flush .and. this%chunk_window > 0.0_SP .and. this%nc%is_open) then
+      ! [t0, t1); a frame at exactly t1 opens the next chunk).  The
+      ! serial writer is open on the IO rank alone; the pnetcdf writer
+      ! on every rank, so its roll-over stays collective.
+      if (do_flush .and. this%chunk_window > 0.0_SP .and. &
+          (this%nc%is_open .or. this%pnc%is_open)) then
          if (t >= this%t_chunk1) then
             call this%nc%close()
+            call this%pnc%close()
             do while (t >= this%t_chunk1)
                this%t_chunk0 = this%t_chunk1
                this%t_chunk1 = this%t_chunk1 + this%chunk_window
             end do
-            call create_chunk_file(this)
+            call create_chunk_file(this, comm)
          end if
       end if
 
       ! One record per flush: stamp the time value before any variable
       ! lands (snapshot and statistics share the frame)
       if (do_flush .and. this%nc%is_open) call this%nc%begin_frame(t)
+      if (do_flush .and. this%pnc%is_open) call this%pnc%begin_frame(t)
       ! Point groups: a windowed channel's first flush writes nothing
       ! (degenerate window) — advance the record only once primed
       if (do_flush .and. this%ncp%is_open .and. &
@@ -499,6 +548,11 @@ contains
          return
       end if
 
+      if (trim(this%format) == 'pnetcdf') then
+         call this%pnc%put(name, vals, this%i0, this%j0)
+         return
+      end if
+
       if (comm%is_io_node()) then
          allocate (glob(this%gatherer%M, this%gatherer%N))
       else
@@ -516,19 +570,13 @@ contains
       end if
    end subroutine channel_flush_field
 
-   ! Define the channel's field stream: snapshot variables under their
-   ! file prefixes plus every <prefix>_<stat> combination.  The set is
-   ! saved on the channel so chunked roll-overs can re-create it.
-   ! IO rank only.
-   subroutine init_netcdf_backend(this, grid, diag_ncid)
+   ! Build the stream's variable set: snapshot variables under their
+   ! file prefixes plus every <prefix>_<stat> combination.  Saved on
+   ! the channel so chunked roll-overs can re-create it.
+   subroutine build_nc_varlist(this)
       class(type_output_channel), intent(inout) :: this
-      type(type_grid_2d), intent(in) :: grid
-      integer, intent(in), optional :: diag_ncid
 
-      integer :: iv, is, n, root
-
-      root = -1
-      if (present(diag_ncid)) root = diag_ncid
+      integer :: iv, is, n
 
       ! statistic variables inherit the base variable's attrs
       allocate (this%nc_names(this%n_vars*(1 + this%n_stats)))
@@ -547,30 +595,58 @@ contains
          end do
       end do
       this%nc_n = n
+   end subroutine build_nc_varlist
+
+   ! Define the serial field stream (IO rank only): a shared-root
+   ! group, the first chunk, or one data.nc per channel.
+   subroutine init_netcdf_backend(this, grid, diag_ncid)
+      class(type_output_channel), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      integer, intent(in), optional :: diag_ncid
+
+      integer :: root
+
+      root = -1
+      if (present(diag_ncid)) root = diag_ncid
+
+      call build_nc_varlist(this)
 
       if (root >= 0) then
          ! layout 'single': the stream is a group in the shared root
          call this%nc%create(trim(this%id), grid%M, grid%N, &
                              grid%dx0, grid%dy0, this%nc_names, &
-                             this%nc_meta, n, root=root)
+                             this%nc_meta, this%nc_n, root=root)
       else if (this%chunk_window > 0.0_SP) then
          call create_chunk_file(this)
       else
          call this%nc%create(this%result_folder//'data.nc', grid%M, grid%N, &
-                             grid%dx0, grid%dy0, this%nc_names, this%nc_meta, n)
+                             grid%dx0, grid%dy0, this%nc_names, this%nc_meta, &
+                             this%nc_n)
       end if
    end subroutine init_netcdf_backend
 
    ! Open the chunk covering [t_chunk0, t_chunk1); the name carries the
-   ! window bounds (zero-padded seconds, deterministic and sortable)
-   subroutine create_chunk_file(this)
+   ! window bounds (zero-padded seconds, deterministic and sortable).
+   ! Serial branch runs on the IO rank alone (comm not needed); the
+   ! pnetcdf branch is collective and requires it.
+   subroutine create_chunk_file(this, comm)
       class(type_output_channel), intent(inout) :: this
-      call this%nc%create(this%result_folder//trim(this%id)//'_'// &
-                          chunk_stamp(this%t_chunk0)//'-'// &
-                          chunk_stamp(this%t_chunk1)//'.nc', &
-                          this%gatherer%M, this%gatherer%N, &
-                          this%dx0, this%dy0, this%nc_names, &
-                          this%nc_meta, this%nc_n)
+      type(type_comm), intent(inout), optional :: comm
+
+      character(:), allocatable :: fname
+
+      fname = this%result_folder//trim(this%id)//'_'// &
+              chunk_stamp(this%t_chunk0)//'-'// &
+              chunk_stamp(this%t_chunk1)//'.nc'
+      if (trim(this%format) == 'pnetcdf') then
+         call this%pnc%create(fname, this%gatherer%M, this%gatherer%N, &
+                              this%dx0, this%dy0, this%nc_names, &
+                              this%nc_meta, this%nc_n, comm)
+      else
+         call this%nc%create(fname, this%gatherer%M, this%gatherer%N, &
+                             this%dx0, this%dy0, this%nc_names, &
+                             this%nc_meta, this%nc_n)
+      end if
    end subroutine create_chunk_file
 
    ! Zero-padded seconds (F edit descriptors cannot zero-fill)
@@ -1054,6 +1130,181 @@ contains
       if (allocated(this%varids)) deallocate (this%varids)
    end subroutine ncp_reset
 
+   ! ---- PnetCDF backend (parallel CDF-5; every method collective) ----
+
+   subroutine pnc_check(status, what)
+      integer, intent(in) :: status
+      character(*), intent(in) :: what
+      if (status /= NF90_NOERR) then
+         write (*, '(A)') 'output_channel/pnetcdf: '//what//': '// &
+            trim(nf90mpi_strerror(status))
+         error stop 'output_channel: fatal PnetCDF error'
+      end if
+   end subroutine pnc_check
+
+   ! Define the file (CDF-5): same dims/vars/attrs as the serial
+   ! writer.  Static coords and per-frame times use the count-0
+   ! collective pattern — every rank participates, only the IO rank
+   ! contributes elements.
+   subroutine pnc_create(this, fname, M, N, dx, dy, names, meta, n_names, comm)
+      class(type_pnetcdf_field_writer), intent(inout) :: this
+      character(*), intent(in) :: fname
+      integer, intent(in) :: M, N
+      real(SP), intent(in) :: dx, dy
+      character(*), intent(in) :: names(:)
+      type(type_var_meta), intent(in) :: meta(:)
+      integer, intent(in) :: n_names
+      type(type_comm), intent(inout) :: comm
+
+      integer :: x_dim, y_dim, t_dim, x_var, y_var
+      integer :: i
+      integer(kind=MPI_OFFSET_KIND) :: dlen
+      real(SP), allocatable :: coord(:)
+
+      call pnc_check(nf90mpi_create(comm%id%mpi_val, fname, &
+                                    ior(NF90_CLOBBER, PNC_64BIT_DATA), &
+                                    MPI_INFO_NULL%mpi_val, this%ncid), &
+                     'create '//fname)
+
+      dlen = int(M, MPI_OFFSET_KIND)
+      call pnc_check(nf90mpi_def_dim(this%ncid, 'x', dlen, x_dim), 'def x')
+      dlen = int(N, MPI_OFFSET_KIND)
+      call pnc_check(nf90mpi_def_dim(this%ncid, 'y', dlen, y_dim), 'def y')
+      dlen = int(NF90_UNLIMITED, MPI_OFFSET_KIND)
+      call pnc_check(nf90mpi_def_dim(this%ncid, 'time', dlen, t_dim), &
+                     'def time')
+
+      call pnc_check(nf90mpi_def_var(this%ncid, 'x', NF90_DOUBLE, [x_dim], &
+                                     x_var), 'def var x')
+      call pnc_check(nf90mpi_put_att(this%ncid, x_var, 'units', 'm'), &
+                     'att x units')
+      call pnc_check(nf90mpi_def_var(this%ncid, 'y', NF90_DOUBLE, [y_dim], &
+                                     y_var), 'def var y')
+      call pnc_check(nf90mpi_put_att(this%ncid, y_var, 'units', 'm'), &
+                     'att y units')
+      call pnc_check(nf90mpi_def_var(this%ncid, 'time', NF90_DOUBLE, [t_dim], &
+                                     this%time_varid), 'def var time')
+      call pnc_check(nf90mpi_put_att(this%ncid, this%time_varid, 'units', &
+                                     'seconds since start'), 'att time units')
+
+      this%n_vars = n_names
+      allocate (this%names(n_names), this%varids(n_names))
+      do i = 1, n_names
+         this%names(i) = names(i)
+         call pnc_check(nf90mpi_def_var(this%ncid, trim(names(i)), &
+                                        NF90_DOUBLE, [x_dim, y_dim, t_dim], &
+                                        this%varids(i)), &
+                        'def var '//trim(names(i)))
+         if (len_trim(meta(i)%units) > 0) &
+            call pnc_check(nf90mpi_put_att(this%ncid, this%varids(i), &
+                                           'units', trim(meta(i)%units)), &
+                           'att units '//trim(names(i)))
+         if (len_trim(meta(i)%long_name) > 0) &
+            call pnc_check(nf90mpi_put_att(this%ncid, this%varids(i), &
+                                           'long_name', trim(meta(i)%long_name)), &
+                           'att long_name '//trim(names(i)))
+         if (len_trim(meta(i)%standard_name) > 0) &
+            call pnc_check(nf90mpi_put_att(this%ncid, this%varids(i), &
+                                           'standard_name', &
+                                           trim(meta(i)%standard_name)), &
+                           'att standard_name '//trim(names(i)))
+      end do
+
+      call pnc_check(nf90mpi_put_att(this%ncid, NF90_GLOBAL, 'Conventions', &
+                                     'CF-1.8'), 'att Conventions')
+      call pnc_check(nf90mpi_put_att(this%ncid, NF90_GLOBAL, 'source', &
+                                     'FUNWAVE-TVD'), 'att source')
+      call pnc_check(nf90mpi_enddef(this%ncid), 'enddef')
+
+      ! cell-center coordinates on the uniform spacing
+      allocate (coord(max(M, N)))
+      do i = 1, M
+         coord(i) = real(i - 1, SP)*dx
+      end do
+      call pnc_check(pnc_put_replicated(this%ncid, x_var, coord(1:M), 1), &
+                     'put x')
+      do i = 1, N
+         coord(i) = real(i - 1, SP)*dy
+      end do
+      call pnc_check(pnc_put_replicated(this%ncid, y_var, coord(1:N), 1), &
+                     'put y')
+
+      this%nrec = 0
+      this%is_open = .true.
+   end subroutine pnc_create
+
+   ! Collective 1-D write of rank-identical data: every rank puts the
+   ! full range with the same bytes (deterministic despite the formal
+   ! overlapping-write caveat).  NOT the count-0 participation pattern
+   ! — PnetCDF 1.15 record-variable puts diverge on it (the numrecs
+   ! sync collective mismatches -> MPI_ERR_TRUNCATE or a hang).  The
+   ! buffer is copied: PnetCDF's F90 interfaces omit intent(in) on
+   ! values, so an intent(in) actual fails generic resolution.
+   integer function pnc_put_replicated(ncid, varid, vals, start1) &
+      result(status)
+      integer, intent(in) :: ncid, varid, start1
+      real(SP), intent(in) :: vals(:)
+
+      integer(kind=MPI_OFFSET_KIND) :: start(1), count(1)
+      real(SP), allocatable :: buf(:)
+
+      buf = vals
+      start = int(start1, MPI_OFFSET_KIND)
+      count = int(size(vals), MPI_OFFSET_KIND)
+      status = nf90mpi_put_var_all(ncid, varid, buf, start=start, count=count)
+   end function pnc_put_replicated
+
+   ! Advance the record dimension and stamp its time value.
+   subroutine pnc_begin_frame(this, t)
+      class(type_pnetcdf_field_writer), intent(inout) :: this
+      real(SP), intent(in) :: t
+      this%nrec = this%nrec + 1
+      call pnc_check(pnc_put_replicated(this%ncid, this%time_varid, [t], &
+                                        this%nrec), 'put time')
+   end subroutine pnc_begin_frame
+
+   ! Write this rank's interior tile at its global subarray offset in
+   ! the current record.  Collective.
+   subroutine pnc_put(this, name, tile, i0, j0)
+      class(type_pnetcdf_field_writer), intent(inout) :: this
+      character(*), intent(in) :: name
+      real(SP), intent(in) :: tile(:, :)
+      integer, intent(in) :: i0, j0
+
+      integer :: i, id
+      integer(kind=MPI_OFFSET_KIND) :: start(3), count(3)
+      real(SP), allocatable :: buf(:, :)
+
+      id = -1
+      do i = 1, this%n_vars
+         if (trim(this%names(i)) == trim(name)) then
+            id = this%varids(i)
+            exit
+         end if
+      end do
+      if (id < 0) &
+         error stop 'output_channel: pnetcdf put of undefined variable '//name
+
+      ! definable copy (PnetCDF F90 values args carry no intent)
+      buf = tile
+      start = int([i0 + 1, j0 + 1, this%nrec], MPI_OFFSET_KIND)
+      count = int([size(tile, 1), size(tile, 2), 1], MPI_OFFSET_KIND)
+      call pnc_check(nf90mpi_put_var_all(this%ncid, id, buf, &
+                                         start=start, count=count), &
+                     'put '//trim(name))
+   end subroutine pnc_put
+
+   subroutine pnc_close(this)
+      class(type_pnetcdf_field_writer), intent(inout) :: this
+      if (this%is_open) call pnc_check(nf90mpi_close(this%ncid), 'close')
+      this%is_open = .false.
+      this%ncid = -1
+      this%nrec = 0
+      this%n_vars = 0
+      if (allocated(this%names)) deallocate (this%names)
+      if (allocated(this%varids)) deallocate (this%varids)
+   end subroutine pnc_close
+
    subroutine channel_finalize(this)
       class(type_output_channel), intent(inout) :: this
       integer :: iv
@@ -1061,6 +1312,7 @@ contains
       call this%gatherer%finalize()
       call this%nc%close()
       call this%ncp%reset()
+      call this%pnc%close()
       if (allocated(this%accum)) then
          do iv = 1, size(this%accum)
             call this%accum(iv)%finalize()

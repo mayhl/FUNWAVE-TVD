@@ -1,0 +1,199 @@
+! allow(E001)
+! Compiled only when FUNWAVE_HAS_PNETCDF: the channel writes CDF-5
+! collectively through PnetCDF; read-back uses plain nf90 (netcdf-c
+! reads CDF-5).
+module test_output_pnetcdf
+
+   use mpi_f08
+   use pFUnit
+   use netcdf
+   use core_constants_mod,       only: SP, N_GHOST
+   use core_comm_mod,            only: type_comm, new_comm
+   use core_grid_mod,            only: type_grid_2d
+   use core_field_registry_mod,  only: type_field_registry
+   use core_output_channel_mod,  only: type_output_channel, type_var_meta
+   implicit none
+
+   integer, parameter :: TEST_M = 8
+   integer, parameter :: TEST_N = 4
+
+contains
+
+   subroutine dummy_fix_lint()
+   end subroutine dummy_fix_lint
+
+   ! 8x4 global grid split 2x1 in x: rank 0 owns i=1..4, rank 1 owns i=5..8.
+   subroutine open_grid(this, grid, comm)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d),   intent(inout) :: grid
+      type(type_comm),      intent(inout) :: comm
+      type(MPI_Comm) :: mcomm
+
+      mcomm = this%getMpiCommunicator()
+      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M       = TEST_M
+      grid%N       = TEST_N
+      grid%nx_proc = 2
+      grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
+   end subroutine open_grid
+
+   subroutine fill_linear(grid, fld)
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP),           intent(inout) :: fld(:,:)
+      integer  :: i, j
+      real(SP) :: x, y
+
+      do j = 1, grid%local_ny
+         do i = 1, grid%local_nx
+            x = real(grid%ibegin + i - 2, SP)
+            y = real(grid%jbegin + j - 2, SP)
+            fld(N_GHOST + i, N_GHOST + j) = 2.0_SP*x + 3.0_SP*y
+         end do
+      end do
+   end subroutine fill_linear
+
+   ! ----------------------------------------------------------------
+   ! field snapshot, pnetcdf: two collective flushes; the subarray
+   ! offsets must assemble the split linear field exactly (read back
+   ! through plain nf90 — CDF-5 is netcdf-c readable)
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_snapshot_pnetcdf(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      character(64) :: att
+      type(type_var_meta) :: vmeta(1)
+      real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), tvals(2), x, y
+      integer  :: i, j, ncid, varid, dimid, nlen
+
+      call open_grid(this, grid, comm)
+      allocate (eta(grid%local_nx + 2*N_GHOST, grid%local_ny + 2*N_GHOST), &
+                source=0.0_SP)
+      call fill_linear(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      vmeta(1)%units = 'm'
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='snap_pnc', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='pnetcdf', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   var_meta=vmeta)
+
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = 2.0_SP*eta
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+      call ch%finalize()
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         @assertEqual(NF90_NOERR, nf90_open('./data.nc', NF90_NOWRITE, ncid))
+
+         @assertEqual(NF90_NOERR, nf90_inq_dimid(ncid, 'time', dimid))
+         @assertEqual(NF90_NOERR, nf90_inquire_dimension(ncid, dimid, len=nlen))
+         @assertEqual(2, nlen)
+
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'time', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, tvals))
+         @assertEqual(1.0_SP, tvals(2), tolerance=1e-12_SP)
+
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'eta', varid))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(ncid, varid, 'units', att))
+         @assertEqual('m', trim(att))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, glob, &
+                                               start=[1, 1, 2], &
+                                               count=[TEST_M, TEST_N, 1]))
+         do j = 1, TEST_N
+            do i = 1, TEST_M
+               x = real(i - 1, SP)
+               y = real(j - 1, SP)
+               @assertEqual(2.0_SP*(2.0_SP*x + 3.0_SP*y), glob(i,j), tolerance=1e-12_SP)
+            end do
+         end do
+
+         @assertEqual(NF90_NOERR, nf90_close(ncid))
+         open (unit=99, file='./data.nc', status='old')
+         close (99, status='delete')
+      end if
+
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_snapshot_pnetcdf
+
+   ! ----------------------------------------------------------------
+   ! chunked pnetcdf: the roll-over is collective — every rank closes
+   ! and reopens; each 1 s chunk holds exactly one assembled frame
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_chunked_pnetcdf(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:,:)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      character(*), parameter :: F2 = './pchk_00000001.0-00000002.0.nc'
+      real(SP) :: cx(1), cy(1), row(TEST_M)
+      integer  :: ncid, varid
+      logical  :: exists
+
+      call open_grid(this, grid, comm)
+      allocate (eta(grid%local_nx + 2*N_GHOST, grid%local_ny + 2*N_GHOST), &
+                source=0.0_SP)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta';  stats(1) = ''
+      cx = 0.0_SP;  cy = 0.0_SP
+      call ch%init(id='pchk', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.true., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='pnetcdf', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   chunk_window=1.0_SP)
+
+      eta = 3.0_SP
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = 5.0_SP
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+      call ch%finalize()
+      call comm%barrier()
+
+      if (comm%is_io_node()) then
+         inquire (file='./pchk_00000000.0-00000001.0.nc', exist=exists)
+         @assertTrue(exists)
+
+         @assertEqual(NF90_NOERR, nf90_open(F2, NF90_NOWRITE, ncid))
+         @assertEqual(NF90_NOERR, nf90_inq_varid(ncid, 'eta', varid))
+         @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, row, &
+                                               start=[1, 1, 1], &
+                                               count=[TEST_M, 1, 1]))
+         @assertEqual(5.0_SP, row(1), tolerance=1e-12_SP)
+         @assertEqual(5.0_SP, row(TEST_M), tolerance=1e-12_SP)
+         @assertEqual(NF90_NOERR, nf90_close(ncid))
+
+         open (unit=99, file='./pchk_00000000.0-00000001.0.nc', status='old')
+         close (99, status='delete')
+         open (unit=99, file=F2, status='old')
+         close (99, status='delete')
+      end if
+
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_chunked_pnetcdf
+
+end module test_output_pnetcdf

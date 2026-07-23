@@ -362,7 +362,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `arrival_time.min_height` | `0.001` | `ArrTimeMin` | m | Elevation threshold defining first wave arrival. |
 | `checkpoint` | — | — | — | Directory to write the hot-start checkpoint set (core.bin) at run end. |
 | `depth_out` | `false` | `OUT_DEPTH` | — | Write the still-water depth field. |
-| `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format (NETCDF needs a netcdf-fortran build). One of `ASCII` \| `BINARY` \| `NETCDF`. |
+| `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format (NETCDF needs a netcdf-fortran build; PNETCDF writes classic CDF-5 collectively and needs a PnetCDF build). One of `ASCII` \| `BINARY` \| `NETCDF` \| `PNETCDF`. |
 | `layout` | `chunked` | — | — | NetCDF file topology; single = one output.nc with streams as groups One of `single` \| `per_stream` \| `chunked`. |
 | `max_file_size` | `50.0` | — | GB | Chunk roll-over size; also the predicted-size warning threshold for single/per_stream. |
 | `result_folder` | `./output/` | `RESULT_FOLDER` | — | Directory for output files. |

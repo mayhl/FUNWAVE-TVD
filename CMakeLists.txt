@@ -41,6 +41,8 @@ option(USE_SPHERICAL "Enable spherical coordinates" OFF)
 # USE_SEDIMENT is retained only because the 3D path still gates on -DSEDIMENT.
 option(USE_SEDIMENT "Enable sediment module (3D path only)" OFF)
 option(USE_NETCDF "Enable NetCDF output when netcdf-fortran is found" ON)
+option(USE_PNETCDF "Enable parallel PnetCDF field output when PnetCDF is found"
+       ON)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -113,6 +115,34 @@ if(FUNWAVE_HAS_NETCDF)
   message(STATUS "netcdf-fortran found -- NetCDF output enabled")
 else()
   message(STATUS "netcdf-fortran not found -- NetCDF output stubbed out")
+endif()
+
+# PnetCDF (optional): parallel CDF-5 field writes.  pnetcdf-config probe
+# (pkg-config .pc files are not shipped by every build); absent -> the
+# dummy `pnetcdf` module compiles in and field_io_type: PNETCDF dies
+# with a clear message at output init.
+set(FUNWAVE_HAS_PNETCDF FALSE)
+if(USE_PNETCDF)
+  find_program(
+    PNETCDF_CONFIG_EXECUTABLE pnetcdf-config
+    HINTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/pnetcdf/installed/bin")
+  if(PNETCDF_CONFIG_EXECUTABLE)
+    execute_process(
+      COMMAND ${PNETCDF_CONFIG_EXECUTABLE} --includedir
+      OUTPUT_VARIABLE PNETCDF_INCLUDE_DIRS
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    execute_process(
+      COMMAND ${PNETCDF_CONFIG_EXECUTABLE} --libdir
+      OUTPUT_VARIABLE _pnc_libdir
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+    set(PNETCDF_LINK "-L${_pnc_libdir}" "-lpnetcdf")
+    set(FUNWAVE_HAS_PNETCDF TRUE)
+  endif()
+endif()
+if(FUNWAVE_HAS_PNETCDF)
+  message(STATUS "PnetCDF found -- parallel field output enabled")
+else()
+  message(STATUS "PnetCDF not found -- parallel field output stubbed out")
 endif()
 
 set(all_targets ${project_targets} ${ext_targets} probe)

@@ -15,6 +15,15 @@ else()
   target_sources(libcore_output PRIVATE netcdf_stub.f90)
 endif()
 
+if(FUNWAVE_HAS_PNETCDF)
+  target_include_directories(libcore_output
+                             PUBLIC "$<BUILD_INTERFACE:${PNETCDF_INCLUDE_DIRS}>")
+  target_link_libraries(libcore_output PUBLIC ${PNETCDF_LINK})
+else()
+  # dummy `pnetcdf` module: nf90mpi calls error out at first use
+  target_sources(libcore_output PRIVATE pnetcdf_stub.f90)
+endif()
+
 set_target_properties(
   libcore_output PROPERTIES Fortran_MODULE_DIRECTORY
                             "${CMAKE_BINARY_DIR}/modules/core")

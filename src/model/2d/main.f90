@@ -933,6 +933,8 @@ contains
             fmt = "binary"
          case ("N", "n")
             fmt = "netcdf"
+         case ("P", "p")
+            fmt = "pnetcdf"
          case default
             fmt = "ascii"
          end select
@@ -942,13 +944,18 @@ contains
          ! are per-flush and ignore the knob)
          field_root = -1
          chunk_win = 0.0_SP
-         if (fmt == "netcdf") then
+         if (fmt == "netcdf" .or. fmt == "pnetcdf") then
             cap_bytes = out%max_file_size*1024.0_SP**3
             rate = real(nv, SP)*real(this%grid%M, SP)*real(this%grid%N, SP) &
                    *8.0_SP/out%interval
             duration = this%simulation%total_time - this%simulation%t_start
             select case (out%layout)
             case ("single")
+               ! classic CDF-5 has no groups, so the shared-root layout
+               ! cannot host a pnetcdf stream
+               if (fmt == "pnetcdf") call this%env%log%exit_on_error( &
+                  "output: layout: single needs netcdf groups -- "// &
+                  "PNETCDF supports per_stream or chunked")
                call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
                field_root = mgr%diag_ncid
             case ("chunked")
@@ -1109,7 +1116,8 @@ contains
    end subroutine build_point_channels
 
    ! Point-channel format: the explicit format: key, else the deck
-   ! default derived from field_io_type (NETCDF => netcdf, else ascii)
+   ! default derived from field_io_type.  PNETCDF also implies netcdf
+   ! points — the parallel writer is field-only, points stay serial.
    function point_format(this, k) result(fmt)
       class(type_model_main), intent(in) :: this
       integer, intent(in) :: k
@@ -1119,7 +1127,7 @@ contains
          fmt = trim(this%output%channels(k)%format)
       else
          select case (this%output%field_io_type(1:1))
-         case ("N", "n")
+         case ("N", "n", "P", "p")
             fmt = "netcdf"
          case default
             fmt = "ascii"
