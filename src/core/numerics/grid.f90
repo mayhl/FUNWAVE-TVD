@@ -16,6 +16,17 @@ module core_grid_mod
       integer :: tj = 32      ! tile size y
    end type type_loop_bounds
 
+   ! Field descriptor for halo_exchange_batch: callers point each slot at a
+   ! ghost-inclusive field and all slots ride one message per neighbor per
+   ! phase.  Rank-2 by construction; the 3D grid gets a rank-3 sibling with
+   ! interior-k packing (the message plan is flattened counts either way).
+   type, public :: type_halo_field
+      real(SP), pointer :: f(:, :) => null()
+   end type type_halo_field
+
+   ! Batch slots sized at setup; halo_exchange_batch chunks longer lists
+   integer, parameter :: MAX_HALO_BATCH = 16
+
    type, public :: type_grid_2d
       integer :: M, N
       ! Domain decomposition
@@ -55,10 +66,16 @@ module core_grid_mod
       real(SP), pointer :: hx_sbuf_shore(:, :) => null(), hx_rbuf_shore(:, :) => null()
       real(SP), pointer :: hx_sbuf_right(:, :) => null(), hx_rbuf_right(:, :) => null()
       real(SP), pointer :: hx_sbuf_left(:, :) => null(), hx_rbuf_left(:, :) => null()
+      ! Batched variants: MAX_HALO_BATCH field slots per message, flat layout
+      real(SP), pointer :: hb_sbuf_back(:) => null(), hb_rbuf_back(:) => null()
+      real(SP), pointer :: hb_sbuf_shore(:) => null(), hb_rbuf_shore(:) => null()
+      real(SP), pointer :: hb_sbuf_right(:) => null(), hb_rbuf_right(:) => null()
+      real(SP), pointer :: hb_sbuf_left(:) => null(), hb_rbuf_left(:) => null()
    contains
       procedure, public :: decompose
       procedure, public :: setup
       procedure, public :: halo_exchange
+      procedure, public :: halo_exchange_batch
       procedure, public :: halo_accumulate
       procedure, public :: init_spacing_uniform
       procedure, public :: init_spacing_variable
@@ -142,6 +159,20 @@ contains
       allocate (this%hx_sbuf_shore(this%lp%nloc, N_GHOST), this%hx_rbuf_shore(this%lp%nloc, N_GHOST))
       allocate (this%hx_sbuf_right(this%lp%mloc, N_GHOST), this%hx_rbuf_right(this%lp%mloc, N_GHOST))
       allocate (this%hx_sbuf_left(this%lp%mloc, N_GHOST), this%hx_rbuf_left(this%lp%mloc, N_GHOST))
+
+      if (associated(this%hb_sbuf_back)) &
+         deallocate (this%hb_sbuf_back, this%hb_rbuf_back, &
+                     this%hb_sbuf_shore, this%hb_rbuf_shore, &
+                     this%hb_sbuf_right, this%hb_rbuf_right, &
+                     this%hb_sbuf_left, this%hb_rbuf_left)
+      allocate (this%hb_sbuf_back(this%lp%nloc*N_GHOST*MAX_HALO_BATCH), &
+                this%hb_rbuf_back(this%lp%nloc*N_GHOST*MAX_HALO_BATCH))
+      allocate (this%hb_sbuf_shore(this%lp%nloc*N_GHOST*MAX_HALO_BATCH), &
+                this%hb_rbuf_shore(this%lp%nloc*N_GHOST*MAX_HALO_BATCH))
+      allocate (this%hb_sbuf_right(this%lp%mloc*N_GHOST*MAX_HALO_BATCH), &
+                this%hb_rbuf_right(this%lp%mloc*N_GHOST*MAX_HALO_BATCH))
+      allocate (this%hb_sbuf_left(this%lp%mloc*N_GHOST*MAX_HALO_BATCH), &
+                this%hb_rbuf_left(this%lp%mloc*N_GHOST*MAX_HALO_BATCH))
 
    end subroutine setup
 
@@ -261,6 +292,144 @@ contains
       end if
 
    end subroutine halo_exchange
+
+   ! Batched halo_exchange: every field in the list rides one packed
+   ! message per neighbor per phase instead of its own exchange — the
+   ! per-field version costs ~2 Waitall latency legs each, and the
+   ! stepper exchanges tens of fields per stage.  Same two-phase
+   ! x-then-y plan (fields are mutually independent during exchange,
+   ! so values are bitwise those of N sequential halo_exchange calls);
+   ! wall fills stay with the caller, per field, after both phases.
+   ! Lists longer than MAX_HALO_BATCH are chunked.
+   subroutine halo_exchange_batch(this, fields)
+      class(type_grid_2d), intent(in) :: this
+      type(type_halo_field), intent(in) :: fields(:)
+
+      integer :: nx, ny, ng, mloc_g, nloc_g, strip_x, strip_y
+      integer :: nf, n0, nb, n, base
+      integer :: nreq, ierr, i, j
+      type(MPI_Request) :: req(4)
+      type(MPI_Status)  :: stat(4)
+
+      nx = this%local_nx
+      ny = this%local_ny
+      ng = N_GHOST
+      mloc_g = nx + 2*ng
+      nloc_g = ny + 2*ng
+      strip_x = nloc_g*ng
+      strip_y = mloc_g*ng
+
+      nf = size(fields)
+      n0 = 0
+      do while (n0 < nf)
+         nb = min(nf - n0, MAX_HALO_BATCH)
+
+         ! ---- Phase 1: x-direction (back / shore) ----
+         do n = 1, nb
+            base = (n - 1)*strip_x
+            do i = 1, ng
+               do j = 1, nloc_g
+                  this%hb_sbuf_back(base + (i - 1)*nloc_g + j) = fields(n0 + n)%f(ng + i, j)
+                  this%hb_sbuf_shore(base + (i - 1)*nloc_g + j) = fields(n0 + n)%f(nx + i, j)
+               end do
+            end do
+         end do
+
+         nreq = 0
+         if (this%back_rank /= MPI_PROC_NULL) then
+            nreq = nreq + 1
+            call MPI_Irecv(this%hb_rbuf_back, nb*strip_x, MPI_SP, this%back_rank, 0, &
+                           this%cart_comm, req(nreq), ierr)
+            nreq = nreq + 1
+            call MPI_Isend(this%hb_sbuf_back, nb*strip_x, MPI_SP, this%back_rank, 1, &
+                           this%cart_comm, req(nreq), ierr)
+         end if
+         if (this%shore_rank /= MPI_PROC_NULL) then
+            nreq = nreq + 1
+            call MPI_Irecv(this%hb_rbuf_shore, nb*strip_x, MPI_SP, this%shore_rank, 1, &
+                           this%cart_comm, req(nreq), ierr)
+            nreq = nreq + 1
+            call MPI_Isend(this%hb_sbuf_shore, nb*strip_x, MPI_SP, this%shore_rank, 0, &
+                           this%cart_comm, req(nreq), ierr)
+         end if
+         if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+
+         if (this%back_rank /= MPI_PROC_NULL) then
+            do n = 1, nb
+               base = (n - 1)*strip_x
+               do i = 1, ng
+                  do j = 1, nloc_g
+                     fields(n0 + n)%f(i, j) = this%hb_rbuf_back(base + (i - 1)*nloc_g + j)
+                  end do
+               end do
+            end do
+         end if
+         if (this%shore_rank /= MPI_PROC_NULL) then
+            do n = 1, nb
+               base = (n - 1)*strip_x
+               do i = 1, ng
+                  do j = 1, nloc_g
+                     fields(n0 + n)%f(nx + ng + i, j) = this%hb_rbuf_shore(base + (i - 1)*nloc_g + j)
+                  end do
+               end do
+            end do
+         end if
+
+         ! ---- Phase 2: y-direction (right / left) ----
+         do n = 1, nb
+            base = (n - 1)*strip_y
+            do j = 1, ng
+               do i = 1, mloc_g
+                  this%hb_sbuf_right(base + (j - 1)*mloc_g + i) = fields(n0 + n)%f(i, ng + j)
+                  this%hb_sbuf_left(base + (j - 1)*mloc_g + i) = fields(n0 + n)%f(i, ny + j)
+               end do
+            end do
+         end do
+
+         nreq = 0
+         if (this%right_rank /= MPI_PROC_NULL) then
+            nreq = nreq + 1
+            call MPI_Irecv(this%hb_rbuf_right, nb*strip_y, MPI_SP, this%right_rank, 2, &
+                           this%cart_comm, req(nreq), ierr)
+            nreq = nreq + 1
+            call MPI_Isend(this%hb_sbuf_right, nb*strip_y, MPI_SP, this%right_rank, 3, &
+                           this%cart_comm, req(nreq), ierr)
+         end if
+         if (this%left_rank /= MPI_PROC_NULL) then
+            nreq = nreq + 1
+            call MPI_Irecv(this%hb_rbuf_left, nb*strip_y, MPI_SP, this%left_rank, 3, &
+                           this%cart_comm, req(nreq), ierr)
+            nreq = nreq + 1
+            call MPI_Isend(this%hb_sbuf_left, nb*strip_y, MPI_SP, this%left_rank, 2, &
+                           this%cart_comm, req(nreq), ierr)
+         end if
+         if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+
+         if (this%right_rank /= MPI_PROC_NULL) then
+            do n = 1, nb
+               base = (n - 1)*strip_y
+               do j = 1, ng
+                  do i = 1, mloc_g
+                     fields(n0 + n)%f(i, j) = this%hb_rbuf_right(base + (j - 1)*mloc_g + i)
+                  end do
+               end do
+            end do
+         end if
+         if (this%left_rank /= MPI_PROC_NULL) then
+            do n = 1, nb
+               base = (n - 1)*strip_y
+               do j = 1, ng
+                  do i = 1, mloc_g
+                     fields(n0 + n)%f(i, ny + ng + j) = this%hb_rbuf_left(base + (j - 1)*mloc_g + i)
+                  end do
+               end do
+            end do
+         end if
+
+         n0 = n0 + nb
+      end do
+
+   end subroutine halo_exchange_batch
 
    ! Reverse of halo_exchange: ship ghost-cell CONTRIBUTIONS back to the
    ! owning rank's interior and add them there (kernels that scatter across

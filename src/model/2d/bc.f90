@@ -28,13 +28,28 @@
 
 module model_bc_mod
    use core_constants_mod, only: SP
-   use core_grid_mod, only: type_grid_2d
+   use core_grid_mod, only: type_grid_2d, type_halo_field
    use model_fields_2d_mod, only: type_fields_2d
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR, SIGN_ANTI
    implicit none
 
    private
-   public :: type_model_bc
+   public :: type_model_bc, type_halo_batch
+
+   ! Growable exchange list: fields append via add() and all ride one
+   ! packed message per neighbor per phase at exchange_batch().  Owner
+   ! modules (foam, sediment, tracer) append to bc%batch alongside the
+   ! state fields instead of issuing their own per-field exchanges.
+   ! add() stores a POINTER to the field — actuals must carry the
+   ! target attribute and outlive the flush.
+   type :: type_halo_batch
+      type(type_halo_field), allocatable :: fld(:)
+      real(SP), allocatable :: sx(:), sy(:)
+      integer :: n = 0
+   contains
+      procedure :: add => batch_add
+      procedure :: reset => batch_reset
+   end type type_halo_batch
 
    type :: type_model_bc
       ! Physical wall fills per face: grid boundary flag AND not
@@ -49,11 +64,14 @@ module model_bc_mod
       ! The show-only display mode exchanges neither (stepper sets).
       logical :: exch_age = .false.
       logical :: exch_nu = .false.
+      ! Shared exchange list — exchange_batch() flushes and resets it
+      type(type_halo_batch) :: batch
    contains
       procedure :: init => bc_init
       procedure :: exchange_state => bc_exchange_state
       procedure :: exchange_dispersion => bc_exchange_dispersion
       procedure :: exchange_scalar => bc_exchange_scalar
+      procedure :: exchange_batch => bc_exchange_batch
    end type type_model_bc
 
 contains
@@ -97,32 +115,32 @@ contains
    ! them here was a ~2e-2 runup u deviation on flume_1d_wk_reg.
    ! ----------------------------------------------------------------
    subroutine bc_exchange_state(this, grid, fields)
-      class(type_model_bc), intent(in) :: this
+      class(type_model_bc), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
-      type(type_fields_2d), intent(inout) :: fields
+      type(type_fields_2d), intent(inout), target :: fields
 
-      real(SP), allocatable :: rmask(:, :)
-
-      call exchange_one(this, grid, fields%eta, SIGN_MIRROR, SIGN_MIRROR)
+      real(SP), allocatable, target :: rmask(:, :)
 
       allocate (rmask, source=real(fields%mask, SP))
-      call exchange_one(this, grid, rmask, SIGN_MIRROR, SIGN_MIRROR)
+
+      ! One packed message per neighbor per phase for the whole state
+      ! (fields are independent during exchange — values identical to
+      ! the per-field sequence); wall fills stay per-field in the flush
+      call this%batch%add(fields%eta, SIGN_MIRROR, SIGN_MIRROR)
+      call this%batch%add(rmask, SIGN_MIRROR, SIGN_MIRROR)
+      call this%batch%add(fields%u, SIGN_ANTI, SIGN_MIRROR)
+      call this%batch%add(fields%p, SIGN_ANTI, SIGN_MIRROR)
+      call this%batch%add(fields%hu, SIGN_ANTI, SIGN_MIRROR)
+      call this%batch%add(fields%v, SIGN_MIRROR, SIGN_ANTI)
+      call this%batch%add(fields%q, SIGN_MIRROR, SIGN_ANTI)
+      call this%batch%add(fields%hv, SIGN_MIRROR, SIGN_ANTI)
+      if (this%exch_age) call this%batch%add(fields%age_break, SIGN_MIRROR, SIGN_MIRROR)
+      if (this%exch_nu) call this%batch%add(fields%nu_break, SIGN_MIRROR, SIGN_MIRROR)
+
+      call this%exchange_batch(grid)
+
       fields%mask = nint(rmask)
       deallocate (rmask)
-
-      call exchange_one(this, grid, fields%u, SIGN_ANTI, SIGN_MIRROR)
-      call exchange_one(this, grid, fields%p, SIGN_ANTI, SIGN_MIRROR)
-      call exchange_one(this, grid, fields%hu, SIGN_ANTI, SIGN_MIRROR)
-      call exchange_one(this, grid, fields%v, SIGN_MIRROR, SIGN_ANTI)
-      call exchange_one(this, grid, fields%q, SIGN_MIRROR, SIGN_ANTI)
-      call exchange_one(this, grid, fields%hv, SIGN_MIRROR, SIGN_ANTI)
-
-      if (this%exch_age) then
-         call exchange_one(this, grid, fields%age_break, SIGN_MIRROR, SIGN_MIRROR)
-      end if
-      if (this%exch_nu) then
-         call exchange_one(this, grid, fields%nu_break, SIGN_MIRROR, SIGN_MIRROR)
-      end if
 
       fields%u = fields%u*fields%mask
       fields%v = fields%v*fields%mask
@@ -156,26 +174,26 @@ contains
    ! ----------------------------------------------------------------
    subroutine bc_exchange_dispersion(this, grid, gamma2, ws, etax, etay)
       use model_kernel_dispersion_mod, only: type_disp_workspace
-      class(type_model_bc), intent(in) :: this
+      class(type_model_bc), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       real(SP), intent(in) :: gamma2
-      type(type_disp_workspace), intent(inout) :: ws
-      real(SP), intent(inout) :: etax(:, :), etay(:, :)
+      type(type_disp_workspace), intent(inout), target :: ws
+      real(SP), intent(inout), target :: etax(:, :), etay(:, :)
 
-      call exchange_one(this, grid, ws%uxx, SIGN_ANTI, SIGN_MIRROR)
-      call exchange_one(this, grid, ws%duxx, SIGN_ANTI, SIGN_MIRROR)
-      call exchange_one(this, grid, ws%vyy, SIGN_MIRROR, SIGN_ANTI)
-      call exchange_one(this, grid, ws%dvyy, SIGN_MIRROR, SIGN_ANTI)
-
-      call exchange_one(this, grid, ws%uxy, SIGN_MIRROR, SIGN_MIRROR)
-      call exchange_one(this, grid, ws%duxy, SIGN_MIRROR, SIGN_MIRROR)
-      call exchange_one(this, grid, ws%vxy, SIGN_MIRROR, SIGN_MIRROR)
-      call exchange_one(this, grid, ws%dvxy, SIGN_MIRROR, SIGN_MIRROR)
-
+      call this%batch%add(ws%uxx, SIGN_ANTI, SIGN_MIRROR)
+      call this%batch%add(ws%duxx, SIGN_ANTI, SIGN_MIRROR)
+      call this%batch%add(ws%vyy, SIGN_MIRROR, SIGN_ANTI)
+      call this%batch%add(ws%dvyy, SIGN_MIRROR, SIGN_ANTI)
+      call this%batch%add(ws%uxy, SIGN_MIRROR, SIGN_MIRROR)
+      call this%batch%add(ws%duxy, SIGN_MIRROR, SIGN_MIRROR)
+      call this%batch%add(ws%vxy, SIGN_MIRROR, SIGN_MIRROR)
+      call this%batch%add(ws%dvxy, SIGN_MIRROR, SIGN_MIRROR)
       if (gamma2 > 0.0_SP) then
-         call exchange_one(this, grid, etax, SIGN_ANTI, SIGN_MIRROR)
-         call exchange_one(this, grid, etay, SIGN_MIRROR, SIGN_ANTI)
+         call this%batch%add(etax, SIGN_ANTI, SIGN_MIRROR)
+         call this%batch%add(etay, SIGN_MIRROR, SIGN_ANTI)
       end if
+
+      call this%exchange_batch(grid)
 
    end subroutine bc_exchange_dispersion
 
@@ -190,7 +208,80 @@ contains
 
    end subroutine bc_exchange_scalar
 
+   ! Flush the shared exchange list: one batched halo exchange, then
+   ! the per-field wall fills, then reset for the next builder.
+   subroutine bc_exchange_batch(this, grid)
+      class(type_model_bc), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+
+      integer :: n
+
+      if (this%batch%n == 0) return
+      call grid%halo_exchange_batch(this%batch%fld(1:this%batch%n))
+      do n = 1, this%batch%n
+         call wall_one(this, grid, this%batch%fld(n)%f, &
+                       this%batch%sx(n), this%batch%sy(n))
+      end do
+      call this%batch%reset()
+
+   end subroutine bc_exchange_batch
+
+   subroutine batch_add(this, f, sign_x, sign_y)
+      class(type_halo_batch), intent(inout) :: this
+      real(SP), intent(inout), target :: f(:, :)
+      real(SP), intent(in) :: sign_x, sign_y
+
+      type(type_halo_field), allocatable :: tf(:)
+      real(SP), allocatable :: ts(:)
+      integer :: cap
+
+      if (.not. allocated(this%fld)) then
+         allocate (this%fld(16), this%sx(16), this%sy(16))
+      else if (this%n == size(this%fld)) then
+         cap = 2*size(this%fld)
+         allocate (tf(cap)); tf(1:this%n) = this%fld(1:this%n)
+         call move_alloc(tf, this%fld)
+         allocate (ts(cap)); ts(1:this%n) = this%sx(1:this%n)
+         call move_alloc(ts, this%sx)
+         allocate (ts(cap)); ts(1:this%n) = this%sy(1:this%n)
+         call move_alloc(ts, this%sy)
+      end if
+
+      this%n = this%n + 1
+      this%fld(this%n)%f => f
+      this%sx(this%n) = sign_x
+      this%sy(this%n) = sign_y
+
+   end subroutine batch_add
+
+   subroutine batch_reset(this)
+      class(type_halo_batch), intent(inout) :: this
+
+      integer :: n
+
+      ! Drop the field pointers (stale targets must not linger); keep
+      ! the capacity
+      do n = 1, this%n
+         this%fld(n)%f => null()
+      end do
+      this%n = 0
+
+   end subroutine batch_reset
+
    subroutine exchange_one(this, grid, f, sign_x, sign_y)
+      class(type_model_bc), intent(in) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: f(:, :)
+      real(SP), intent(in) :: sign_x, sign_y
+
+      call grid%halo_exchange(f)
+      call wall_one(this, grid, f, sign_x, sign_y)
+
+   end subroutine exchange_one
+
+   ! Physical wall fills + corner repair for one exchanged field — the
+   ! local half of exchange_one, shared by the batched paths
+   subroutine wall_one(this, grid, f, sign_x, sign_y)
       class(type_model_bc), intent(in) :: this
       type(type_grid_2d), intent(in) :: grid
       real(SP), intent(inout) :: f(:, :)
@@ -198,7 +289,6 @@ contains
 
       integer :: j, k, ng
 
-      call grid%halo_exchange(f)
       call fill_ghost_wall(grid%lp, this%fill_west, this%fill_east, &
                            this%fill_south, this%fill_north, sign_x, sign_y, f)
 
@@ -227,6 +317,6 @@ contains
          end if
       end associate
 
-   end subroutine exchange_one
+   end subroutine wall_one
 
 end module model_bc_mod
