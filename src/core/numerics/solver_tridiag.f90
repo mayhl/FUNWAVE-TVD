@@ -113,6 +113,8 @@ contains
          end do
       end if
 
+      ! recurrence runs along i, rows independent — thread over j
+      !$omp parallel do default(shared) schedule(static) private(i)
       do j = lp%jb, lp%je
          do i = lp%ib + 1, lp%ie
             if (a(i, j) /= 0.0_SP) then
@@ -121,6 +123,7 @@ contains
             end if
          end do
       end do
+      !$omp end parallel do
 
       if (grid%iproc < grid%nx_proc - 1) then
          do j = lp%jb, lp%je
@@ -144,11 +147,13 @@ contains
          end do
       end if
 
+      !$omp parallel do default(shared) schedule(static) private(i)
       do j = lp%jb, lp%je
          do i = lp%ie - 1, lp%ib, -1
             f(i, j) = d(i, j) - c(i, j)*f(i + 1, j)
          end do
       end do
+      !$omp end parallel do
 
       if (grid%iproc > 0) then
          do j = lp%jb, lp%je
@@ -193,6 +198,10 @@ contains
          end do
       end if
 
+      ! NOT OMP-threaded: the j recurrence bars the sweep loop, and the
+      ! i-slab variant (each thread sweeping its own column range) cost
+      ! ~5% serial under ifx — code-shape regression, wheat A/B 310901
+      ! vs 310916; columns stay a GPU-pass target
       do j = lp%jb + 1, lp%je
          do i = lp%ib, lp%ie
             if (a(i, j) /= 0.0_SP) then
@@ -360,11 +369,13 @@ contains
          end if
 
          ! --- Step 9: combine ---
+         !$omp parallel do default(shared) schedule(static) private(k)
          do j = lp%jb, lp%je
             do k = lp%ib, lp%ie
                f(k, j) = y1(k, j) + beta(j)*y2(k, j)
             end do
          end do
+         !$omp end parallel do
 
       end associate
 
@@ -491,11 +502,13 @@ contains
          end if
 
          ! --- Step 9: combine ---
+         !$omp parallel do default(shared) schedule(static) private(i)
          do j = lp%jb, lp%je
             do i = lp%ib, lp%ie
                f(i, j) = y1(i, j) + beta(i)*y2(i, j)
             end do
          end do
+         !$omp end parallel do
 
       end associate
 
