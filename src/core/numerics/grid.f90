@@ -71,6 +71,15 @@ module core_grid_mod
       real(SP), pointer :: hb_sbuf_shore(:) => null(), hb_rbuf_shore(:) => null()
       real(SP), pointer :: hb_sbuf_right(:) => null(), hb_rbuf_right(:) => null()
       real(SP), pointer :: hb_sbuf_left(:) => null(), hb_rbuf_left(:) => null()
+      ! Persistent-request cache for halo_exchange_batch — counts and buffer
+      ! addresses are fixed per batch length, so one Startall replaces the
+      ! per-call Isend/Irecv construction and UCX keeps its registration warm.
+      ! Column nb holds that length's x/y-phase request quads, built lazily on
+      ! first use; PROC_NULL neighbors ride along as no-op requests.  Pointer
+      ! components for the same intent(in) reason as the buffers.
+      type(MPI_Request), pointer :: hb_reqx(:, :) => null()  ! (4, MAX_HALO_BATCH)
+      type(MPI_Request), pointer :: hb_reqy(:, :) => null()
+      logical, pointer :: hb_req_ready(:) => null()
    contains
       procedure, public :: decompose
       procedure, public :: setup
@@ -160,6 +169,8 @@ contains
       allocate (this%hx_sbuf_right(this%lp%mloc, N_GHOST), this%hx_rbuf_right(this%lp%mloc, N_GHOST))
       allocate (this%hx_sbuf_left(this%lp%mloc, N_GHOST), this%hx_rbuf_left(this%lp%mloc, N_GHOST))
 
+      ! requests reference the buffers — retire them before the memory moves
+      call free_batch_requests(this)
       if (associated(this%hb_sbuf_back)) &
          deallocate (this%hb_sbuf_back, this%hb_rbuf_back, &
                      this%hb_sbuf_shore, this%hb_rbuf_shore, &
@@ -173,6 +184,11 @@ contains
                 this%hb_rbuf_right(this%lp%mloc*N_GHOST*MAX_HALO_BATCH))
       allocate (this%hb_sbuf_left(this%lp%mloc*N_GHOST*MAX_HALO_BATCH), &
                 this%hb_rbuf_left(this%lp%mloc*N_GHOST*MAX_HALO_BATCH))
+
+      if (.not. associated(this%hb_reqx)) &
+         allocate (this%hb_reqx(4, MAX_HALO_BATCH), this%hb_reqy(4, MAX_HALO_BATCH), &
+                   this%hb_req_ready(MAX_HALO_BATCH))
+      this%hb_req_ready = .false.
 
    end subroutine setup
 
@@ -300,16 +316,16 @@ contains
    ! x-then-y plan (fields are mutually independent during exchange,
    ! so values are bitwise those of N sequential halo_exchange calls);
    ! wall fills stay with the caller, per field, after both phases.
-   ! Lists longer than MAX_HALO_BATCH are chunked.
+   ! Lists longer than MAX_HALO_BATCH are chunked; message posts ride the
+   ! persistent-request cache (see batch_requests_init).
    subroutine halo_exchange_batch(this, fields)
       class(type_grid_2d), intent(in) :: this
       type(type_halo_field), intent(in) :: fields(:)
 
       integer :: nx, ny, ng, mloc_g, nloc_g, strip_x, strip_y
       integer :: nf, n0, nb, n, base
-      integer :: nreq, ierr, i, j
-      type(MPI_Request) :: req(4)
-      type(MPI_Status)  :: stat(4)
+      integer :: ierr, i, j
+      type(MPI_Status) :: stat(4)
 
       nx = this%local_nx
       ny = this%local_ny
@@ -335,24 +351,9 @@ contains
             end do
          end do
 
-         nreq = 0
-         if (this%back_rank /= MPI_PROC_NULL) then
-            nreq = nreq + 1
-            call MPI_Irecv(this%hb_rbuf_back, nb*strip_x, MPI_SP, this%back_rank, 0, &
-                           this%cart_comm, req(nreq), ierr)
-            nreq = nreq + 1
-            call MPI_Isend(this%hb_sbuf_back, nb*strip_x, MPI_SP, this%back_rank, 1, &
-                           this%cart_comm, req(nreq), ierr)
-         end if
-         if (this%shore_rank /= MPI_PROC_NULL) then
-            nreq = nreq + 1
-            call MPI_Irecv(this%hb_rbuf_shore, nb*strip_x, MPI_SP, this%shore_rank, 1, &
-                           this%cart_comm, req(nreq), ierr)
-            nreq = nreq + 1
-            call MPI_Isend(this%hb_sbuf_shore, nb*strip_x, MPI_SP, this%shore_rank, 0, &
-                           this%cart_comm, req(nreq), ierr)
-         end if
-         if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+         if (.not. this%hb_req_ready(nb)) call batch_requests_init(this, nb)
+         call MPI_Startall(4, this%hb_reqx(:, nb), ierr)
+         call MPI_Waitall(4, this%hb_reqx(:, nb), stat, ierr)
 
          if (this%back_rank /= MPI_PROC_NULL) then
             do n = 1, nb
@@ -386,24 +387,8 @@ contains
             end do
          end do
 
-         nreq = 0
-         if (this%right_rank /= MPI_PROC_NULL) then
-            nreq = nreq + 1
-            call MPI_Irecv(this%hb_rbuf_right, nb*strip_y, MPI_SP, this%right_rank, 2, &
-                           this%cart_comm, req(nreq), ierr)
-            nreq = nreq + 1
-            call MPI_Isend(this%hb_sbuf_right, nb*strip_y, MPI_SP, this%right_rank, 3, &
-                           this%cart_comm, req(nreq), ierr)
-         end if
-         if (this%left_rank /= MPI_PROC_NULL) then
-            nreq = nreq + 1
-            call MPI_Irecv(this%hb_rbuf_left, nb*strip_y, MPI_SP, this%left_rank, 3, &
-                           this%cart_comm, req(nreq), ierr)
-            nreq = nreq + 1
-            call MPI_Isend(this%hb_sbuf_left, nb*strip_y, MPI_SP, this%left_rank, 2, &
-                           this%cart_comm, req(nreq), ierr)
-         end if
-         if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+         call MPI_Startall(4, this%hb_reqy(:, nb), ierr)
+         call MPI_Waitall(4, this%hb_reqy(:, nb), stat, ierr)
 
          if (this%right_rank /= MPI_PROC_NULL) then
             do n = 1, nb
@@ -430,6 +415,49 @@ contains
       end do
 
    end subroutine halo_exchange_batch
+
+   ! To build the persistent quads for batch length nb: counts are fixed per
+   ! length and the buffers sit at fixed addresses from setup(), so the
+   ! requests stay valid until the grid is re-setup or finalized.  Tag scheme
+   ! matches the old per-call posts exactly.
+   subroutine batch_requests_init(this, nb)
+      class(type_grid_2d), intent(in) :: this
+      integer, intent(in) :: nb
+      integer :: strip_x, strip_y, ierr
+      strip_x = this%lp%nloc*N_GHOST
+      strip_y = this%lp%mloc*N_GHOST
+      call MPI_Recv_init(this%hb_rbuf_back, nb*strip_x, MPI_SP, this%back_rank, 0, &
+                         this%cart_comm, this%hb_reqx(1, nb), ierr)
+      call MPI_Send_init(this%hb_sbuf_back, nb*strip_x, MPI_SP, this%back_rank, 1, &
+                         this%cart_comm, this%hb_reqx(2, nb), ierr)
+      call MPI_Recv_init(this%hb_rbuf_shore, nb*strip_x, MPI_SP, this%shore_rank, 1, &
+                         this%cart_comm, this%hb_reqx(3, nb), ierr)
+      call MPI_Send_init(this%hb_sbuf_shore, nb*strip_x, MPI_SP, this%shore_rank, 0, &
+                         this%cart_comm, this%hb_reqx(4, nb), ierr)
+      call MPI_Recv_init(this%hb_rbuf_right, nb*strip_y, MPI_SP, this%right_rank, 2, &
+                         this%cart_comm, this%hb_reqy(1, nb), ierr)
+      call MPI_Send_init(this%hb_sbuf_right, nb*strip_y, MPI_SP, this%right_rank, 3, &
+                         this%cart_comm, this%hb_reqy(2, nb), ierr)
+      call MPI_Recv_init(this%hb_rbuf_left, nb*strip_y, MPI_SP, this%left_rank, 3, &
+                         this%cart_comm, this%hb_reqy(3, nb), ierr)
+      call MPI_Send_init(this%hb_sbuf_left, nb*strip_y, MPI_SP, this%left_rank, 2, &
+                         this%cart_comm, this%hb_reqy(4, nb), ierr)
+      this%hb_req_ready(nb) = .true.
+   end subroutine batch_requests_init
+
+   subroutine free_batch_requests(this)
+      class(type_grid_2d), intent(inout) :: this
+      integer :: nb, k, ierr
+      if (.not. associated(this%hb_req_ready)) return
+      do nb = 1, MAX_HALO_BATCH
+         if (.not. this%hb_req_ready(nb)) cycle
+         do k = 1, 4
+            call MPI_Request_free(this%hb_reqx(k, nb), ierr)
+            call MPI_Request_free(this%hb_reqy(k, nb), ierr)
+         end do
+         this%hb_req_ready(nb) = .false.
+      end do
+   end subroutine free_batch_requests
 
    ! Reverse of halo_exchange: ship ghost-cell CONTRIBUTIONS back to the
    ! owning rank's interior and add them there (kernels that scatter across
@@ -785,6 +813,11 @@ contains
    subroutine grid_finalize(this)
       class(type_grid_2d), intent(inout) :: this
       call clear_spacing(this)
+      call free_batch_requests(this)
+      if (associated(this%hb_reqx)) then
+         deallocate (this%hb_reqx, this%hb_reqy, this%hb_req_ready)
+         nullify (this%hb_reqx, this%hb_reqy, this%hb_req_ready)
+      end if
       if (associated(this%hx_sbuf_back)) then
          deallocate (this%hx_sbuf_back, this%hx_rbuf_back, &
                      this%hx_sbuf_shore, this%hx_rbuf_shore, &
