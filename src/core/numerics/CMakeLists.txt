@@ -7,11 +7,11 @@ set_target_properties(
   libcore_numerics PROPERTIES Fortran_MODULE_DIRECTORY
                               "${CMAKE_BINARY_DIR}/modules/core")
 
-# only the OMP-threaded solvers pay the OpenMP compile flag
+# only the directive-carrying sources pay the OpenMP compile flag
 if(USE_OPENMP)
   set_source_files_properties(
-    interpolation.f90 solver_tridiag.f90 PROPERTIES COMPILE_OPTIONS
-                                                    "${OpenMP_Fortran_FLAGS}")
+    grid.f90 interpolation.f90 solver_tridiag.f90
+    PROPERTIES COMPILE_OPTIONS "${OpenMP_Fortran_FLAGS}")
 endif()
 
 target_link_libraries(libcore_numerics PUBLIC libcore_engine libcore_infra

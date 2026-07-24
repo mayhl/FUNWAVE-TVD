@@ -351,6 +351,9 @@ contains
          nb = min(nf - n0, MAX_HALO_BATCH)
 
          ! ---- Phase 1: x-direction (back / shore) ----
+         ! pack/unpack threaded over the field index (disjoint slabs);
+         ! MPI stays outside the regions (THREAD_FUNNELED)
+         !$omp parallel do default(shared) schedule(static) private(base, i, j)
          do n = 1, nb
             base = (n - 1)*strip_x
             do i = 1, ng
@@ -360,6 +363,7 @@ contains
                end do
             end do
          end do
+         !$omp end parallel do
 
          if (.not. this%hb_req_ready(nb)) call batch_requests_init(this, nb)
          t0 = MPI_Wtime()
@@ -369,6 +373,7 @@ contains
          comm_n(CT_HALO_X) = comm_n(CT_HALO_X) + 1
 
          if (this%back_rank /= MPI_PROC_NULL) then
+            !$omp parallel do default(shared) schedule(static) private(base, i, j)
             do n = 1, nb
                base = (n - 1)*strip_x
                do i = 1, ng
@@ -377,8 +382,10 @@ contains
                   end do
                end do
             end do
+            !$omp end parallel do
          end if
          if (this%shore_rank /= MPI_PROC_NULL) then
+            !$omp parallel do default(shared) schedule(static) private(base, i, j)
             do n = 1, nb
                base = (n - 1)*strip_x
                do i = 1, ng
@@ -387,9 +394,11 @@ contains
                   end do
                end do
             end do
+            !$omp end parallel do
          end if
 
          ! ---- Phase 2: y-direction (right / left) ----
+         !$omp parallel do default(shared) schedule(static) private(base, i, j)
          do n = 1, nb
             base = (n - 1)*strip_y
             do j = 1, ng
@@ -399,6 +408,7 @@ contains
                end do
             end do
          end do
+         !$omp end parallel do
 
          t0 = MPI_Wtime()
          call MPI_Startall(4, this%hb_reqy(:, nb), ierr)
@@ -407,6 +417,7 @@ contains
          comm_n(CT_HALO_Y) = comm_n(CT_HALO_Y) + 1
 
          if (this%right_rank /= MPI_PROC_NULL) then
+            !$omp parallel do default(shared) schedule(static) private(base, i, j)
             do n = 1, nb
                base = (n - 1)*strip_y
                do j = 1, ng
@@ -415,8 +426,10 @@ contains
                   end do
                end do
             end do
+            !$omp end parallel do
          end if
          if (this%left_rank /= MPI_PROC_NULL) then
+            !$omp parallel do default(shared) schedule(static) private(base, i, j)
             do n = 1, nb
                base = (n - 1)*strip_y
                do j = 1, ng
@@ -425,6 +438,7 @@ contains
                   end do
                end do
             end do
+            !$omp end parallel do
          end if
 
          n0 = n0 + nb
