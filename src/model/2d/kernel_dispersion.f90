@@ -2,8 +2,6 @@
 module model_kernel_dispersion_mod
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
-   use model_kernel_derivatives_mod, only: deriv_x, deriv_y, &
-                                           deriv_xx, deriv_yy, deriv_xy
    implicit none
    private
 
@@ -73,6 +71,49 @@ contains
    end subroutine dws_free
 
    ! ----------------------------------------------------------------
+   ! Point-stencil helpers for the fused derivative sweeps.  Same
+   ! expressions as the kernel_derivatives array kernels; kept in this
+   ! module so ifx/gfortran inline them at -O2 (a cross-module call
+   ! per point would need IPO to disappear).
+   ! ----------------------------------------------------------------
+   pure function pt_dx(f, i, j, idx, m9) result(d)
+      real(SP), intent(in) :: f(:, :), idx
+      integer, intent(in)  :: i, j, m9
+      real(SP) :: d
+      d = (f(i + 1, j) - f(i - 1, j))*0.5_SP*idx*m9
+   end function pt_dx
+
+   pure function pt_dy(f, i, j, idy, m9) result(d)
+      real(SP), intent(in) :: f(:, :), idy
+      integer, intent(in)  :: i, j, m9
+      real(SP) :: d
+      d = (f(i, j + 1) - f(i, j - 1))*0.5_SP*idy*m9
+   end function pt_dy
+
+   pure function pt_dxx(f, i, j, idx, m9) result(d)
+      real(SP), intent(in) :: f(:, :), idx
+      integer, intent(in)  :: i, j, m9
+      real(SP) :: d
+      d = (f(i + 1, j) - 2.0_SP*f(i, j) + f(i - 1, j))*idx*idx*m9
+   end function pt_dxx
+
+   pure function pt_dyy(f, i, j, idy, m9) result(d)
+      real(SP), intent(in) :: f(:, :), idy
+      integer, intent(in)  :: i, j, m9
+      real(SP) :: d
+      d = (f(i, j + 1) - 2.0_SP*f(i, j) + f(i, j - 1))*idy*idy*m9
+   end function pt_dyy
+
+   pure function pt_dxy(f, i, j, idx, idy, m9) result(d)
+      real(SP), intent(in) :: f(:, :), idx, idy
+      integer, intent(in)  :: i, j, m9
+      real(SP) :: t1, t2, d
+      t1 = (f(i + 1, j + 1) - f(i + 1, j - 1))*0.5_SP*idy
+      t2 = (f(i - 1, j + 1) - f(i - 1, j - 1))*0.5_SP*idy
+      d = (t1 - t2)*0.5_SP*idx*m9
+   end function pt_dxy
+
+   ! ----------------------------------------------------------------
    ! Boussinesq dispersion source terms (Shi et al. 2012, Cartesian).
    !
    ! Always computed: etat, u4/v4, u1p/v1p.
@@ -110,22 +151,39 @@ contains
       ! outside the fixed per-stage set, so those cells never change
 
       ! ---- second-order derivatives of u / v --------------------------
-      call deriv_xx(lp, inv_dx, mask9, u, ws%uxx)
-      call deriv_xy(lp, inv_dx, inv_dy, mask9, u, ws%uxy)
-      call deriv_xy(lp, inv_dx, inv_dy, mask9, v, ws%vxy)
-      call deriv_yy(lp, inv_dy, mask9, v, ws%vyy)
+      ! one fused sweep instead of four deriv_* calls — the split sweeps
+      ! re-streamed u and v once per output (perf audit, np20 cachegrind)
+      !$omp parallel do default(shared) schedule(static) private(i)
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            ws%uxx(i, j) = pt_dxx(u, i, j, inv_dx(i, j), mask9(i, j))
+            ws%uxy(i, j) = pt_dxy(u, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+            ws%vxy(i, j) = pt_dxy(v, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+            ws%vyy(i, j) = pt_dyy(v, i, j, inv_dy(i, j), mask9(i, j))
+         end do
+      end do
 
       ! ---- first-order derivatives (gamma2 or show_breaking) ----------
       if (gamma2 > 0.0_SP) then
-         call deriv_x(lp, inv_dx, mask9, u, ws%ux)
-         call deriv_x(lp, inv_dx, mask9, v, ws%vx)
-         call deriv_y(lp, inv_dy, mask9, u, ws%uy)
-         call deriv_y(lp, inv_dy, mask9, v, ws%vy)
-         call deriv_x(lp, inv_dx, mask9, eta, etax)
-         call deriv_y(lp, inv_dy, mask9, eta, etay)
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               ws%ux(i, j) = pt_dx(u, i, j, inv_dx(i, j), mask9(i, j))
+               ws%vx(i, j) = pt_dx(v, i, j, inv_dx(i, j), mask9(i, j))
+               ws%uy(i, j) = pt_dy(u, i, j, inv_dy(i, j), mask9(i, j))
+               ws%vy(i, j) = pt_dy(v, i, j, inv_dy(i, j), mask9(i, j))
+               etax(i, j) = pt_dx(eta, i, j, inv_dx(i, j), mask9(i, j))
+               etay(i, j) = pt_dy(eta, i, j, inv_dy(i, j), mask9(i, j))
+            end do
+         end do
       else if (show_breaking) then
-         call deriv_x(lp, inv_dx, mask9, eta, etax)
-         call deriv_y(lp, inv_dy, mask9, eta, etay)
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               etax(i, j) = pt_dx(eta, i, j, inv_dx(i, j), mask9(i, j))
+               etay(i, j) = pt_dy(eta, i, j, inv_dy(i, j), mask9(i, j))
+            end do
+         end do
       end if
 
       ! ---- DU, DV, ETAT -----------------------------------------------
@@ -154,27 +212,46 @@ contains
       end if
 
       ! ---- second-order derivatives of (h*u) / (h*v) -----------------
-      call deriv_xx(lp, inv_dx, mask9, ws%du, ws%duxx)
-      call deriv_xy(lp, inv_dx, inv_dy, mask9, ws%du, ws%duxy)
-      call deriv_xy(lp, inv_dx, inv_dy, mask9, ws%dv, ws%dvxy)
-      call deriv_yy(lp, inv_dy, mask9, ws%dv, ws%dvyy)
-
-      ! ---- additional derivatives for gamma2 terms --------------------
+      ! same fusion as the u/v group; under gamma2 the t-derivative
+      ! family rides the sweep too — 18 separate deriv_* calls
+      ! otherwise stream du/dv/ut/vt/dut/dvt four times each
       if (gamma2 > 0.0_SP) then
-         call deriv_x(lp, inv_dx, mask9, ws%du, ws%dux)
-         call deriv_y(lp, inv_dy, mask9, ws%dv, ws%dvy)
-         call deriv_x(lp, inv_dx, mask9, ut, ws%utx)
-         call deriv_y(lp, inv_dy, mask9, vt, ws%vty)
-         call deriv_xx(lp, inv_dx, mask9, ut, ws%utxx)
-         call deriv_yy(lp, inv_dy, mask9, vt, ws%vtyy)
-         call deriv_xy(lp, inv_dx, inv_dy, mask9, ut, ws%utxy)
-         call deriv_xy(lp, inv_dx, inv_dy, mask9, vt, ws%vtxy)
-         call deriv_x(lp, inv_dx, mask9, ws%dut, ws%dutx)
-         call deriv_y(lp, inv_dy, mask9, ws%dvt, ws%dvty)
-         call deriv_xx(lp, inv_dx, mask9, ws%dut, ws%dutxx)
-         call deriv_yy(lp, inv_dy, mask9, ws%dvt, ws%dvtyy)
-         call deriv_xy(lp, inv_dx, inv_dy, mask9, ws%dut, ws%dutxy)
-         call deriv_xy(lp, inv_dx, inv_dy, mask9, ws%dvt, ws%dvtxy)
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               ws%duxx(i, j) = pt_dxx(ws%du, i, j, inv_dx(i, j), mask9(i, j))
+               ws%duxy(i, j) = pt_dxy(ws%du, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+               ws%dvxy(i, j) = pt_dxy(ws%dv, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+               ws%dvyy(i, j) = pt_dyy(ws%dv, i, j, inv_dy(i, j), mask9(i, j))
+
+               ws%dux(i, j) = pt_dx(ws%du, i, j, inv_dx(i, j), mask9(i, j))
+               ws%dvy(i, j) = pt_dy(ws%dv, i, j, inv_dy(i, j), mask9(i, j))
+
+               ws%utx(i, j) = pt_dx(ut, i, j, inv_dx(i, j), mask9(i, j))
+               ws%vty(i, j) = pt_dy(vt, i, j, inv_dy(i, j), mask9(i, j))
+               ws%utxx(i, j) = pt_dxx(ut, i, j, inv_dx(i, j), mask9(i, j))
+               ws%vtyy(i, j) = pt_dyy(vt, i, j, inv_dy(i, j), mask9(i, j))
+               ws%utxy(i, j) = pt_dxy(ut, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+               ws%vtxy(i, j) = pt_dxy(vt, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+
+               ws%dutx(i, j) = pt_dx(ws%dut, i, j, inv_dx(i, j), mask9(i, j))
+               ws%dvty(i, j) = pt_dy(ws%dvt, i, j, inv_dy(i, j), mask9(i, j))
+               ws%dutxx(i, j) = pt_dxx(ws%dut, i, j, inv_dx(i, j), mask9(i, j))
+               ws%dvtyy(i, j) = pt_dyy(ws%dvt, i, j, inv_dy(i, j), mask9(i, j))
+               ws%dutxy(i, j) = pt_dxy(ws%dut, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+               ws%dvtxy(i, j) = pt_dxy(ws%dvt, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+            end do
+         end do
+      else
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               ws%duxx(i, j) = pt_dxx(ws%du, i, j, inv_dx(i, j), mask9(i, j))
+               ws%duxy(i, j) = pt_dxy(ws%du, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+               ws%dvxy(i, j) = pt_dxy(ws%dv, i, j, inv_dx(i, j), inv_dy(i, j), mask9(i, j))
+               ws%dvyy(i, j) = pt_dyy(ws%dv, i, j, inv_dy(i, j), mask9(i, j))
+            end do
+         end do
       end if
 
       ! zero cross-derivatives at domain faces (legacy dispersion.F
@@ -268,8 +345,35 @@ contains
       coeff_b = beta1 - 0.5_SP
       coeff_1p = 0.5_SP*(1.0_SP - beta1)*(1.0_SP - beta1)
 
+      if (gamma2 <= 0.0_SP) then
+         !$omp parallel do default(shared) schedule(static) &
+         !$omp& private(i, uxxvxy, uxyvyy, huxxhvxy, huxyhvyy, rh)
+         do j = 1, lp%nloc
+            do i = 1, lp%mloc
+               uxxvxy = ws%uxx(i, j) + ws%vxy(i, j)
+               uxyvyy = ws%uxy(i, j) + ws%vyy(i, j)
+               huxxhvxy = ws%duxx(i, j) + ws%dvxy(i, j)
+               huxyhvyy = ws%duxy(i, j) + ws%dvyy(i, j)
+               rh = depth(i, j)
+
+               u4(i, j) = coeff_a*rh*rh*uxxvxy + coeff_b*rh*huxxhvxy
+               v4(i, j) = coeff_a*rh*rh*uxyvyy + coeff_b*rh*huxyhvyy
+               u1p(i, j) = coeff_1p*rh*rh*uxxvxy + (beta1 - 1.0_SP)*rh*huxxhvxy
+               v1p(i, j) = coeff_1p*rh*rh*uxyvyy + (beta1 - 1.0_SP)*rh*huxyhvyy
+            end do
+         end do
+         return
+      end if
+
+      ! ---- gamma2: linear + nonlinear passes fused per row ------------
+      ! the two passes share the eight exchanged stencil arrays, so a
+      ! second full sweep re-streamed them from DRAM at large tiles;
+      ! the nonlinear body only reads workspace arrays, never the
+      ! linear pass outputs, so the row fusion is order-exact
       !$omp parallel do default(shared) schedule(static) &
-      !$omp& private(i, uxxvxy, uxyvyy, huxxhvxy, huxyhvyy, rh, reta, ken1, ken2)
+      !$omp& private(i, uxxvxy, uxyvyy, huxxhvxy, huxyhvyy, rh, rhx, rhy, reta, &
+      !$omp&         uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y, huxxhvxy_x, huxxhvxy_y, &
+      !$omp&         huxyhvyy_x, huxyhvyy_y, ken1, ken2, ken3, ken4, ken5, omega_0, omega_1)
       do j = 1, lp%nloc
          do i = 1, lp%mloc
             uxxvxy = ws%uxx(i, j) + ws%vxy(i, j)
@@ -284,25 +388,15 @@ contains
             v1p(i, j) = coeff_1p*rh*rh*uxyvyy + (beta1 - 1.0_SP)*rh*huxyhvyy
 
             ! gamma2 nonlinear addition to u4/v4
-            if (gamma2 > 0.0_SP) then
-               reta = eta(i, j)
-               ken1 = (1.0_SP/6.0_SP - beta1 + beta1*beta1)*rh*reta*beta2 &
-                      + (0.5_SP*beta1*beta1 - 1.0_SP/6.0_SP)*reta*reta*beta2*beta2
-               ken2 = (beta1 - 0.5_SP)*reta*beta2
-               u4(i, j) = u4(i, j) + gamma2*mask9(i, j)*(ken1*uxxvxy + ken2*huxxhvxy)
-               v4(i, j) = v4(i, j) + gamma2*mask9(i, j)*(ken1*uxyvyy + ken2*huxyhvyy)
-            end if
+            reta = eta(i, j)
+            ken1 = (1.0_SP/6.0_SP - beta1 + beta1*beta1)*rh*reta*beta2 &
+                   + (0.5_SP*beta1*beta1 - 1.0_SP/6.0_SP)*reta*reta*beta2*beta2
+            ken2 = (beta1 - 0.5_SP)*reta*beta2
+            u4(i, j) = u4(i, j) + gamma2*mask9(i, j)*(ken1*uxxvxy + ken2*huxxhvxy)
+            v4(i, j) = v4(i, j) + gamma2*mask9(i, j)*(ken1*uxyvyy + ken2*huxyhvyy)
          end do
-      end do
 
-      ! ---- nonlinear dispersion terms (gamma2 > 0 only) ---------------
-      if (gamma2 <= 0.0_SP) return
-
-      !$omp parallel do default(shared) schedule(static) &
-      !$omp& private(i, uxxvxy, uxyvyy, huxxhvxy, huxyhvyy, rh, rhx, rhy, reta, &
-      !$omp&         uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y, huxxhvxy_x, huxxhvxy_y, &
-      !$omp&         huxyhvyy_x, huxyhvyy_y, ken1, ken2, ken3, ken4, ken5, omega_0, omega_1)
-      do j = lp%jb, lp%je
+         if (j < lp%jb .or. j > lp%je) cycle
          do i = lp%ib, lp%ie
             uxxvxy = ws%uxx(i, j) + ws%vxy(i, j)
             uxyvyy = ws%uxy(i, j) + ws%vyy(i, j)
