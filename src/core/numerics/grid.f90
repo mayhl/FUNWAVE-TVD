@@ -3,6 +3,9 @@ module core_grid_mod
    use core_comm_mod, only: type_comm
    use core_crs_mod, only: type_crs, CRS_GEOGRAPHIC
    use mpi_f08
+   use, intrinsic :: iso_fortran_env, only: real64
+   use core_comm_timers_mod, only: comm_t, comm_n, CT_HALO_X, CT_HALO_Y, &
+                                   CT_HALO_ONE
    implicit none
 
    type, public :: type_loop_bounds
@@ -201,6 +204,7 @@ contains
 
       integer :: nx, ny, ng, mloc_g, nloc_g
       integer :: nreq, ierr, i, j
+      real(real64) :: t0
       type(MPI_Request) :: req(4)
       type(MPI_Status)  :: stat(4)
 
@@ -249,7 +253,10 @@ contains
          nreq = nreq + 1
          call MPI_Isend(sbuf_shore, nloc_g*ng, MPI_SP, this%shore_rank, 0, this%cart_comm, req(nreq), ierr)
       end if
+      t0 = MPI_Wtime()
       if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+      comm_t(CT_HALO_ONE) = comm_t(CT_HALO_ONE) + (MPI_Wtime() - t0)
+      comm_n(CT_HALO_ONE) = comm_n(CT_HALO_ONE) + 1
 
       ! Unpack into ghost cells
       if (this%back_rank /= MPI_PROC_NULL) then
@@ -290,7 +297,9 @@ contains
          nreq = nreq + 1
          call MPI_Isend(sbuf_left, mloc_g*ng, MPI_SP, this%left_rank, 2, this%cart_comm, req(nreq), ierr)
       end if
+      t0 = MPI_Wtime()
       if (nreq > 0) call MPI_Waitall(nreq, req, stat, ierr)
+      comm_t(CT_HALO_ONE) = comm_t(CT_HALO_ONE) + (MPI_Wtime() - t0)
 
       if (this%right_rank /= MPI_PROC_NULL) then
          do j = 1, ng
@@ -325,6 +334,7 @@ contains
       integer :: nx, ny, ng, mloc_g, nloc_g, strip_x, strip_y
       integer :: nf, n0, nb, n, base
       integer :: ierr, i, j
+      real(real64) :: t0
       type(MPI_Status) :: stat(4)
 
       nx = this%local_nx
@@ -352,8 +362,11 @@ contains
          end do
 
          if (.not. this%hb_req_ready(nb)) call batch_requests_init(this, nb)
+         t0 = MPI_Wtime()
          call MPI_Startall(4, this%hb_reqx(:, nb), ierr)
          call MPI_Waitall(4, this%hb_reqx(:, nb), stat, ierr)
+         comm_t(CT_HALO_X) = comm_t(CT_HALO_X) + (MPI_Wtime() - t0)
+         comm_n(CT_HALO_X) = comm_n(CT_HALO_X) + 1
 
          if (this%back_rank /= MPI_PROC_NULL) then
             do n = 1, nb
@@ -387,8 +400,11 @@ contains
             end do
          end do
 
+         t0 = MPI_Wtime()
          call MPI_Startall(4, this%hb_reqy(:, nb), ierr)
          call MPI_Waitall(4, this%hb_reqy(:, nb), stat, ierr)
+         comm_t(CT_HALO_Y) = comm_t(CT_HALO_Y) + (MPI_Wtime() - t0)
+         comm_n(CT_HALO_Y) = comm_n(CT_HALO_Y) + 1
 
          if (this%right_rank /= MPI_PROC_NULL) then
             do n = 1, nb

@@ -114,9 +114,11 @@ contains
    ! here — the stepper owns time.
    ! ----------------------------------------------------------------
    subroutine numerics_estimate_dt(this, grid, u, v, h, fixed_dt, dt_fixed, dt)
+      use, intrinsic :: iso_fortran_env, only: real64
       use core_constants_mod, only: GRAV, SMALL, LARGE, MPI_SP
       use core_grid_mod, only: type_grid_2d
-      use mpi_f08, only: MPI_Allreduce, MPI_MIN, MPI_IN_PLACE
+      use mpi_f08, only: MPI_Allreduce, MPI_MIN, MPI_IN_PLACE, MPI_Wtime
+      use core_comm_timers_mod, only: comm_t, comm_n, CT_DT_REDUCE
       class(type_model_numerics), intent(in) :: this
       type(type_grid_2d), intent(in) :: grid
       real(SP), intent(in) :: u(:, :), v(:, :), h(:, :)
@@ -125,6 +127,7 @@ contains
       real(SP), intent(out) :: dt
 
       real(SP) :: dt_min, celerity, speed, dt_cfl
+      real(real64) :: ct0
       integer :: i, j, ierr
 
       dt_min = LARGE
@@ -140,7 +143,10 @@ contains
       end do
       end associate
 
+      ct0 = MPI_Wtime()
       call MPI_Allreduce(MPI_IN_PLACE, dt_min, 1, MPI_SP, MPI_MIN, grid%cart_comm, ierr)
+      comm_t(CT_DT_REDUCE) = comm_t(CT_DT_REDUCE) + (MPI_Wtime() - ct0)
+      comm_n(CT_DT_REDUCE) = comm_n(CT_DT_REDUCE) + 1
       dt_cfl = this%CFL*dt_min
 
       if (fixed_dt) then

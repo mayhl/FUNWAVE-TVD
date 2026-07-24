@@ -737,7 +737,12 @@ contains
    ! would otherwise see zero velocity.
    ! ----------------------------------------------------------------
    subroutine stepper_sync_from_flux(this)
+      use, intrinsic :: iso_fortran_env, only: real64
+      use mpi_f08, only: MPI_Wtime
+      use core_comm_timers_mod, only: comm_t, comm_n, CT_TRID_X, CT_TRID_Y
       class(type_model_stepper_2d), intent(inout) :: this
+
+      real(real64) :: ct0
 
       associate (f => this%fields, lp => this%grid%lp, &
                  phy => this%physics, num => this%numerics)
@@ -760,6 +765,7 @@ contains
                                       f%mask, f%mask9, f%depth, f%h, f%p, &
                                       this%dws%vxy, this%dws%dvxy, &
                                       this%west_dirichlet, f%u, this%ews)
+            ct0 = MPI_Wtime()
             if (phy%periodic_x) then
                call trid_x_periodic(lp, this%grid, this%ews%a, this%ews%c, &
                                     this%ews%d, this%tws, this%ews%f)
@@ -767,6 +773,8 @@ contains
                call trid_x(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
                            this%ews%f)
             end if
+            comm_t(CT_TRID_X) = comm_t(CT_TRID_X) + (MPI_Wtime() - ct0)
+            comm_n(CT_TRID_X) = comm_n(CT_TRID_X) + 1
             f%u(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
 
             call cal_etauv_assemble_y(lp, phy%disp_time_left, phy%Gamma1, &
@@ -775,6 +783,7 @@ contains
                                       f%mask, f%mask9, f%depth, f%h, f%eta, &
                                       f%q, this%dws%uxy, this%dws%duxy, &
                                       this%dws%ux, this%dws%dux, this%ews)
+            ct0 = MPI_Wtime()
             if (phy%periodic) then
                call trid_y_periodic(lp, this%grid, this%ews%a, this%ews%c, &
                                     this%ews%d, this%tws, this%ews%f)
@@ -782,6 +791,8 @@ contains
                call trid_y(lp, this%grid, this%ews%a, this%ews%c, this%ews%d, &
                            this%ews%f)
             end if
+            comm_t(CT_TRID_Y) = comm_t(CT_TRID_Y) + (MPI_Wtime() - ct0)
+            comm_n(CT_TRID_Y) = comm_n(CT_TRID_Y) + 1
             f%v(lp%ib:lp%ie, lp%jb:lp%je) = this%ews%f(lp%ib:lp%ie, lp%jb:lp%je)
          else
             call cal_uv_no_dispersion(lp, num%MinDepthFrc, f%h, f%p, f%q, &

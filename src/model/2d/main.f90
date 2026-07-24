@@ -1155,9 +1155,11 @@ contains
    end subroutine add_var
 
    subroutine model_finalize(this)
-      use mpi_f08, only: MPI_Finalize
+      use mpi_f08, only: MPI_Finalize, MPI_COMM_WORLD
+      use core_comm_timers_mod, only: comm_timers_report
       class(type_model_main), intent(inout) :: this
       integer :: ierr
+      call comm_timers_report(MPI_COMM_WORLD)
       call this%env%finalize()
       call MPI_Finalize(ierr)
    end subroutine model_finalize
