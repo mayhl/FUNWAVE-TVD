@@ -699,9 +699,19 @@ contains
       associate (a_loc => ws%a_loc, c1 => ws%c1, &
                  d1 => ws%d1, d2 => ws%d2, y1 => ws%y1, y2 => ws%y2)
 
-         a_loc = a
-         c1 = c
-         d1 = d
+         ! fused workspace fill: one threaded pass instead of four serial
+         ! whole-array sweeps (3 copies + the Step-3 d2 zero) — pure
+         ! bandwidth, hit every stage on periodic decks
+         !$omp parallel do default(shared) schedule(static) private(k)
+         do j = 1, ws%n
+            do k = 1, ws%m
+               a_loc(k, j) = a(k, j)
+               c1(k, j) = c(k, j)
+               d1(k, j) = d(k, j)
+               d2(k, j) = 0.0_SP
+            end do
+         end do
+         !$omp end parallel do
 
          ! --- Step 1: exchange boundary off-diagonal values ---
          call MPI_Cart_rank(grid%cart_comm, [0, grid%jproc], west_rank, ierr)
@@ -737,8 +747,7 @@ contains
             end do
          end if
 
-         ! --- Step 3: build RHS for the correction solve ---
-         d2 = 0.0_SP
+         ! --- Step 3: boundary RHS for the correction solve (d2 zeroed above) ---
          if (grid%iproc == 0) then
             do j = lp%jb, lp%je
                d2(lp%ib, j) = 1.0_SP/(1.0_SP + c_end(j))
@@ -827,9 +836,17 @@ contains
       associate (a_loc => ws%a_loc, c1 => ws%c1, &
                  d1 => ws%d1, d2 => ws%d2, y1 => ws%y1, y2 => ws%y2)
 
-         a_loc = a
-         c1 = c
-         d1 = d
+         ! fused workspace fill — see the note in trid_x_periodic
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = 1, ws%n
+            do i = 1, ws%m
+               a_loc(i, j) = a(i, j)
+               c1(i, j) = c(i, j)
+               d1(i, j) = d(i, j)
+               d2(i, j) = 0.0_SP
+            end do
+         end do
+         !$omp end parallel do
 
          ! --- Step 1: exchange boundary off-diagonal values ---
          call MPI_Cart_rank(grid%cart_comm, [grid%iproc, 0], south_rank, ierr)
@@ -865,8 +882,7 @@ contains
             end do
          end if
 
-         ! --- Step 3: build RHS for the correction solve ---
-         d2 = 0.0_SP
+         ! --- Step 3: boundary RHS for the correction solve (d2 zeroed above) ---
          if (grid%jproc == 0) then
             do i = lp%ib, lp%ie
                d2(i, lp%jb) = 1.0_SP/(1.0_SP + c_end(i))
