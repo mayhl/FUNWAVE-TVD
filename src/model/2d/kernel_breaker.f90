@@ -41,6 +41,10 @@ contains
    ! Loop runs over lp%jb-1..lp%je+1 x lp%ib-1..lp%ie+1 so that
    ! ghost-cell nu_break values are available to the flux kernel.
    ! Age ghost cells must be exchanged by the caller before this call.
+   ! NOT OMP-threaded: the age propagation reads neighbour ages written
+   ! earlier in the same sweep (order-dependent, already
+   ! decomp-inconsistent at rank seams) — the Jacobi restructure that
+   ! fixes it is the one parity-breaking item, parked for the GPU pass.
    ! ----------------------------------------------------------------
    subroutine wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                             dx, dy, dt, t_brk, min_depth_frc, &
@@ -218,6 +222,7 @@ contains
       integer :: i, j
       real(SP) :: c_shallow, cap1
 
+      !$omp parallel do default(shared) schedule(static) private(i, c_shallow, cap1)
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             if (.not. in_wm_zone(i, j)) cycle

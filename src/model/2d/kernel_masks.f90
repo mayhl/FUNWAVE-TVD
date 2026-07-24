@@ -23,6 +23,11 @@ contains
    !
    ! MPI ghost-cell exchange is NOT performed here; the caller must
    ! exchange MASK and MASK9 before the next kernel step.
+   ! NOT OMP-threaded: a newly-dry cell writes its neighbours' faces
+   ! (depthx(i+1,j)/depthy(i,j+1)) with values that differ from what the
+   ! neighbour's own iteration writes — order-dependent under threads.
+   ! The face-owned gather that fixes it reproduces legacy bitwise (dry
+   ! cell wins its own face) — parked for the GPU pass.
    ! ----------------------------------------------------------------
    subroutine update_mask(lp, eta, depth, mask_struc, mask, &
                           depthx, depthy, truncate_depth)
@@ -87,6 +92,7 @@ contains
 
       integer :: i, j
 
+      !$omp parallel do default(shared) schedule(static) private(i)
       do j = lp%jb - 1, lp%je + 1
          do i = lp%ib - 1, lp%ie + 1
             if (viscosity_breaking) then

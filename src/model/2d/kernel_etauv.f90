@@ -118,15 +118,15 @@ contains
    ! switch is off, but the switch still gates the add — legacy fills all
    ! three whenever any one of them is on (sediment.f90 NOTE 21).
    ! ----------------------------------------------------------------
-   pure subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
-                                 pflx, qflx, fx, fy, gx, gy, &
-                                 src_x, src_y, wm_on, prec_on, ves_on, &
-                                 wavemaker_mass, prec_rate, &
-                                 ves_flux, subgrid_on, porosity, &
-                                 sed_mass_on, sed_dc_on, sed_exg_on, &
-                                 sed_mass, sed_dc_x, sed_dc_y, &
-                                 sed_exg_x, sed_exg_y, &
-                                 eta0, ubar0, vbar0, eta, ubar, vbar)
+   subroutine cal_rk_update(lp, alpha, beta, dt, inv_dx, inv_dy, &
+                            pflx, qflx, fx, fy, gx, gy, &
+                            src_x, src_y, wm_on, prec_on, ves_on, &
+                            wavemaker_mass, prec_rate, &
+                            ves_flux, subgrid_on, porosity, &
+                            sed_mass_on, sed_dc_on, sed_exg_on, &
+                            sed_mass, sed_dc_x, sed_dc_y, &
+                            sed_exg_x, sed_exg_y, &
+                            eta0, ubar0, vbar0, eta, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in) :: alpha, beta, dt
       real(SP), intent(in) :: inv_dx(:, :), inv_dy(:, :)
@@ -147,6 +147,7 @@ contains
       real(SP) :: r1, r2, r3
       integer :: i, j
 
+      !$omp parallel do default(shared) schedule(static) private(i, r1, r2, r3)
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             r1 = -(pflx(i + 1, j) - pflx(i, j))*inv_dx(i, j) &
@@ -187,9 +188,9 @@ contains
    ! into the RHS at the first interior column (legacy etauv_solver
    ! left_bc block): $d := d - a\,u_{ib-1}$.
    ! ----------------------------------------------------------------
-   pure subroutine cal_etauv_assemble_x(lp, gamma1, min_depth, b1, b2, &
-                                        inv_dx, mask, mask9, depth, h, &
-                                        ubar, vxy, dvxy, west_dirichlet, u, ws)
+   subroutine cal_etauv_assemble_x(lp, gamma1, min_depth, b1, b2, &
+                                   inv_dx, mask, mask9, depth, h, &
+                                   ubar, vxy, dvxy, west_dirichlet, u, ws)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: gamma1, min_depth, b1, b2
       real(SP), intent(in)  :: inv_dx(:, :)
@@ -204,6 +205,8 @@ contains
       real(SP) :: idxsq, heff
       integer  :: i, j
 
+      !$omp parallel do default(shared) schedule(static) &
+      !$omp& private(i, dep, depl, depr, tmp1, tmp2, tmp3, tmp4, idxsq, heff)
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             dep = max(depth(i, j), min_depth)
@@ -243,9 +246,9 @@ contains
    ! Fills ws%a/c/d over the full interior (degenerate rows get explicit
    ! zeros); solve with trid_y[_periodic] into ws%f.
    ! ----------------------------------------------------------------
-   pure subroutine cal_etauv_assemble_y(lp, disp_time_left, gamma1, gamma2, &
-                                        min_depth, b1, b2, inv_dy, mask, mask9, &
-                                        depth, h, eta, vbar, uxy, duxy, ux, dux, ws)
+   subroutine cal_etauv_assemble_y(lp, disp_time_left, gamma1, gamma2, &
+                                   min_depth, b1, b2, inv_dy, mask, mask9, &
+                                   depth, h, eta, vbar, uxy, duxy, ux, dux, ws)
       type(type_loop_bounds), intent(in) :: lp
       logical, intent(in)  :: disp_time_left
       real(SP), intent(in)  :: gamma1, gamma2, min_depth, b1, b2
@@ -263,6 +266,9 @@ contains
 
       if (disp_time_left) then
 
+         !$omp parallel do default(shared) schedule(static) &
+         !$omp& private(i, dep, depl, depr, tmp1, tmp2, tmp3, tmp4, idysq, heff, &
+         !$omp&         reta, retal, retar, etay_ij)
          do j = lp%jb, lp%je
             do i = lp%ib, lp%ie
                dep = max(depth(i, j), min_depth)
@@ -303,6 +309,8 @@ contains
 
       else
 
+         !$omp parallel do default(shared) schedule(static) &
+         !$omp& private(i, dep, depl, depr, tmp1, tmp2, tmp3, tmp4, idysq, heff)
          do j = lp%jb, lp%je
             do i = lp%ib, lp%ie
                dep = max(depth(i, j), min_depth)
@@ -336,7 +344,7 @@ contains
    ! ----------------------------------------------------------------
    ! cal_uv_no_dispersion — depth-average U = Ubar/H, V = Vbar/H.
    ! ----------------------------------------------------------------
-   pure subroutine cal_uv_no_dispersion(lp, min_depth, h, ubar, vbar, u, v)
+   subroutine cal_uv_no_dispersion(lp, min_depth, h, ubar, vbar, u, v)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: min_depth
       real(SP), intent(in)  :: h(:, :), ubar(:, :), vbar(:, :)
@@ -345,6 +353,7 @@ contains
       real(SP) :: heff
       integer  :: i, j
 
+      !$omp parallel do default(shared) schedule(static) private(i, heff)
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             heff = max(h(i, j), min_depth)
@@ -359,8 +368,8 @@ contains
    ! cal_etauv_update — mask zeroing, HU/HV assembly, Froude cap.
    ! Runs after U and V are final for the stage (either path).
    ! ----------------------------------------------------------------
-   pure subroutine cal_etauv_update(lp, froude_cap, min_depth, mask, h, &
-                                    u, v, hu, hv, ubar, vbar)
+   subroutine cal_etauv_update(lp, froude_cap, min_depth, mask, h, &
+                               u, v, hu, hv, ubar, vbar)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)    :: froude_cap, min_depth
       integer, intent(in)    :: mask(:, :)
@@ -372,6 +381,8 @@ contains
       real(SP) :: heff, utotal, fr_speed, utheta
       integer  :: i, j
 
+      !$omp parallel do default(shared) schedule(static) &
+      !$omp& private(i, heff, utotal, fr_speed, utheta)
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             if (mask(i, j) < 1) then

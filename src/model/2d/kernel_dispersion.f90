@@ -129,6 +129,7 @@ contains
       end if
 
       ! ---- DU, DV, ETAT -----------------------------------------------
+      !$omp parallel do default(shared) schedule(static) private(i)
       do j = 1, lp%nloc - 1
          do i = 1, lp%mloc - 1
             ws%du(i, j) = max(depth(i, j), min_depth_frc)*u(i, j)
@@ -141,6 +142,7 @@ contains
       ! ---- Ut, Vt and their depth-scaled forms (gamma2 only) ----------
       if (gamma2 > 0.0_SP) then
          inv_dt = 1.0_SP/dt
+         !$omp parallel do default(shared) schedule(static) private(i)
          do j = 1, lp%nloc
             do i = 1, lp%mloc
                ut(i, j) = (u(i, j) - u0(i, j))*inv_dt
@@ -266,6 +268,8 @@ contains
       coeff_b = beta1 - 0.5_SP
       coeff_1p = 0.5_SP*(1.0_SP - beta1)*(1.0_SP - beta1)
 
+      !$omp parallel do default(shared) schedule(static) &
+      !$omp& private(i, uxxvxy, uxyvyy, huxxhvxy, huxyhvyy, rh, reta, ken1, ken2)
       do j = 1, lp%nloc
          do i = 1, lp%mloc
             uxxvxy = ws%uxx(i, j) + ws%vxy(i, j)
@@ -294,6 +298,10 @@ contains
       ! ---- nonlinear dispersion terms (gamma2 > 0 only) ---------------
       if (gamma2 <= 0.0_SP) return
 
+      !$omp parallel do default(shared) schedule(static) &
+      !$omp& private(i, uxxvxy, uxyvyy, huxxhvxy, huxyhvyy, rh, rhx, rhy, reta, &
+      !$omp&         uxxvxy_x, uxxvxy_y, uxyvyy_x, uxyvyy_y, huxxhvxy_x, huxxhvxy_y, &
+      !$omp&         huxyhvyy_x, huxyhvyy_y, ken1, ken2, ken3, ken4, ken5, omega_0, omega_1)
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             uxxvxy = ws%uxx(i, j) + ws%vxy(i, j)
