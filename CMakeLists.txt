@@ -43,6 +43,7 @@ option(USE_SEDIMENT "Enable sediment module (3D path only)" OFF)
 option(USE_NETCDF "Enable NetCDF output when netcdf-fortran is found" ON)
 option(USE_PNETCDF "Enable parallel PnetCDF field output when PnetCDF is found"
        ON)
+option(USE_OPENMP "Enable OpenMP threading (hybrid MPI x OpenMP)" OFF)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -77,6 +78,16 @@ enable_language(Fortran)
 find_package(MPI REQUIRED COMPONENTS Fortran)
 find_package(Git REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
+
+# OpenMP compiles are scoped per source file (each directive-carrying CMakeLists
+# opts its files in) -- the global flag taxed every kernel ~10% under ifx (wheat
+# A/B 311001 vs 310901); only the link step is global so every exe -- tests
+# included -- pulls the runtime
+if(USE_OPENMP)
+  find_package(OpenMP REQUIRED COMPONENTS Fortran)
+  set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_Fortran_FLAGS}")
+endif()
 
 # netcdf-fortran (optional): pkg-config first (brew + most HPC modules ship the
 # .pc), nf-config fallback (older module trees).  Absent -> the dummy `netcdf`
@@ -118,14 +129,13 @@ else()
 endif()
 
 # PnetCDF (optional): parallel CDF-5 field writes.  pnetcdf-config probe
-# (pkg-config .pc files are not shipped by every build); absent -> the
-# dummy `pnetcdf` module compiles in and field_io_type: PNETCDF dies
-# with a clear message at output init.
+# (pkg-config .pc files are not shipped by every build); absent -> the dummy
+# `pnetcdf` module compiles in and field_io_type: PNETCDF dies with a clear
+# message at output init.
 set(FUNWAVE_HAS_PNETCDF FALSE)
 if(USE_PNETCDF)
-  find_program(
-    PNETCDF_CONFIG_EXECUTABLE pnetcdf-config
-    HINTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/pnetcdf/installed/bin")
+  find_program(PNETCDF_CONFIG_EXECUTABLE pnetcdf-config
+               HINTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/pnetcdf/installed/bin")
   if(PNETCDF_CONFIG_EXECUTABLE)
     execute_process(
       COMMAND ${PNETCDF_CONFIG_EXECUTABLE} --includedir

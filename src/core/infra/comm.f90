@@ -67,11 +67,12 @@ contains
    function type_comm_initialize(io_rank_id, comm_id) result(this)
 
       use mpi_f08, only: MPI_COMM_WORLD, MPI_SUCCESS
+!$    use omp_lib, only: omp_get_max_threads
       integer, intent(in) :: io_rank_id
       type(MPI_Comm), intent(in), optional :: comm_id
       type(type_comm) :: this
 
-      integer :: ierr
+      integer :: ierr, provided
       logical :: is_mpi_initialized
 
       if (present(comm_id)) then
@@ -84,10 +85,16 @@ contains
          end if
 
          if (.not. is_mpi_initialized) then
-            call MPI_Init(ierr)
+            ! funneled: all MPI calls stay on the master thread outside
+            ! parallel regions, so the hybrid build needs no thread-serialized
+            ! MPI library; a threadless run accepts whatever is provided
+            call MPI_Init_thread(MPI_THREAD_FUNNELED, provided, ierr)
             if (ierr .ne. MPI_SUCCESS) then
                error stop "Failed to initialize MPI."
             end if
+!$          if (provided < MPI_THREAD_FUNNELED .and. omp_get_max_threads() > 1) then
+!$             error stop "MPI library lacks the MPI_THREAD_FUNNELED support needed for OpenMP threads."
+!$          end if
          end if
       end if
 

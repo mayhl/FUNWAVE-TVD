@@ -38,3 +38,18 @@ target_sources(
           stepper.f90
           checkpoint.f90
           main.f90)
+
+# only the OMP-threaded kernels pay the OpenMP compile flag; the target lives in
+# src/, hence TARGET_DIRECTORY
+if(USE_OPENMP)
+  set_source_files_properties(
+    kernel_derivatives.f90
+    kernel_fluxes.f90
+    kernel_masks.f90
+    kernel_dispersion.f90
+    kernel_breaker.f90
+    kernel_etauv.f90
+    TARGET_DIRECTORY
+    ${main_lib}_model
+    PROPERTIES COMPILE_OPTIONS "${OpenMP_Fortran_FLAGS}")
+endif()

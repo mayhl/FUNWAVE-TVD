@@ -6,6 +6,12 @@ set_target_properties(
   libcore_infra PROPERTIES Fortran_MODULE_DIRECTORY
                            "${CMAKE_BINARY_DIR}/modules/core")
 
+# comm.f90 carries !$ sentinels (MPI_Init_thread guard)
+if(USE_OPENMP)
+  set_source_files_properties(comm.f90 PROPERTIES COMPILE_OPTIONS
+                                                  "${OpenMP_Fortran_FLAGS}")
+endif()
+
 target_link_libraries(libcore_infra PUBLIC libcore_base)
 
 target_link_libraries(libcore_infra PUBLIC ${ext_libs})
