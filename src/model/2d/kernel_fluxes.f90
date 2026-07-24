@@ -7,10 +7,18 @@ module model_kernel_fluxes_mod
 
    real(SP), parameter :: SMALL = 1.0e-6_SP
 
-   ! j-strip height for the blocked fourth-order construction pass:
-   ! sized so a strip of the ~20 construct/assemble arrays stays
-   ! L2-resident on production tile widths (perf audit, cache rung)
-   integer, parameter :: J_BLOCK = 32
+   ! j-strip height bounds for the blocked fourth-order construction
+   ! pass: the height is derived per call from the tile width so the
+   ! strip working set (~40 arrays live across the construct/assemble/
+   ! flux stages) stays inside an L2 share at ANY tile width —
+   ! production-narrow tiles hit the 32-row cap (the original fixed
+   ! height), wide low-rank tiles get shorter strips (perf audit,
+   ! cache rung C4).  Partition changes are bitwise: strip-owned
+   ! writes, identical per-point arithmetic.
+   integer, parameter :: J_BLOCK_MAX = 32
+   integer, parameter :: J_BLOCK_MIN = 8
+   integer, parameter :: STRIP_TARGET_BYTES = 1048576
+   integer, parameter :: STRIP_ARRAYS = 40
 
    ! Interface arrays for one time-step; caller allocates once and reuses.
    type, public :: type_flux_workspace
@@ -1002,9 +1010,14 @@ contains
       type(type_flux_workspace), intent(inout) :: ws
       type(type_loop_bounds) :: lps
       integer :: j0, j1, jsx, jex, jsy, jey, jsf, jef, ng, m, n, m1, n1
+      integer :: jblk
       logical :: use_hll
       use_hll = constr(1:3) == "HLL"
       ng = N_GHOST; m = lp%mloc; n = lp%nloc; m1 = m + 1; n1 = n + 1
+      ! strip height from the tile width (see the J_BLOCK_* note)
+      jblk = max(J_BLOCK_MIN, min(J_BLOCK_MAX, &
+                                  STRIP_TARGET_BYTES &
+                                  /(STRIP_ARRAYS*(storage_size(0.0_SP)/8)*m)))
       ! j-strip blocking: run every sweep — constructs, assembles,
       ! wave speeds, interface fluxes — over one strip of rows before
       ! moving north, so each stage's outputs are still cache-resident
@@ -1023,8 +1036,8 @@ contains
       lps = lp
       !$omp parallel do default(shared) schedule(static) firstprivate(lps) &
       !$omp& private(j1, jsx, jex, jsy, jey, jsf, jef)
-      do j0 = 1, n1, J_BLOCK
-         j1 = min(j0 + J_BLOCK - 1, n1)
+      do j0 = 1, n1, jblk
+         j1 = min(j0 + jblk - 1, n1)
          lps%jb = max(lp%jb, j0)
          lps%je = min(lp%je, j1)
          if (lps%jb <= lps%je) then
