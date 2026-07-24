@@ -44,6 +44,9 @@ module core_grid_mod
       ! Owned by the grid; does not alias or mutate the caller's comm.
       ! MPI_COMM_NULL on ranks not participating in this grid (nested grid use).
       type(MPI_Comm) :: cart_comm
+      ! Column sub-communicator (fixed iproc, every jproc) — the trid_y
+      ! transpose path all-to-alls full y-lines inside it
+      type(MPI_Comm) :: col_comm
       ! MPI neighbor ranks (MPI_PROC_NULL if at domain boundary)
       integer :: back_rank, shore_rank, left_rank, right_rank
       ! Boundary flags
@@ -138,6 +141,10 @@ contains
 
       call MPI_Cart_shift(this%cart_comm, 0, 1, this%back_rank, this%shore_rank, ier)
       call MPI_Cart_shift(this%cart_comm, 1, 1, this%right_rank, this%left_rank, ier)
+
+      ! column sub-comm for the trid_y transpose path; sub-comm ranks
+      ! follow jproc order (Cart_sub keeps retained-dimension ordering)
+      call MPI_Cart_sub(this%cart_comm, [.false., .true.], this%col_comm, ier)
 
       this%is_back_boundary = (this%back_rank == MPI_PROC_NULL)
       this%is_shore_boundary = (this%shore_rank == MPI_PROC_NULL)

@@ -39,6 +39,15 @@ module core_solver_tridiag_mod
    ! Chunk-pipeline probe state (see chunk_width)
    integer :: trid_chunk_saved = 0
 
+   ! Transpose-path probe state (see trid_use_transpose)
+   integer :: trid_algo_saved = 0
+
+   ! Transpose-path persistent buffers — grow-only, sized on first
+   ! solve (grid extents are run-constant); avoids per-stage heap
+   ! churn.  Message buffers are shared by both all-to-all phases.
+   real(SP), allocatable :: ts_sbuf(:), ts_rbuf(:)
+   real(SP), allocatable :: ts_la(:, :), ts_lc(:, :), ts_l1(:, :), ts_l2(:, :)
+
 contains
 
    subroutine tws_alloc(ws, m, n)
@@ -77,6 +86,24 @@ contains
       end if
       chunk_width = trid_chunk_saved
    end function chunk_width
+
+   ! ----------------------------------------------------------------
+   ! trid_use_transpose — algorithm knob for the distributed y solves.
+   ! FUNWAVE_TRID_ALGO=transpose swaps the chunk-pipelined chain for
+   ! the column all-to-all path (probe knob; pin a ny_proc threshold
+   ! after the wheat A/B).  Per-line arithmetic is identical, so the
+   ! choice is bitwise-neutral.
+   ! ----------------------------------------------------------------
+   logical function trid_use_transpose()
+      character(len=16) :: env
+      integer :: stat
+      if (trid_algo_saved == 0) then
+         trid_algo_saved = 1
+         call get_environment_variable("FUNWAVE_TRID_ALGO", env, status=stat)
+         if (stat == 0 .and. env == "transpose") trid_algo_saved = 2
+      end if
+      trid_use_transpose = (trid_algo_saved == 2)
+   end function trid_use_transpose
 
    ! ----------------------------------------------------------------
    ! trid_thomas_1d — serial 1D Thomas along a single line.
@@ -446,6 +473,11 @@ contains
          return
       end if
 
+      if (trid_use_transpose()) then
+         call trid_y_alltoall(lp, grid, a, c, d, f)
+         return
+      end if
+
       nt = lp%ie - lp%ib + 1
       w = min(chunk_width(), nt)
       nc = (nt + w - 1)/w
@@ -578,6 +610,11 @@ contains
          return
       end if
 
+      if (trid_use_transpose()) then
+         call trid_y_alltoall(lp, grid, a, c, d1, f1, d2, f2)
+         return
+      end if
+
       nt = lp%ie - lp%ib + 1
       w = min(chunk_width(), nt)
       nc = (nt + w - 1)/w
@@ -675,6 +712,221 @@ contains
          call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
 
    end subroutine trid_y2
+
+   ! ----------------------------------------------------------------
+   ! trid_y_alltoall — transpose form of the distributed y solve.
+   ! Column all-to-all gathers full y-lines (each rank takes a near-
+   ! even share of the x-columns), one serial Thomas per line, second
+   ! all-to-all scatters the solutions back.  Trades the alpha*PY
+   ! latency ladder of the pipelined chain for pure bandwidth — the
+   ! 8n trid_y datum (ctband 312020).  Per-line float sequence matches
+   ! the pipelined recurrence exactly (rank seams just split rows), so
+   ! the path is bitwise vs trid_y/trid_y2.  The pack loops ARE the
+   ! transpose: send side packs y-fastest per destination, unpack
+   ! lands y-contiguous line storage — no standalone transpose pass.
+   ! Line solves unthreaded (ifx code-shape lesson, trid_y note).
+   ! d2/f2 present = the two-RHS Sherman-Morrison batch.
+   ! FUTURE: persist the buffers on type_trid_workspace.
+   ! ----------------------------------------------------------------
+   subroutine trid_y_alltoall(lp, grid, a, c, d1, f1, d2, f2)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d1(:, :)
+      real(SP), intent(out)   :: f1(:, :)
+      real(SP), intent(inout), optional :: d2(:, :)
+      real(SP), intent(out), optional :: f2(:, :)
+
+      integer, allocatable :: wq(:), x0(:), nyp(:), yoff(:)
+      integer, allocatable :: scnt(:), sdsp(:), rcnt(:), rdsp(:)
+      integer :: py, me, mx, ny, nyg, nrhs, nfin, w_me
+      integer :: r, x, jj, pos, base, rem, ierr, sbn, rbn
+
+      py = grid%ny_proc
+      me = grid%jproc
+      mx = lp%ie - lp%ib + 1
+      ny = lp%je - lp%jb + 1
+      nrhs = 1
+      if (present(d2)) nrhs = 2
+      nfin = 2 + nrhs
+
+      allocate (wq(0:py - 1), x0(0:py - 1), nyp(0:py - 1), yoff(0:py - 1))
+      allocate (scnt(0:py - 1), sdsp(0:py - 1), rcnt(0:py - 1), rdsp(0:py - 1))
+
+      ! x-column shares (near-even) and per-rank y extents
+      base = mx/py
+      rem = mod(mx, py)
+      do r = 0, py - 1
+         wq(r) = base
+         if (r < rem) wq(r) = wq(r) + 1
+      end do
+      x0(0) = 0
+      do r = 1, py - 1
+         x0(r) = x0(r - 1) + wq(r - 1)
+      end do
+      call MPI_Allgather(ny, 1, MPI_INTEGER, nyp, 1, MPI_INTEGER, &
+                         grid%col_comm, ierr)
+      yoff(0) = 0
+      do r = 1, py - 1
+         yoff(r) = yoff(r - 1) + nyp(r - 1)
+      end do
+      nyg = yoff(py - 1) + nyp(py - 1)
+      w_me = wq(me)
+
+      ! --- forward all-to-all: a, c, d1[, d2] slabs -> full lines ---
+      do r = 0, py - 1
+         scnt(r) = nfin*wq(r)*ny
+         rcnt(r) = nfin*w_me*nyp(r)
+      end do
+      sdsp(0) = 0; rdsp(0) = 0
+      do r = 1, py - 1
+         sdsp(r) = sdsp(r - 1) + scnt(r - 1)
+         rdsp(r) = rdsp(r - 1) + rcnt(r - 1)
+      end do
+
+      sbn = max(nfin*mx*ny, nrhs*w_me*nyg)
+      rbn = max(nfin*w_me*nyg, nrhs*mx*ny)
+      if (.not. allocated(ts_sbuf) .or. size(ts_sbuf) < sbn) then
+         if (allocated(ts_sbuf)) deallocate (ts_sbuf)
+         allocate (ts_sbuf(sbn))
+      end if
+      if (.not. allocated(ts_rbuf) .or. size(ts_rbuf) < rbn) then
+         if (allocated(ts_rbuf)) deallocate (ts_rbuf)
+         allocate (ts_rbuf(rbn))
+      end if
+      if (.not. allocated(ts_la) .or. size(ts_la, 1) < nyg .or. size(ts_la, 2) < w_me) then
+         if (allocated(ts_la)) deallocate (ts_la, ts_lc, ts_l1)
+         allocate (ts_la(nyg, w_me), ts_lc(nyg, w_me), ts_l1(nyg, w_me))
+      end if
+      if (nrhs == 2 .and. (.not. allocated(ts_l2) .or. size(ts_l2, 1) < nyg &
+                           .or. size(ts_l2, 2) < w_me)) then
+         if (allocated(ts_l2)) deallocate (ts_l2)
+         allocate (ts_l2(nyg, w_me))
+      end if
+      pos = 0
+      do r = 0, py - 1
+         call pack_slab(a, x0(r), wq(r))
+         call pack_slab(c, x0(r), wq(r))
+         call pack_slab(d1, x0(r), wq(r))
+         if (nrhs == 2) call pack_slab(d2, x0(r), wq(r))
+      end do
+      call MPI_Alltoallv(ts_sbuf, scnt, sdsp, MPI_SP, ts_rbuf, rcnt, rdsp, MPI_SP, &
+                         grid%col_comm, ierr)
+
+      pos = 0
+      do r = 0, py - 1
+         call unpack_lines(ts_la, yoff(r), nyp(r))
+         call unpack_lines(ts_lc, yoff(r), nyp(r))
+         call unpack_lines(ts_l1, yoff(r), nyp(r))
+         if (nrhs == 2) call unpack_lines(ts_l2, yoff(r), nyp(r))
+      end do
+
+      ! --- one serial Thomas per line; back-sub in place (l -> f).
+      ! Same fused sweep as trid_y/trid_y2: within a row the d updates
+      ! read the PREVIOUS row's eliminated c, so both RHS share one
+      ! elimination bitwise ---
+      if (nrhs == 2) then
+         do x = 1, w_me
+            do jj = 2, nyg
+               if (ts_la(jj, x) /= 0.0_SP) then
+                  ts_lc(jj, x) = ts_lc(jj, x)/ts_la(jj, x)/(1.0_SP/ts_la(jj, x) - ts_lc(jj - 1, x))
+                  ts_l1(jj, x) = (ts_l1(jj, x)/ts_la(jj, x) - ts_l1(jj - 1, x))/(1.0_SP/ts_la(jj, x) - ts_lc(jj - 1, x))
+                  ts_l2(jj, x) = (ts_l2(jj, x)/ts_la(jj, x) - ts_l2(jj - 1, x))/(1.0_SP/ts_la(jj, x) - ts_lc(jj - 1, x))
+               end if
+            end do
+            do jj = nyg - 1, 1, -1
+               ts_l1(jj, x) = ts_l1(jj, x) - ts_lc(jj, x)*ts_l1(jj + 1, x)
+               ts_l2(jj, x) = ts_l2(jj, x) - ts_lc(jj, x)*ts_l2(jj + 1, x)
+            end do
+         end do
+      else
+         do x = 1, w_me
+            do jj = 2, nyg
+               if (ts_la(jj, x) /= 0.0_SP) then
+                  ts_lc(jj, x) = ts_lc(jj, x)/ts_la(jj, x)/(1.0_SP/ts_la(jj, x) - ts_lc(jj - 1, x))
+                  ts_l1(jj, x) = (ts_l1(jj, x)/ts_la(jj, x) - ts_l1(jj - 1, x))/(1.0_SP/ts_la(jj, x) - ts_lc(jj - 1, x))
+               end if
+            end do
+            do jj = nyg - 1, 1, -1
+               ts_l1(jj, x) = ts_l1(jj, x) - ts_lc(jj, x)*ts_l1(jj + 1, x)
+            end do
+         end do
+      end if
+
+      ! --- return all-to-all: solved lines -> owner slabs ---
+      do r = 0, py - 1
+         scnt(r) = nrhs*w_me*nyp(r)
+         rcnt(r) = nrhs*wq(r)*ny
+      end do
+      sdsp(0) = 0; rdsp(0) = 0
+      do r = 1, py - 1
+         sdsp(r) = sdsp(r - 1) + scnt(r - 1)
+         rdsp(r) = rdsp(r - 1) + rcnt(r - 1)
+      end do
+      pos = 0
+      do r = 0, py - 1
+         call pack_lines(ts_l1, yoff(r), nyp(r))
+         if (nrhs == 2) call pack_lines(ts_l2, yoff(r), nyp(r))
+      end do
+      call MPI_Alltoallv(ts_sbuf, scnt, sdsp, MPI_SP, ts_rbuf, rcnt, rdsp, MPI_SP, &
+                         grid%col_comm, ierr)
+      pos = 0
+      do r = 0, py - 1
+         call unpack_slab(f1, x0(r), wq(r))
+         if (nrhs == 2) call unpack_slab(f2, x0(r), wq(r))
+      end do
+
+   contains
+
+      subroutine pack_slab(fld, xoff, w)
+         real(SP), intent(in) :: fld(:, :)
+         integer, intent(in) :: xoff, w
+         integer :: xx, j2
+         do xx = 1, w
+            do j2 = 1, ny
+               pos = pos + 1
+               ts_sbuf(pos) = fld(lp%ib - 1 + xoff + xx, lp%jb - 1 + j2)
+            end do
+         end do
+      end subroutine pack_slab
+
+      subroutine unpack_lines(lf, yo, nyr)
+         real(SP), intent(inout) :: lf(:, :)
+         integer, intent(in) :: yo, nyr
+         integer :: xx, j2
+         do xx = 1, w_me
+            do j2 = 1, nyr
+               pos = pos + 1
+               lf(yo + j2, xx) = ts_rbuf(pos)
+            end do
+         end do
+      end subroutine unpack_lines
+
+      subroutine pack_lines(lf, yo, nyr)
+         real(SP), intent(in) :: lf(:, :)
+         integer, intent(in) :: yo, nyr
+         integer :: xx, j2
+         do xx = 1, w_me
+            do j2 = 1, nyr
+               pos = pos + 1
+               ts_sbuf(pos) = lf(yo + j2, xx)
+            end do
+         end do
+      end subroutine pack_lines
+
+      subroutine unpack_slab(fld, xoff, w)
+         real(SP), intent(inout) :: fld(:, :)
+         integer, intent(in) :: xoff, w
+         integer :: xx, j2
+         do xx = 1, w
+            do j2 = 1, ny
+               pos = pos + 1
+               fld(lp%ib - 1 + xoff + xx, lp%jb - 1 + j2) = ts_rbuf(pos)
+            end do
+         end do
+      end subroutine unpack_slab
+
+   end subroutine trid_y_alltoall
 
    ! ----------------------------------------------------------------
    ! trid_x_periodic — Sherman-Morrison for x-periodic BC.
