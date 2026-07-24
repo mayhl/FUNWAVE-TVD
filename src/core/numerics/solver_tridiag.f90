@@ -20,13 +20,15 @@ module core_solver_tridiag_mod
    public :: trid_x, trid_y
    public :: trid_x_periodic, trid_y_periodic
 
-   ! Scratch for the periodic (Sherman-Morrison) solves: two coefficient
-   ! copies plus the two auxiliary solutions.  Allocated once by the caller
-   ! (mloc×nloc), reused every stage/step — no per-call heap traffic.
+   ! Scratch for the periodic (Sherman-Morrison) solves: one coefficient
+   ! copy plus the two RHS/solution pairs.  Both solves share a single
+   ! eliminated c (the c recurrence never reads d).  Allocated once by
+   ! the caller (mloc×nloc), reused every stage/step — no per-call heap
+   ! traffic.
    type, public :: type_trid_workspace
       integer :: m = 0, n = 0
       real(SP), allocatable :: a_loc(:, :)
-      real(SP), allocatable :: c1(:, :), c2(:, :)
+      real(SP), allocatable :: c1(:, :)
       real(SP), allocatable :: d1(:, :), d2(:, :)
       real(SP), allocatable :: y1(:, :), y2(:, :)
    contains
@@ -34,14 +36,16 @@ module core_solver_tridiag_mod
       procedure :: free => tws_free
    end type type_trid_workspace
 
+   ! Chunk-pipeline probe state (see chunk_width)
+   integer :: trid_chunk_saved = 0
+
 contains
 
    subroutine tws_alloc(ws, m, n)
       class(type_trid_workspace), intent(inout) :: ws
       integer, intent(in) :: m, n
       ws%m = m; ws%n = n
-      allocate (ws%a_loc(m, n), &
-                ws%c1(m, n), ws%c2(m, n), &
+      allocate (ws%a_loc(m, n), ws%c1(m, n), &
                 ws%d1(m, n), ws%d2(m, n), &
                 ws%y1(m, n), ws%y2(m, n))
    end subroutine tws_alloc
@@ -49,8 +53,30 @@ contains
    subroutine tws_free(ws)
       class(type_trid_workspace), intent(inout) :: ws
       ws%m = 0; ws%n = 0
-      deallocate (ws%a_loc, ws%c1, ws%c2, ws%d1, ws%d2, ws%y1, ws%y2)
+      deallocate (ws%a_loc, ws%c1, ws%d1, ws%d2, ws%y1, ws%y2)
    end subroutine tws_free
+
+   ! ----------------------------------------------------------------
+   ! chunk_width — transverse strip width for the chunk-pipelined
+   ! sweeps.  Read once from FUNWAVE_TRID_CHUNK (probe knob; pin the
+   ! winner into TRID_CHUNK_DEF after sweeping).  Width is bitwise-
+   ! neutral: chunk boundaries move message packing, never the
+   ! recurrence.
+   ! ----------------------------------------------------------------
+   integer function chunk_width()
+      integer, parameter :: TRID_CHUNK_DEF = 48
+      character(len=8) :: env
+      integer :: stat, v
+      if (trid_chunk_saved <= 0) then
+         trid_chunk_saved = TRID_CHUNK_DEF
+         call get_environment_variable("FUNWAVE_TRID_CHUNK", env, status=stat)
+         if (stat == 0) then
+            read (env, *, iostat=stat) v
+            if (stat == 0 .and. v > 0) trid_chunk_saved = v
+         end if
+      end if
+      chunk_width = trid_chunk_saved
+   end function chunk_width
 
    ! ----------------------------------------------------------------
    ! trid_thomas_1d — serial 1D Thomas along a single line.
@@ -78,13 +104,16 @@ contains
    end subroutine trid_thomas_1d
 
    ! ----------------------------------------------------------------
-   ! trid_x — MPI pipeline Thomas in x.
+   ! trid_x — MPI chunk-pipelined Thomas in x.
    ! Forward sweep west→east; back-sub east→west.
    ! west neighbor = grid%back_rank, east = grid%shore_rank.
    ! Chain endpoints come from the cart POSITION (iproc), never from
    ! neighbor nullity: under a periodic cart topology the wrap makes
    ! every rank have neighbors, but the sweep is still linear.
-   ! Works for PX=1 (single x-rank, exchanges skipped).
+   ! The transverse j-extent is swept in chunks so downstream ranks
+   ! start eliminating while this rank is still mid-block; same-tag
+   ! chunks match FIFO (recvs pre-posted and sends issued in chunk
+   ! order).  PX=1 keeps the plain full-width path.
    ! c and d are overwritten during elimination; a is read-only.
    ! ----------------------------------------------------------------
    subroutine trid_x(lp, grid, a, c, d, f)
@@ -94,83 +123,290 @@ contains
       real(SP), intent(inout) :: c(:, :), d(:, :)
       real(SP), intent(out)   :: f(:, :)
 
-      real(SP)          :: smsg(lp%nloc, 2), rmsg(lp%nloc, 2)
-      type(MPI_Request) :: req
+      real(SP)          :: smsg(2, lp%nloc), rmsg(2, lp%nloc)
+      real(SP)          :: sbk(lp%nloc), rbk(lp%nloc)
+      type(MPI_Request) :: rreq(lp%nloc), sreq(lp%nloc)
       type(MPI_Status)  :: stat
-      integer           :: i, j, ierr
+      integer           :: i, j, ierr, nt, w, nc, ic, j0, j1
 
-      ! --- forward sweep ---
-      if (grid%iproc > 0) then
-         call MPI_Irecv(rmsg, 2*lp%nloc, MPI_SP, grid%back_rank, 0, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
+      if (grid%nx_proc == 1) then
+         ! single-rank chain: plain full-width Thomas, no messages
+         !$omp parallel do default(shared) schedule(static) private(i)
          do j = lp%jb, lp%je
-            if (a(lp%ib, j) /= 0.0_SP) then
-               c(lp%ib, j) = c(lp%ib, j)/a(lp%ib, j) &
-                             /(1.0_SP/a(lp%ib, j) - rmsg(j, 2))
-               d(lp%ib, j) = (d(lp%ib, j)/a(lp%ib, j) - rmsg(j, 1)) &
-                             /(1.0_SP/a(lp%ib, j) - rmsg(j, 2))
-            end if
+            do i = lp%ib + 1, lp%ie
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i - 1, j))
+                  d(i, j) = (d(i, j)/a(i, j) - d(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
+               end if
+            end do
          end do
-      end if
-
-      ! recurrence runs along i, rows independent — thread over j
-      !$omp parallel do default(shared) schedule(static) private(i)
-      do j = lp%jb, lp%je
-         do i = lp%ib + 1, lp%ie
-            if (a(i, j) /= 0.0_SP) then
-               c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i - 1, j))
-               d(i, j) = (d(i, j)/a(i, j) - d(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
-            end if
-         end do
-      end do
-      !$omp end parallel do
-
-      if (grid%iproc < grid%nx_proc - 1) then
-         do j = lp%jb, lp%je
-            smsg(j, 1) = d(lp%ie, j)
-            smsg(j, 2) = c(lp%ie, j)
-         end do
-         call MPI_Isend(smsg, 2*lp%nloc, MPI_SP, grid%shore_rank, 0, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
-      end if
-
-      ! --- back substitution ---
-      if (grid%iproc < grid%nx_proc - 1) then
-         call MPI_Irecv(rmsg, 2*lp%nloc, MPI_SP, grid%shore_rank, 1, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
-         do j = lp%jb, lp%je
-            f(lp%ie, j) = d(lp%ie, j) - c(lp%ie, j)*rmsg(j, 1)
-         end do
-      else
+         !$omp end parallel do
          do j = lp%jb, lp%je
             f(lp%ie, j) = d(lp%ie, j)
          end do
-      end if
-
-      !$omp parallel do default(shared) schedule(static) private(i)
-      do j = lp%jb, lp%je
-         do i = lp%ie - 1, lp%ib, -1
-            f(i, j) = d(i, j) - c(i, j)*f(i + 1, j)
-         end do
-      end do
-      !$omp end parallel do
-
-      if (grid%iproc > 0) then
+         !$omp parallel do default(shared) schedule(static) private(i)
          do j = lp%jb, lp%je
-            smsg(j, 1) = f(lp%ib, j)
+            do i = lp%ie - 1, lp%ib, -1
+               f(i, j) = d(i, j) - c(i, j)*f(i + 1, j)
+            end do
          end do
-         call MPI_Isend(smsg, 2*lp%nloc, MPI_SP, grid%back_rank, 1, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
+         !$omp end parallel do
+         return
       end if
+
+      nt = lp%je - lp%jb + 1
+      w = min(chunk_width(), nt)
+      nc = (nt + w - 1)/w
+
+      ! --- forward sweep, chunk-pipelined ---
+      if (grid%iproc > 0) then
+         do ic = 1, nc
+            j0 = lp%jb + (ic - 1)*w
+            j1 = min(j0 + w - 1, lp%je)
+            call MPI_Irecv(rmsg(:, j0:j1), 2*(j1 - j0 + 1), MPI_SP, grid%back_rank, 0, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         j0 = lp%jb + (ic - 1)*w
+         j1 = min(j0 + w - 1, lp%je)
+         if (grid%iproc > 0) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do j = j0, j1
+               if (a(lp%ib, j) /= 0.0_SP) then
+                  c(lp%ib, j) = c(lp%ib, j)/a(lp%ib, j) &
+                                /(1.0_SP/a(lp%ib, j) - rmsg(2, j))
+                  d(lp%ib, j) = (d(lp%ib, j)/a(lp%ib, j) - rmsg(1, j)) &
+                                /(1.0_SP/a(lp%ib, j) - rmsg(2, j))
+               end if
+            end do
+         end if
+         ! recurrence runs along i, rows independent — thread over the chunk
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = j0, j1
+            do i = lp%ib + 1, lp%ie
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i - 1, j))
+                  d(i, j) = (d(i, j)/a(i, j) - d(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
+               end if
+            end do
+         end do
+         !$omp end parallel do
+         if (grid%iproc < grid%nx_proc - 1) then
+            do j = j0, j1
+               smsg(1, j) = d(lp%ie, j)
+               smsg(2, j) = c(lp%ie, j)
+            end do
+            call MPI_Isend(smsg(:, j0:j1), 2*(j1 - j0 + 1), MPI_SP, grid%shore_rank, 0, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%iproc < grid%nx_proc - 1) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
+
+      ! --- back substitution, chunk-pipelined ---
+      if (grid%iproc < grid%nx_proc - 1) then
+         do ic = 1, nc
+            j0 = lp%jb + (ic - 1)*w
+            j1 = min(j0 + w - 1, lp%je)
+            call MPI_Irecv(rbk(j0:j1), j1 - j0 + 1, MPI_SP, grid%shore_rank, 1, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         j0 = lp%jb + (ic - 1)*w
+         j1 = min(j0 + w - 1, lp%je)
+         if (grid%iproc < grid%nx_proc - 1) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do j = j0, j1
+               f(lp%ie, j) = d(lp%ie, j) - c(lp%ie, j)*rbk(j)
+            end do
+         else
+            do j = j0, j1
+               f(lp%ie, j) = d(lp%ie, j)
+            end do
+         end if
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = j0, j1
+            do i = lp%ie - 1, lp%ib, -1
+               f(i, j) = d(i, j) - c(i, j)*f(i + 1, j)
+            end do
+         end do
+         !$omp end parallel do
+         if (grid%iproc > 0) then
+            do j = j0, j1
+               sbk(j) = f(lp%ib, j)
+            end do
+            call MPI_Isend(sbk(j0:j1), j1 - j0 + 1, MPI_SP, grid%back_rank, 1, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%iproc > 0) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
 
    end subroutine trid_x
 
    ! ----------------------------------------------------------------
-   ! trid_y — MPI pipeline Thomas in y.
+   ! trid_x2 — two-RHS chunk-pipelined Thomas in x, one shared
+   ! elimination.  The c recurrence never reads d, so both RHS ride a
+   ! single sweep: per-RHS arithmetic matches two trid_x calls bitwise,
+   ! but the rank pipeline is traversed once instead of twice.
+   ! Chunking as in trid_x.  Sherman-Morrison callers only (both
+   ! solves must share a and the pre-sweep c).
+   ! ----------------------------------------------------------------
+   subroutine trid_x2(lp, grid, a, c, d1, d2, f1, f2)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d1(:, :), d2(:, :)
+      real(SP), intent(out)   :: f1(:, :), f2(:, :)
+
+      real(SP)          :: smsg(3, lp%nloc), rmsg(3, lp%nloc)
+      real(SP)          :: sbk(2, lp%nloc), rbk(2, lp%nloc)
+      type(MPI_Request) :: rreq(lp%nloc), sreq(lp%nloc)
+      type(MPI_Status)  :: stat
+      integer           :: i, j, ierr, nt, w, nc, ic, j0, j1
+
+      if (grid%nx_proc == 1) then
+         ! single-rank chain: plain full-width Thomas, no messages
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = lp%jb, lp%je
+            do i = lp%ib + 1, lp%ie
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i - 1, j))
+                  d1(i, j) = (d1(i, j)/a(i, j) - d1(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
+                  d2(i, j) = (d2(i, j)/a(i, j) - d2(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
+               end if
+            end do
+         end do
+         !$omp end parallel do
+         do j = lp%jb, lp%je
+            f1(lp%ie, j) = d1(lp%ie, j)
+            f2(lp%ie, j) = d2(lp%ie, j)
+         end do
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = lp%jb, lp%je
+            do i = lp%ie - 1, lp%ib, -1
+               f1(i, j) = d1(i, j) - c(i, j)*f1(i + 1, j)
+               f2(i, j) = d2(i, j) - c(i, j)*f2(i + 1, j)
+            end do
+         end do
+         !$omp end parallel do
+         return
+      end if
+
+      nt = lp%je - lp%jb + 1
+      w = min(chunk_width(), nt)
+      nc = (nt + w - 1)/w
+
+      ! --- forward sweep, chunk-pipelined ---
+      if (grid%iproc > 0) then
+         do ic = 1, nc
+            j0 = lp%jb + (ic - 1)*w
+            j1 = min(j0 + w - 1, lp%je)
+            call MPI_Irecv(rmsg(:, j0:j1), 3*(j1 - j0 + 1), MPI_SP, grid%back_rank, 0, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         j0 = lp%jb + (ic - 1)*w
+         j1 = min(j0 + w - 1, lp%je)
+         if (grid%iproc > 0) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do j = j0, j1
+               if (a(lp%ib, j) /= 0.0_SP) then
+                  c(lp%ib, j) = c(lp%ib, j)/a(lp%ib, j) &
+                                /(1.0_SP/a(lp%ib, j) - rmsg(3, j))
+                  d1(lp%ib, j) = (d1(lp%ib, j)/a(lp%ib, j) - rmsg(1, j)) &
+                                 /(1.0_SP/a(lp%ib, j) - rmsg(3, j))
+                  d2(lp%ib, j) = (d2(lp%ib, j)/a(lp%ib, j) - rmsg(2, j)) &
+                                 /(1.0_SP/a(lp%ib, j) - rmsg(3, j))
+               end if
+            end do
+         end if
+         ! recurrence runs along i, rows independent — thread over the chunk
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = j0, j1
+            do i = lp%ib + 1, lp%ie
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i - 1, j))
+                  d1(i, j) = (d1(i, j)/a(i, j) - d1(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
+                  d2(i, j) = (d2(i, j)/a(i, j) - d2(i - 1, j))/(1.0_SP/a(i, j) - c(i - 1, j))
+               end if
+            end do
+         end do
+         !$omp end parallel do
+         if (grid%iproc < grid%nx_proc - 1) then
+            do j = j0, j1
+               smsg(1, j) = d1(lp%ie, j)
+               smsg(2, j) = d2(lp%ie, j)
+               smsg(3, j) = c(lp%ie, j)
+            end do
+            call MPI_Isend(smsg(:, j0:j1), 3*(j1 - j0 + 1), MPI_SP, grid%shore_rank, 0, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%iproc < grid%nx_proc - 1) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
+
+      ! --- back substitution, chunk-pipelined ---
+      if (grid%iproc < grid%nx_proc - 1) then
+         do ic = 1, nc
+            j0 = lp%jb + (ic - 1)*w
+            j1 = min(j0 + w - 1, lp%je)
+            call MPI_Irecv(rbk(:, j0:j1), 2*(j1 - j0 + 1), MPI_SP, grid%shore_rank, 1, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         j0 = lp%jb + (ic - 1)*w
+         j1 = min(j0 + w - 1, lp%je)
+         if (grid%iproc < grid%nx_proc - 1) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do j = j0, j1
+               f1(lp%ie, j) = d1(lp%ie, j) - c(lp%ie, j)*rbk(1, j)
+               f2(lp%ie, j) = d2(lp%ie, j) - c(lp%ie, j)*rbk(2, j)
+            end do
+         else
+            do j = j0, j1
+               f1(lp%ie, j) = d1(lp%ie, j)
+               f2(lp%ie, j) = d2(lp%ie, j)
+            end do
+         end if
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = j0, j1
+            do i = lp%ie - 1, lp%ib, -1
+               f1(i, j) = d1(i, j) - c(i, j)*f1(i + 1, j)
+               f2(i, j) = d2(i, j) - c(i, j)*f2(i + 1, j)
+            end do
+         end do
+         !$omp end parallel do
+         if (grid%iproc > 0) then
+            do j = j0, j1
+               sbk(1, j) = f1(lp%ib, j)
+               sbk(2, j) = f2(lp%ib, j)
+            end do
+            call MPI_Isend(sbk(:, j0:j1), 2*(j1 - j0 + 1), MPI_SP, grid%back_rank, 1, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%iproc > 0) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
+
+   end subroutine trid_x2
+
+   ! ----------------------------------------------------------------
+   ! trid_y — MPI chunk-pipelined Thomas in y.
    ! Forward sweep south→north; back-sub north→south.
    ! south neighbor = grid%right_rank, north = grid%left_rank.
    ! Chain endpoints from the cart position (jproc), as in trid_x —
    ! required for periodic-y cart topologies (Sherman-Morrison callers).
+   ! The transverse i-extent is swept in chunks (see trid_x); PY=1
+   ! keeps the plain full-width path.
    ! ----------------------------------------------------------------
    subroutine trid_y(lp, grid, a, c, d, f)
       type(type_loop_bounds), intent(in)    :: lp
@@ -179,75 +415,266 @@ contains
       real(SP), intent(inout) :: c(:, :), d(:, :)
       real(SP), intent(out)   :: f(:, :)
 
-      real(SP)          :: smsg(lp%mloc, 2), rmsg(lp%mloc, 2)
-      type(MPI_Request) :: req
+      real(SP)          :: smsg(2, lp%mloc), rmsg(2, lp%mloc)
+      real(SP)          :: sbk(lp%mloc), rbk(lp%mloc)
+      type(MPI_Request) :: rreq(lp%mloc), sreq(lp%mloc)
       type(MPI_Status)  :: stat
-      integer           :: i, j, ierr
+      integer           :: i, j, ierr, nt, w, nc, ic, i0, i1
 
-      ! --- forward sweep ---
-      if (grid%jproc > 0) then
-         call MPI_Irecv(rmsg, 2*lp%mloc, MPI_SP, grid%right_rank, 0, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
-         do i = lp%ib, lp%ie
-            if (a(i, lp%jb) /= 0.0_SP) then
-               c(i, lp%jb) = c(i, lp%jb)/a(i, lp%jb) &
-                             /(1.0_SP/a(i, lp%jb) - rmsg(i, 2))
-               d(i, lp%jb) = (d(i, lp%jb)/a(i, lp%jb) - rmsg(i, 1)) &
-                             /(1.0_SP/a(i, lp%jb) - rmsg(i, 2))
-            end if
+      if (grid%ny_proc == 1) then
+         ! single-rank chain: plain full-width Thomas, no messages.
+         ! NOT OMP-threaded: the j recurrence bars the sweep loop, and
+         ! the i-slab variant (each thread sweeping its own column
+         ! range) cost ~5% serial under ifx — code-shape regression,
+         ! wheat A/B 310901 vs 310916; columns stay a GPU-pass target
+         do j = lp%jb + 1, lp%je
+            do i = lp%ib, lp%ie
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i, j - 1))
+                  d(i, j) = (d(i, j)/a(i, j) - d(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
+               end if
+            end do
          end do
-      end if
-
-      ! NOT OMP-threaded: the j recurrence bars the sweep loop, and the
-      ! i-slab variant (each thread sweeping its own column range) cost
-      ! ~5% serial under ifx — code-shape regression, wheat A/B 310901
-      ! vs 310916; columns stay a GPU-pass target
-      do j = lp%jb + 1, lp%je
-         do i = lp%ib, lp%ie
-            if (a(i, j) /= 0.0_SP) then
-               c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i, j - 1))
-               d(i, j) = (d(i, j)/a(i, j) - d(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
-            end if
-         end do
-      end do
-
-      if (grid%jproc < grid%ny_proc - 1) then
-         do i = lp%ib, lp%ie
-            smsg(i, 1) = d(i, lp%je)
-            smsg(i, 2) = c(i, lp%je)
-         end do
-         call MPI_Isend(smsg, 2*lp%mloc, MPI_SP, grid%left_rank, 0, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
-      end if
-
-      ! --- back substitution ---
-      if (grid%jproc < grid%ny_proc - 1) then
-         call MPI_Irecv(rmsg, 2*lp%mloc, MPI_SP, grid%left_rank, 1, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
-         do i = lp%ib, lp%ie
-            f(i, lp%je) = d(i, lp%je) - c(i, lp%je)*rmsg(i, 1)
-         end do
-      else
          do i = lp%ib, lp%ie
             f(i, lp%je) = d(i, lp%je)
          end do
+         do j = lp%je - 1, lp%jb, -1
+            do i = lp%ib, lp%ie
+               f(i, j) = d(i, j) - c(i, j)*f(i, j + 1)
+            end do
+         end do
+         return
       end if
 
-      do j = lp%je - 1, lp%jb, -1
-         do i = lp%ib, lp%ie
-            f(i, j) = d(i, j) - c(i, j)*f(i, j + 1)
-         end do
-      end do
+      nt = lp%ie - lp%ib + 1
+      w = min(chunk_width(), nt)
+      nc = (nt + w - 1)/w
 
+      ! --- forward sweep, chunk-pipelined ---
       if (grid%jproc > 0) then
-         do i = lp%ib, lp%ie
-            smsg(i, 1) = f(i, lp%jb)
+         do ic = 1, nc
+            i0 = lp%ib + (ic - 1)*w
+            i1 = min(i0 + w - 1, lp%ie)
+            call MPI_Irecv(rmsg(:, i0:i1), 2*(i1 - i0 + 1), MPI_SP, grid%right_rank, 0, &
+                           grid%cart_comm, rreq(ic), ierr)
          end do
-         call MPI_Isend(smsg, 2*lp%mloc, MPI_SP, grid%right_rank, 1, grid%cart_comm, req, ierr)
-         call MPI_Wait(req, stat, ierr)
       end if
+
+      do ic = 1, nc
+         i0 = lp%ib + (ic - 1)*w
+         i1 = min(i0 + w - 1, lp%ie)
+         if (grid%jproc > 0) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do i = i0, i1
+               if (a(i, lp%jb) /= 0.0_SP) then
+                  c(i, lp%jb) = c(i, lp%jb)/a(i, lp%jb) &
+                                /(1.0_SP/a(i, lp%jb) - rmsg(2, i))
+                  d(i, lp%jb) = (d(i, lp%jb)/a(i, lp%jb) - rmsg(1, i)) &
+                                /(1.0_SP/a(i, lp%jb) - rmsg(2, i))
+               end if
+            end do
+         end if
+         ! unthreaded sweep — see the code-shape note on the PY=1 path
+         do j = lp%jb + 1, lp%je
+            do i = i0, i1
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i, j - 1))
+                  d(i, j) = (d(i, j)/a(i, j) - d(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
+               end if
+            end do
+         end do
+         if (grid%jproc < grid%ny_proc - 1) then
+            do i = i0, i1
+               smsg(1, i) = d(i, lp%je)
+               smsg(2, i) = c(i, lp%je)
+            end do
+            call MPI_Isend(smsg(:, i0:i1), 2*(i1 - i0 + 1), MPI_SP, grid%left_rank, 0, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%jproc < grid%ny_proc - 1) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
+
+      ! --- back substitution, chunk-pipelined ---
+      if (grid%jproc < grid%ny_proc - 1) then
+         do ic = 1, nc
+            i0 = lp%ib + (ic - 1)*w
+            i1 = min(i0 + w - 1, lp%ie)
+            call MPI_Irecv(rbk(i0:i1), i1 - i0 + 1, MPI_SP, grid%left_rank, 1, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         i0 = lp%ib + (ic - 1)*w
+         i1 = min(i0 + w - 1, lp%ie)
+         if (grid%jproc < grid%ny_proc - 1) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do i = i0, i1
+               f(i, lp%je) = d(i, lp%je) - c(i, lp%je)*rbk(i)
+            end do
+         else
+            do i = i0, i1
+               f(i, lp%je) = d(i, lp%je)
+            end do
+         end if
+         do j = lp%je - 1, lp%jb, -1
+            do i = i0, i1
+               f(i, j) = d(i, j) - c(i, j)*f(i, j + 1)
+            end do
+         end do
+         if (grid%jproc > 0) then
+            do i = i0, i1
+               sbk(i) = f(i, lp%jb)
+            end do
+            call MPI_Isend(sbk(i0:i1), i1 - i0 + 1, MPI_SP, grid%right_rank, 1, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%jproc > 0) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
 
    end subroutine trid_y
+
+   ! ----------------------------------------------------------------
+   ! trid_y2 — two-RHS chunk-pipelined Thomas in y, one shared
+   ! elimination.  y analogue of trid_x2; sweeps unthreaded as in
+   ! trid_y (see the code-shape note there).
+   ! ----------------------------------------------------------------
+   subroutine trid_y2(lp, grid, a, c, d1, d2, f1, f2)
+      type(type_loop_bounds), intent(in)    :: lp
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), intent(in)    :: a(:, :)
+      real(SP), intent(inout) :: c(:, :), d1(:, :), d2(:, :)
+      real(SP), intent(out)   :: f1(:, :), f2(:, :)
+
+      real(SP)          :: smsg(3, lp%mloc), rmsg(3, lp%mloc)
+      real(SP)          :: sbk(2, lp%mloc), rbk(2, lp%mloc)
+      type(MPI_Request) :: rreq(lp%mloc), sreq(lp%mloc)
+      type(MPI_Status)  :: stat
+      integer           :: i, j, ierr, nt, w, nc, ic, i0, i1
+
+      if (grid%ny_proc == 1) then
+         ! single-rank chain: plain full-width Thomas, no messages
+         do j = lp%jb + 1, lp%je
+            do i = lp%ib, lp%ie
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i, j - 1))
+                  d1(i, j) = (d1(i, j)/a(i, j) - d1(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
+                  d2(i, j) = (d2(i, j)/a(i, j) - d2(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
+               end if
+            end do
+         end do
+         do i = lp%ib, lp%ie
+            f1(i, lp%je) = d1(i, lp%je)
+            f2(i, lp%je) = d2(i, lp%je)
+         end do
+         do j = lp%je - 1, lp%jb, -1
+            do i = lp%ib, lp%ie
+               f1(i, j) = d1(i, j) - c(i, j)*f1(i, j + 1)
+               f2(i, j) = d2(i, j) - c(i, j)*f2(i, j + 1)
+            end do
+         end do
+         return
+      end if
+
+      nt = lp%ie - lp%ib + 1
+      w = min(chunk_width(), nt)
+      nc = (nt + w - 1)/w
+
+      ! --- forward sweep, chunk-pipelined ---
+      if (grid%jproc > 0) then
+         do ic = 1, nc
+            i0 = lp%ib + (ic - 1)*w
+            i1 = min(i0 + w - 1, lp%ie)
+            call MPI_Irecv(rmsg(:, i0:i1), 3*(i1 - i0 + 1), MPI_SP, grid%right_rank, 0, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         i0 = lp%ib + (ic - 1)*w
+         i1 = min(i0 + w - 1, lp%ie)
+         if (grid%jproc > 0) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do i = i0, i1
+               if (a(i, lp%jb) /= 0.0_SP) then
+                  c(i, lp%jb) = c(i, lp%jb)/a(i, lp%jb) &
+                                /(1.0_SP/a(i, lp%jb) - rmsg(3, i))
+                  d1(i, lp%jb) = (d1(i, lp%jb)/a(i, lp%jb) - rmsg(1, i)) &
+                                 /(1.0_SP/a(i, lp%jb) - rmsg(3, i))
+                  d2(i, lp%jb) = (d2(i, lp%jb)/a(i, lp%jb) - rmsg(2, i)) &
+                                 /(1.0_SP/a(i, lp%jb) - rmsg(3, i))
+               end if
+            end do
+         end if
+         ! unthreaded sweep — see the code-shape note in trid_y
+         do j = lp%jb + 1, lp%je
+            do i = i0, i1
+               if (a(i, j) /= 0.0_SP) then
+                  c(i, j) = c(i, j)/a(i, j)/(1.0_SP/a(i, j) - c(i, j - 1))
+                  d1(i, j) = (d1(i, j)/a(i, j) - d1(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
+                  d2(i, j) = (d2(i, j)/a(i, j) - d2(i, j - 1))/(1.0_SP/a(i, j) - c(i, j - 1))
+               end if
+            end do
+         end do
+         if (grid%jproc < grid%ny_proc - 1) then
+            do i = i0, i1
+               smsg(1, i) = d1(i, lp%je)
+               smsg(2, i) = d2(i, lp%je)
+               smsg(3, i) = c(i, lp%je)
+            end do
+            call MPI_Isend(smsg(:, i0:i1), 3*(i1 - i0 + 1), MPI_SP, grid%left_rank, 0, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%jproc < grid%ny_proc - 1) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
+
+      ! --- back substitution, chunk-pipelined ---
+      if (grid%jproc < grid%ny_proc - 1) then
+         do ic = 1, nc
+            i0 = lp%ib + (ic - 1)*w
+            i1 = min(i0 + w - 1, lp%ie)
+            call MPI_Irecv(rbk(:, i0:i1), 2*(i1 - i0 + 1), MPI_SP, grid%left_rank, 1, &
+                           grid%cart_comm, rreq(ic), ierr)
+         end do
+      end if
+
+      do ic = 1, nc
+         i0 = lp%ib + (ic - 1)*w
+         i1 = min(i0 + w - 1, lp%ie)
+         if (grid%jproc < grid%ny_proc - 1) then
+            call MPI_Wait(rreq(ic), stat, ierr)
+            do i = i0, i1
+               f1(i, lp%je) = d1(i, lp%je) - c(i, lp%je)*rbk(1, i)
+               f2(i, lp%je) = d2(i, lp%je) - c(i, lp%je)*rbk(2, i)
+            end do
+         else
+            do i = i0, i1
+               f1(i, lp%je) = d1(i, lp%je)
+               f2(i, lp%je) = d2(i, lp%je)
+            end do
+         end if
+         do j = lp%je - 1, lp%jb, -1
+            do i = i0, i1
+               f1(i, j) = d1(i, j) - c(i, j)*f1(i, j + 1)
+               f2(i, j) = d2(i, j) - c(i, j)*f2(i, j + 1)
+            end do
+         end do
+         if (grid%jproc > 0) then
+            do i = i0, i1
+               sbk(1, i) = f1(i, lp%jb)
+               sbk(2, i) = f2(i, lp%jb)
+            end do
+            call MPI_Isend(sbk(:, i0:i1), 2*(i1 - i0 + 1), MPI_SP, grid%right_rank, 1, &
+                           grid%cart_comm, sreq(ic), ierr)
+         end if
+      end do
+      if (grid%jproc > 0) &
+         call MPI_Waitall(nc, sreq(1:nc), MPI_STATUSES_IGNORE, ierr)
+
+   end subroutine trid_y2
 
    ! ----------------------------------------------------------------
    ! trid_x_periodic — Sherman-Morrison for x-periodic BC.
@@ -269,7 +696,7 @@ contains
       integer  :: j, k, ierr
       type(MPI_Status) :: stat
 
-      associate (a_loc => ws%a_loc, c1 => ws%c1, c2 => ws%c2, &
+      associate (a_loc => ws%a_loc, c1 => ws%c1, &
                  d1 => ws%d1, d2 => ws%d2, y1 => ws%y1, y2 => ws%y2)
 
          a_loc = a
@@ -310,12 +737,7 @@ contains
             end do
          end if
 
-         c2 = c1   ! both solves use the same normalised c
-
-         ! --- Step 3: first solve B*y1 = d1 ---
-         call trid_x(lp, grid, a_loc, c1, d1, y1)
-
-         ! --- Step 4: build RHS for second solve ---
+         ! --- Step 3: build RHS for the correction solve ---
          d2 = 0.0_SP
          if (grid%iproc == 0) then
             do j = lp%jb, lp%je
@@ -328,10 +750,10 @@ contains
             end do
          end if
 
-         ! --- Step 5: second solve B*y2 = d2 ---
-         call trid_x(lp, grid, a_loc, c2, d2, y2)
+         ! --- Step 4: batched solve B*y1 = d1, B*y2 = d2 ---
+         call trid_x2(lp, grid, a_loc, c1, d1, d2, y1, y2)
 
-         ! --- Step 6: gather y1(ie,j) and y2(ie,j) to west rank ---
+         ! --- Step 5: gather y1(ie,j) and y2(ie,j) to west rank ---
          if (grid%iproc == grid%nx_proc - 1 .and. grid%nx_proc > 1) then
             y1_end = y1(lp%ie, :)
             y2_end = y2(lp%ie, :)
@@ -347,7 +769,7 @@ contains
             y2_end = y2(lp%ie, :)
          end if
 
-         ! --- Step 7: west rank computes beta ---
+         ! --- Step 6: west rank computes beta ---
          beta = 0.0_SP
          if (grid%iproc == 0) then
             do j = lp%jb, lp%je
@@ -356,7 +778,7 @@ contains
             end do
          end if
 
-         ! --- Step 8: broadcast beta along x-row (same jproc) ---
+         ! --- Step 7: broadcast beta along x-row (same jproc) ---
          if (grid%nx_proc > 1) then
             if (grid%iproc == 0) then
                do k = 1, grid%nx_proc - 1
@@ -368,7 +790,7 @@ contains
             end if
          end if
 
-         ! --- Step 9: combine ---
+         ! --- Step 8: combine ---
          !$omp parallel do default(shared) schedule(static) private(k)
          do j = lp%jb, lp%je
             do k = lp%ib, lp%ie
@@ -402,7 +824,7 @@ contains
       integer  :: i, j, k, ierr
       type(MPI_Status) :: stat
 
-      associate (a_loc => ws%a_loc, c1 => ws%c1, c2 => ws%c2, &
+      associate (a_loc => ws%a_loc, c1 => ws%c1, &
                  d1 => ws%d1, d2 => ws%d2, y1 => ws%y1, y2 => ws%y2)
 
          a_loc = a
@@ -443,12 +865,7 @@ contains
             end do
          end if
 
-         c2 = c1
-
-         ! --- Step 3: first solve B*y1 = d1 ---
-         call trid_y(lp, grid, a_loc, c1, d1, y1)
-
-         ! --- Step 4: build RHS for second solve ---
+         ! --- Step 3: build RHS for the correction solve ---
          d2 = 0.0_SP
          if (grid%jproc == 0) then
             do i = lp%ib, lp%ie
@@ -461,10 +878,10 @@ contains
             end do
          end if
 
-         ! --- Step 5: second solve B*y2 = d2 ---
-         call trid_y(lp, grid, a_loc, c2, d2, y2)
+         ! --- Step 4: batched solve B*y1 = d1, B*y2 = d2 ---
+         call trid_y2(lp, grid, a_loc, c1, d1, d2, y1, y2)
 
-         ! --- Step 6: gather y1(i,je) and y2(i,je) to south rank ---
+         ! --- Step 5: gather y1(i,je) and y2(i,je) to south rank ---
          if (grid%jproc == grid%ny_proc - 1 .and. grid%ny_proc > 1) then
             y1_end = y1(:, lp%je)
             y2_end = y2(:, lp%je)
@@ -480,7 +897,7 @@ contains
             y2_end = y2(:, lp%je)
          end if
 
-         ! --- Step 7: south rank computes beta ---
+         ! --- Step 6: south rank computes beta ---
          beta = 0.0_SP
          if (grid%jproc == 0) then
             do i = lp%ib, lp%ie
@@ -489,7 +906,7 @@ contains
             end do
          end if
 
-         ! --- Step 8: broadcast beta along y-column (same iproc) ---
+         ! --- Step 7: broadcast beta along y-column (same iproc) ---
          if (grid%ny_proc > 1) then
             if (grid%jproc == 0) then
                do k = 1, grid%ny_proc - 1
@@ -501,7 +918,7 @@ contains
             end if
          end if
 
-         ! --- Step 9: combine ---
+         ! --- Step 8: combine ---
          !$omp parallel do default(shared) schedule(static) private(i)
          do j = lp%jb, lp%je
             do i = lp%ib, lp%ie
