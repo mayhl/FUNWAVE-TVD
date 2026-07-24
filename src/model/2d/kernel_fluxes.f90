@@ -7,6 +7,11 @@ module model_kernel_fluxes_mod
 
    real(SP), parameter :: SMALL = 1.0e-6_SP
 
+   ! j-strip height for the blocked fourth-order construction pass:
+   ! sized so a strip of the ~20 construct/assemble arrays stays
+   ! L2-resident on production tile widths (perf audit, cache rung)
+   integer, parameter :: J_BLOCK = 32
+
    ! Interface arrays for one time-step; caller allocates once and reuses.
    type, public :: type_flux_workspace
       integer :: m = 0, n = 0
@@ -54,7 +59,7 @@ module model_kernel_fluxes_mod
    public :: weno_construct_x, weno_construct_y
    public :: wave_speed, hll
    public :: flux_at_interface, flux_at_interface_hll
-   public :: construction, construction_ho
+   public :: construction, fluxes_ho_blocked
    public :: construction_ho_minmod, construction_ho_mlp
    public :: construction_weno
    public :: fluxes, flux_wall_bc, flux_dry_bc
@@ -667,10 +672,27 @@ contains
       real(SP), intent(in)  :: vyl(:, :), vyr(:, :), hyl(:, :), hyr(:, :)
       real(SP), intent(out) :: sxl(:, :), sxr(:, :)
       real(SP), intent(out) :: syl(:, :), syr(:, :)
+      call wave_speed_strip(lp, 1, lp%nloc + 1, uxl, uxr, vyl, vyr, &
+                            hxl, hxr, hyl, hyr, sxl, sxr, syl, syr)
+      call wave_speed_bands(lp, sxl, sxr, syl, syr)
+   end subroutine wave_speed
+
+   ! ----------------------------------------------------------------
+   ! Interior wave-speed compute over a row strip (ghost bands are
+   ! mirror fills of these values — wave_speed_bands, post-pass).
+   ! ----------------------------------------------------------------
+   pure subroutine wave_speed_strip(lp, js, je, uxl, uxr, vyl, vyr, &
+                                    hxl, hxr, hyl, hyr, sxl, sxr, syl, syr)
+      type(type_loop_bounds), intent(in) :: lp
+      integer, intent(in) :: js, je
+      real(SP), intent(in)  :: uxl(:, :), uxr(:, :), hxl(:, :), hxr(:, :)
+      real(SP), intent(in)  :: vyl(:, :), vyr(:, :), hyl(:, :), hyr(:, :)
+      real(SP), intent(inout) :: sxl(:, :), sxr(:, :)
+      real(SP), intent(inout) :: syl(:, :), syr(:, :)
       integer  :: i, j, m, n, m1, n1
       real(SP) :: spl, spr, sps, us
       m = lp%mloc; n = lp%nloc; m1 = m + 1; n1 = n + 1
-      do j = 1 + N_GHOST, n - N_GHOST
+      do j = max(js, 1 + N_GHOST), min(je, n - N_GHOST)
          do i = 1 + N_GHOST, m1 - N_GHOST
             spl = sqrt(GRAV*abs(hxl(i, j))); spr = sqrt(GRAV*abs(hxr(i, j)))
             sps = 0.5_SP*(spl + spr) + 0.25_SP*(uxl(i, j) - uxr(i, j))
@@ -679,6 +701,29 @@ contains
             sxr(i, j) = max(uxr(i, j) + spr, us + sps)
          end do
       end do
+      do j = max(js, 1 + N_GHOST), min(je, n1 - N_GHOST)
+         do i = 1 + N_GHOST, m - N_GHOST
+            spl = sqrt(GRAV*abs(hyl(i, j))); spr = sqrt(GRAV*abs(hyr(i, j)))
+            sps = 0.5_SP*(spl + spr) + 0.25_SP*(vyl(i, j) - vyr(i, j))
+            us = 0.5_SP*(vyl(i, j) + vyr(i, j)) + spl - spr
+            syl(i, j) = min(vyl(i, j) - spl, us - sps)
+            syr(i, j) = max(vyr(i, j) + spr, us + sps)
+         end do
+      end do
+   end subroutine wave_speed_strip
+
+   ! ----------------------------------------------------------------
+   ! Ghost-band mirror fills for the wave speeds.  Reads only interior
+   ! values (or bands filled earlier in this routine), so it must run
+   ! after ALL interior strips — order of the four groups preserved
+   ! from the original fused form.
+   ! ----------------------------------------------------------------
+   pure subroutine wave_speed_bands(lp, sxl, sxr, syl, syr)
+      type(type_loop_bounds), intent(in) :: lp
+      real(SP), intent(inout) :: sxl(:, :), sxr(:, :)
+      real(SP), intent(inout) :: syl(:, :), syr(:, :)
+      integer  :: i, j, m, n, m1, n1
+      m = lp%mloc; n = lp%nloc; m1 = m + 1; n1 = n + 1
       do j = 1 + N_GHOST, n - N_GHOST
          do i = 1, N_GHOST
             sxl(i, j) = sxl(N_GHOST + 1, j); sxr(i, j) = sxr(N_GHOST + 1, j)
@@ -693,15 +738,6 @@ contains
          end do
          do j = n - N_GHOST + 1, n
             sxl(i, j) = sxl(i, n - N_GHOST); sxr(i, j) = sxr(i, n - N_GHOST)
-         end do
-      end do
-      do j = 1 + N_GHOST, n1 - N_GHOST
-         do i = 1 + N_GHOST, m - N_GHOST
-            spl = sqrt(GRAV*abs(hyl(i, j))); spr = sqrt(GRAV*abs(hyr(i, j)))
-            sps = 0.5_SP*(spl + spr) + 0.25_SP*(vyl(i, j) - vyr(i, j))
-            us = 0.5_SP*(vyl(i, j) + vyr(i, j)) + spl - spr
-            syl(i, j) = min(vyl(i, j) - spl, us - sps)
-            syr(i, j) = max(vyr(i, j) + spr, us + sps)
          end do
       end do
       do i = 1 + N_GHOST, m - N_GHOST
@@ -720,19 +756,20 @@ contains
             syl(i, j) = syl(m - N_GHOST, j); syr(i, j) = syr(m - N_GHOST, j)
          end do
       end do
-   end subroutine wave_speed
+   end subroutine wave_speed_bands
 
    ! ----------------------------------------------------------------
    ! HLL flux kernel.
    ! ----------------------------------------------------------------
-   pure subroutine hll(sl, sr, fl, fr, ul, ur, fout)
+   pure subroutine hll(sl, sr, fl, fr, ul, ur, fout, is, ie, js, je)
       real(SP), intent(in)  :: sl(:, :), sr(:, :)
       real(SP), intent(in)  :: fl(:, :), fr(:, :), ul(:, :), ur(:, :)
-      real(SP), intent(out) :: fout(:, :)
+      real(SP), intent(inout) :: fout(:, :)
+      integer, intent(in)   :: is, ie, js, je
       real(SP) :: denom
       integer  :: i, j
-      do j = 1, size(fout, 2)
-         do i = 1, size(fout, 1)
+      do j = js, je
+         do i = is, ie
             if (sl(i, j) >= 0.0_SP) then
                fout(i, j) = fl(i, j)
             else if (sr(i, j) <= 0.0_SP) then
@@ -752,42 +789,67 @@ contains
    ! ----------------------------------------------------------------
    subroutine flux_at_interface(ws)
       type(type_flux_workspace), intent(inout) :: ws
-      ws%p = 0.5_SP*(ws%pr + ws%pl)
-      ws%fx = 0.5_SP*(ws%fxr + ws%fxl)
-      ws%gx = 0.5_SP*(ws%gxr + ws%gxl)
-      ws%q = 0.5_SP*(ws%qr + ws%ql)
-      ws%fy = 0.5_SP*(ws%fyr + ws%fyl)
-      ws%gy = 0.5_SP*(ws%gyr + ws%gyl)
+      call flux_interface_avg_x(ws, 1, ws%m + 1, 1, ws%n)
+      call flux_interface_avg_y(ws, 1, ws%m, 1, ws%n + 1)
    end subroutine flux_at_interface
+
+   subroutine flux_interface_avg_x(ws, is, ie, js, je)
+      type(type_flux_workspace), intent(inout) :: ws
+      integer, intent(in) :: is, ie, js, je
+      ws%p(is:ie, js:je) = 0.5_SP*(ws%pr(is:ie, js:je) + ws%pl(is:ie, js:je))
+      ws%fx(is:ie, js:je) = 0.5_SP*(ws%fxr(is:ie, js:je) + ws%fxl(is:ie, js:je))
+      ws%gx(is:ie, js:je) = 0.5_SP*(ws%gxr(is:ie, js:je) + ws%gxl(is:ie, js:je))
+   end subroutine flux_interface_avg_x
+
+   subroutine flux_interface_avg_y(ws, is, ie, js, je)
+      type(type_flux_workspace), intent(inout) :: ws
+      integer, intent(in) :: is, ie, js, je
+      ws%q(is:ie, js:je) = 0.5_SP*(ws%qr(is:ie, js:je) + ws%ql(is:ie, js:je))
+      ws%fy(is:ie, js:je) = 0.5_SP*(ws%fyr(is:ie, js:je) + ws%fyl(is:ie, js:je))
+      ws%gy(is:ie, js:je) = 0.5_SP*(ws%gyr(is:ie, js:je) + ws%gyl(is:ie, js:je))
+   end subroutine flux_interface_avg_y
 
    ! ----------------------------------------------------------------
    ! HLL-based flux.
    ! ----------------------------------------------------------------
    subroutine flux_at_interface_hll(ws)
       type(type_flux_workspace), intent(inout) :: ws
-      call hll(ws%sxl, ws%sxr, ws%pl, ws%pr, ws%etarxl, ws%etarxr, ws%p)
-      call hll(ws%syl, ws%syr, ws%ql, ws%qr, ws%etaryl, ws%etaryr, ws%q)
-      call hll(ws%sxl, ws%sxr, ws%fxl, ws%fxr, ws%huxl, ws%huxr, ws%fx)
-      call hll(ws%syl, ws%syr, ws%fyl, ws%fyr, ws%huyl, ws%huyr, ws%fy)
-      call hll(ws%sxl, ws%sxr, ws%gxl, ws%gxr, ws%hvxl, ws%hvxr, ws%gx)
-      call hll(ws%syl, ws%syr, ws%gyl, ws%gyr, ws%hvyl, ws%hvyr, ws%gy)
+      call flux_interface_hll_x(ws, 1, ws%m + 1, 1, ws%n)
+      call flux_interface_hll_y(ws, 1, ws%m, 1, ws%n + 1)
    end subroutine flux_at_interface_hll
+
+   subroutine flux_interface_hll_x(ws, is, ie, js, je)
+      type(type_flux_workspace), intent(inout) :: ws
+      integer, intent(in) :: is, ie, js, je
+      call hll(ws%sxl, ws%sxr, ws%pl, ws%pr, ws%etarxl, ws%etarxr, ws%p, is, ie, js, je)
+      call hll(ws%sxl, ws%sxr, ws%fxl, ws%fxr, ws%huxl, ws%huxr, ws%fx, is, ie, js, je)
+      call hll(ws%sxl, ws%sxr, ws%gxl, ws%gxr, ws%hvxl, ws%hvxr, ws%gx, is, ie, js, je)
+   end subroutine flux_interface_hll_x
+
+   subroutine flux_interface_hll_y(ws, is, ie, js, je)
+      type(type_flux_workspace), intent(inout) :: ws
+      integer, intent(in) :: is, ie, js, je
+      call hll(ws%syl, ws%syr, ws%ql, ws%qr, ws%etaryl, ws%etaryr, ws%q, is, ie, js, je)
+      call hll(ws%syl, ws%syr, ws%fyl, ws%fyr, ws%huyl, ws%huyr, ws%fy, is, ie, js, je)
+      call hll(ws%syl, ws%syr, ws%gyl, ws%gyr, ws%hvyl, ws%hvyr, ws%gy, is, ie, js, je)
+   end subroutine flux_interface_hll_y
 
    ! ----------------------------------------------------------------
    ! Private helper: assemble P/Fx/Gx from x-interface arrays.
    ! ----------------------------------------------------------------
-   subroutine assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
+   subroutine assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, js, je)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_flux_workspace), intent(inout) :: ws
       real(SP), intent(in) :: depthx(:, :), gamma1, gamma3
       integer, intent(in) :: mask9(:, :)
       logical, intent(in) :: dispersion
+      integer, intent(in) :: js, je   ! row strip, ghosts included (1..n)
       integer  :: i, j, ii
       real(SP) :: u4l, u4r, v4l, v4r
-      ws%hxl = ws%etarxl + depthx
-      ws%hxr = ws%etarxr + depthx
+      ws%hxl(:, js:je) = ws%etarxl(:, js:je) + depthx(:, js:je)
+      ws%hxr(:, js:je) = ws%etarxr(:, js:je) + depthx(:, js:je)
       if (dispersion) then
-         do j = 1, ws%n
+         do j = js, je
             do i = 1, ws%m + 1
                ii = min(i, ws%m)
                u4l = gamma1*mask9(ii, j)*ws%u4xl(i, j)
@@ -805,32 +867,37 @@ contains
             end do
          end do
       else
-         ws%pl = ws%huxl
-         ws%pr = ws%huxr
-         ws%fxl = gamma3*ws%pl*ws%uxl &
-                  + 0.5_SP*GRAV*(gamma3*ws%etarxl**2 + 2.0_SP*ws%etarxl*depthx)
-         ws%fxr = gamma3*ws%pr*ws%uxr &
-                  + 0.5_SP*GRAV*(gamma3*ws%etarxr**2 + 2.0_SP*ws%etarxr*depthx)
-         ws%gxl = gamma3*ws%hxl*ws%uxl*ws%vxl
-         ws%gxr = gamma3*ws%hxr*ws%uxr*ws%vxr
+         do j = js, je
+            do i = 1, ws%m + 1
+               ws%pl(i, j) = ws%huxl(i, j)
+               ws%pr(i, j) = ws%huxr(i, j)
+               ws%fxl(i, j) = gamma3*ws%pl(i, j)*ws%uxl(i, j) &
+                              + 0.5_SP*GRAV*(gamma3*ws%etarxl(i, j)**2 + 2.0_SP*ws%etarxl(i, j)*depthx(i, j))
+               ws%fxr(i, j) = gamma3*ws%pr(i, j)*ws%uxr(i, j) &
+                              + 0.5_SP*GRAV*(gamma3*ws%etarxr(i, j)**2 + 2.0_SP*ws%etarxr(i, j)*depthx(i, j))
+               ws%gxl(i, j) = gamma3*ws%hxl(i, j)*ws%uxl(i, j)*ws%vxl(i, j)
+               ws%gxr(i, j) = gamma3*ws%hxr(i, j)*ws%uxr(i, j)*ws%vxr(i, j)
+            end do
+         end do
       end if
    end subroutine assemble_x
 
    ! ----------------------------------------------------------------
    ! Private helper: assemble Q/Fy/Gy from y-interface arrays.
    ! ----------------------------------------------------------------
-   subroutine assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
+   subroutine assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, js, je)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_flux_workspace), intent(inout) :: ws
       real(SP), intent(in) :: depthy(:, :), gamma1, gamma3
       integer, intent(in) :: mask9(:, :)
       logical, intent(in) :: dispersion
+      integer, intent(in) :: js, je   ! row strip, ghosts included (1..n+1)
       integer  :: i, j, jj
       real(SP) :: u4l, u4r, v4l, v4r
-      ws%hyl = ws%etaryl + depthy
-      ws%hyr = ws%etaryr + depthy
+      ws%hyl(:, js:je) = ws%etaryl(:, js:je) + depthy(:, js:je)
+      ws%hyr(:, js:je) = ws%etaryr(:, js:je) + depthy(:, js:je)
       if (dispersion) then
-         do j = 1, ws%n + 1
+         do j = js, je
             jj = min(j, ws%n)
             do i = 1, ws%m
                v4l = gamma1*mask9(i, jj)*ws%v4yl(i, j)
@@ -848,14 +915,18 @@ contains
             end do
          end do
       else
-         ws%ql = ws%hvyl
-         ws%qr = ws%hvyr
-         ws%gyl = gamma3*ws%ql*ws%vyl &
-                  + 0.5_SP*GRAV*(gamma3*ws%etaryl**2 + 2.0_SP*ws%etaryl*depthy)
-         ws%gyr = gamma3*ws%qr*ws%vyr &
-                  + 0.5_SP*GRAV*(gamma3*ws%etaryr**2 + 2.0_SP*ws%etaryr*depthy)
-         ws%fyl = gamma3*ws%hyl*ws%uyl*ws%vyl
-         ws%fyr = gamma3*ws%hyr*ws%uyr*ws%vyr
+         do j = js, je
+            do i = 1, ws%m
+               ws%ql(i, j) = ws%hvyl(i, j)
+               ws%qr(i, j) = ws%hvyr(i, j)
+               ws%gyl(i, j) = gamma3*ws%ql(i, j)*ws%vyl(i, j) &
+                              + 0.5_SP*GRAV*(gamma3*ws%etaryl(i, j)**2 + 2.0_SP*ws%etaryl(i, j)*depthy(i, j))
+               ws%gyr(i, j) = gamma3*ws%qr(i, j)*ws%vyr(i, j) &
+                              + 0.5_SP*GRAV*(gamma3*ws%etaryr(i, j)**2 + 2.0_SP*ws%etaryr(i, j)*depthy(i, j))
+               ws%fyl(i, j) = gamma3*ws%hyl(i, j)*ws%uyl(i, j)*ws%vyl(i, j)
+               ws%fyr(i, j) = gamma3*ws%hyr(i, j)*ws%uyr(i, j)*ws%vyr(i, j)
+            end do
+         end do
       end if
    end subroutine assemble_y
 
@@ -883,7 +954,7 @@ contains
          call delx_fun(inv_dx, u4, ws%sl); call construct_x(dx, u4, ws%sl, ws%u4xl, ws%u4xr)
          call delx_fun(inv_dx, v4, ws%sl); call construct_x(dx, v4, ws%sl, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, 1, lp%nloc)
       call dely_fun(inv_dy, eta, ws%sl); call construct_y(dy, eta, ws%sl, ws%etaryl, ws%etaryr)
       call dely_fun(inv_dy, u, ws%sl); call construct_y(dy, u, ws%sl, ws%uyl, ws%uyr)
       call dely_fun(inv_dy, v, ws%sl); call construct_y(dy, v, ws%sl, ws%vyl, ws%vyr)
@@ -893,15 +964,18 @@ contains
          call dely_fun(inv_dy, v4, ws%sl); call construct_y(dy, v4, ws%sl, ws%v4yl, ws%v4yr)
          call dely_fun(inv_dy, u4, ws%sl); call construct_y(dy, u4, ws%sl, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, 1, lp%nloc + 1)
    end subroutine construction
 
    ! ----------------------------------------------------------------
-   ! High-order CONSTRUCTION ('FOU'): 4th-order van Leer+minmod.
+   ! High-order 'FOU' path, j-strip blocked end to end: 4th-order
+   ! van Leer+minmod construction, wave speeds, and interface fluxes.
    ! ----------------------------------------------------------------
-   subroutine construction_ho(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                              mask, mask9, gamma1, gamma3, dispersion, ws)
+   subroutine fluxes_ho_blocked(lp, constr, eta, u, v, hu, hv, u4, v4, &
+                                depthx, depthy, mask, mask9, gamma1, gamma3, &
+                                dispersion, ws)
       type(type_loop_bounds), intent(in)    :: lp
+      character(len=*), intent(in)    :: constr
       real(SP), intent(in)  :: eta(:, :), u(:, :), v(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
@@ -909,27 +983,90 @@ contains
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
-      call construct_ho_x(lp, mask, eta, ws%etarxl, ws%etarxr)
-      call construct_ho_x(lp, mask, u, ws%uxl, ws%uxr)
-      call construct_ho_x(lp, mask, v, ws%vxl, ws%vxr)
-      call construct_ho_x(lp, mask, hu, ws%huxl, ws%huxr)
-      call construct_ho_x(lp, mask, hv, ws%hvxl, ws%hvxr)
-      if (dispersion) then
-         call construct_ho_x(lp, mask, u4, ws%u4xl, ws%u4xr)
-         call construct_ho_x(lp, mask, v4, ws%v4xl, ws%v4xr)
+      type(type_loop_bounds) :: lps
+      integer :: j0, j1, jsx, jex, jsy, jey, ng, m, n, m1, n1
+      logical :: use_hll
+      use_hll = constr(1:3) == "HLL"
+      ng = N_GHOST; m = lp%mloc; n = lp%nloc; m1 = m + 1; n1 = n + 1
+      ! j-strip blocking: run every sweep — constructs, assembles,
+      ! wave speeds, interface fluxes — over one strip of rows before
+      ! moving north, so each stage's outputs are still cache-resident
+      ! when the next re-reads them.  Pure visit-order change — the
+      ! kernels are pointwise or read-only-stencil in j, so per-cell
+      ! arithmetic is untouched (bitwise); the y-kernels' je+1 seam row
+      ! is recomputed identically by the next strip.  Interface fluxes
+      ! cover only the interior-complete block in-strip; ghost rows and
+      ! cols wait on the wave-speed mirror fills (post-pass below).
+      ! FUTURE: extend to the other reconstruction variants if the
+      ! FOU win holds
+      lps = lp
+      do j0 = 1, n1, J_BLOCK
+         j1 = min(j0 + J_BLOCK - 1, n1)
+         lps%jb = max(lp%jb, j0)
+         lps%je = min(lp%je, j1)
+         if (lps%jb <= lps%je) then
+            call construct_ho_x(lps, mask, eta, ws%etarxl, ws%etarxr)
+            call construct_ho_x(lps, mask, u, ws%uxl, ws%uxr)
+            call construct_ho_x(lps, mask, v, ws%vxl, ws%vxr)
+            call construct_ho_x(lps, mask, hu, ws%huxl, ws%huxr)
+            call construct_ho_x(lps, mask, hv, ws%hvxl, ws%hvxr)
+            if (dispersion) then
+               call construct_ho_x(lps, mask, u4, ws%u4xl, ws%u4xr)
+               call construct_ho_x(lps, mask, v4, ws%v4xl, ws%v4xr)
+            end if
+         end if
+         if (j0 <= n) then
+            call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, &
+                            j0, min(j1, n))
+         end if
+         if (lps%jb <= lps%je) then
+            call construct_ho_y(lps, mask, eta, ws%etaryl, ws%etaryr)
+            call construct_ho_y(lps, mask, u, ws%uyl, ws%uyr)
+            call construct_ho_y(lps, mask, v, ws%vyl, ws%vyr)
+            call construct_ho_y(lps, mask, hv, ws%hvyl, ws%hvyr)
+            call construct_ho_y(lps, mask, hu, ws%huyl, ws%huyr)
+            if (dispersion) then
+               call construct_ho_y(lps, mask, v4, ws%v4yl, ws%v4yr)
+               call construct_ho_y(lps, mask, u4, ws%u4yl, ws%u4yr)
+            end if
+         end if
+         call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, j0, j1)
+         call wave_speed_strip(lp, j0, j1, ws%uxl, ws%uxr, ws%vyl, ws%vyr, &
+                               ws%hxl, ws%hxr, ws%hyl, ws%hyr, &
+                               ws%sxl, ws%sxr, ws%syl, ws%syr)
+         jsx = max(j0, 1 + ng); jex = min(j1, n - ng)
+         jsy = max(j0, 1 + ng); jey = min(j1, n1 - ng)
+         if (use_hll) then
+            if (jsx <= jex) call flux_interface_hll_x(ws, 1 + ng, m1 - ng, jsx, jex)
+            if (jsy <= jey) call flux_interface_hll_y(ws, 1 + ng, m - ng, jsy, jey)
+         else
+            if (jsx <= jex) call flux_interface_avg_x(ws, 1 + ng, m1 - ng, jsx, jex)
+            if (jsy <= jey) call flux_interface_avg_y(ws, 1 + ng, m - ng, jsy, jey)
+         end if
+      end do
+      call wave_speed_bands(lp, ws%sxl, ws%sxr, ws%syl, ws%syr)
+      ! ghost-frame interface fluxes: south/north rows full-width,
+      ! west/east cols over the interior rows
+      if (use_hll) then
+         call flux_interface_hll_x(ws, 1, m1, 1, ng)
+         call flux_interface_hll_x(ws, 1, m1, n - ng + 1, n)
+         call flux_interface_hll_x(ws, 1, ng, ng + 1, n - ng)
+         call flux_interface_hll_x(ws, m1 - ng + 1, m1, ng + 1, n - ng)
+         call flux_interface_hll_y(ws, 1, m, 1, ng)
+         call flux_interface_hll_y(ws, 1, m, n1 - ng + 1, n1)
+         call flux_interface_hll_y(ws, 1, ng, ng + 1, n1 - ng)
+         call flux_interface_hll_y(ws, m - ng + 1, m, ng + 1, n1 - ng)
+      else
+         call flux_interface_avg_x(ws, 1, m1, 1, ng)
+         call flux_interface_avg_x(ws, 1, m1, n - ng + 1, n)
+         call flux_interface_avg_x(ws, 1, ng, ng + 1, n - ng)
+         call flux_interface_avg_x(ws, m1 - ng + 1, m1, ng + 1, n - ng)
+         call flux_interface_avg_y(ws, 1, m, 1, ng)
+         call flux_interface_avg_y(ws, 1, m, n1 - ng + 1, n1)
+         call flux_interface_avg_y(ws, 1, ng, ng + 1, n1 - ng)
+         call flux_interface_avg_y(ws, m - ng + 1, m, ng + 1, n1 - ng)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
-      call construct_ho_y(lp, mask, eta, ws%etaryl, ws%etaryr)
-      call construct_ho_y(lp, mask, u, ws%uyl, ws%uyr)
-      call construct_ho_y(lp, mask, v, ws%vyl, ws%vyr)
-      call construct_ho_y(lp, mask, hv, ws%hvyl, ws%hvyr)
-      call construct_ho_y(lp, mask, hu, ws%huyl, ws%huyr)
-      if (dispersion) then
-         call construct_ho_y(lp, mask, v4, ws%v4yl, ws%v4yr)
-         call construct_ho_y(lp, mask, u4, ws%u4yl, ws%u4yr)
-      end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
-   end subroutine construction_ho
+   end subroutine fluxes_ho_blocked
 
    ! ----------------------------------------------------------------
    ! 'FMI': 4th-order minmod-only.
@@ -953,7 +1090,7 @@ contains
          call construct_ho_x_minmod(lp, mask, u4, ws%u4xl, ws%u4xr)
          call construct_ho_x_minmod(lp, mask, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, 1, lp%nloc)
       call construct_ho_y_minmod(lp, mask, eta, ws%etaryl, ws%etaryr)
       call construct_ho_y_minmod(lp, mask, u, ws%uyl, ws%uyr)
       call construct_ho_y_minmod(lp, mask, v, ws%vyl, ws%vyr)
@@ -963,7 +1100,7 @@ contains
          call construct_ho_y_minmod(lp, mask, v4, ws%v4yl, ws%v4yr)
          call construct_ho_y_minmod(lp, mask, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, 1, lp%nloc + 1)
    end subroutine construction_ho_minmod
 
    ! ----------------------------------------------------------------
@@ -988,7 +1125,7 @@ contains
          call construct_ho_x_mlp(lp, mask, u4, ws%u4xl, ws%u4xr)
          call construct_ho_x_mlp(lp, mask, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, 1, lp%nloc)
       call construct_ho_y_mlp(lp, mask, eta, ws%etaryl, ws%etaryr)
       call construct_ho_y_mlp(lp, mask, u, ws%uyl, ws%uyr)
       call construct_ho_y_mlp(lp, mask, v, ws%vyl, ws%vyr)
@@ -998,7 +1135,7 @@ contains
          call construct_ho_y_mlp(lp, mask, v4, ws%v4yl, ws%v4yr)
          call construct_ho_y_mlp(lp, mask, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, 1, lp%nloc + 1)
    end subroutine construction_ho_mlp
 
    ! ----------------------------------------------------------------
@@ -1023,7 +1160,7 @@ contains
          call weno_construct_x(lp, u4, ws%u4xl, ws%u4xr)
          call weno_construct_x(lp, v4, ws%v4xl, ws%v4xr)
       end if
-      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion)
+      call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, 1, lp%nloc)
       call weno_construct_y(lp, eta, ws%etaryl, ws%etaryr)
       call weno_construct_y(lp, u, ws%uyl, ws%uyr)
       call weno_construct_y(lp, v, ws%vyl, ws%vyr)
@@ -1033,7 +1170,7 @@ contains
          call weno_construct_y(lp, v4, ws%v4yl, ws%v4yr)
          call weno_construct_y(lp, u4, ws%u4yl, ws%u4yr)
       end if
-      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion)
+      call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, 1, lp%nloc + 1)
    end subroutine construction_weno
 
    ! ----------------------------------------------------------------
@@ -1054,10 +1191,16 @@ contains
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
 
+      ! the FOU default path is j-strip blocked through the whole
+      ! chain; the other variants keep the full-sweep structure
+      if (high_order(1:3) == "FOU") then
+         call fluxes_ho_blocked(lp, constr, eta, u, v, hu, hv, u4, v4, &
+                                depthx, depthy, mask, mask9, gamma1, gamma3, &
+                                dispersion, ws)
+         return
+      end if
+
       select case (high_order(1:3))
-      case ("FOU")
-         call construction_ho(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
-                              mask, mask9, gamma1, gamma3, dispersion, ws)
       case ("FMI")
          call construction_ho_minmod(lp, eta, u, v, hu, hv, u4, v4, depthx, depthy, &
                                      mask, mask9, gamma1, gamma3, dispersion, ws)
