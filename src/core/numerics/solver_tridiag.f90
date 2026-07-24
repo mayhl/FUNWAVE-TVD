@@ -42,6 +42,8 @@ module core_solver_tridiag_mod
    ! Transpose-path probe state (see trid_use_transpose)
    integer :: trid_algo_saved = 0
 
+   logical :: ts_notice_done = .false.
+
    ! Transpose-path persistent buffers — grow-only, sized on first
    ! solve (grid extents are run-constant); avoids per-stage heap
    ! churn.  Message buffers are shared by both all-to-all phases.
@@ -750,6 +752,13 @@ contains
       if (present(d2)) nrhs = 2
       nfin = 2 + nrhs
 
+      ! one-time engagement notice — a silently-inert probe knob reads
+      ! as a trivially-passing A/B (the 313158 lesson)
+      if (.not. ts_notice_done .and. grid%iproc == 0 .and. me == 0) then
+         write (*, '(a)') "solver_tridiag: transpose path active"
+         ts_notice_done = .true.
+      end if
+
       allocate (wq(0:py - 1), x0(0:py - 1), nyp(0:py - 1), yoff(0:py - 1))
       allocate (scnt(0:py - 1), sdsp(0:py - 1), rcnt(0:py - 1), rdsp(0:py - 1))
 
@@ -973,15 +982,18 @@ contains
             a_beg = a_loc(lp%ib, :)
             c_end = c1(lp%ie, :)
          else
+            ! Sendrecv — see the deadlock note in trid_y_periodic
             if (grid%iproc == 0) then
                a_beg = a_loc(lp%ib, :)
-               call MPI_Send(a_beg, lp%nloc, MPI_SP, east_rank, 20, grid%cart_comm, ierr)
-               call MPI_Recv(c_end, lp%nloc, MPI_SP, east_rank, 21, grid%cart_comm, stat, ierr)
+               call MPI_Sendrecv(a_beg, lp%nloc, MPI_SP, east_rank, 20, &
+                                 c_end, lp%nloc, MPI_SP, east_rank, 21, &
+                                 grid%cart_comm, stat, ierr)
             end if
             if (grid%iproc == grid%nx_proc - 1) then
                c_end = c1(lp%ie, :)
-               call MPI_Send(c_end, lp%nloc, MPI_SP, west_rank, 21, grid%cart_comm, ierr)
-               call MPI_Recv(a_beg, lp%nloc, MPI_SP, west_rank, 20, grid%cart_comm, stat, ierr)
+               call MPI_Sendrecv(c_end, lp%nloc, MPI_SP, west_rank, 21, &
+                                 a_beg, lp%nloc, MPI_SP, west_rank, 20, &
+                                 grid%cart_comm, stat, ierr)
             end if
          end if
 
@@ -1108,15 +1120,20 @@ contains
             a_beg = a_loc(:, lp%jb)
             c_end = c1(:, lp%je)
          else
+            ! Sendrecv: the send-then-recv ordering on both chain ends
+            ! deadlocks once mloc exceeds the eager threshold (latent
+            ! in legacy too — small tiles never rendezvous)
             if (grid%jproc == 0) then   ! southernmost (jproc=0)
                a_beg = a_loc(:, lp%jb)
-               call MPI_Send(a_beg, lp%mloc, MPI_SP, north_rank, 30, grid%cart_comm, ierr)
-               call MPI_Recv(c_end, lp%mloc, MPI_SP, north_rank, 31, grid%cart_comm, stat, ierr)
+               call MPI_Sendrecv(a_beg, lp%mloc, MPI_SP, north_rank, 30, &
+                                 c_end, lp%mloc, MPI_SP, north_rank, 31, &
+                                 grid%cart_comm, stat, ierr)
             end if
             if (grid%jproc == grid%ny_proc - 1) then    ! northernmost (jproc=PY-1)
                c_end = c1(:, lp%je)
-               call MPI_Send(c_end, lp%mloc, MPI_SP, south_rank, 31, grid%cart_comm, ierr)
-               call MPI_Recv(a_beg, lp%mloc, MPI_SP, south_rank, 30, grid%cart_comm, stat, ierr)
+               call MPI_Sendrecv(c_end, lp%mloc, MPI_SP, south_rank, 31, &
+                                 a_beg, lp%mloc, MPI_SP, south_rank, 30, &
+                                 grid%cart_comm, stat, ierr)
             end if
          end if
 
