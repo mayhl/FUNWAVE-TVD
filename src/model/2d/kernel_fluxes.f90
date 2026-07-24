@@ -286,11 +286,12 @@ contains
    ! ----------------------------------------------------------------
    ! 4th-order MUSCL-TVD in y: van Leer (3rd) + minmod (4th).
    ! ----------------------------------------------------------------
-   pure subroutine construct_ho_y(lp, mask, vin, outl, outr)
+   pure subroutine construct_ho_y(lp, mask, vin, outl, outr, js, je)
       type(type_loop_bounds), intent(in) :: lp
       integer, intent(in)  :: mask(:, :)
       real(SP), intent(in)  :: vin(:, :)
       real(SP), intent(out) :: outl(:, :), outr(:, :)
+      integer, intent(in)  :: js, je   ! face rows to write (full sweep = jb..je+1)
       real(SP) :: din(lp%mloc, lp%nloc)
       real(SP) :: typ1, typ2, typ3, dvp1, dvp2, dvp3
       real(SP) :: van1, van2, rat, tmp1, tmp2
@@ -298,7 +299,7 @@ contains
       ! no din zero-fill: every read row below is written first
       ! two j-outer nests like the minmod sibling — the fused per-i
       ! form walked both inner loops at stride mloc (perf audit item 2)
-      do j = lp%jb - 1, lp%je + 2
+      do j = js - 1, je + 1
          do i = lp%ib, lp%ie
             typ1 = vin(i, j - 1) - vin(i, j - 2)
             typ2 = vin(i, j) - vin(i, j - 1)
@@ -319,7 +320,7 @@ contains
             din(i, j) = typ2 - (1.0_SP/6.0_SP)*(dvp3 - 2.0_SP*dvp2 + dvp1)
          end do
       end do
-      do j = lp%jb, lp%je + 1
+      do j = js, je
          do i = lp%ib, lp%ie
             tmp1 = din(i, j - 1); tmp2 = din(i, j)
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
@@ -984,7 +985,7 @@ contains
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
       type(type_loop_bounds) :: lps
-      integer :: j0, j1, jsx, jex, jsy, jey, ng, m, n, m1, n1
+      integer :: j0, j1, jsx, jex, jsy, jey, jsf, jef, ng, m, n, m1, n1
       logical :: use_hll
       use_hll = constr(1:3) == "HLL"
       ng = N_GHOST; m = lp%mloc; n = lp%nloc; m1 = m + 1; n1 = n + 1
@@ -993,13 +994,19 @@ contains
       ! moving north, so each stage's outputs are still cache-resident
       ! when the next re-reads them.  Pure visit-order change — the
       ! kernels are pointwise or read-only-stencil in j, so per-cell
-      ! arithmetic is untouched (bitwise); the y-kernels' je+1 seam row
-      ! is recomputed identically by the next strip.  Interface fluxes
-      ! cover only the interior-complete block in-strip; ghost rows and
-      ! cols wait on the wave-speed mirror fills (post-pass below).
+      ! arithmetic is untouched (bitwise).  Every write is strip-owned:
+      ! the y-face rows are partitioned jsf..jef (a strip writes only
+      ! faces inside its own rows, no je+1 seam spill), so strips are
+      ! fully independent and the loop threads directly; static schedule
+      ! + identical per-strip arithmetic keeps any thread count bitwise.
+      ! Interface fluxes cover only the interior-complete block in-strip;
+      ! ghost rows and cols wait on the wave-speed mirror fills
+      ! (post-pass below, serial).
       ! FUTURE: extend to the other reconstruction variants if the
       ! FOU win holds
       lps = lp
+      !$omp parallel do default(shared) schedule(static) firstprivate(lps) &
+      !$omp& private(j1, jsx, jex, jsy, jey, jsf, jef)
       do j0 = 1, n1, J_BLOCK
          j1 = min(j0 + J_BLOCK - 1, n1)
          lps%jb = max(lp%jb, j0)
@@ -1019,15 +1026,16 @@ contains
             call assemble_x(lp, ws, depthx, mask9, gamma1, gamma3, dispersion, &
                             j0, min(j1, n))
          end if
-         if (lps%jb <= lps%je) then
-            call construct_ho_y(lps, mask, eta, ws%etaryl, ws%etaryr)
-            call construct_ho_y(lps, mask, u, ws%uyl, ws%uyr)
-            call construct_ho_y(lps, mask, v, ws%vyl, ws%vyr)
-            call construct_ho_y(lps, mask, hv, ws%hvyl, ws%hvyr)
-            call construct_ho_y(lps, mask, hu, ws%huyl, ws%huyr)
+         jsf = max(lp%jb, j0); jef = min(lp%je + 1, j1)
+         if (jsf <= jef) then
+            call construct_ho_y(lp, mask, eta, ws%etaryl, ws%etaryr, jsf, jef)
+            call construct_ho_y(lp, mask, u, ws%uyl, ws%uyr, jsf, jef)
+            call construct_ho_y(lp, mask, v, ws%vyl, ws%vyr, jsf, jef)
+            call construct_ho_y(lp, mask, hv, ws%hvyl, ws%hvyr, jsf, jef)
+            call construct_ho_y(lp, mask, hu, ws%huyl, ws%huyr, jsf, jef)
             if (dispersion) then
-               call construct_ho_y(lps, mask, v4, ws%v4yl, ws%v4yr)
-               call construct_ho_y(lps, mask, u4, ws%u4yl, ws%u4yr)
+               call construct_ho_y(lp, mask, v4, ws%v4yl, ws%v4yr, jsf, jef)
+               call construct_ho_y(lp, mask, u4, ws%u4yl, ws%u4yr, jsf, jef)
             end if
          end if
          call assemble_y(lp, ws, depthy, mask9, gamma1, gamma3, dispersion, j0, j1)
@@ -1044,6 +1052,7 @@ contains
             if (jsy <= jey) call flux_interface_avg_y(ws, 1 + ng, m - ng, jsy, jey)
          end if
       end do
+      !$omp end parallel do
       call wave_speed_bands(lp, ws%sxl, ws%sxr, ws%syl, ws%syr)
       ! ghost-frame interface fluxes: south/north rows full-width,
       ! west/east cols over the interior rows

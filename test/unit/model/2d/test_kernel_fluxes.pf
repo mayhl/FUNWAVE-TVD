@@ -202,7 +202,7 @@ contains
       end do
       outl = 0.0_SP;  outr = 0.0_SP
 
-      call construct_ho_y(lp, mask, uin, outl, outr)
+      call construct_ho_y(lp, mask, uin, outl, outr, lp%jb, lp%je + 1)
 
       do j = lp%jb, lp%je + 1
          do i = lp%ib, lp%ie
