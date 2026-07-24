@@ -57,7 +57,7 @@ module model_kernel_fluxes_mod
    public :: construct_ho_x_minmod, construct_ho_y_minmod
    public :: construct_ho_x_mlp, construct_ho_y_mlp
    public :: weno_construct_x, weno_construct_y
-   public :: wave_speed, hll
+   public :: wave_speed, hll3
    public :: flux_at_interface, flux_at_interface_hll
    public :: construction, fluxes_ho_blocked
    public :: construction_ho_minmod, construction_ho_mlp
@@ -760,30 +760,46 @@ contains
    end subroutine wave_speed_bands
 
    ! ----------------------------------------------------------------
-   ! HLL flux kernel.
+   ! HLL flux kernel over the three interface fluxes of one direction,
+   ! fused so the wave-speed strips stream once instead of once per
+   ! flux (perf audit, cache rung); branch and expression per flux
+   ! match the former single-flux kernel exactly.
    ! ----------------------------------------------------------------
-   pure subroutine hll(sl, sr, fl, fr, ul, ur, fout, is, ie, js, je)
+   pure subroutine hll3(sl, sr, f1l, f1r, u1l, u1r, f1out, &
+                        f2l, f2r, u2l, u2r, f2out, &
+                        f3l, f3r, u3l, u3r, f3out, is, ie, js, je)
       real(SP), intent(in)  :: sl(:, :), sr(:, :)
-      real(SP), intent(in)  :: fl(:, :), fr(:, :), ul(:, :), ur(:, :)
-      real(SP), intent(inout) :: fout(:, :)
+      real(SP), intent(in)  :: f1l(:, :), f1r(:, :), u1l(:, :), u1r(:, :)
+      real(SP), intent(in)  :: f2l(:, :), f2r(:, :), u2l(:, :), u2r(:, :)
+      real(SP), intent(in)  :: f3l(:, :), f3r(:, :), u3l(:, :), u3r(:, :)
+      real(SP), intent(inout) :: f1out(:, :), f2out(:, :), f3out(:, :)
       integer, intent(in)   :: is, ie, js, je
-      real(SP) :: denom
+      real(SP) :: rsl, rsr, denom
       integer  :: i, j
       do j = js, je
          do i = is, ie
-            if (sl(i, j) >= 0.0_SP) then
-               fout(i, j) = fl(i, j)
-            else if (sr(i, j) <= 0.0_SP) then
-               fout(i, j) = fr(i, j)
+            rsl = sl(i, j); rsr = sr(i, j)
+            if (rsl >= 0.0_SP) then
+               f1out(i, j) = f1l(i, j)
+               f2out(i, j) = f2l(i, j)
+               f3out(i, j) = f3l(i, j)
+            else if (rsr <= 0.0_SP) then
+               f1out(i, j) = f1r(i, j)
+               f2out(i, j) = f2r(i, j)
+               f3out(i, j) = f3r(i, j)
             else
-               denom = sr(i, j) - sl(i, j)
+               denom = rsr - rsl
                if (abs(denom) < SMALL) denom = SMALL
-               fout(i, j) = (sr(i, j)*fl(i, j) - sl(i, j)*fr(i, j) &
-                             + sl(i, j)*sr(i, j)*(ur(i, j) - ul(i, j)))/denom
+               f1out(i, j) = (rsr*f1l(i, j) - rsl*f1r(i, j) &
+                              + rsl*rsr*(u1r(i, j) - u1l(i, j)))/denom
+               f2out(i, j) = (rsr*f2l(i, j) - rsl*f2r(i, j) &
+                              + rsl*rsr*(u2r(i, j) - u2l(i, j)))/denom
+               f3out(i, j) = (rsr*f3l(i, j) - rsl*f3r(i, j) &
+                              + rsl*rsr*(u3r(i, j) - u3l(i, j)))/denom
             end if
          end do
       end do
-   end subroutine hll
+   end subroutine hll3
 
    ! ----------------------------------------------------------------
    ! Average-based flux (predictor / averaging approach).
@@ -822,17 +838,17 @@ contains
    subroutine flux_interface_hll_x(ws, is, ie, js, je)
       type(type_flux_workspace), intent(inout) :: ws
       integer, intent(in) :: is, ie, js, je
-      call hll(ws%sxl, ws%sxr, ws%pl, ws%pr, ws%etarxl, ws%etarxr, ws%p, is, ie, js, je)
-      call hll(ws%sxl, ws%sxr, ws%fxl, ws%fxr, ws%huxl, ws%huxr, ws%fx, is, ie, js, je)
-      call hll(ws%sxl, ws%sxr, ws%gxl, ws%gxr, ws%hvxl, ws%hvxr, ws%gx, is, ie, js, je)
+      call hll3(ws%sxl, ws%sxr, ws%pl, ws%pr, ws%etarxl, ws%etarxr, ws%p, &
+                ws%fxl, ws%fxr, ws%huxl, ws%huxr, ws%fx, &
+                ws%gxl, ws%gxr, ws%hvxl, ws%hvxr, ws%gx, is, ie, js, je)
    end subroutine flux_interface_hll_x
 
    subroutine flux_interface_hll_y(ws, is, ie, js, je)
       type(type_flux_workspace), intent(inout) :: ws
       integer, intent(in) :: is, ie, js, je
-      call hll(ws%syl, ws%syr, ws%ql, ws%qr, ws%etaryl, ws%etaryr, ws%q, is, ie, js, je)
-      call hll(ws%syl, ws%syr, ws%fyl, ws%fyr, ws%huyl, ws%huyr, ws%fy, is, ie, js, je)
-      call hll(ws%syl, ws%syr, ws%gyl, ws%gyr, ws%hvyl, ws%hvyr, ws%gy, is, ie, js, je)
+      call hll3(ws%syl, ws%syr, ws%ql, ws%qr, ws%etaryl, ws%etaryr, ws%q, &
+                ws%fyl, ws%fyr, ws%huyl, ws%huyr, ws%fy, &
+                ws%gyl, ws%gyr, ws%hvyl, ws%hvyr, ws%gy, is, ie, js, je)
    end subroutine flux_interface_hll_y
 
    ! ----------------------------------------------------------------
