@@ -162,7 +162,8 @@ contains
       eta = 0.0_SP
       call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
                          pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
-                         wm, prec, zeros, .false., zeros, &
+                         .true., .true., .false., wm, prec, zeros, &
+                         .false., zeros, &
                          .false., .false., .false., &
                          zeros, zeros, zeros, zeros, zeros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
@@ -173,7 +174,8 @@ contains
       eta = 0.0_SP
       call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
                          pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
-                         wm, prec, zeros, .true., poros, &
+                         .true., .true., .false., wm, prec, zeros, &
+                         .true., poros, &
                          .false., .false., .false., &
                          zeros, zeros, zeros, zeros, zeros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
@@ -186,7 +188,8 @@ contains
       poros = 1.0_SP
       call cal_rk_update(lp, 0.0_SP, 1.0_SP, 1.0_SP, inv_dx, inv_dy, &
                          pflx, qflx, fx, fy, gx, gy, src_x, src_y, &
-                         wm, prec, zeros, .true., poros, &
+                         .true., .true., .false., wm, prec, zeros, &
+                         .true., poros, &
                          .false., .false., .false., &
                          zeros, zeros, zeros, zeros, zeros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
