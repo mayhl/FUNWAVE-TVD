@@ -82,6 +82,8 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_NUMERICS_FROUDE_CAP = "3.0"
    character(*), parameter :: DEF_NUMERICS_MIN_DEPTH = "0.1"
    character(*), parameter :: DEF_NUMERICS_RECONSTRUCTION = "fourth"
+   character(*), parameter :: DEF_NUMERICS_TRIDIAG_CHUNK = "48"
+   character(*), parameter :: DEF_NUMERICS_TRIDIAG_TRANSPOSE_MIN_PY = "40"
    ! ── obstacle ──
    character(*), parameter :: DEF_OBSTACLE_BREAKWATER_ABSORB_COEF = "10.0"
    ! ── output ──

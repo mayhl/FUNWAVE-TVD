@@ -7,7 +7,7 @@ module test_solver_tridiag
    use core_grid_mod,           only: type_loop_bounds, type_grid_2d
    use core_solver_tridiag_mod, only: trid_thomas_1d, trid_x, trid_y, &
                                       trid_x_periodic, trid_y_periodic, &
-                                      type_trid_workspace
+                                      trid_y_alltoall, type_trid_workspace
    use mpi_f08
 
    implicit none
@@ -403,6 +403,58 @@ contains
          end do
       end do
    end subroutine test_trid_y_distributed
+
+   ! ----------------------------------------------------------------
+   ! trid_y_alltoall vs trid_y on 2x2 ranks: the transpose path must
+   ! reproduce the pipelined sweep BITWISE (same per-line recurrence,
+   ! rank seams just split rows) — tolerance zero on purpose.  The
+   ! two-RHS lanes are checked by feeding d twice: f2 must equal f1
+   ! exactly (identical float sequences).
+   ! ----------------------------------------------------------------
+   @test(npes=[4])
+   subroutine test_trid_y_transpose_bitwise(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_loop_bounds) :: lp
+      type(type_grid_2d)     :: grid
+      real(SP) :: a(MLOC, NLOC), c(MLOC, NLOC), d(MLOC, NLOC)
+      real(SP) :: c2(MLOC, NLOC), d2(MLOC, NLOC), d3(MLOC, NLOC)
+      real(SP) :: f_pipe(MLOC, NLOC), f_tr(MLOC, NLOC), f_tr2(MLOC, NLOC)
+      real(SP) :: x_exact(2*LNY)
+      integer  :: i, j, jg, ng
+
+      call make_dist_grid(this, grid, lp)
+      ng = 2*LNY
+      do jg = 1, ng
+         x_exact(jg) = real(jg, SP)
+      end do
+
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
+      do j = lp%jb, lp%je
+         jg = grid%jbegin + (j - lp%jb)
+         do i = lp%ib, lp%ie
+            a(i, j) = merge(0.0_SP, -0.5_SP, jg == 1)
+            c(i, j) = merge(0.0_SP, -0.5_SP, jg == ng)
+            if (jg == 1) then
+               d(i, j) = x_exact(1) - 0.5_SP*x_exact(2)
+            else if (jg == ng) then
+               d(i, j) = -0.5_SP*x_exact(ng - 1) + x_exact(ng)
+            else
+               d(i, j) = -0.5_SP*x_exact(jg - 1) + x_exact(jg) - 0.5_SP*x_exact(jg + 1)
+            end if
+         end do
+      end do
+      c2 = c; d2 = d; d3 = d   ! trid_y overwrites c and d
+
+      call trid_y(lp, grid, a, c, d, f_pipe)
+      call trid_y_alltoall(lp, grid, a, c2, d2, f_tr, d3, f_tr2)
+
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie
+            @mpiAssertEqual(f_pipe(i, j), f_tr(i, j), 0.0_SP)
+            @mpiAssertEqual(f_tr(i, j), f_tr2(i, j), 0.0_SP)
+         end do
+      end do
+   end subroutine test_trid_y_transpose_bitwise
 
    ! ----------------------------------------------------------------
    ! trid_x_periodic on 2x2 ranks: global circulant, solution = 1.

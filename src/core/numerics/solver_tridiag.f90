@@ -19,6 +19,9 @@ module core_solver_tridiag_mod
    public :: trid_thomas_1d
    public :: trid_x, trid_y
    public :: trid_x_periodic, trid_y_periodic
+   public :: trid_configure
+   ! public for the unit-test bitwise pair vs the pipelined sweeps
+   public :: trid_y_alltoall
 
    ! Scratch for the periodic (Sherman-Morrison) solves: one coefficient
    ! copy plus the two RHS/solution pairs.  Both solves share a single
@@ -36,13 +39,15 @@ module core_solver_tridiag_mod
       procedure :: free => tws_free
    end type type_trid_workspace
 
-   ! Chunk-pipeline probe state (see chunk_width)
-   integer :: trid_chunk_saved = 0
-
-   ! Transpose-path probe state (see trid_use_transpose)
-   integer :: trid_algo_saved = 0
-
-   logical :: ts_notice_done = .false.
+   ! Chunk width of the pipelined sweeps and the transpose threshold —
+   ! deck-tunable (numerics: tridiag:), defaults measured on wheat:
+   ! chunk from the 312446 sweep (flat 16-64, 96 worse), threshold
+   ! from the 313297 A/B (transpose wins at PY=80 and PY=40 on 8
+   ! nodes, neutral at PY=40 on 4, loses at PY<=10).  Both are
+   ! bitwise-neutral and system-flavored — retune per fabric via the
+   ! benchmark harness.
+   integer :: trid_chunk = 48
+   integer :: trid_transpose_min_py = 40
 
    ! Transpose-path persistent buffers — grow-only, sized on first
    ! solve (grid extents are run-constant); avoids per-stage heap
@@ -68,44 +73,14 @@ contains
    end subroutine tws_free
 
    ! ----------------------------------------------------------------
-   ! chunk_width — transverse strip width for the chunk-pipelined
-   ! sweeps.  Read once from FUNWAVE_TRID_CHUNK (probe knob; pin the
-   ! winner into TRID_CHUNK_DEF after sweeping).  Width is bitwise-
-   ! neutral: chunk boundaries move message packing, never the
-   ! recurrence.
+   ! trid_configure — deck overrides for the tunables above (numerics
+   ! reader calls this; non-positive values keep the defaults)
    ! ----------------------------------------------------------------
-   integer function chunk_width()
-      integer, parameter :: TRID_CHUNK_DEF = 48
-      character(len=8) :: env
-      integer :: stat, v
-      if (trid_chunk_saved <= 0) then
-         trid_chunk_saved = TRID_CHUNK_DEF
-         call get_environment_variable("FUNWAVE_TRID_CHUNK", env, status=stat)
-         if (stat == 0) then
-            read (env, *, iostat=stat) v
-            if (stat == 0 .and. v > 0) trid_chunk_saved = v
-         end if
-      end if
-      chunk_width = trid_chunk_saved
-   end function chunk_width
-
-   ! ----------------------------------------------------------------
-   ! trid_use_transpose — algorithm knob for the distributed y solves.
-   ! FUNWAVE_TRID_ALGO=transpose swaps the chunk-pipelined chain for
-   ! the column all-to-all path (probe knob; pin a ny_proc threshold
-   ! after the wheat A/B).  Per-line arithmetic is identical, so the
-   ! choice is bitwise-neutral.
-   ! ----------------------------------------------------------------
-   logical function trid_use_transpose()
-      character(len=16) :: env
-      integer :: stat
-      if (trid_algo_saved == 0) then
-         trid_algo_saved = 1
-         call get_environment_variable("FUNWAVE_TRID_ALGO", env, status=stat)
-         if (stat == 0 .and. env == "transpose") trid_algo_saved = 2
-      end if
-      trid_use_transpose = (trid_algo_saved == 2)
-   end function trid_use_transpose
+   subroutine trid_configure(chunk, transpose_min_py)
+      integer, intent(in) :: chunk, transpose_min_py
+      if (chunk > 0) trid_chunk = chunk
+      if (transpose_min_py > 0) trid_transpose_min_py = transpose_min_py
+   end subroutine trid_configure
 
    ! ----------------------------------------------------------------
    ! trid_thomas_1d — serial 1D Thomas along a single line.
@@ -184,7 +159,7 @@ contains
       end if
 
       nt = lp%je - lp%jb + 1
-      w = min(chunk_width(), nt)
+      w = min(trid_chunk, nt)
       nc = (nt + w - 1)/w
 
       ! --- forward sweep, chunk-pipelined ---
@@ -327,7 +302,7 @@ contains
       end if
 
       nt = lp%je - lp%jb + 1
-      w = min(chunk_width(), nt)
+      w = min(trid_chunk, nt)
       nc = (nt + w - 1)/w
 
       ! --- forward sweep, chunk-pipelined ---
@@ -475,13 +450,13 @@ contains
          return
       end if
 
-      if (trid_use_transpose()) then
+      if (grid%ny_proc >= trid_transpose_min_py) then
          call trid_y_alltoall(lp, grid, a, c, d, f)
          return
       end if
 
       nt = lp%ie - lp%ib + 1
-      w = min(chunk_width(), nt)
+      w = min(trid_chunk, nt)
       nc = (nt + w - 1)/w
 
       ! --- forward sweep, chunk-pipelined ---
@@ -612,13 +587,13 @@ contains
          return
       end if
 
-      if (trid_use_transpose()) then
+      if (grid%ny_proc >= trid_transpose_min_py) then
          call trid_y_alltoall(lp, grid, a, c, d1, f1, d2, f2)
          return
       end if
 
       nt = lp%ie - lp%ib + 1
-      w = min(chunk_width(), nt)
+      w = min(trid_chunk, nt)
       nc = (nt + w - 1)/w
 
       ! --- forward sweep, chunk-pipelined ---
@@ -751,13 +726,6 @@ contains
       nrhs = 1
       if (present(d2)) nrhs = 2
       nfin = 2 + nrhs
-
-      ! one-time engagement notice — a silently-inert probe knob reads
-      ! as a trivially-passing A/B (the 313158 lesson)
-      if (.not. ts_notice_done .and. grid%iproc == 0 .and. me == 0) then
-         write (*, '(a)') "solver_tridiag: transpose path active"
-         ts_notice_done = .true.
-      end if
 
       allocate (wq(0:py - 1), x0(0:py - 1), nyp(0:py - 1), yoff(0:py - 1))
       allocate (scnt(0:py - 1), sdsp(0:py - 1), rcnt(0:py - 1), rdsp(0:py - 1))

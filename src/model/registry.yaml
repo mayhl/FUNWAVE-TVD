@@ -329,6 +329,16 @@ sections:
         units: "m"
         latex: "$d_{\\min}$"
         doc: "Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc)."
+      tridiag.chunk:
+        legacy: ~
+        default: 48
+        units: ~
+        doc: "Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (wheat sweep flat over 16-64)."
+      tridiag.transpose_min_py:
+        legacy: ~
+        default: 40
+        units: ~
+        doc: "Minimum y-rank count that switches the distributed y solve to the all-to-all transpose. System-tuned latency/bandwidth crossover; bitwise-neutral."
       reconstruction:
         legacy: HIGH_ORDER
         default: fourth

@@ -102,6 +102,8 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `flux_solver` | `hllc` | `CONSTR` | — | Approximate Riemann solver. One of `hllc` \| `hll`. |
 | `froude_cap` | `3.0` | `FroudeCap` | — | Maximum Froude number (velocity limiter). |
 | `min_depth` | `0.1` | `MinDepth` | m | Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc). |
+| `tridiag.chunk` | `48` | — | — | Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (wheat sweep flat over 16-64). |
+| `tridiag.transpose_min_py` | `40` | — | — | Minimum y-rank count that switches the distributed y solve to the all-to-all transpose. System-tuned latency/bandwidth crossover; bitwise-neutral. |
 | `reconstruction` | `fourth` | `HIGH_ORDER` | — | Spatial reconstruction scheme. One of `fourth` \| `fminmod` \| `weno` \| `mlp` \| `basic`. |
 
 ## `grid:`

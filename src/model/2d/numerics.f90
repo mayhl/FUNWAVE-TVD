@@ -12,6 +12,9 @@
 !    min_depth:      <real>    wet/dry + friction floor (m),           default 0.1
 !    reconstruction: <string>  'fourth' | 'fminmod' | 'weno' | 'mlp' | 'basic',
 !                              default fourth
+!    tridiag:                  system-tuned solver knobs, bitwise-neutral:
+!      chunk:            <int> pipelined-sweep chunk width,            default 48
+!      transpose_min_py: <int> all-to-all y-solve rank threshold,      default 40
 !
 !  Enum values are lowercase in YAML and upcased here for the prefix
 !  dispatch in kernel_fluxes.  min_depth is a single floor: legacy folded
@@ -33,7 +36,9 @@ module model_numerics_mod
 
    use model_config_defaults_mod, only: DEF_NUMERICS_CFL, DEF_NUMERICS_FLUX_SOLVER, &
                                         DEF_NUMERICS_FROUDE_CAP, DEF_NUMERICS_MIN_DEPTH, &
-                                        DEF_NUMERICS_RECONSTRUCTION
+                                        DEF_NUMERICS_RECONSTRUCTION, &
+                                        DEF_NUMERICS_TRIDIAG_CHUNK, &
+                                        DEF_NUMERICS_TRIDIAG_TRANSPOSE_MIN_PY
 
    implicit none
 
@@ -58,11 +63,16 @@ module model_numerics_mod
 contains
 
    subroutine numerics_read_input(this, env)
+      use core_yaml_file_mod, only: type_yaml_reader
+      use core_solver_tridiag_mod, only: trid_configure
       class(type_model_numerics), intent(inout) :: this
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_num, no_key
+      type(type_yaml_reader) :: tri_yaml
+      integer :: tri_chunk, tri_min_py
+      character(96) :: msg
+      logical :: no_num, no_key, no_tri
 
       ! Set string defaults before possible early return so consumers always get valid values
       this%construction = "HLLC"
@@ -84,6 +94,20 @@ contains
       ! MinDepthFrc pair to their minimum so they were one value in practice
       call sub_env%yaml%read("min_depth", silent=no_key, val=this%MinDepth, default=DEF_NUMERICS_MIN_DEPTH)
       this%MinDepthFrc = this%MinDepth
+
+      ! tridiag: system-tuned solver knobs (bitwise-neutral); absent
+      ! keys keep the wheat-measured defaults compiled into the solver
+      tri_yaml = sub_env%yaml%cast_dictionary("tridiag", no_tri)
+      if (.not. no_tri) then
+         call tri_yaml%read("chunk", silent=no_key, val=tri_chunk, &
+                            default=DEF_NUMERICS_TRIDIAG_CHUNK)
+         call tri_yaml%read("transpose_min_py", silent=no_key, val=tri_min_py, &
+                            default=DEF_NUMERICS_TRIDIAG_TRANSPOSE_MIN_PY)
+         call trid_configure(tri_chunk, tri_min_py)
+         write (msg, '(a,i0,a,i0)') "numerics/tridiag: chunk=", tri_chunk, &
+            ", transpose_min_py=", tri_min_py
+         call sub_env%log%info(trim(msg))
+      end if
 
    end subroutine numerics_read_input
 
