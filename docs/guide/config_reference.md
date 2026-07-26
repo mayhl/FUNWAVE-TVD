@@ -108,7 +108,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 
 ## `grid:`
 
-**Required.**  Computational grid — extent, spacing, bathymetry source, MPI decomposition, optional Coriolis.
+**Required.**  Computational grid — extent, spacing, bathymetry source, MPI decomposition, optional Coriolis + georeferencing.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
@@ -120,6 +120,11 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `bathy_slope` | — | `SLP` | — | Bed slope for a sloping-beach bathymetry. |
 | `bathy_slope_x0` | — | `Xslp` | m | x location where the slope begins. |
 | `bathy_type` | `flat` | `DEPTH_TYPE` | — | Bathymetry generator. One of `flat` \| `slope` \| `data`. |
+| `crs.epsg` | — | — | — | EPSG code of the projected horizontal CRS in metres; presence georeferences the grid (absent = local unreferenced). |
+| `crs.origin_x` | `0.0` | — | m | Projected easting of the cell (1,1) centre. |
+| `crs.origin_y` | `0.0` | — | m | Projected northing of the cell (1,1) centre. |
+| `crs.rotation` | `0.0` | — | deg | Grid +x axis angle, CCW from projected east (math convention, NOT compass azimuth); 0 = axis-aligned. |
+| `crs.vertical_datum` | — | — | — | Vertical datum name that depths/eta reference (e.g. NAVD88, IGLD85 LWD); output-stamp provenance only. |
 | `dx` | — | `DX` | m | Grid spacing in x. |
 | `dy` | — | `DY` | m | Grid spacing in y. |
 | `grid_nx` | — | `Mglob` | — | Number of grid cells in x (global). |

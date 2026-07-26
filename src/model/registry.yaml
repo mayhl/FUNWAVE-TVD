@@ -349,7 +349,7 @@ sections:
   # ── grid ──
   grid:
     required: true
-    doc: "Computational grid — extent, spacing, bathymetry source, MPI decomposition, optional Coriolis."
+    doc: "Computational grid — extent, spacing, bathymetry source, MPI decomposition, optional Coriolis + georeferencing."
     keys:
       coriolis.f: {legacy: ~, default: ~, units: s-1, latex: $f$, doc: Constant Coriolis parameter (f-plane; overrides latitude).}
       coriolis.latitude: {legacy: ~, default: ~, units: degrees_north, latex: $\varphi$, doc: Reference latitude for the f-plane Coriolis parameter.}
@@ -359,6 +359,20 @@ sections:
       bathy_slope: {legacy: SLP, default: ~, units: ~, latex: $s$, doc: Bed slope for a sloping-beach bathymetry.}
       bathy_slope_x0: {legacy: Xslp, default: ~, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
       bathy_type: {legacy: DEPTH_TYPE, default: flat, units: ~, values: [flat, slope, data], doc: Bathymetry generator.}
+      # crs: georef of the (possibly rotated) rectilinear grid — the shared
+      # funtools<->engine contract; supersedes the ad-hoc X_origin/Y_origin/
+      # EPSG/rotation_deg keys funtools emitted into input.txt.  World from
+      # local metres (u,v) measured from the cell (1,1) centre:
+      #   E = origin_x + u cos(rot) - v sin(rot)
+      #   N = origin_y + u sin(rot) + v cos(rot)
+      # Metadata only: physics stays in local metres; the engine's job is
+      # stamping the CF grid_mapping quartet (epsg_code, funwave_origin_x/y,
+      # funwave_rotation_deg) onto NetCDF output, mirroring funtools bathy.nc.
+      crs.epsg: {legacy: ~, default: ~, units: ~, doc: EPSG code of the projected horizontal CRS in metres; presence georeferences the grid (absent = local unreferenced).}
+      crs.origin_x: {legacy: ~, default: 0.0, units: m, latex: $x_0$, doc: "Projected easting of the cell (1,1) centre."}
+      crs.origin_y: {legacy: ~, default: 0.0, units: m, latex: $y_0$, doc: "Projected northing of the cell (1,1) centre."}
+      crs.rotation: {legacy: ~, default: 0.0, units: deg, latex: $\theta_g$, doc: "Grid +x axis angle, CCW from projected east (math convention, NOT compass azimuth); 0 = axis-aligned."}
+      crs.vertical_datum: {legacy: ~, default: ~, units: ~, doc: "Vertical datum name that depths/eta reference (e.g. NAVD88, IGLD85 LWD); output-stamp provenance only."}
       dx: {legacy: DX, default: ~, units: m, latex: $\Delta x$, doc: Grid spacing in x.}
       dy: {legacy: DY, default: ~, units: m, latex: $\Delta y$, doc: Grid spacing in y.}
       grid_nx: {legacy: Mglob, default: ~, units: ~, latex: $N_x$, doc: Number of grid cells in x (global).}

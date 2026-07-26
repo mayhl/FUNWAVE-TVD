@@ -54,6 +54,9 @@ module model_config_defaults_mod
    ! ── grid ──
    character(*), parameter :: DEF_GRID_BATHY_CORRECTION = "NO"
    character(*), parameter :: DEF_GRID_BATHY_TYPE = "flat"
+   character(*), parameter :: DEF_GRID_CRS_ORIGIN_X = "0.0"
+   character(*), parameter :: DEF_GRID_CRS_ORIGIN_Y = "0.0"
+   character(*), parameter :: DEF_GRID_CRS_ROTATION = "0.0"
    ! ── hot_start ──
    character(*), parameter :: DEF_HOT_START_BED_DEFORMATION = "NO"
    character(*), parameter :: DEF_HOT_START_OUTPUT_START_NUMBER = "0"
