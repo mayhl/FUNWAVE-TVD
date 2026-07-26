@@ -231,6 +231,31 @@ simulations:
     tolerances:
       field: { default: 0.0 }
 
+  # stability_rip: no-reference stability sentinel for the swe_eta_ramp taper.
+  # rip bathy (rows 1-400 of the scaled ripbig depth) pushed to the 2026-07
+  # damping-mission tripping config (hm0 1.45, swe_eta_dep 0.6); the deck
+  # engages the smoothstep taper (swe_eta_ramp 0.10) that must keep it stable —
+  # a ramp regression collapses dt (min_dt) or blows up (run aborts), either
+  # way failing the case.  exe_type central-random has no ref branch, so this
+  # runs in oracle mode (single dev run; stability_check reads no ref).  decomp
+  # pinned for a deterministic tripwire.
+  - name: stability_rip
+    exe_type: central-random
+    input: test/regression/inputs/stability
+    input_files: [stability_rip.yaml]
+    decomp: [4, 2]
+    binary: funwave
+    output_dir: output
+    tags: [stability, 2d]
+    postprocess:
+      stability: test.regression.postproc.stability_check
+    # min_dt 0.006 sits between the healthy operating floor (dt settles at 0.01
+    # on wheat/ifx under this forcing, 10/10 ensemble draws) and the blow-up
+    # cascade (2.5e-3 by t~105, 10/10 hard-switch draws) — decomp-robust either
+    # side.  0.011 would false-fail the healthy arm on ifx.
+    tolerances:
+      stability: { min_dt: 0.006, max_abs_eta: 30.0 }
+
   - name: standing_wave_3d_10m
     exe_type: central-3d
     # decomp pinned np=2 (PX=2|Mglob=100): wheat scan showed the 3D HYPRE Poisson

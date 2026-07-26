@@ -1,0 +1,76 @@
+# Stability sentinel — no-reference oracle for the swe_eta_ramp taper.
+#
+# Bathymetry: rows 1-400 of the scaled ripbig depth (planar h=x/30 from x=-60
+# with a=1.5 Gaussian rip channels, makebath.m recipe, dx=dy=0.5), a 2-channel
+# 1136x400 slice.  Forcing pushed to the 2026-07 damping-mission tripping
+# config: hm0 1.45 + swe_eta_dep 0.6.  On the hard SWE switch (swe_eta_ramp 0)
+# this blows up near t~100 (deep-dt cascade below the CFL floor); the smoothstep
+# taper (swe_eta_ramp 0.10, engaged here) must hold.  The stability_check
+# postproc asserts dt never collapses and the final eta stays finite/bounded.
+#
+# Fixed dt 0.04; under this forcing the CFL halves it to 0.02 (gfortran) or
+# 0.01 (wheat/ifx, t~53) where the healthy run settles — the blow-up cascades
+# past 5e-3 instead.  screen_interval 1.0 so the per-step dt is sampled densely
+# in the log for the dt-floor check.
+
+grid:
+  cell_size: [0.5, 0.5]
+  grid_size: [1136, 400]
+  bathymetry:
+    type: file
+    file: depth_sentinel.txt
+    nx: 1136
+    ny: 400
+simulation:
+  title: stability_rip
+  total_time: 120.0
+  screen_interval: 1.0
+  time_stepping:
+    fixed_dt: yes
+    dt: 0.04
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 1.45
+    gamma: 5.0
+    freq:
+      peak: 0.1
+      min: 0.03
+      max: 0.5
+    directional:
+      peak: 0.0
+      spread: 10.0
+    discretization:
+      freq_bins: 45
+      theta_bins: 24
+  source:
+    x_center: 474.0
+    y_center: 0.0
+    depth: 13.0
+boundaries:
+  east:
+    sponge:
+      width: 60.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+physics:
+  dispersion:
+    swe_eta_dep: 0.6
+    swe_eta_ramp: 0.10
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  interval: 40.0
+  result_folder: output/
+  field_io_type: BINARY
+  variables: [ETA]
