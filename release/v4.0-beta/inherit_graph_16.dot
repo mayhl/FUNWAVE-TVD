@@ -5,9 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="core_range_parse_mod\l::type_base_range",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__range__parse__mod_1_1type__base__range.html",tooltip="Base type for range logic."];
-  Node0 -> Node1 [id="edge1_Node000000_Node000001",dir="back",color="steelblue1",style="solid",tooltip=" "];
-  Node1 [id="Node000001",label="core_range_parse_mod\l::type_integer_range",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__range__parse__mod_1_1type__integer__range.html",tooltip="Integer range type."];
-  Node0 -> Node2 [id="edge2_Node000000_Node000002",dir="back",color="steelblue1",style="solid",tooltip=" "];
-  Node2 [id="Node000002",label="core_range_parse_mod\l::type_real_range",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__range__parse__mod_1_1type__real__range.html",tooltip="Real range type."];
+  Node0 [id="Node000000",label="core_output_gatherer\l_mod::type_output_gatherer",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__output__gatherer__mod_1_1type__output__gatherer.html",tooltip=" "];
 }

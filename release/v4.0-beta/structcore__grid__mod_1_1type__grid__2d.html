@@ -118,12 +118,18 @@ Public Member Functions</h2></td></tr>
 <tr class="memitem:aecf2f517f6d40a24a7399c10afbde3ba" id="r_aecf2f517f6d40a24a7399c10afbde3ba"><td class="memItemLeft" align="right" valign="top"><a id="aecf2f517f6d40a24a7399c10afbde3ba" name="aecf2f517f6d40a24a7399c10afbde3ba"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>decompose</b> (this, nprocs)</td></tr>
 <tr class="separator:aecf2f517f6d40a24a7399c10afbde3ba"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afe9b953119b3d77bde98cbbd0afe76ec" id="r_afe9b953119b3d77bde98cbbd0afe76ec"><td class="memItemLeft" align="right" valign="top"><a id="afe9b953119b3d77bde98cbbd0afe76ec" name="afe9b953119b3d77bde98cbbd0afe76ec"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>setup</b> (this, comm, create_partition, periodic_y)</td></tr>
-<tr class="separator:afe9b953119b3d77bde98cbbd0afe76ec"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aec69302aa9836986ef1d8793c27c0ae4" id="r_aec69302aa9836986ef1d8793c27c0ae4"><td class="memItemLeft" align="right" valign="top"><a id="aec69302aa9836986ef1d8793c27c0ae4" name="aec69302aa9836986ef1d8793c27c0ae4"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>setup</b> (this, comm, create_partition, periodic_y, periodic_x)</td></tr>
+<tr class="separator:aec69302aa9836986ef1d8793c27c0ae4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aec37c325495b8fd461681b0ad5e56695" id="r_aec37c325495b8fd461681b0ad5e56695"><td class="memItemLeft" align="right" valign="top"><a id="aec37c325495b8fd461681b0ad5e56695" name="aec37c325495b8fd461681b0ad5e56695"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>halo_exchange</b> (this, field)</td></tr>
 <tr class="separator:aec37c325495b8fd461681b0ad5e56695"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ade79bd36fa3ee934ccf849b28ee41bff" id="r_ade79bd36fa3ee934ccf849b28ee41bff"><td class="memItemLeft" align="right" valign="top"><a id="ade79bd36fa3ee934ccf849b28ee41bff" name="ade79bd36fa3ee934ccf849b28ee41bff"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>halo_exchange_batch</b> (this, fields)</td></tr>
+<tr class="separator:ade79bd36fa3ee934ccf849b28ee41bff"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8c5fa9be2241350c4016ef428f5deb6f" id="r_a8c5fa9be2241350c4016ef428f5deb6f"><td class="memItemLeft" align="right" valign="top"><a id="a8c5fa9be2241350c4016ef428f5deb6f" name="a8c5fa9be2241350c4016ef428f5deb6f"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>halo_accumulate</b> (this, field)</td></tr>
+<tr class="separator:a8c5fa9be2241350c4016ef428f5deb6f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab031dda7fcde9087e213b081e393c428" id="r_ab031dda7fcde9087e213b081e393c428"><td class="memItemLeft" align="right" valign="top"><a id="ab031dda7fcde9087e213b081e393c428" name="ab031dda7fcde9087e213b081e393c428"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>init_spacing_uniform</b> (this, dx0, dy0, x0, y0)</td></tr>
 <tr class="separator:ab031dda7fcde9087e213b081e393c428"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -196,6 +202,9 @@ integer&#160;</td><td class="memItemRight" valign="bottom"><b>jg_stop</b></td></
 <tr class="memitem:a58499b54eb5403b489e5d1f0532aef5e" id="r_a58499b54eb5403b489e5d1f0532aef5e"><td class="memItemLeft" align="right" valign="top"><a id="a58499b54eb5403b489e5d1f0532aef5e" name="a58499b54eb5403b489e5d1f0532aef5e"></a>
 type(mpi_comm)&#160;</td><td class="memItemRight" valign="bottom"><b>cart_comm</b></td></tr>
 <tr class="separator:a58499b54eb5403b489e5d1f0532aef5e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a39a4370f73e22be0763788fe8b66de6d" id="r_a39a4370f73e22be0763788fe8b66de6d"><td class="memItemLeft" align="right" valign="top"><a id="a39a4370f73e22be0763788fe8b66de6d" name="a39a4370f73e22be0763788fe8b66de6d"></a>
+type(mpi_comm)&#160;</td><td class="memItemRight" valign="bottom"><b>col_comm</b></td></tr>
+<tr class="separator:a39a4370f73e22be0763788fe8b66de6d"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:af389f300a8689c5b7e3428ef6f8f426a" id="r_af389f300a8689c5b7e3428ef6f8f426a"><td class="memItemLeft" align="right" valign="top"><a id="af389f300a8689c5b7e3428ef6f8f426a" name="af389f300a8689c5b7e3428ef6f8f426a"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>back_rank</b></td></tr>
 <tr class="separator:af389f300a8689c5b7e3428ef6f8f426a"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -253,6 +262,63 @@ real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign
 <tr class="memitem:a4e87ce62b94b152fac4cfcdb3fb96aea" id="r_a4e87ce62b94b152fac4cfcdb3fb96aea"><td class="memItemLeft" align="right" valign="top"><a id="a4e87ce62b94b152fac4cfcdb3fb96aea" name="a4e87ce62b94b152fac4cfcdb3fb96aea"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>y</b></td></tr>
 <tr class="separator:a4e87ce62b94b152fac4cfcdb3fb96aea"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8ac35cda29c75c13ce16ecf4a9b3aadd" id="r_a8ac35cda29c75c13ce16ecf4a9b3aadd"><td class="memItemLeft" align="right" valign="top"><a id="a8ac35cda29c75c13ce16ecf4a9b3aadd" name="a8ac35cda29c75c13ce16ecf4a9b3aadd"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_sbuf_back</b> =&gt; null()</td></tr>
+<tr class="separator:a8ac35cda29c75c13ce16ecf4a9b3aadd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adeefa4f3d6144ce6aca3b7cbc6e965d5" id="r_adeefa4f3d6144ce6aca3b7cbc6e965d5"><td class="memItemLeft" align="right" valign="top"><a id="adeefa4f3d6144ce6aca3b7cbc6e965d5" name="adeefa4f3d6144ce6aca3b7cbc6e965d5"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_rbuf_back</b> =&gt; null()</td></tr>
+<tr class="separator:adeefa4f3d6144ce6aca3b7cbc6e965d5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aedc75264b1f900aea3ddba9da1941ff3" id="r_aedc75264b1f900aea3ddba9da1941ff3"><td class="memItemLeft" align="right" valign="top"><a id="aedc75264b1f900aea3ddba9da1941ff3" name="aedc75264b1f900aea3ddba9da1941ff3"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_sbuf_shore</b> =&gt; null()</td></tr>
+<tr class="separator:aedc75264b1f900aea3ddba9da1941ff3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac416a3f10acee0adeb170d3f80ed6393" id="r_ac416a3f10acee0adeb170d3f80ed6393"><td class="memItemLeft" align="right" valign="top"><a id="ac416a3f10acee0adeb170d3f80ed6393" name="ac416a3f10acee0adeb170d3f80ed6393"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_rbuf_shore</b> =&gt; null()</td></tr>
+<tr class="separator:ac416a3f10acee0adeb170d3f80ed6393"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a675359ec75f7ce4b21025e16a7a8ed74" id="r_a675359ec75f7ce4b21025e16a7a8ed74"><td class="memItemLeft" align="right" valign="top"><a id="a675359ec75f7ce4b21025e16a7a8ed74" name="a675359ec75f7ce4b21025e16a7a8ed74"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_sbuf_right</b> =&gt; null()</td></tr>
+<tr class="separator:a675359ec75f7ce4b21025e16a7a8ed74"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2934a9f39d4cb51e82319c92300b98d3" id="r_a2934a9f39d4cb51e82319c92300b98d3"><td class="memItemLeft" align="right" valign="top"><a id="a2934a9f39d4cb51e82319c92300b98d3" name="a2934a9f39d4cb51e82319c92300b98d3"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_rbuf_right</b> =&gt; null()</td></tr>
+<tr class="separator:a2934a9f39d4cb51e82319c92300b98d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a06aa44c84602bb6c1ac1ec510e6a3233" id="r_a06aa44c84602bb6c1ac1ec510e6a3233"><td class="memItemLeft" align="right" valign="top"><a id="a06aa44c84602bb6c1ac1ec510e6a3233" name="a06aa44c84602bb6c1ac1ec510e6a3233"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_sbuf_left</b> =&gt; null()</td></tr>
+<tr class="separator:a06aa44c84602bb6c1ac1ec510e6a3233"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ace538c858a9588885fe17912daaa6595" id="r_ace538c858a9588885fe17912daaa6595"><td class="memItemLeft" align="right" valign="top"><a id="ace538c858a9588885fe17912daaa6595" name="ace538c858a9588885fe17912daaa6595"></a>
+real(sp), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hx_rbuf_left</b> =&gt; null()</td></tr>
+<tr class="separator:ace538c858a9588885fe17912daaa6595"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab379e3c7f96d264ba65b1f8bf258c388" id="r_ab379e3c7f96d264ba65b1f8bf258c388"><td class="memItemLeft" align="right" valign="top"><a id="ab379e3c7f96d264ba65b1f8bf258c388" name="ab379e3c7f96d264ba65b1f8bf258c388"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_sbuf_back</b> =&gt; null()</td></tr>
+<tr class="separator:ab379e3c7f96d264ba65b1f8bf258c388"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a7221f425c8dc2f340cbb721cfc4eb329" id="r_a7221f425c8dc2f340cbb721cfc4eb329"><td class="memItemLeft" align="right" valign="top"><a id="a7221f425c8dc2f340cbb721cfc4eb329" name="a7221f425c8dc2f340cbb721cfc4eb329"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_rbuf_back</b> =&gt; null()</td></tr>
+<tr class="separator:a7221f425c8dc2f340cbb721cfc4eb329"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afc04c0774c7ed25d32dd20e065b12d9a" id="r_afc04c0774c7ed25d32dd20e065b12d9a"><td class="memItemLeft" align="right" valign="top"><a id="afc04c0774c7ed25d32dd20e065b12d9a" name="afc04c0774c7ed25d32dd20e065b12d9a"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_sbuf_shore</b> =&gt; null()</td></tr>
+<tr class="separator:afc04c0774c7ed25d32dd20e065b12d9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aaf4cbfd65eec3bc8790b9560b26db4c8" id="r_aaf4cbfd65eec3bc8790b9560b26db4c8"><td class="memItemLeft" align="right" valign="top"><a id="aaf4cbfd65eec3bc8790b9560b26db4c8" name="aaf4cbfd65eec3bc8790b9560b26db4c8"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_rbuf_shore</b> =&gt; null()</td></tr>
+<tr class="separator:aaf4cbfd65eec3bc8790b9560b26db4c8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5ae6788545892ffe6f190b6ea11579e0" id="r_a5ae6788545892ffe6f190b6ea11579e0"><td class="memItemLeft" align="right" valign="top"><a id="a5ae6788545892ffe6f190b6ea11579e0" name="a5ae6788545892ffe6f190b6ea11579e0"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_sbuf_right</b> =&gt; null()</td></tr>
+<tr class="separator:a5ae6788545892ffe6f190b6ea11579e0"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9964524469d26e090a2b59d576549ba6" id="r_a9964524469d26e090a2b59d576549ba6"><td class="memItemLeft" align="right" valign="top"><a id="a9964524469d26e090a2b59d576549ba6" name="a9964524469d26e090a2b59d576549ba6"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_rbuf_right</b> =&gt; null()</td></tr>
+<tr class="separator:a9964524469d26e090a2b59d576549ba6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a01c762914e2b895e98ae1b2f73f18d7e" id="r_a01c762914e2b895e98ae1b2f73f18d7e"><td class="memItemLeft" align="right" valign="top"><a id="a01c762914e2b895e98ae1b2f73f18d7e" name="a01c762914e2b895e98ae1b2f73f18d7e"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_sbuf_left</b> =&gt; null()</td></tr>
+<tr class="separator:a01c762914e2b895e98ae1b2f73f18d7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8bbb7811b1ec60d067cf289e8032100a" id="r_a8bbb7811b1ec60d067cf289e8032100a"><td class="memItemLeft" align="right" valign="top"><a id="a8bbb7811b1ec60d067cf289e8032100a" name="a8bbb7811b1ec60d067cf289e8032100a"></a>
+real(sp), dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_rbuf_left</b> =&gt; null()</td></tr>
+<tr class="separator:a8bbb7811b1ec60d067cf289e8032100a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a20228e8db0222ed2fbc0a5ed606ff4fd" id="r_a20228e8db0222ed2fbc0a5ed606ff4fd"><td class="memItemLeft" align="right" valign="top"><a id="a20228e8db0222ed2fbc0a5ed606ff4fd" name="a20228e8db0222ed2fbc0a5ed606ff4fd"></a>
+type(mpi_request), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_reqx</b> =&gt; null()</td></tr>
+<tr class="separator:a20228e8db0222ed2fbc0a5ed606ff4fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a63e2b9babc24fdb6f002434fb5033e8b" id="r_a63e2b9babc24fdb6f002434fb5033e8b"><td class="memItemLeft" align="right" valign="top"><a id="a63e2b9babc24fdb6f002434fb5033e8b" name="a63e2b9babc24fdb6f002434fb5033e8b"></a>
+type(mpi_request), dimension(:, :), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_reqy</b> =&gt; null()</td></tr>
+<tr class="separator:a63e2b9babc24fdb6f002434fb5033e8b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa540894fc7fe47dea76e86ce3569f9b6" id="r_aa540894fc7fe47dea76e86ce3569f9b6"><td class="memItemLeft" align="right" valign="top"><a id="aa540894fc7fe47dea76e86ce3569f9b6" name="aa540894fc7fe47dea76e86ce3569f9b6"></a>
+logical, dimension(:), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>hb_req_ready</b> =&gt; null()</td></tr>
+<tr class="separator:aa540894fc7fe47dea76e86ce3569f9b6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this type was generated from the following file:<ul>
 <li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/numerics/<b>grid.f90</b></li>

@@ -22,6 +22,7 @@ var annotated_dup =
     ] ],
     [ "core_grid_mod", null, [
       [ "type_grid_2d", "structcore__grid__mod_1_1type__grid__2d.html", null ],
+      [ "type_halo_field", "structcore__grid__mod_1_1type__halo__field.html", null ],
       [ "type_loop_bounds", "structcore__grid__mod_1_1type__loop__bounds.html", null ]
     ] ],
     [ "core_interpolation_mod", "namespacecore__interpolation__mod.html", [
@@ -32,7 +33,8 @@ var annotated_dup =
       [ "type_log_writer", "structcore__log__io__mod_1_1type__log__writer.html", null ]
     ] ],
     [ "core_output_channel_mod", null, [
-      [ "type_output_channel", "structcore__output__channel__mod_1_1type__output__channel.html", null ]
+      [ "type_output_channel", "structcore__output__channel__mod_1_1type__output__channel.html", null ],
+      [ "type_var_meta", "structcore__output__channel__mod_1_1type__var__meta.html", null ]
     ] ],
     [ "core_output_gatherer_mod", null, [
       [ "type_output_gatherer", "structcore__output__gatherer__mod_1_1type__output__gatherer.html", null ]
@@ -65,7 +67,7 @@ var annotated_dup =
       [ "type_unit", "structcore__units__mod_1_1type__unit.html", null ]
     ] ],
     [ "core_yaml_file_mod", null, [
-      [ "type_yaml_reader", "structcore__yaml__file__mod_1_1type__yaml__reader.html", null ]
+      [ "type_yaml_reader", "structcore__yaml__file__mod_1_1type__yaml__reader.html", "structcore__yaml__file__mod_1_1type__yaml__reader" ]
     ] ],
     [ "input_read", null, [
       [ "read_four_type_values", "interfaceinput__read_1_1read__four__type__values.html", null ]
@@ -114,6 +116,7 @@ var annotated_dup =
       [ "type_model_base", "structmodel__base__mod_1_1type__model__base.html", null ]
     ] ],
     [ "model_bc_mod", null, [
+      [ "type_halo_batch", "structmodel__bc__mod_1_1type__halo__batch.html", null ],
       [ "type_model_bc", "structmodel__bc__mod_1_1type__model__bc.html", null ]
     ] ],
     [ "model_breaking_mod", null, [
@@ -121,6 +124,9 @@ var annotated_dup =
     ] ],
     [ "model_coupling_mod", null, [
       [ "type_model_coupling", "structmodel__coupling__mod_1_1type__model__coupling.html", null ]
+    ] ],
+    [ "model_field_input_mod", null, [
+      [ "type_file_spec", "structmodel__field__input__mod_1_1type__file__spec.html", null ]
     ] ],
     [ "model_fields_2d_mod", null, [
       [ "type_fields_2d", "structmodel__fields__2d__mod_1_1type__fields__2d.html", "structmodel__fields__2d__mod_1_1type__fields__2d" ]
@@ -136,6 +142,9 @@ var annotated_dup =
     ] ],
     [ "model_hot_start_mod", null, [
       [ "type_model_hot_start", "structmodel__hot__start__mod_1_1type__model__hot__start.html", null ]
+    ] ],
+    [ "model_initial_mod", null, [
+      [ "type_model_initial", "structmodel__initial__mod_1_1type__model__initial.html", null ]
     ] ],
     [ "model_kernel_dispersion_mod", null, [
       [ "type_disp_workspace", "structmodel__kernel__dispersion__mod_1_1type__disp__workspace.html", null ]
@@ -164,7 +173,8 @@ var annotated_dup =
     ] ],
     [ "model_output_mod", null, [
       [ "type_channel_config", "structmodel__output__mod_1_1type__channel__config.html", null ],
-      [ "type_model_output", "structmodel__output__mod_1_1type__model__output.html", null ]
+      [ "type_model_output", "structmodel__output__mod_1_1type__model__output.html", null ],
+      [ "type_output_geometry", "structmodel__output__mod_1_1type__output__geometry.html", null ]
     ] ],
     [ "model_physics_mod", null, [
       [ "type_model_physics", "structmodel__physics__mod_1_1type__model__physics.html", null ]
@@ -185,9 +195,6 @@ var annotated_dup =
     [ "model_sponge_mod", null, [
       [ "type_model_sponge", "structmodel__sponge__mod_1_1type__model__sponge.html", "structmodel__sponge__mod_1_1type__model__sponge" ]
     ] ],
-    [ "model_stations_mod", null, [
-      [ "type_model_stations", "structmodel__stations__mod_1_1type__model__stations.html", null ]
-    ] ],
     [ "model_stepper_2d_mod", null, [
       [ "type_model_stepper_2d", "structmodel__stepper__2d__mod_1_1type__model__stepper__2d.html", null ]
     ] ],
@@ -195,7 +202,7 @@ var annotated_dup =
       [ "type_model_subgrid", "structmodel__subgrid__mod_1_1type__model__subgrid.html", null ]
     ] ],
     [ "model_tide_mod", null, [
-      [ "type_model_tide", "structmodel__tide__mod_1_1type__model__tide.html", null ]
+      [ "type_model_tide", "structmodel__tide__mod_1_1type__model__tide.html", "structmodel__tide__mod_1_1type__model__tide" ]
     ] ],
     [ "model_tracer_mod", null, [
       [ "type_model_tracer", "structmodel__tracer__mod_1_1type__model__tracer.html", null ]
@@ -204,7 +211,14 @@ var annotated_dup =
       [ "type_model_vessel", "structmodel__vessel__mod_1_1type__model__vessel.html", null ]
     ] ],
     [ "model_wavemaker_mod", null, [
+      [ "spectrum_density_i", "interfacemodel__wavemaker__mod_1_1spectrum__density__i.html", null ],
       [ "type_model_wavemaker", "structmodel__wavemaker__mod_1_1type__model__wavemaker.html", null ]
+    ] ],
+    [ "netcdf", null, [
+      [ "nf90_put_var", "interfacenetcdf_1_1nf90__put__var.html", null ]
+    ] ],
+    [ "pnetcdf", null, [
+      [ "nf90mpi_put_var_all", "interfacepnetcdf_1_1nf90mpi__put__var__all.html", null ]
     ] ],
     [ "probe_mod", null, [
       [ "dump_state", "interfaceprobe__mod_1_1dump__state.html", null ],

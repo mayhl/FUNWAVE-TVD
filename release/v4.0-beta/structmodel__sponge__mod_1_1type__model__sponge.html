@@ -122,12 +122,22 @@ Collaboration diagram for model_sponge_mod::type_model_sponge:</div>
 Public Member Functions</h2></td></tr>
 <tr class="memitem:aacfb436f1b26dd639dba76a35d131f00" id="r_aacfb436f1b26dd639dba76a35d131f00"><td class="memItemLeft" align="right" valign="top"><a id="aacfb436f1b26dd639dba76a35d131f00" name="aacfb436f1b26dd639dba76a35d131f00"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>read_input</b> (this, env)</td></tr>
+<tr class="memdesc:aacfb436f1b26dd639dba76a35d131f00"><td class="mdescLeft">&#160;</td><td class="mdescRight">No-op satisfying the deferred base binding — configuration arrives from the boundaries: reader (model_boundaries_mod) <br /></td></tr>
 <tr class="separator:aacfb436f1b26dd639dba76a35d131f00"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:accd2831d0edc3ac5685bcdc2193af9f4" id="r_accd2831d0edc3ac5685bcdc2193af9f4"><td class="memItemLeft" align="right" valign="top"><a id="accd2831d0edc3ac5685bcdc2193af9f4" name="accd2831d0edc3ac5685bcdc2193af9f4"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>any_direct</b> (this)</td></tr>
+<tr class="separator:accd2831d0edc3ac5685bcdc2193af9f4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a86ad1445b7c62a00182adda15814e780" id="r_a86ad1445b7c62a00182adda15814e780"><td class="memItemLeft" align="right" valign="top"><a id="a86ad1445b7c62a00182adda15814e780" name="a86ad1445b7c62a00182adda15814e780"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>any_friction</b> (this)</td></tr>
+<tr class="separator:a86ad1445b7c62a00182adda15814e780"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6fedf988d1cdc7f85a1e1b93f0470167" id="r_a6fedf988d1cdc7f85a1e1b93f0470167"><td class="memItemLeft" align="right" valign="top"><a id="a6fedf988d1cdc7f85a1e1b93f0470167" name="a6fedf988d1cdc7f85a1e1b93f0470167"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>any_diffusion</b> (this)</td></tr>
+<tr class="separator:a6fedf988d1cdc7f85a1e1b93f0470167"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:adf56008ae4f092940c0077d7aba93925" id="r_adf56008ae4f092940c0077d7aba93925"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925">init_compute</a> (this, grid)</td></tr>
 <tr class="memdesc:adf56008ae4f092940c0077d7aba93925"><td class="mdescLeft">&#160;</td><td class="mdescRight">Allocate and compute sponge coefficient arrays.  <br /></td></tr>
 <tr class="separator:adf56008ae4f092940c0077d7aba93925"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab6e7349f0361fc62ffd9a4ce3e74d83e" id="r_ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#ab6e7349f0361fc62ffd9a4ce3e74d83e">merge_friction</a> (this, cd_inout, depth)</td></tr>
-<tr class="memdesc:ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Max-merge friction sponge profile into an external Cd array.  <br /></td></tr>
+<tr class="memdesc:ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="mdescLeft">&#160;</td><td class="mdescRight">Add the friction sponge profile into an external drag-base array.  <br /></td></tr>
 <tr class="separator:ab6e7349f0361fc62ffd9a4ce3e74d83e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a494b68dbb81a39195f4c200be00114e6" id="r_a494b68dbb81a39195f4c200be00114e6"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#a494b68dbb81a39195f4c200be00114e6">apply</a> (this, fields, grid)</td></tr>
 <tr class="memdesc:a494b68dbb81a39195f4c200be00114e6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply Larsen-Dancy (1983) per-stage damping to the state (legacy SPONGE_DAMPING, old/sponge.F).  <br /></td></tr>
@@ -142,39 +152,30 @@ procedure(<a class="el" href="interfacemodel__base__mod_1_1model__read__input.ht
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
-<tr class="memitem:a625dcdf68a73eabbe9be511a956bc1e9" id="r_a625dcdf68a73eabbe9be511a956bc1e9"><td class="memItemLeft" align="right" valign="top"><a id="a625dcdf68a73eabbe9be511a956bc1e9" name="a625dcdf68a73eabbe9be511a956bc1e9"></a>
-logical&#160;</td><td class="memItemRight" valign="bottom"><b>diffusion_sponge</b> = .false.</td></tr>
-<tr class="separator:a625dcdf68a73eabbe9be511a956bc1e9"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a3ff8e9d121c4dbaad1eeb10e79268832" id="r_a3ff8e9d121c4dbaad1eeb10e79268832"><td class="memItemLeft" align="right" valign="top"><a id="a3ff8e9d121c4dbaad1eeb10e79268832" name="a3ff8e9d121c4dbaad1eeb10e79268832"></a>
-logical&#160;</td><td class="memItemRight" valign="bottom"><b>direct_sponge</b> = .false.</td></tr>
-<tr class="separator:a3ff8e9d121c4dbaad1eeb10e79268832"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab720771da16ffebf9059073ce2514f86" id="r_ab720771da16ffebf9059073ce2514f86"><td class="memItemLeft" align="right" valign="top"><a id="ab720771da16ffebf9059073ce2514f86" name="ab720771da16ffebf9059073ce2514f86"></a>
-logical&#160;</td><td class="memItemRight" valign="bottom"><b>friction_sponge</b> = .false.</td></tr>
-<tr class="separator:ab720771da16ffebf9059073ce2514f86"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a75a644d591876c5c8f52720a46b150be" id="r_a75a644d591876c5c8f52720a46b150be"><td class="memItemLeft" align="right" valign="top"><a id="a75a644d591876c5c8f52720a46b150be" name="a75a644d591876c5c8f52720a46b150be"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>csp</b> = 0.1_SP</td></tr>
-<tr class="separator:a75a644d591876c5c8f52720a46b150be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a5f320d9c8ee53baed0df8757a09ab02a" id="r_a5f320d9c8ee53baed0df8757a09ab02a"><td class="memItemLeft" align="right" valign="top"><a id="a5f320d9c8ee53baed0df8757a09ab02a" name="a5f320d9c8ee53baed0df8757a09ab02a"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>cdsponge</b> = 5.0_SP</td></tr>
-<tr class="separator:a5f320d9c8ee53baed0df8757a09ab02a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aea2d1deec6e06ace2bcb1441fe4e7d28" id="r_aea2d1deec6e06ace2bcb1441fe4e7d28"><td class="memItemLeft" align="right" valign="top"><a id="aea2d1deec6e06ace2bcb1441fe4e7d28" name="aea2d1deec6e06ace2bcb1441fe4e7d28"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>sponge_west_width</b> = 0.0_SP</td></tr>
-<tr class="separator:aea2d1deec6e06ace2bcb1441fe4e7d28"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1cc13f6a23617be57bc77c21b9db53be" id="r_a1cc13f6a23617be57bc77c21b9db53be"><td class="memItemLeft" align="right" valign="top"><a id="a1cc13f6a23617be57bc77c21b9db53be" name="a1cc13f6a23617be57bc77c21b9db53be"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>sponge_east_width</b> = 0.0_SP</td></tr>
-<tr class="separator:a1cc13f6a23617be57bc77c21b9db53be"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab8bf56bb1a112c143272fb350ab020b4" id="r_ab8bf56bb1a112c143272fb350ab020b4"><td class="memItemLeft" align="right" valign="top"><a id="ab8bf56bb1a112c143272fb350ab020b4" name="ab8bf56bb1a112c143272fb350ab020b4"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>sponge_south_width</b> = 0.0_SP</td></tr>
-<tr class="separator:ab8bf56bb1a112c143272fb350ab020b4"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ab1615761a7b7b9e026afd97662a0ceb2" id="r_ab1615761a7b7b9e026afd97662a0ceb2"><td class="memItemLeft" align="right" valign="top"><a id="ab1615761a7b7b9e026afd97662a0ceb2" name="ab1615761a7b7b9e026afd97662a0ceb2"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>sponge_north_width</b> = 0.0_SP</td></tr>
-<tr class="separator:ab1615761a7b7b9e026afd97662a0ceb2"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:afb0daf6b2af61884f85edba1021ced73" id="r_afb0daf6b2af61884f85edba1021ced73"><td class="memItemLeft" align="right" valign="top"><a id="afb0daf6b2af61884f85edba1021ced73" name="afb0daf6b2af61884f85edba1021ced73"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>r_sponge</b> = 0.85_SP</td></tr>
-<tr class="separator:afb0daf6b2af61884f85edba1021ced73"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2f5cee69660d03823e3763bdd39192fe" id="r_a2f5cee69660d03823e3763bdd39192fe"><td class="memItemLeft" align="right" valign="top"><a id="a2f5cee69660d03823e3763bdd39192fe" name="a2f5cee69660d03823e3763bdd39192fe"></a>
-real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>a_sponge</b> = 5.0_SP</td></tr>
-<tr class="separator:a2f5cee69660d03823e3763bdd39192fe"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac6931e0e90c5c893c6d645ced99c1c0b" id="r_ac6931e0e90c5c893c6d645ced99c1c0b"><td class="memItemLeft" align="right" valign="top"><a id="ac6931e0e90c5c893c6d645ced99c1c0b" name="ac6931e0e90c5c893c6d645ced99c1c0b"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>width</b> = 0.0_SP</td></tr>
+<tr class="separator:ac6931e0e90c5c893c6d645ced99c1c0b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a84455ac9fffd332748d0ac3c0778a379" id="r_a84455ac9fffd332748d0ac3c0778a379"><td class="memItemLeft" align="right" valign="top"><a id="a84455ac9fffd332748d0ac3c0778a379" name="a84455ac9fffd332748d0ac3c0778a379"></a>
+logical, dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>direct_on</b> = .false.</td></tr>
+<tr class="separator:a84455ac9fffd332748d0ac3c0778a379"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a98b088fe30a7dacce3342fc459ef010b" id="r_a98b088fe30a7dacce3342fc459ef010b"><td class="memItemLeft" align="right" valign="top"><a id="a98b088fe30a7dacce3342fc459ef010b" name="a98b088fe30a7dacce3342fc459ef010b"></a>
+logical, dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>friction_on</b> = .false.</td></tr>
+<tr class="separator:a98b088fe30a7dacce3342fc459ef010b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a6186d8ee5dcc2263af870490304754a6" id="r_a6186d8ee5dcc2263af870490304754a6"><td class="memItemLeft" align="right" valign="top"><a id="a6186d8ee5dcc2263af870490304754a6" name="a6186d8ee5dcc2263af870490304754a6"></a>
+logical, dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>diffusion_on</b> = .false.</td></tr>
+<tr class="separator:a6186d8ee5dcc2263af870490304754a6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a797472fb20a55b3a209e9cb57a3e10a7" id="r_a797472fb20a55b3a209e9cb57a3e10a7"><td class="memItemLeft" align="right" valign="top"><a id="a797472fb20a55b3a209e9cb57a3e10a7" name="a797472fb20a55b3a209e9cb57a3e10a7"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>r_direct</b> = 0.85_SP</td></tr>
+<tr class="separator:a797472fb20a55b3a209e9cb57a3e10a7"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ad033bf88241032d28a48bbd13c65321d" id="r_ad033bf88241032d28a48bbd13c65321d"><td class="memItemLeft" align="right" valign="top"><a id="ad033bf88241032d28a48bbd13c65321d" name="ad033bf88241032d28a48bbd13c65321d"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>a_direct</b> = 5.0_SP</td></tr>
+<tr class="separator:ad033bf88241032d28a48bbd13c65321d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae00557dada0856a882f7d70a11b61e7e" id="r_ae00557dada0856a882f7d70a11b61e7e"><td class="memItemLeft" align="right" valign="top"><a id="ae00557dada0856a882f7d70a11b61e7e" name="ae00557dada0856a882f7d70a11b61e7e"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>cd_fric</b> = 0.0_SP</td></tr>
+<tr class="separator:ae00557dada0856a882f7d70a11b61e7e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af7f08339d485499f48ea76e600d40b65" id="r_af7f08339d485499f48ea76e600d40b65"><td class="memItemLeft" align="right" valign="top"><a id="af7f08339d485499f48ea76e600d40b65" name="af7f08339d485499f48ea76e600d40b65"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>nu_diff</b> = 0.1_SP</td></tr>
+<tr class="separator:af7f08339d485499f48ea76e600d40b65"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7b8b0c55f52884f834e99cfec560f823" id="r_a7b8b0c55f52884f834e99cfec560f823"><td class="memItemLeft" align="right" valign="top"><a id="a7b8b0c55f52884f834e99cfec560f823" name="a7b8b0c55f52884f834e99cfec560f823"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>coeff</b></td></tr>
 <tr class="separator:a7b8b0c55f52884f834e99cfec560f823"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -256,7 +257,7 @@ logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_activated</b> =
 
 <p>Allocate and compute sponge coefficient arrays. </p>
 <p>Direct sponge (coeff): Larsen-Dancy exponential damping ratio. Friction sponge (cd): tanh-profile drag coefficient; allocates cd_sponge. Diffusion sponge (nu): tanh-profile lateral viscosity.</p>
-<p>All arrays ghost-inclusive. Called once at init_compute time, before the first timestep and after gridsetup() + gridinit_spacing() have run. To max-merge friction sponge into an external Cd array instead, call <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#ab6e7349f0361fc62ffd9a4ce3e74d83e" title="Max-merge friction sponge profile into an external Cd array.">merge_friction()</a> after <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925" title="Allocate and compute sponge coefficient arrays.">init_compute()</a>. </p>
+<p>All arrays ghost-inclusive. Called once at init_compute time, before the first timestep and after gridsetup() + gridinit_spacing() have run. To max-merge friction sponge into an external Cd array instead, call <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#ab6e7349f0361fc62ffd9a4ce3e74d83e" title="Add the friction sponge profile into an external drag-base array.">merge_friction()</a> after <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925" title="Allocate and compute sponge coefficient arrays.">init_compute()</a>. </p>
 
 </div>
 </div>
@@ -292,10 +293,10 @@ logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_activated</b> =
       </table>
 </div><div class="memdoc">
 
-<p>Max-merge friction sponge profile into an external Cd array. </p>
-<p>Must be called after <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925" title="Allocate and compute sponge coefficient arrays.">init_compute()</a>. When friction_sponge is active, max-merges cd_sponge*depth into cd_inout and then deallocates cd_sponge. No-op when friction_sponge is inactive or not allocated.</p>
-<p>The *depth factor converts the flux-based sponge drag to the same units as the velocity-based friction term in cal_sources: legacy: -CD_4_SPONGE * U * |UV| * Depth (Wei et al. flux form) merged: -(CD_4_SPONGE * Depth) * U * |UV| (same as Cd * U * |UV|)</p>
-<p>Use this instead of holding both cd_sponge and frictionCd simultaneously: call spongeinit_compute(grid) call spongemerge_friction(frictionCd, fieldsdepth) </p>
+<p>Add the friction sponge profile into an external drag-base array. </p>
+<p>Must be called after <a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#adf56008ae4f092940c0077d7aba93925" title="Allocate and compute sponge coefficient arrays.">init_compute()</a>. When a friction sponge is active, adds cd_sponge*depth into cd_inout and then deallocates cd_sponge. No-op when no friction sponge is active or not allocated.</p>
+<p>The *depth factor converts the flux-based sponge drag to the same units as the velocity-based friction term in cal_sources: legacy: -CD_4_SPONGE * U * |UV| * Depth (Wei et al. flux form) merged: -(CD_4_SPONGE * Depth) * U * |UV| (same as Cd * U * |UV|) Composition with a constant/Manning drag is additive (drag terms sum), superseding the earlier max()-merge (legacy ledger 8d).</p>
+<p>Merge into friction's constant base so both survive the per-step Manning rebuild, then sync_base pushes it into the effective Cd: call spongeinit_compute(grid) call spongemerge_friction(frictioncd_base, fieldsdepth) call frictionsync_base() </p>
 
 </div>
 </div>

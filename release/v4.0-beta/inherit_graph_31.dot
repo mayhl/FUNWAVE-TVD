@@ -5,5 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="model_bc_mod::type\l_model_bc",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structmodel__bc__mod_1_1type__model__bc.html",tooltip=" "];
+  Node0 [id="Node000000",label="model_base_mod::model\l_read_input",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$interfacemodel__base__mod_1_1model__read__input.html",tooltip=" "];
 }

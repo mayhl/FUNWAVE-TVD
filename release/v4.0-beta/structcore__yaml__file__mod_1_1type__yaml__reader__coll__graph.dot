@@ -9,7 +9,9 @@ digraph "core_yaml_file_mod::type_yaml_reader"
   Node2 [id="Node000002",label="core_log_io_mod::type\l_log_writer",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__log__io__mod_1_1type__log__writer.html",tooltip=" "];
   Node3 -> Node1 [id="edge2_Node000001_Node000003",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" comm",fontcolor="grey" ];
   Node3 [id="Node000003",label="core_comm_mod::type_comm",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structcore__comm__mod_1_1type__comm.html",tooltip=" "];
-  Node2 -> Node3 [id="edge3_Node000003_Node000002",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" log",fontcolor="grey" ];
-  Node4 -> Node1 [id="edge4_Node000001_Node000004",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" file",fontcolor="grey" ];
-  Node4 [id="Node000004",label="yamlfile",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",tooltip=" "];
+  Node4 -> Node3 [id="edge3_Node000003_Node000004",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" id",fontcolor="grey" ];
+  Node4 [id="Node000004",label="mpi_comm",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",tooltip=" "];
+  Node2 -> Node3 [id="edge4_Node000003_Node000002",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" log",fontcolor="grey" ];
+  Node5 -> Node1 [id="edge5_Node000001_Node000005",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" file",fontcolor="grey" ];
+  Node5 [id="Node000005",label="yamlfile",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",tooltip=" "];
 }

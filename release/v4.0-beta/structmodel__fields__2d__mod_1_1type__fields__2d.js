@@ -27,6 +27,7 @@ var structmodel__fields__2d__mod_1_1type__fields__2d =
     [ "p0", "structmodel__fields__2d__mod_1_1type__fields__2d.html#a794e25968f1afcaab5f38201adeabc81", null ],
     [ "q", "structmodel__fields__2d__mod_1_1type__fields__2d.html#a033d05cbd35a5ca4fc7eb58b876cb2c9", null ],
     [ "q0", "structmodel__fields__2d__mod_1_1type__fields__2d.html#ab2a166c72823d465f56656fee1300e2a", null ],
+    [ "swe_w", "structmodel__fields__2d__mod_1_1type__fields__2d.html#aafbb5f35dfd85008163a29200361e4d7", null ],
     [ "u", "structmodel__fields__2d__mod_1_1type__fields__2d.html#a8364e1e14577bca958068f0ee00c8038", null ],
     [ "u_max", "structmodel__fields__2d__mod_1_1type__fields__2d.html#a22a4aa045909fea7b02c0843e5dc1b30", null ],
     [ "ux", "structmodel__fields__2d__mod_1_1type__fields__2d.html#a2023a5f69990b6c7b73064005145435b", null ],

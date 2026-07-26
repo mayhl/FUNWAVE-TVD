@@ -53,7 +53,7 @@ var NAVTREE =
 var NAVTREEINDEX =
 [
 "accumulators_8f90.html",
-"structmodel__fields__2d__mod_1_1type__fields__2d.html#a22a4aa045909fea7b02c0843e5dc1b30"
+"structmodel__coupling__mod_1_1type__model__coupling.html"
 ];
 
 var SYNCONMSG = 'click to disable panel synchronisation';

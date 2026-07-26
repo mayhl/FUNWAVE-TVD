@@ -7,5 +7,7 @@ var searchData=
   ['new_5finteger_5frange_4',['new_integer_range',['../structcore__range__parse__mod_1_1type__integer__range.html#a1e5ab90f5f517ee2e04573fcb502423a',1,'core_range_parse_mod::type_integer_range']]],
   ['new_5flog_5fwriter_5',['new_log_writer',['../interfacecore__log__io__mod_1_1new__log__writer.html',1,'core_log_io_mod']]],
   ['new_5freal_5frange_6',['new_real_range',['../structcore__range__parse__mod_1_1type__real__range.html#a083f664dacd74916b9d71c37ccc0f59d',1,'core_range_parse_mod::type_real_range']]],
-  ['nu_5fbreak_7',['nu_break',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#a5cbdaaa84ea5adc3ee76de3dd3db4956',1,'model_fields_2d_mod::type_fields_2d']]]
+  ['nf90_5fput_5fvar_7',['nf90_put_var',['../interfacenetcdf_1_1nf90__put__var.html',1,'netcdf']]],
+  ['nf90mpi_5fput_5fvar_5fall_8',['nf90mpi_put_var_all',['../interfacepnetcdf_1_1nf90mpi__put__var__all.html',1,'pnetcdf']]],
+  ['nu_5fbreak_9',['nu_break',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#a5cbdaaa84ea5adc3ee76de3dd3db4956',1,'model_fields_2d_mod::type_fields_2d']]]
 ];

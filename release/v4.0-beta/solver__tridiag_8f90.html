@@ -103,7 +103,8 @@ $(document).ready(function(){initNavTree('solver__tridiag_8f90.html',''); initRe
   <div class="summary">
 <a href="#nested-classes">Data Types</a> &#124;
 <a href="#namespaces">Modules</a> &#124;
-<a href="#func-members">Functions/Subroutines</a>  </div>
+<a href="#func-members">Functions/Subroutines</a> &#124;
+<a href="#var-members">Variables</a>  </div>
   <div class="headertitle"><div class="title">solver_tridiag.f90 File Reference</div></div>
 </div><!--header-->
 <div class="contents">
@@ -124,9 +125,9 @@ Modules</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions/Subroutines</h2></td></tr>
-<tr class="memitem:a93040f21e8b6441dbd8fd33f85efa564" id="r_a93040f21e8b6441dbd8fd33f85efa564"><td class="memItemLeft" align="right" valign="top"><a id="a93040f21e8b6441dbd8fd33f85efa564" name="a93040f21e8b6441dbd8fd33f85efa564"></a>
-subroutine&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::tws_alloc</b> (ws, m, n)</td></tr>
-<tr class="separator:a93040f21e8b6441dbd8fd33f85efa564"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8ce05da6fdc5835d6f5712f459fa26a9" id="r_a8ce05da6fdc5835d6f5712f459fa26a9"><td class="memItemLeft" align="right" valign="top"><a id="a8ce05da6fdc5835d6f5712f459fa26a9" name="a8ce05da6fdc5835d6f5712f459fa26a9"></a>
+subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_configure</b> (chunk, transpose_min_py)</td></tr>
+<tr class="separator:a8ce05da6fdc5835d6f5712f459fa26a9"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:ab27ca9a6bb24ea79f5d1bd9780f636ad" id="r_ab27ca9a6bb24ea79f5d1bd9780f636ad"><td class="memItemLeft" align="right" valign="top"><a id="ab27ca9a6bb24ea79f5d1bd9780f636ad" name="ab27ca9a6bb24ea79f5d1bd9780f636ad"></a>
 pure subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_thomas_1d</b> (n, a, c, d, z)</td></tr>
 <tr class="separator:ab27ca9a6bb24ea79f5d1bd9780f636ad"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -136,12 +137,21 @@ subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_so
 <tr class="memitem:aff3376a99a0631f236a603462e39e170" id="r_aff3376a99a0631f236a603462e39e170"><td class="memItemLeft" align="right" valign="top"><a id="aff3376a99a0631f236a603462e39e170" name="aff3376a99a0631f236a603462e39e170"></a>
 subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_y</b> (lp, grid, a, c, d, f)</td></tr>
 <tr class="separator:aff3376a99a0631f236a603462e39e170"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a464c879f5cc553d82b641ffc8bc69517" id="r_a464c879f5cc553d82b641ffc8bc69517"><td class="memItemLeft" align="right" valign="top"><a id="a464c879f5cc553d82b641ffc8bc69517" name="a464c879f5cc553d82b641ffc8bc69517"></a>
+subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_y_alltoall</b> (lp, grid, a, c, d1, f1, d2, f2)</td></tr>
+<tr class="separator:a464c879f5cc553d82b641ffc8bc69517"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a5a0c04dce95efa797cf2b75303b62e47" id="r_a5a0c04dce95efa797cf2b75303b62e47"><td class="memItemLeft" align="right" valign="top"><a id="a5a0c04dce95efa797cf2b75303b62e47" name="a5a0c04dce95efa797cf2b75303b62e47"></a>
 subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_x_periodic</b> (lp, grid, a, c, d, ws, f)</td></tr>
 <tr class="separator:a5a0c04dce95efa797cf2b75303b62e47"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a3bc21216d5ee3fb364da00bec360fc89" id="r_a3bc21216d5ee3fb364da00bec360fc89"><td class="memItemLeft" align="right" valign="top"><a id="a3bc21216d5ee3fb364da00bec360fc89" name="a3bc21216d5ee3fb364da00bec360fc89"></a>
 subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_y_periodic</b> (lp, grid, a, c, d, ws, f)</td></tr>
 <tr class="separator:a3bc21216d5ee3fb364da00bec360fc89"><td class="memSeparator" colspan="2">&#160;</td></tr>
+</table><table class="memberdecls">
+<tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="var-members" name="var-members"></a>
+Variables</h2></td></tr>
+<tr class="memitem:a00105223c3af3a851a53a50611980ea0" id="r_a00105223c3af3a851a53a50611980ea0"><td class="memItemLeft" align="right" valign="top"><a id="a00105223c3af3a851a53a50611980ea0" name="a00105223c3af3a851a53a50611980ea0"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>core_solver_tridiag_mod::trid_chunk</b> = 48</td></tr>
+<tr class="separator:a00105223c3af3a851a53a50611980ea0"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Tridiagonal solvers — serial Thomas primitive and MPI-distributed sweeps. </p>

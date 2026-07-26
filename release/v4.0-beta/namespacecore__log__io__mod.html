@@ -120,6 +120,9 @@ Data Types</h2></td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="func-members" name="func-members"></a>
 Functions/Subroutines</h2></td></tr>
+<tr class="memitem:a65dd2e124713db080cfb7d424d62c173" id="r_a65dd2e124713db080cfb7d424d62c173"><td class="memItemLeft" align="right" valign="top"><a id="a65dd2e124713db080cfb7d424d62c173" name="a65dd2e124713db080cfb7d424d62c173"></a>
+subroutine, public&#160;</td><td class="memItemRight" valign="bottom"><b>set_default_log_levels</b> (stdout_level, stderr_level, file_level)</td></tr>
+<tr class="separator:a65dd2e124713db080cfb7d424d62c173"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a9e517258c507e6795e7d20a8a1486545" id="r_a9e517258c507e6795e7d20a8a1486545"><td class="memItemLeft" align="right" valign="top"><a id="a9e517258c507e6795e7d20a8a1486545" name="a9e517258c507e6795e7d20a8a1486545"></a>
 character(len=:) function, allocatable, public&#160;</td><td class="memItemRight" valign="bottom"><b>format_log_line</b> (this, timestamp, prefix, msg)</td></tr>
 <tr class="memdesc:a9e517258c507e6795e7d20a8a1486545"><td class="mdescLeft">&#160;</td><td class="mdescRight">Format log line Format: YYYY-MM-DD HH:MM:SS [LABEL] PREFIX: MSG. <br /></td></tr>
@@ -143,6 +146,9 @@ integer, parameter, public&#160;</td><td class="memItemRight" valign="bottom"><b
 <tr class="memitem:adb23d353904173300586be4bd30be4b2" id="r_adb23d353904173300586be4bd30be4b2"><td class="memItemLeft" align="right" valign="top"><a id="adb23d353904173300586be4bd30be4b2" name="adb23d353904173300586be4bd30be4b2"></a>
 integer, parameter, public&#160;</td><td class="memItemRight" valign="bottom"><b>log_level_fatal</b> = 5</td></tr>
 <tr class="separator:adb23d353904173300586be4bd30be4b2"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0fe90cefdf249d58cd8af263109c5f70" id="r_a0fe90cefdf249d58cd8af263109c5f70"><td class="memItemLeft" align="right" valign="top"><a id="a0fe90cefdf249d58cd8af263109c5f70" name="a0fe90cefdf249d58cd8af263109c5f70"></a>
+integer, parameter, public&#160;</td><td class="memItemRight" valign="bottom"><b>log_level_off</b> = 6</td></tr>
+<tr class="separator:a0fe90cefdf249d58cd8af263109c5f70"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <a name="details" id="details"></a><h2 class="groupheader">Detailed Description</h2>
 <div class="textblock"><p>Module for platform-independent logging. Replaces external flogging dependency with a native implementation. </p>

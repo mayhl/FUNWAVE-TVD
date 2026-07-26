@@ -148,6 +148,10 @@ procedure&#160;</td><td class="memItemRight" valign="bottom"><b>sanitize_path</b
 <tr class="memitem:a417254abfe7babaa38d26b092c6cecf8" id="r_a417254abfe7babaa38d26b092c6cecf8"><td class="memItemLeft" align="right" valign="top"><a id="a417254abfe7babaa38d26b092c6cecf8" name="a417254abfe7babaa38d26b092c6cecf8"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>cast_dictionary</b> (this, key, is_empty)</td></tr>
 <tr class="separator:a417254abfe7babaa38d26b092c6cecf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac2ce1017a84d248cf7a0d5cbfe34b410" id="r_ac2ce1017a84d248cf7a0d5cbfe34b410"><td class="memItemLeft" align="right" valign="top"><a id="ac2ce1017a84d248cf7a0d5cbfe34b410" name="ac2ce1017a84d248cf7a0d5cbfe34b410"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>cast_dictionary_list</b> (this, key, is_empty)</td></tr>
+<tr class="memdesc:ac2ce1017a84d248cf7a0d5cbfe34b410"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cast key to a list of dictionary readers: a mapping yields one child, a sequence of mappings one child per item — list-shaped sections (e.g. wavemaker:) accept both spellings transparently. <br /></td></tr>
+<tr class="separator:ac2ce1017a84d248cf7a0d5cbfe34b410"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0211483a06863d62696d2ba4ae53ed79" id="r_a0211483a06863d62696d2ba4ae53ed79"><td class="memItemLeft" align="right" valign="top"><a id="a0211483a06863d62696d2ba4ae53ed79" name="a0211483a06863d62696d2ba4ae53ed79"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>is_dictionary</b> (this, key, is_empty)</td></tr>
 <tr class="separator:a0211483a06863d62696d2ba4ae53ed79"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -157,54 +161,54 @@ procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>is_dicti
 <tr class="memitem:a5d40b81120f4044575a28c9a7c86a822" id="r_a5d40b81120f4044575a28c9a7c86a822"><td class="memItemLeft" align="right" valign="top"><a id="a5d40b81120f4044575a28c9a7c86a822" name="a5d40b81120f4044575a28c9a7c86a822"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_time</b> (this, key, default, silent, val)</td></tr>
 <tr class="separator:a5d40b81120f4044575a28c9a7c86a822"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a02d13c468d22a57998cf8fe09bb33df8" id="r_a02d13c468d22a57998cf8fe09bb33df8"><td class="memItemLeft" align="right" valign="top"><a id="a02d13c468d22a57998cf8fe09bb33df8" name="a02d13c468d22a57998cf8fe09bb33df8"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_integer</b> read_integer</td></tr>
-<tr class="separator:a02d13c468d22a57998cf8fe09bb33df8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac04c723b4e4e3564aea01e94e38c285e" id="r_ac04c723b4e4e3564aea01e94e38c285e"><td class="memItemLeft" align="right" valign="top"><a id="ac04c723b4e4e3564aea01e94e38c285e" name="ac04c723b4e4e3564aea01e94e38c285e"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_integer_node</b> read_integer_node</td></tr>
-<tr class="separator:ac04c723b4e4e3564aea01e94e38c285e"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a20e9e010c91cc768c29efa9270c2a507" id="r_a20e9e010c91cc768c29efa9270c2a507"><td class="memItemLeft" align="right" valign="top"><a id="a20e9e010c91cc768c29efa9270c2a507" name="a20e9e010c91cc768c29efa9270c2a507"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive_integer</b> read_positive_integer</td></tr>
-<tr class="separator:a20e9e010c91cc768c29efa9270c2a507"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a50d15df6c704143f0ddd39b9bd91dc08" id="r_a50d15df6c704143f0ddd39b9bd91dc08"><td class="memItemLeft" align="right" valign="top"><a id="a50d15df6c704143f0ddd39b9bd91dc08" name="a50d15df6c704143f0ddd39b9bd91dc08"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative_integer</b> read_negative_integer</td></tr>
-<tr class="separator:a50d15df6c704143f0ddd39b9bd91dc08"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae28a67563eaffad1f9e4d02243123521" id="r_ae28a67563eaffad1f9e4d02243123521"><td class="memItemLeft" align="right" valign="top"><a id="ae28a67563eaffad1f9e4d02243123521" name="ae28a67563eaffad1f9e4d02243123521"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative_integer</b> read_nonnegative_integer</td></tr>
-<tr class="separator:ae28a67563eaffad1f9e4d02243123521"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac35c1fe726cf45faacb485f5c44bd442" id="r_ac35c1fe726cf45faacb485f5c44bd442"><td class="memItemLeft" align="right" valign="top"><a id="ac35c1fe726cf45faacb485f5c44bd442" name="ac35c1fe726cf45faacb485f5c44bd442"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive_integer</b> read_nonpositive_integer</td></tr>
-<tr class="separator:ac35c1fe726cf45faacb485f5c44bd442"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aee31650cbde993a3b8e013197e2b4c51" id="r_aee31650cbde993a3b8e013197e2b4c51"><td class="memItemLeft" align="right" valign="top"><a id="aee31650cbde993a3b8e013197e2b4c51" name="aee31650cbde993a3b8e013197e2b4c51"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_real</b> read_real</td></tr>
-<tr class="separator:aee31650cbde993a3b8e013197e2b4c51"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a850141eb100654dc819619f0c4bd0963" id="r_a850141eb100654dc819619f0c4bd0963"><td class="memItemLeft" align="right" valign="top"><a id="a850141eb100654dc819619f0c4bd0963" name="a850141eb100654dc819619f0c4bd0963"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_real_node</b> read_real_node</td></tr>
-<tr class="separator:a850141eb100654dc819619f0c4bd0963"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a188c232c70bbc9744c67470d8d1fd3ec" id="r_a188c232c70bbc9744c67470d8d1fd3ec"><td class="memItemLeft" align="right" valign="top"><a id="a188c232c70bbc9744c67470d8d1fd3ec" name="a188c232c70bbc9744c67470d8d1fd3ec"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive_real</b> read_positive_real</td></tr>
-<tr class="separator:a188c232c70bbc9744c67470d8d1fd3ec"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b7256280a56f49cd2fa9be36cf37975" id="r_a4b7256280a56f49cd2fa9be36cf37975"><td class="memItemLeft" align="right" valign="top"><a id="a4b7256280a56f49cd2fa9be36cf37975" name="a4b7256280a56f49cd2fa9be36cf37975"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative_real</b> read_negative_real</td></tr>
-<tr class="separator:a4b7256280a56f49cd2fa9be36cf37975"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a7ebddf3ea759d1f54fbc3ac99b9afeee" id="r_a7ebddf3ea759d1f54fbc3ac99b9afeee"><td class="memItemLeft" align="right" valign="top"><a id="a7ebddf3ea759d1f54fbc3ac99b9afeee" name="a7ebddf3ea759d1f54fbc3ac99b9afeee"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative_real</b> read_nonnegative_real</td></tr>
-<tr class="separator:a7ebddf3ea759d1f54fbc3ac99b9afeee"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a26bc0d5829964e4f2a1511cec634d716" id="r_a26bc0d5829964e4f2a1511cec634d716"><td class="memItemLeft" align="right" valign="top"><a id="a26bc0d5829964e4f2a1511cec634d716" name="a26bc0d5829964e4f2a1511cec634d716"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive_real</b> read_nonpositive_real</td></tr>
-<tr class="separator:a26bc0d5829964e4f2a1511cec634d716"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a62aa6777967f6c2be1106f1a06b161f1" id="r_a62aa6777967f6c2be1106f1a06b161f1"><td class="memItemLeft" align="right" valign="top"><a id="a62aa6777967f6c2be1106f1a06b161f1" name="a62aa6777967f6c2be1106f1a06b161f1"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_logical</b> read_logical</td></tr>
-<tr class="separator:a62aa6777967f6c2be1106f1a06b161f1"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:adcdbc3b86e953f9461851dd8657b9995" id="r_adcdbc3b86e953f9461851dd8657b9995"><td class="memItemLeft" align="right" valign="top"><a id="adcdbc3b86e953f9461851dd8657b9995" name="adcdbc3b86e953f9461851dd8657b9995"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_logical_node</b> read_logical_node</td></tr>
-<tr class="separator:adcdbc3b86e953f9461851dd8657b9995"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac7372f112b4243b2597e60d4044eb662" id="r_ac7372f112b4243b2597e60d4044eb662"><td class="memItemLeft" align="right" valign="top"><a id="ac7372f112b4243b2597e60d4044eb662" name="ac7372f112b4243b2597e60d4044eb662"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_string</b> read_string</td></tr>
-<tr class="separator:ac7372f112b4243b2597e60d4044eb662"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a19e292345f45f5f4e6c0196ea0048191" id="r_a19e292345f45f5f4e6c0196ea0048191"><td class="memItemLeft" align="right" valign="top"><a id="a19e292345f45f5f4e6c0196ea0048191" name="a19e292345f45f5f4e6c0196ea0048191"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_string_node</b> read_string_node</td></tr>
-<tr class="separator:a19e292345f45f5f4e6c0196ea0048191"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8bc3164dccb5a742743ca20d3c618104" id="r_a8bc3164dccb5a742743ca20d3c618104"><td class="memItemLeft" align="right" valign="top"><a id="a8bc3164dccb5a742743ca20d3c618104" name="a8bc3164dccb5a742743ca20d3c618104"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_integer</b> (this, key, default, silent, required_range, recommend_range, val)</td></tr>
+<tr class="separator:a8bc3164dccb5a742743ca20d3c618104"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3495dfa21ed5967dd8b3215c09078651" id="r_a3495dfa21ed5967dd8b3215c09078651"><td class="memItemLeft" align="right" valign="top"><a id="a3495dfa21ed5967dd8b3215c09078651" name="a3495dfa21ed5967dd8b3215c09078651"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_integer_node</b> (this, key, default, silent, required_range, recommend_range, val)</td></tr>
+<tr class="separator:a3495dfa21ed5967dd8b3215c09078651"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a3cce614049a0a8e765a1da0b18a61b36" id="r_a3cce614049a0a8e765a1da0b18a61b36"><td class="memItemLeft" align="right" valign="top"><a id="a3cce614049a0a8e765a1da0b18a61b36" name="a3cce614049a0a8e765a1da0b18a61b36"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive_integer</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a3cce614049a0a8e765a1da0b18a61b36"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adb1097de4431034e1d0ac3d172df61fc" id="r_adb1097de4431034e1d0ac3d172df61fc"><td class="memItemLeft" align="right" valign="top"><a id="adb1097de4431034e1d0ac3d172df61fc" name="adb1097de4431034e1d0ac3d172df61fc"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative_integer</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:adb1097de4431034e1d0ac3d172df61fc"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aeec32c8a20fa727bc1709c1ab59a072c" id="r_aeec32c8a20fa727bc1709c1ab59a072c"><td class="memItemLeft" align="right" valign="top"><a id="aeec32c8a20fa727bc1709c1ab59a072c" name="aeec32c8a20fa727bc1709c1ab59a072c"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative_integer</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:aeec32c8a20fa727bc1709c1ab59a072c"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9d7dbfe233ec9ec71f289fc43dcdd257" id="r_a9d7dbfe233ec9ec71f289fc43dcdd257"><td class="memItemLeft" align="right" valign="top"><a id="a9d7dbfe233ec9ec71f289fc43dcdd257" name="a9d7dbfe233ec9ec71f289fc43dcdd257"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive_integer</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a9d7dbfe233ec9ec71f289fc43dcdd257"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:afb87454dc0f109cb3936486e002ba286" id="r_afb87454dc0f109cb3936486e002ba286"><td class="memItemLeft" align="right" valign="top"><a id="afb87454dc0f109cb3936486e002ba286" name="afb87454dc0f109cb3936486e002ba286"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_real</b> (this, key, default, silent, required_range, recommend_range, dim, val)</td></tr>
+<tr class="separator:afb87454dc0f109cb3936486e002ba286"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a58320d0871b55afb29c69363e922e1fe" id="r_a58320d0871b55afb29c69363e922e1fe"><td class="memItemLeft" align="right" valign="top"><a id="a58320d0871b55afb29c69363e922e1fe" name="a58320d0871b55afb29c69363e922e1fe"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_real_node</b> (this, key, default, silent, required_range, recommend_range, dim, val)</td></tr>
+<tr class="separator:a58320d0871b55afb29c69363e922e1fe"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af9c514641d599d21a6946ade39fdac62" id="r_af9c514641d599d21a6946ade39fdac62"><td class="memItemLeft" align="right" valign="top"><a id="af9c514641d599d21a6946ade39fdac62" name="af9c514641d599d21a6946ade39fdac62"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive_real</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:af9c514641d599d21a6946ade39fdac62"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adbdeb5a48229ae229c54131d51ec47c1" id="r_adbdeb5a48229ae229c54131d51ec47c1"><td class="memItemLeft" align="right" valign="top"><a id="adbdeb5a48229ae229c54131d51ec47c1" name="adbdeb5a48229ae229c54131d51ec47c1"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative_real</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:adbdeb5a48229ae229c54131d51ec47c1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a950133d3f4a981de2016198fa0d3c9eb" id="r_a950133d3f4a981de2016198fa0d3c9eb"><td class="memItemLeft" align="right" valign="top"><a id="a950133d3f4a981de2016198fa0d3c9eb" name="a950133d3f4a981de2016198fa0d3c9eb"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative_real</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a950133d3f4a981de2016198fa0d3c9eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a8fdf8175d79685b9ddd098a4b17e94eb" id="r_a8fdf8175d79685b9ddd098a4b17e94eb"><td class="memItemLeft" align="right" valign="top"><a id="a8fdf8175d79685b9ddd098a4b17e94eb" name="a8fdf8175d79685b9ddd098a4b17e94eb"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive_real</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a8fdf8175d79685b9ddd098a4b17e94eb"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a9d1028cf4b79ecc358fde6bc5d99b6fd" id="r_a9d1028cf4b79ecc358fde6bc5d99b6fd"><td class="memItemLeft" align="right" valign="top"><a id="a9d1028cf4b79ecc358fde6bc5d99b6fd" name="a9d1028cf4b79ecc358fde6bc5d99b6fd"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_logical</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a9d1028cf4b79ecc358fde6bc5d99b6fd"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a5063881bb5c9d64cb91e7c2b42d51a48" id="r_a5063881bb5c9d64cb91e7c2b42d51a48"><td class="memItemLeft" align="right" valign="top"><a id="a5063881bb5c9d64cb91e7c2b42d51a48" name="a5063881bb5c9d64cb91e7c2b42d51a48"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_logical_node</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a5063881bb5c9d64cb91e7c2b42d51a48"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a618f753a5f09f6c102da6d4c1b1f83b1" id="r_a618f753a5f09f6c102da6d4c1b1f83b1"><td class="memItemLeft" align="right" valign="top"><a id="a618f753a5f09f6c102da6d4c1b1f83b1" name="a618f753a5f09f6c102da6d4c1b1f83b1"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_string</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a618f753a5f09f6c102da6d4c1b1f83b1"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a629edc130cfe05d4f8020e4ac9b05992" id="r_a629edc130cfe05d4f8020e4ac9b05992"><td class="memItemLeft" align="right" valign="top"><a id="a629edc130cfe05d4f8020e4ac9b05992" name="a629edc130cfe05d4f8020e4ac9b05992"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_string_node</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a629edc130cfe05d4f8020e4ac9b05992"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7c29adfbf2398d230f56792795e1d435" id="r_a7c29adfbf2398d230f56792795e1d435"><td class="memItemLeft" align="right" valign="top"><a id="a7c29adfbf2398d230f56792795e1d435" name="a7c29adfbf2398d230f56792795e1d435"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_string_array</b> (this, key, silent, val)</td></tr>
 <tr class="separator:a7c29adfbf2398d230f56792795e1d435"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -223,18 +227,18 @@ procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_enu
 <tr class="memitem:a76f31752b0f244948676454ef82a222b" id="r_a76f31752b0f244948676454ef82a222b"><td class="memItemLeft" align="right" valign="top"><a id="a76f31752b0f244948676454ef82a222b" name="a76f31752b0f244948676454ef82a222b"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_input_path</b> (this, key, default, silent, val)</td></tr>
 <tr class="separator:a76f31752b0f244948676454ef82a222b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a771c38fd6a67f29514b84b67ce63d82a" id="r_a771c38fd6a67f29514b84b67ce63d82a"><td class="memItemLeft" align="right" valign="top"><a id="a771c38fd6a67f29514b84b67ce63d82a" name="a771c38fd6a67f29514b84b67ce63d82a"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> read_integer</td></tr>
-<tr class="separator:a771c38fd6a67f29514b84b67ce63d82a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4ac940a6e9342b5506e689edc8935f3a" id="r_a4ac940a6e9342b5506e689edc8935f3a"><td class="memItemLeft" align="right" valign="top"><a id="a4ac940a6e9342b5506e689edc8935f3a" name="a4ac940a6e9342b5506e689edc8935f3a"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> read_real</td></tr>
-<tr class="separator:a4ac940a6e9342b5506e689edc8935f3a"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:acdd07d8ecccf959a93557d33501f8dde" id="r_acdd07d8ecccf959a93557d33501f8dde"><td class="memItemLeft" align="right" valign="top"><a id="acdd07d8ecccf959a93557d33501f8dde" name="acdd07d8ecccf959a93557d33501f8dde"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> read_logical</td></tr>
-<tr class="separator:acdd07d8ecccf959a93557d33501f8dde"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a559b2d859d01d15150aba4e00782dbd6" id="r_a559b2d859d01d15150aba4e00782dbd6"><td class="memItemLeft" align="right" valign="top"><a id="a559b2d859d01d15150aba4e00782dbd6" name="a559b2d859d01d15150aba4e00782dbd6"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> read_string</td></tr>
-<tr class="separator:a559b2d859d01d15150aba4e00782dbd6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab1226ade715778a1d4d2e28c0b689561" id="r_ab1226ade715778a1d4d2e28c0b689561"><td class="memItemLeft" align="right" valign="top"><a id="ab1226ade715778a1d4d2e28c0b689561" name="ab1226ade715778a1d4d2e28c0b689561"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (this, key, default, silent, required_range, recommend_range, val)</td></tr>
+<tr class="separator:ab1226ade715778a1d4d2e28c0b689561"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ac4aae7cf5b9fcbf9c7aa1c3c1470c2c5" id="r_ac4aae7cf5b9fcbf9c7aa1c3c1470c2c5"><td class="memItemLeft" align="right" valign="top"><a id="ac4aae7cf5b9fcbf9c7aa1c3c1470c2c5" name="ac4aae7cf5b9fcbf9c7aa1c3c1470c2c5"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (this, key, default, silent, required_range, recommend_range, dim, val)</td></tr>
+<tr class="separator:ac4aae7cf5b9fcbf9c7aa1c3c1470c2c5"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acd9f3ab8a2cd4e30154d93716197af14" id="r_acd9f3ab8a2cd4e30154d93716197af14"><td class="memItemLeft" align="right" valign="top"><a id="acd9f3ab8a2cd4e30154d93716197af14" name="acd9f3ab8a2cd4e30154d93716197af14"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:acd9f3ab8a2cd4e30154d93716197af14"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:acd9f3ab8a2cd4e30154d93716197af14" id="r_acd9f3ab8a2cd4e30154d93716197af14"><td class="memItemLeft" align="right" valign="top"><a id="acd9f3ab8a2cd4e30154d93716197af14" name="acd9f3ab8a2cd4e30154d93716197af14"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:acd9f3ab8a2cd4e30154d93716197af14"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a734a7aa647e7da75cab3f100a55793e6" id="r_a734a7aa647e7da75cab3f100a55793e6"><td class="memItemLeft" align="right" valign="top"><a id="a734a7aa647e7da75cab3f100a55793e6" name="a734a7aa647e7da75cab3f100a55793e6"></a>
 generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (this, key, values, default, silent, val)</td></tr>
 <tr class="separator:a734a7aa647e7da75cab3f100a55793e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -250,30 +254,30 @@ generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (
 <tr class="memitem:aac56e96783adcf2cd458ba83283ec9d8" id="r_aac56e96783adcf2cd458ba83283ec9d8"><td class="memItemLeft" align="right" valign="top"><a id="aac56e96783adcf2cd458ba83283ec9d8" name="aac56e96783adcf2cd458ba83283ec9d8"></a>
 generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read</b> (this, key, silent, val)</td></tr>
 <tr class="separator:aac56e96783adcf2cd458ba83283ec9d8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4272c550467e25a89b1e76b12ef984c7" id="r_a4272c550467e25a89b1e76b12ef984c7"><td class="memItemLeft" align="right" valign="top"><a id="a4272c550467e25a89b1e76b12ef984c7" name="a4272c550467e25a89b1e76b12ef984c7"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive</b> read_positive_integer</td></tr>
-<tr class="separator:a4272c550467e25a89b1e76b12ef984c7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ad739e0a4fd3d6477fe27101a3ff35b8d" id="r_ad739e0a4fd3d6477fe27101a3ff35b8d"><td class="memItemLeft" align="right" valign="top"><a id="ad739e0a4fd3d6477fe27101a3ff35b8d" name="ad739e0a4fd3d6477fe27101a3ff35b8d"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive</b> read_positive_real</td></tr>
-<tr class="separator:ad739e0a4fd3d6477fe27101a3ff35b8d"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6f82f5ef0155274a48088beaafd1582b" id="r_a6f82f5ef0155274a48088beaafd1582b"><td class="memItemLeft" align="right" valign="top"><a id="a6f82f5ef0155274a48088beaafd1582b" name="a6f82f5ef0155274a48088beaafd1582b"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative</b> read_negative_integer</td></tr>
-<tr class="separator:a6f82f5ef0155274a48088beaafd1582b"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ae3e3efe8be3804f6780da6c0ce576615" id="r_ae3e3efe8be3804f6780da6c0ce576615"><td class="memItemLeft" align="right" valign="top"><a id="ae3e3efe8be3804f6780da6c0ce576615" name="ae3e3efe8be3804f6780da6c0ce576615"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative</b> read_negative_real</td></tr>
-<tr class="separator:ae3e3efe8be3804f6780da6c0ce576615"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a72a84366d073c73811670f726c9094e3" id="r_a72a84366d073c73811670f726c9094e3"><td class="memItemLeft" align="right" valign="top"><a id="a72a84366d073c73811670f726c9094e3" name="a72a84366d073c73811670f726c9094e3"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative</b> read_nonnegative_integer</td></tr>
-<tr class="separator:a72a84366d073c73811670f726c9094e3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a1282a308fc1ab941459bddf69e6050dc" id="r_a1282a308fc1ab941459bddf69e6050dc"><td class="memItemLeft" align="right" valign="top"><a id="a1282a308fc1ab941459bddf69e6050dc" name="a1282a308fc1ab941459bddf69e6050dc"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative</b> read_nonnegative_real</td></tr>
-<tr class="separator:a1282a308fc1ab941459bddf69e6050dc"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a56b389688b1f823a7b81062c0dd091f7" id="r_a56b389688b1f823a7b81062c0dd091f7"><td class="memItemLeft" align="right" valign="top"><a id="a56b389688b1f823a7b81062c0dd091f7" name="a56b389688b1f823a7b81062c0dd091f7"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive</b> read_nonpositive_integer</td></tr>
-<tr class="separator:a56b389688b1f823a7b81062c0dd091f7"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a2510ed34fe23942f91d220d09a202064" id="r_a2510ed34fe23942f91d220d09a202064"><td class="memItemLeft" align="right" valign="top"><a id="a2510ed34fe23942f91d220d09a202064" name="a2510ed34fe23942f91d220d09a202064"></a>
-generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive</b> read_nonpositive_real</td></tr>
-<tr class="separator:a2510ed34fe23942f91d220d09a202064"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af5bb50cdb0a63d6bd668c911fe65b7f8" id="r_af5bb50cdb0a63d6bd668c911fe65b7f8"><td class="memItemLeft" align="right" valign="top"><a id="af5bb50cdb0a63d6bd668c911fe65b7f8" name="af5bb50cdb0a63d6bd668c911fe65b7f8"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:af5bb50cdb0a63d6bd668c911fe65b7f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af5bb50cdb0a63d6bd668c911fe65b7f8" id="r_af5bb50cdb0a63d6bd668c911fe65b7f8"><td class="memItemLeft" align="right" valign="top"><a id="af5bb50cdb0a63d6bd668c911fe65b7f8" name="af5bb50cdb0a63d6bd668c911fe65b7f8"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_positive</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:af5bb50cdb0a63d6bd668c911fe65b7f8"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adecfc15519ce28a33a4f4d0cc73235d3" id="r_adecfc15519ce28a33a4f4d0cc73235d3"><td class="memItemLeft" align="right" valign="top"><a id="adecfc15519ce28a33a4f4d0cc73235d3" name="adecfc15519ce28a33a4f4d0cc73235d3"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:adecfc15519ce28a33a4f4d0cc73235d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:adecfc15519ce28a33a4f4d0cc73235d3" id="r_adecfc15519ce28a33a4f4d0cc73235d3"><td class="memItemLeft" align="right" valign="top"><a id="adecfc15519ce28a33a4f4d0cc73235d3" name="adecfc15519ce28a33a4f4d0cc73235d3"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_negative</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:adecfc15519ce28a33a4f4d0cc73235d3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a85b490887379aa62e11e5add18014d36" id="r_a85b490887379aa62e11e5add18014d36"><td class="memItemLeft" align="right" valign="top"><a id="a85b490887379aa62e11e5add18014d36" name="a85b490887379aa62e11e5add18014d36"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a85b490887379aa62e11e5add18014d36"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a85b490887379aa62e11e5add18014d36" id="r_a85b490887379aa62e11e5add18014d36"><td class="memItemLeft" align="right" valign="top"><a id="a85b490887379aa62e11e5add18014d36" name="a85b490887379aa62e11e5add18014d36"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonnegative</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:a85b490887379aa62e11e5add18014d36"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af725c861555de34cb8f2029b53d88ed4" id="r_af725c861555de34cb8f2029b53d88ed4"><td class="memItemLeft" align="right" valign="top"><a id="af725c861555de34cb8f2029b53d88ed4" name="af725c861555de34cb8f2029b53d88ed4"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:af725c861555de34cb8f2029b53d88ed4"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af725c861555de34cb8f2029b53d88ed4" id="r_af725c861555de34cb8f2029b53d88ed4"><td class="memItemLeft" align="right" valign="top"><a id="af725c861555de34cb8f2029b53d88ed4" name="af725c861555de34cb8f2029b53d88ed4"></a>
+generic, public&#160;</td><td class="memItemRight" valign="bottom"><b>read_nonpositive</b> (this, key, default, silent, val)</td></tr>
+<tr class="separator:af725c861555de34cb8f2029b53d88ed4"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table><table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-attribs" name="pub-attribs"></a>
 Public Attributes</h2></td></tr>
@@ -297,7 +301,7 @@ type(yamlfile)&#160;</td><td class="memItemRight" valign="bottom"><b>file</b></t
 <tr class="separator:a8c6410837b190318a44abce467fe844e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 </table>
 <hr/>The documentation for this type was generated from the following file:<ul>
-<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/infra/<b>yaml.F90</b></li>
+<li>/home/runner/work/FUNWAVE-TVD/FUNWAVE-TVD/src/core/infra/<b>yaml.f90</b></li>
 </ul>
 </div><!-- contents -->
 </div><!-- doc-content -->
