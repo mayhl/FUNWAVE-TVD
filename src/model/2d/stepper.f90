@@ -176,6 +176,13 @@ module model_stepper_2d_mod
       ! show in modern (deliberate 19c deviation from the ykchoi trap)
       logical :: run_breaker = .false.
 
+      ! Viscosity mode pins mask9/swe_w at their all-one settled state
+      ! (update_mask9 is state-independent there); once the first in-loop
+      ! rebuild + ring ride has run, every repeat is a no-op — this flag
+      ! lets sync_from_flux skip them.  Never set while the vessel hull
+      ! blanks mask9 per stage.
+      logical :: m9_settled = .false.
+
       ! Combined eddy viscosity, allocated only when more than one of
       ! nu_break / vessel deep-draft / nu_sponge is active (legacy nu_vis
       ! assembly in sources.F); single-source cases alias the source
@@ -811,28 +818,43 @@ contains
 
          call update_mask(lp, f%eta, f%depth, f%mask_struc, f%mask, &
                           this%depth_fx, this%depth_fy, truncate_depth=.true.)
-         call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
-                           num%MinDepthFrc, phy%SWE_ETA_DEP, &
-                           phy%viscosity_breaking)
 
-         ! 18c quirk-drop, honouring the kernel_masks caller contract:
-         ! update_mask9 is interior-only, and nothing since init refreshed
-         ! the seam/periodic ghost ring the derivative stencils read — it
-         ! sat stale (history at seams, init values under periodic-y).
-         ! Ride the real-copy halo exchange so the ring is a pure function
-         ! of the interior; wall ghosts keep their well-defined zeros
-         ! (halo_exchange fills seams and wraps only, ledger 8c intact).
-         block
-            real(SP), allocatable :: rmask(:, :)
-            allocate (rmask, source=real(f%mask9, SP))
-            call this%grid%halo_exchange(rmask)
-            f%mask9 = nint(rmask)
-         end block
+         ! viscosity mode makes the rebuild below state-independent (all-1
+         ! over its range), so after the first pass mask9/swe_w sit at a
+         ! fixed point and the rebuild + ride + weight refresh are skipped
+         ! via m9_settled; the vessel hull re-blank keeps the per-stage
+         ! rebuild, and the guard leaves t = 0 (pure product, ledger 8c)
+         ! to the first pass
+         if (.not. (phy%viscosity_breaking .and. this%m9_settled &
+                    .and. .not. ves_mask_on(this))) then
+            call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
+                              num%MinDepthFrc, phy%SWE_ETA_DEP, &
+                              phy%viscosity_breaking)
 
-         ! real dispersion-gate weight off the settled mask9 (halos valid)
-         call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
-                                phy%SWE_ETA_DEP, phy%SWE_ETA_RAMP, &
-                                phy%viscosity_breaking, f%swe_w)
+            ! 18c quirk-drop, honouring the kernel_masks caller contract:
+            ! update_mask9 is interior-only, and nothing since init refreshed
+            ! the seam/periodic ghost ring the derivative stencils read — it
+            ! sat stale (history at seams, init values under periodic-y).
+            ! Ride the real-copy halo exchange so the ring is a pure function
+            ! of the interior; wall ghosts keep their well-defined zeros
+            ! (halo_exchange fills seams and wraps only, ledger 8c intact).
+            block
+               real(SP), allocatable :: rmask(:, :)
+               allocate (rmask, source=real(f%mask9, SP))
+               call this%grid%halo_exchange(rmask)
+               f%mask9 = nint(rmask)
+            end block
+
+            ! real dispersion-gate weight off the settled mask9 (halos valid)
+            call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
+                                   phy%SWE_ETA_DEP, phy%SWE_ETA_RAMP, &
+                                   phy%viscosity_breaking, f%swe_w)
+            ! latch only once the vessel is NOT blanking mask9 — else a
+            ! mid-run deactivation (is_activated -> F) would leave m9_settled
+            ! true and freeze mask9 with the stale hull zeros; the guard's
+            ! .not. ves_mask_on term forces this last all-1 rebuild first
+            if (.not. ves_mask_on(this)) this%m9_settled = .true.
+         end if
 
       end associate
 
