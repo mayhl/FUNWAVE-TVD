@@ -83,7 +83,8 @@ contains
       logical,  intent(in)  :: dispersion, periodic, disp_time_left
       real(SP), intent(in)  :: froude_cap, min_depth, gamma1, gamma2, b1, b2
       real(SP), intent(in)  :: inv_dx(:,:), inv_dy(:,:)
-      integer,  intent(in)  :: mask(:,:), mask9(:,:)
+      integer,  intent(in)  :: mask(:,:)
+      real(SP), intent(in)  :: mask9(:,:)
       real(SP), intent(in)  :: depth(:,:), h(:,:), eta(:,:)
       real(SP), intent(inout) :: ubar(:,:), vbar(:,:)
       real(SP), intent(in)  :: vxy(:,:), dvxy(:,:), uxy(:,:), duxy(:,:)
@@ -205,7 +206,8 @@ contains
       real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
       real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
 
       real(SP), parameter :: D0 = 10.0_SP, UB = 2.0_SP, VB = 1.0_SP
@@ -217,7 +219,7 @@ contains
       depth = D0;  h = D0;  eta = 0.0_SP
       ubar = UB;   vbar = VB
       inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1
+      mask = 1;  mask9 = 1.0_SP
       vxy = 0.0_SP;  dvxy = 0.0_SP
       uxy = 0.0_SP;  duxy = 0.0_SP
       ux  = 0.0_SP;  dux  = 0.0_SP
@@ -257,7 +259,8 @@ contains
       real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
       real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: im, jm
 
       real(SP), parameter :: D0 = 5.0_SP, UB = 1.0_SP, VB = 1.0_SP
@@ -271,7 +274,7 @@ contains
       depth = D0;  h = D0;  eta = 0.0_SP
       ubar = UB;   vbar = VB
       inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1
+      mask = 1;  mask9 = 1.0_SP
       mask(im, jm) = 0
       vxy = 0.0_SP;  dvxy = 0.0_SP
       uxy = 0.0_SP;  duxy = 0.0_SP
@@ -314,7 +317,8 @@ contains
       real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
       real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       real(SP) :: cap_speed, u45, utotal
       integer  :: i, j
 
@@ -326,7 +330,7 @@ contains
 
       depth = H0;  h = H0;  eta = 0.0_SP
       inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1
+      mask = 1;  mask9 = 1.0_SP
       vxy = 0.0_SP;  dvxy = 0.0_SP
       uxy = 0.0_SP;  duxy = 0.0_SP
       ux  = 0.0_SP;  dux  = 0.0_SP
@@ -395,7 +399,8 @@ contains
       real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
       real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
 
       real(SP), parameter :: D0 = 8.0_SP, UB = 4.0_SP, VB = 2.0_SP
@@ -407,7 +412,7 @@ contains
       depth = D0;  h = D0;  eta = 0.0_SP
       ubar = UB;   vbar = VB
       inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1
+      mask = 1;  mask9 = 1.0_SP
       vxy = 0.0_SP;  dvxy = 0.0_SP
       uxy = 0.0_SP;  duxy = 0.0_SP
       ux  = 0.0_SP;  dux  = 0.0_SP
@@ -446,7 +451,8 @@ contains
       real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
       real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
 
       call make_lp(lp)
@@ -456,7 +462,7 @@ contains
       depth = 5.0_SP;  h = 5.0_SP;  eta = 0.0_SP
       ubar = 0.0_SP;   vbar = 0.0_SP
       inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1
+      mask = 1;  mask9 = 1.0_SP
       vxy = 0.0_SP;  dvxy = 0.0_SP
       uxy = 0.0_SP;  duxy = 0.0_SP
       ux  = 0.0_SP;  dux  = 0.0_SP

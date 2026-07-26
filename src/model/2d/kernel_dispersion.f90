@@ -78,35 +78,40 @@ contains
    ! ----------------------------------------------------------------
    pure function pt_dx(f, i, j, idx, m9) result(d)
       real(SP), intent(in) :: f(:, :), idx
-      integer, intent(in)  :: i, j, m9
+      integer, intent(in)  :: i, j
+      real(SP), intent(in) :: m9
       real(SP) :: d
       d = (f(i + 1, j) - f(i - 1, j))*0.5_SP*idx*m9
    end function pt_dx
 
    pure function pt_dy(f, i, j, idy, m9) result(d)
       real(SP), intent(in) :: f(:, :), idy
-      integer, intent(in)  :: i, j, m9
+      integer, intent(in)  :: i, j
+      real(SP), intent(in) :: m9
       real(SP) :: d
       d = (f(i, j + 1) - f(i, j - 1))*0.5_SP*idy*m9
    end function pt_dy
 
    pure function pt_dxx(f, i, j, idx, m9) result(d)
       real(SP), intent(in) :: f(:, :), idx
-      integer, intent(in)  :: i, j, m9
+      integer, intent(in)  :: i, j
+      real(SP), intent(in) :: m9
       real(SP) :: d
       d = (f(i + 1, j) - 2.0_SP*f(i, j) + f(i - 1, j))*idx*idx*m9
    end function pt_dxx
 
    pure function pt_dyy(f, i, j, idy, m9) result(d)
       real(SP), intent(in) :: f(:, :), idy
-      integer, intent(in)  :: i, j, m9
+      integer, intent(in)  :: i, j
+      real(SP), intent(in) :: m9
       real(SP) :: d
       d = (f(i, j + 1) - 2.0_SP*f(i, j) + f(i, j - 1))*idy*idy*m9
    end function pt_dyy
 
    pure function pt_dxy(f, i, j, idx, idy, m9) result(d)
       real(SP), intent(in) :: f(:, :), idx, idy
-      integer, intent(in)  :: i, j, m9
+      integer, intent(in)  :: i, j
+      real(SP), intent(in) :: m9
       real(SP) :: t1, t2, d
       t1 = (f(i + 1, j + 1) - f(i + 1, j - 1))*0.5_SP*idy
       t2 = (f(i - 1, j + 1) - f(i - 1, j - 1))*0.5_SP*idy
@@ -134,7 +139,7 @@ contains
       real(SP), intent(in)    :: eta(:, :), depth(:, :)
       real(SP), intent(in)    :: u(:, :), v(:, :), u0(:, :), v0(:, :)
       real(SP), intent(in)    :: p(:, :), q(:, :)
-      integer, intent(in)    :: mask9(:, :)
+      real(SP), intent(in)    :: mask9(:, :)
       real(SP), intent(in)    :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)    :: dt, min_depth_frc, gamma2
       logical, intent(in)    :: show_breaking
@@ -315,7 +320,7 @@ contains
       type(type_disp_workspace), intent(in) :: ws
       real(SP), intent(in)    :: eta(:, :), depth(:, :)
       real(SP), intent(in)    :: u(:, :), v(:, :)
-      integer, intent(in)    :: mask9(:, :)
+      real(SP), intent(in)    :: mask9(:, :)
       real(SP), intent(in)    :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)    :: beta1, beta2, gamma2
       real(SP), intent(in)    :: etat(:, :), etax(:, :), etay(:, :)

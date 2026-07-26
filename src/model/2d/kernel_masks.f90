@@ -5,7 +5,7 @@ module model_kernel_masks_mod
    implicit none
    private
 
-   public :: update_mask, update_mask9
+   public :: update_mask, update_mask9, update_swe_weight
 
 contains
 
@@ -108,5 +108,44 @@ contains
          end do
       end do
    end subroutine update_mask9
+
+   ! ----------------------------------------------------------------
+   ! Real dispersion-gate weight consumed by the kernels in place of
+   ! MASK9: swe_w = mask9 * smoothstep taper over eta/depth in
+   ! [swe_eta_dep - swe_eta_ramp, swe_eta_dep].  Ramp 0 (or viscosity
+   ! breaking) reduces to real(mask9) — bitwise the old behaviour.
+   ! Pointwise over the FULL local array: mask9/eta carry valid halos
+   ! here (caller runs it after the mask9 ring exchange), so no new
+   ! exchange is needed.  Rationale: the hard switch converts last-bit
+   ! eta differences into O(1) residual flips at threshold cells — the
+   ! blow-up injector of the 2026-07 damping mission.
+   ! ----------------------------------------------------------------
+   subroutine update_swe_weight(eta, depth, mask9, min_depth_frc, &
+                                swe_eta_dep, swe_eta_ramp, &
+                                viscosity_breaking, swe_w)
+      real(SP), intent(in)  :: eta(:, :), depth(:, :)
+      integer, intent(in)  :: mask9(:, :)
+      real(SP), intent(in)  :: min_depth_frc, swe_eta_dep, swe_eta_ramp
+      logical, intent(in)  :: viscosity_breaking
+      real(SP), intent(out) :: swe_w(:, :)
+
+      real(SP) :: t
+      integer :: i, j
+
+      if (swe_eta_ramp <= 0.0_SP .or. viscosity_breaking) then
+         swe_w = real(mask9, SP)
+         return
+      end if
+
+      !$omp parallel do default(shared) schedule(static) private(i, t)
+      do j = 1, size(mask9, 2)
+         do i = 1, size(mask9, 1)
+            t = (swe_eta_dep - abs(eta(i, j)) &
+                 /max(depth(i, j), min_depth_frc))/swe_eta_ramp
+            t = min(1.0_SP, max(0.0_SP, t))
+            swe_w(i, j) = real(mask9(i, j), SP)*t*t*(3.0_SP - 2.0_SP*t)
+         end do
+      end do
+   end subroutine update_swe_weight
 
 end module model_kernel_masks_mod

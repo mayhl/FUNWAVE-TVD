@@ -42,7 +42,8 @@ module model_physics_mod
 
    use model_config_defaults_mod, only: DEF_PHYSICS_DISPERSION_BETA_REF, &
                                         DEF_PHYSICS_DISPERSION_SCHEME, &
-                                        DEF_PHYSICS_DISPERSION_SWE_ETA_DEP
+                                        DEF_PHYSICS_DISPERSION_SWE_ETA_DEP, &
+                                        DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP
 
    implicit none
 
@@ -67,6 +68,8 @@ module model_physics_mod
       real(SP) :: Gamma3 = 1.0_SP
       logical  :: viscosity_breaking = .true.   ! set from breaking.model in model_setup
       real(SP) :: SWE_ETA_DEP = 0.80_SP
+      ! smoothstep taper width below SWE_ETA_DEP; 0 = legacy hard switch
+      real(SP) :: SWE_ETA_RAMP = 0.0_SP
 
       ! f-plane Coriolis (legacy has the source term in the spherical
       ! branch only; [[design-grid-crs]] decouples f from the metric —
@@ -149,6 +152,8 @@ contains
                              default=DEF_PHYSICS_DISPERSION_BETA_REF)
          call disp_yaml%read("swe_eta_dep", silent=no_key, val=this%SWE_ETA_DEP, &
                              default=DEF_PHYSICS_DISPERSION_SWE_ETA_DEP)
+         call disp_yaml%read("swe_eta_ramp", silent=no_key, val=this%SWE_ETA_RAMP, &
+                             default=DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP)
       end if
 
    end subroutine physics_read_input

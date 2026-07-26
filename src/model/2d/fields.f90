@@ -41,6 +41,9 @@ module model_fields_2d_mod
       integer, allocatable :: mask(:, :)        !< wet/dry mask                 (MASK)
       integer, allocatable :: mask_struc(:, :)  !< permanent structure mask     (MASK_STRUC)
       integer, allocatable :: mask9(:, :)       !< 3x3 stencil wet/dry mask     (MASK9)
+      ! real SWE dispersion weight: mask9 x smoothstep taper (swe_eta_ramp);
+      ! equals real(mask9) when the taper is off — the kernels' multiplier
+      real(SP), allocatable :: swe_w(:, :)      !< dispersion gate weight
 
       ! ── Runge-Kutta history ───────────────────────────────────────────────
       ! State saved at the start of each timestep for multi-stage RK.
@@ -109,6 +112,7 @@ contains
       allocate (this%mask(mloc, nloc), source=0)
       allocate (this%mask_struc(mloc, nloc), source=0)
       allocate (this%mask9(mloc, nloc), source=0)
+      allocate (this%swe_w(mloc, nloc), source=0.0_SP)
 
       allocate (this%eta0(mloc, nloc), source=0.0_SP)
       allocate (this%p0(mloc, nloc), source=0.0_SP)
@@ -201,6 +205,7 @@ contains
       if (allocated(this%mask)) deallocate (this%mask)
       if (allocated(this%mask_struc)) deallocate (this%mask_struc)
       if (allocated(this%mask9)) deallocate (this%mask9)
+      if (allocated(this%swe_w)) deallocate (this%swe_w)
 
       if (allocated(this%eta0)) deallocate (this%eta0)
       if (allocated(this%p0)) deallocate (this%p0)

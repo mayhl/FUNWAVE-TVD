@@ -43,7 +43,8 @@ contains
       real(SP), intent(out) :: u4(:,:), v4(:,:), u1p(:,:), v1p(:,:)
       real(SP), intent(out) :: u1pp(:,:), v1pp(:,:), u2(:,:), v2(:,:), u3(:,:), v3(:,:)
       real(SP), intent(out) :: wavemaker_mass(:,:), cd(:,:), nu_vis(:,:)
-      integer,  intent(out) :: mask(:,:), mask9(:,:)
+      integer,  intent(out) :: mask(:,:)
+      real(SP), intent(out) :: mask9(:,:)
       inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
       depth_x = 10.0_SP;  depth_y = 10.0_SP
       eta = 0.0_SP;  h = 10.0_SP
@@ -53,7 +54,7 @@ contains
       u1pp = 0.0_SP;  v1pp = 0.0_SP;  u2 = 0.0_SP;  v2 = 0.0_SP
       u3 = 0.0_SP;  v3 = 0.0_SP
       wavemaker_mass = 0.0_SP;  cd = 0.0_SP;  nu_vis = 0.0_SP
-      mask = 1;  mask9 = 1
+      mask = 1;  mask9 = 1.0_SP
    end subroutine zero_inputs
 
    ! ----------------------------------------------------------------
@@ -75,7 +76,8 @@ contains
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
       real(SP) :: coriolis(MLOC,NLOC)
       real(SP) :: depth(MLOC,NLOC), cd_bw(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: DS = 0.1_SP, ETA0 = 0.5_SP
 
@@ -127,7 +129,8 @@ contains
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
       real(SP) :: coriolis(MLOC,NLOC)
       real(SP) :: depth(MLOC,NLOC), cd_bw(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: CD0 = 0.01_SP, U0 = 2.0_SP
 
@@ -175,7 +178,8 @@ contains
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
       real(SP) :: coriolis(MLOC,NLOC)
       real(SP) :: depth(MLOC,NLOC), cd_bw(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: WM0 = 0.3_SP, U0 = 1.5_SP, V0 = -0.5_SP
 
@@ -225,7 +229,8 @@ contains
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
       real(SP) :: coriolis(MLOC,NLOC)
       real(SP) :: depth(MLOC,NLOC), cd_bw(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
 
       call make_lp(lp)
@@ -279,7 +284,8 @@ contains
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
       real(SP) :: coriolis(MLOC,NLOC)
       real(SP) :: depth(MLOC,NLOC), cd_bw(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: F0 = 1.0e-2_SP, P0 = 2.0_SP, Q0 = 3.0_SP
 
@@ -342,7 +348,8 @@ contains
       real(SP) :: src_x(MLOC,NLOC), src_y(MLOC,NLOC)
       real(SP) :: coriolis(MLOC,NLOC)
       real(SP) :: depth(MLOC,NLOC), cd_bw(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), mask9(MLOC,NLOC)
+      integer  :: mask(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       integer  :: i, j
       real(SP), parameter :: CBW = 0.4_SP, U0 = 2.0_SP, D0 = 7.0_SP
 

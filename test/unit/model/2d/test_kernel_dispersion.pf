@@ -41,7 +41,7 @@ contains
       real(SP), intent(in)    :: eta(:,:), depth(:,:)
       real(SP), intent(in)    :: u(:,:), v(:,:), u0(:,:), v0(:,:)
       real(SP), intent(in)    :: p(:,:), q(:,:)
-      integer,  intent(in)    :: mask9(:,:)
+      real(SP), intent(in)    :: mask9(:,:)
       real(SP), intent(in)    :: inv_dx(:,:), inv_dy(:,:)
       real(SP), intent(in)    :: dt, mdf, beta1, beta2, gamma2
       logical,  intent(in)    :: shb, wb, eb, sb, nb
@@ -95,7 +95,7 @@ contains
       real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
       real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
       real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
       real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
@@ -110,7 +110,7 @@ contains
 
       eta = 0.0_SP;  depth = 1.0_SP
       u = 0.0_SP;    v = 0.0_SP;  u0 = 0.0_SP;  v0 = 0.0_SP
-      mask9 = 1;  inv_dx = 1.0_SP/DX_VAL;  inv_dy = 1.0_SP/DX_VAL
+      mask9 = 1.0_SP;  inv_dx = 1.0_SP/DX_VAL;  inv_dy = 1.0_SP/DX_VAL
       ! P(i,j) = (i-1)*DX_VAL  => P(i+1,j)-P(i,j) = DX_VAL  => dP/dx*inv_dx = 1
       do j = 1, NLOC
          do i = 1, MLOC+1
@@ -150,7 +150,7 @@ contains
       real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
       real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
       real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
       real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
@@ -164,7 +164,7 @@ contains
 
       eta = 0.0_SP;  depth = 1.0_SP
       u = 1.0_SP;  v = 0.5_SP;  u0 = 1.0_SP;  v0 = 0.5_SP
-      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1
+      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1.0_SP
       inv_dx = 1.0_SP;  inv_dy = 1.0_SP
       ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
       u1pp = 0.0_SP;  v1pp = 0.0_SP
@@ -201,7 +201,7 @@ contains
       real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
       real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
       real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
       real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
@@ -215,7 +215,7 @@ contains
 
       eta = 0.0_SP;  depth = 1.0_SP
       u = 0.0_SP;  v = 0.0_SP;  u0 = 0.0_SP;  v0 = 0.0_SP
-      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1
+      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1.0_SP
       inv_dx = 1.0_SP;  inv_dy = 1.0_SP
       ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
       ! pre-set gamma2 arrays to sentinel
@@ -254,7 +254,7 @@ contains
       real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
       real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
       real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      integer  :: mask9(MLOC,NLOC)
+      real(SP) :: mask9(MLOC,NLOC)
       real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
       real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
       real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
@@ -276,7 +276,7 @@ contains
          end do
       end do
       v = 0.0_SP;  u0 = u;  v0 = 0.0_SP
-      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1
+      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1.0_SP
       inv_dx = 1.0_SP;  inv_dy = 1.0_SP
       ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
       u1pp = 0.0_SP;  v1pp = 0.0_SP

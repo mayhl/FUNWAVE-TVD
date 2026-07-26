@@ -866,7 +866,7 @@ contains
       type(type_loop_bounds), intent(in)    :: lp
       type(type_flux_workspace), intent(inout) :: ws
       real(SP), intent(in) :: depthx(:, :), gamma1, gamma3
-      integer, intent(in) :: mask9(:, :)
+      real(SP), intent(in) :: mask9(:, :)
       logical, intent(in) :: dispersion
       integer, intent(in) :: js, je   ! row strip, ghosts included (1..n)
       integer  :: i, j, ii
@@ -914,7 +914,7 @@ contains
       type(type_loop_bounds), intent(in)    :: lp
       type(type_flux_workspace), intent(inout) :: ws
       real(SP), intent(in) :: depthy(:, :), gamma1, gamma3
-      integer, intent(in) :: mask9(:, :)
+      real(SP), intent(in) :: mask9(:, :)
       logical, intent(in) :: dispersion
       integer, intent(in) :: js, je   ! row strip, ghosts included (1..n+1)
       integer  :: i, j, jj
@@ -966,7 +966,8 @@ contains
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
       real(SP), intent(in)  :: dx(:, :), dy(:, :), inv_dx(:, :), inv_dy(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
@@ -1004,7 +1005,8 @@ contains
       real(SP), intent(in)  :: eta(:, :), u(:, :), v(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
@@ -1115,7 +1117,8 @@ contains
       real(SP), intent(in)  :: eta(:, :), u(:, :), v(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
@@ -1150,7 +1153,8 @@ contains
       real(SP), intent(in)  :: eta(:, :), u(:, :), v(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
@@ -1185,7 +1189,7 @@ contains
       real(SP), intent(in)  :: eta(:, :), u(:, :), v(:, :), hu(:, :), hv(:, :)
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
-      integer, intent(in)  :: mask9(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws
@@ -1224,7 +1228,8 @@ contains
       real(SP), intent(in)  :: u4(:, :), v4(:, :)
       real(SP), intent(in)  :: depthx(:, :), depthy(:, :)
       real(SP), intent(in)  :: dx(:, :), dy(:, :), inv_dx(:, :), inv_dy(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: gamma1, gamma3
       logical, intent(in)  :: dispersion
       type(type_flux_workspace), intent(inout) :: ws

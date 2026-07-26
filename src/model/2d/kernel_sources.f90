@@ -66,7 +66,8 @@ contains
       real(SP), intent(in)  :: gamma1, gamma2
       logical, intent(in)  :: dispersion, coriolis_on, breakwater_on
       logical, intent(in)  :: vessel_drag_on, wind_on
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in) :: mask9(:, :)
       real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)  :: depth(:, :), depth_x(:, :), depth_y(:, :)
       real(SP), intent(in)  :: eta(:, :), h(:, :), u(:, :), v(:, :)

@@ -194,7 +194,8 @@ contains
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: gamma1, min_depth, b1, b2
       real(SP), intent(in)  :: inv_dx(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: depth(:, :), h(:, :)
       real(SP), intent(in)  :: ubar(:, :), vxy(:, :), dvxy(:, :)
       logical, intent(in)  :: west_dirichlet
@@ -253,7 +254,8 @@ contains
       logical, intent(in)  :: disp_time_left
       real(SP), intent(in)  :: gamma1, gamma2, min_depth, b1, b2
       real(SP), intent(in)  :: inv_dy(:, :)
-      integer, intent(in)  :: mask(:, :), mask9(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: depth(:, :), h(:, :), eta(:, :)
       real(SP), intent(in)  :: vbar(:, :), uxy(:, :), duxy(:, :)
       real(SP), intent(in)  :: ux(:, :), dux(:, :)
