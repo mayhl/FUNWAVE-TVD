@@ -312,7 +312,7 @@ sections:
         latex: "$C_{\\mathrm{CFL}}$"
         doc: "CFL number for the adaptive timestep."
       flux_solver:
-        legacy: CONSTR
+        legacy: CONSTRUCTION
         default: hllc
         units: ~
         values: [hllc, hll]
@@ -354,7 +354,7 @@ sections:
       coriolis.f: {legacy: ~, default: ~, units: s-1, latex: $f$, doc: Constant Coriolis parameter (f-plane; overrides latitude).}
       coriolis.latitude: {legacy: ~, default: ~, units: degrees_north, latex: $\varphi$, doc: Reference latitude for the f-plane Coriolis parameter.}
       bathy_correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass.}
-      bathy_depth: {legacy: Depth_Flat, default: ~, units: m, latex: $d_0$, doc: Still-water depth for a flat bottom.}
+      bathy_depth: {legacy: DEPTH_FLAT, default: ~, units: m, latex: $d_0$, doc: Still-water depth for a flat bottom.}
       bathy_file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: Bathymetry data file.}
       bathy_slope: {legacy: SLP, default: ~, units: ~, latex: $s$, doc: Bed slope for a sloping-beach bathymetry.}
       bathy_slope_x0: {legacy: Xslp, default: ~, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
@@ -377,8 +377,8 @@ sections:
       dy: {legacy: DY, default: ~, units: m, latex: $\Delta y$, doc: Grid spacing in y.}
       grid_nx: {legacy: Mglob, default: ~, units: ~, latex: $N_x$, doc: Number of grid cells in x (global).}
       grid_ny: {legacy: Nglob, default: ~, units: ~, latex: $N_y$, doc: Number of grid cells in y (global).}
-      nx_proc: {legacy: px, default: ~, units: ~, latex: $P_x$, doc: MPI process count in x (absent = auto-decompose).}
-      ny_proc: {legacy: py, default: ~, units: ~, latex: $P_y$, doc: MPI process count in y (absent = auto-decompose).}
+      nx_proc: {legacy: PX, default: ~, units: ~, latex: $P_x$, doc: MPI process count in x (absent = auto-decompose).}
+      ny_proc: {legacy: PY, default: ~, units: ~, latex: $P_y$, doc: MPI process count in y (absent = auto-decompose).}
 
   # ── simulation ──
   simulation:
@@ -390,7 +390,7 @@ sections:
       title: {legacy: TITLE, default: ~, units: ~, doc: Run title (reserved for NetCDF global attrs).}
       total_time: {legacy: TOTAL_TIME, default: ~, units: s, latex: $T$, doc: Total simulated duration.}
       time_stepping.dt: {legacy: DT_fixed, default: ~, units: s, latex: $\Delta t$, doc: Fixed timestep value (with fixed_dt).}
-      time_stepping.fixed_dt: {legacy: FIXED_DT, default: false, units: ~, doc: Use a fixed timestep instead of adaptive CFL.}
+      time_stepping.fixed_dt: {legacy: ~, default: false, units: ~, doc: Use a fixed timestep instead of adaptive CFL.}
 
   # ── initial ──
   initial:
@@ -401,8 +401,8 @@ sections:
       fields.format: {legacy: ~, default: ~, units: ~, values: [ascii, binary, netcdf], doc: Field-file format override (default from the extension).}
       fields.u: {legacy: ~, default: ~, units: ~, doc: Initial x-velocity field ref (with fields.v; absent = still).}
       fields.v: {legacy: ~, default: ~, units: ~, doc: Initial y-velocity field ref (with fields.u).}
-      hump.amplitude: {legacy: AMP_SOLI, default: ~, units: m, doc: Hump amplitude.}
-      hump.radius: {legacy: GauRadius, default: ~, units: m, doc: Gaussian hump radius.}
+      hump.amplitude: {legacy: AMP, default: ~, units: m, doc: Hump amplitude.}
+      hump.radius: {legacy: ~, default: ~, units: m, doc: Gaussian hump radius.}
       hump.shape: {legacy: ~, default: ~, units: ~, values: [rect, gaussian, dipole], doc: Hump shape.}
       hump.width: {legacy: WID, default: ~, units: m, doc: Hump width.}
       hump.x_center: {legacy: Xc, default: ~, units: m, doc: Hump center x.}
@@ -412,13 +412,13 @@ sections:
       n_wave.gamma: {legacy: gamma_Nwave, default: ~, units: ~, doc: N-wave shape parameter.}
       n_wave.x1: {legacy: x1_Nwave, default: ~, units: m, doc: N-wave leading position.}
       n_wave.x2: {legacy: x2_Nwave, default: ~, units: m, doc: N-wave trailing position.}
-      sine_mode.amplitude: {legacy: AMP_SOLI, default: 0.0, units: m, latex: $a$, doc: Standing sine-mode amplitude.}
-      sine_mode.depth: {legacy: DEP_SOLI, default: 0.0, units: m, latex: $d$, doc: Sine-mode still-water depth.}
-      sine_mode.mode_x: {legacy: MODE_X, default: 1, units: ~, doc: Sine mode number in x.}
-      sine_mode.mode_y: {legacy: MODE_Y, default: 0, units: ~, doc: Sine mode number in y.}
-      solitary.amplitude: {legacy: AMP_SOLI, default: 0.0, units: m, latex: $a$, doc: Solitary-wave amplitude.}
-      solitary.depth: {legacy: DEP_SOLI, default: 0.0, units: m, latex: $d$, doc: Solitary-wave still-water depth.}
-      solitary.direction: {legacy: SolitaryPositiveDirection, default: +x, units: ~, values: [+x, -x, +y, -y], doc: Solitary-wave propagation direction.}
+      sine_mode.amplitude: {legacy: AMP, default: 0.0, units: m, latex: $a$, doc: Standing sine-mode amplitude.}
+      sine_mode.depth: {legacy: DEP, default: 0.0, units: m, latex: $d$, doc: Sine-mode still-water depth.}
+      sine_mode.mode_x: {legacy: ~, default: 1, units: ~, doc: Sine mode number in x.}
+      sine_mode.mode_y: {legacy: ~, default: 0, units: ~, doc: Sine mode number in y.}
+      solitary.amplitude: {legacy: AMP, default: 0.0, units: m, latex: $a$, doc: Solitary-wave amplitude.}
+      solitary.depth: {legacy: DEP, default: 0.0, units: m, latex: $d$, doc: Solitary-wave still-water depth.}
+      solitary.direction: {legacy: ~, default: +x, units: ~, values: [+x, -x, +y, -y], doc: Solitary-wave propagation direction.}
       solitary.x_center: {legacy: XWAVEMAKER, default: 0.0, units: m, doc: Solitary-wave initial crest x.}
       solitary.angle: {legacy: ~, default: ~, units: deg, latex: $\theta$, doc: Oblique crest angle from +x (presence selects the doubly-periodic tiled train; excludes direction).}
       solitary.y_center: {legacy: ~, default: 0.0, units: m, doc: Solitary-wave initial crest y (angle only).}
@@ -428,10 +428,10 @@ sections:
     doc: "Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE transition depth."
     keys:
       dispersion.beta_ref: {legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
-      dispersion.gamma1: {legacy: gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: Dispersion coefficient Gamma1 (overrides the scheme preset).}
-      dispersion.gamma2: {legacy: gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: Dispersion coefficient Gamma2 (overrides the scheme preset).}
-      dispersion.gamma3: {legacy: gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: Dispersion coefficient Gamma3 (overrides the scheme preset).}
-      dispersion.scheme: {legacy: DISPERSION, default: fully_nonlinear, units: ~, values: [fully_nonlinear, weakly_nonlinear, linear, nswe], doc: Dispersion preset for Gamma1/2/3.}
+      dispersion.gamma1: {legacy: Gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: Dispersion coefficient Gamma1 (overrides the scheme preset).}
+      dispersion.gamma2: {legacy: Gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: Dispersion coefficient Gamma2 (overrides the scheme preset).}
+      dispersion.gamma3: {legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: Dispersion coefficient Gamma3 (overrides the scheme preset).}
+      dispersion.scheme: {legacy: ~, default: fully_nonlinear, units: ~, values: [fully_nonlinear, weakly_nonlinear, linear, nswe], doc: Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values).}
       dispersion.swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: eta/depth ratio above which cells switch to shallow-water equations.}
       dispersion.swe_eta_ramp: {legacy: ~, default: 0.0, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch.}
 
@@ -457,7 +457,7 @@ sections:
     keys:
       cd: {legacy: Cd, default: ~, units: ~, latex: $C_d$, doc: Constant quadratic bottom-drag coefficient.}
       manning: {legacy: ~, default: ~, units: 's m^{-1/3}', latex: $n$, doc: Manning roughness n (converted to Cd per cell).}
-      file: {legacy: CD_FILE, default: ~, units: ~, doc: Spatially varying Cd map file (init-gated pending).}
+      file: {legacy: FRICTION_FILE, default: ~, units: ~, doc: Spatially varying Cd map file (init-gated pending).}
 
   # ── obstacle ──
   obstacle:
@@ -474,7 +474,7 @@ sections:
       gaussian.file: {legacy: METEO_GAUSIAN_FILE, default: ~, units: ~, doc: Gaussian pressure-disturbance file (presence enables; forces pressure coupling).}
       wind.file: {legacy: CONSTANT_WIND_FILE, default: ~, units: ~, doc: Constant wind-field file (presence enables wind stress).}
       wind.cd: {legacy: Cdw, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient.}
-      wind.wave_interaction: {legacy: WindWaveInteraction, default: false, units: ~, doc: Modulate wind stress by the wave field.}
+      wind.wave_interaction: {legacy: ~, default: false, units: ~, doc: Modulate wind stress by the wave field.}
       wind.crest_percent: {legacy: WindCrestPercent, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
       holland.file: {legacy: STORM_FILE, default: ~, units: ~, doc: Holland-model storm-track file.}
       holland.air_pressure: {legacy: AirPressure, default: false, units: ~, doc: Apply the storm pressure coupling.}
@@ -520,7 +520,7 @@ sections:
     keys:
       folder: {legacy: VESSEL_FOLDER, default: ~, units: ~, doc: Directory of per-hull vessel_NNNNN files.}
       count: {legacy: NumVessel, default: 1, units: ~, doc: Number of vessels.}
-      propeller: {legacy: PROPELLER, default: false, units: ~, doc: Enable propeller jets (must match the build's -DPROPELLER).}
+      propeller: {legacy: ~, default: false, units: ~, doc: Enable propeller jets (must match the build's -DPROPELLER).}
       deep_draft.clearance: {legacy: CLEARANCE, default: ~, units: m, doc: Keel clearance above the bed (required for deep_draft).}
       deep_draft.mask: {legacy: MaskMethod, default: true, units: ~, doc: Mask cells fully blocked by the hull.}
       deep_draft.cd: {legacy: CdDeepDraft, default: ~, units: ~, latex: '$C_{d,v}$', doc: Hull drag coefficient (presence enables hull drag).}
@@ -545,8 +545,8 @@ sections:
       bedload: {legacy: BedLoad, default: false, units: ~, doc: Include bed-load transport.}
       shields_cr_bedload: {legacy: Shields_cr_bedload, default: ~, units: ~, latex: '$\theta_{cr,b}$', doc: Critical Shields for bed load (absent = shields_cr).}
       morph_factor: {legacy: Morph_factor, default: 1, units: ~, doc: Morphological acceleration factor.}
-      hard_bottom.file: {legacy: Mask_s_File, default: ~, units: ~, doc: Non-erodible hard-bottom mask file (required).}
-      avalanche.tan_phi: {legacy: tan_phi, default: ~, units: ~, latex: $\tan\phi$, doc: Tangent of the repose angle (required for avalanche).}
+      hard_bottom.file: {legacy: Hard_bottom_file, default: ~, units: ~, doc: Non-erodible hard-bottom mask file (required).}
+      avalanche.tan_phi: {legacy: Tan_phi, default: ~, units: ~, latex: $\tan\phi$, doc: Tangent of the repose angle (required for avalanche).}
       avalanche.interval: {legacy: Aval_interval, default: ~, units: s, doc: Avalanche relaxation interval (absent = every step).}
       cohesive.soft_bed: {legacy: SoftBed, default: true, units: ~, doc: Track a consolidating soft-bed layer.}
       cohesive.tau_cr: {legacy: Tau_cr_coh, default: ~, units: m2/s2, latex: '$\tau_{cr}$', doc: Critical erosion shear stress (required for cohesive).}
@@ -575,7 +575,7 @@ sections:
       bed_deformation: {legacy: BED_DEFORMATION, default: false, units: ~, doc: Apply bed deformation on restart.}
       eta_file: {legacy: ETA_FILE, default: ~, units: ~, doc: Surface-elevation restart field file.}
       mask_file: {legacy: MASK_FILE, default: ~, units: ~, doc: Wet/dry mask restart field file.}
-      output_start_number: {legacy: FileNumber_HOTSTART, default: 0, units: ~, doc: First output frame number after restart.}
+      output_start_number: {legacy: ~, default: 0, units: ~, doc: First output frame number after restart.}
       time: {legacy: HotStartTime, default: 0.0, units: s, latex: '$t_{\mathrm{hs}}$', doc: Simulation time at the restart instant.}
       u_file: {legacy: U_FILE, default: ~, units: ~, doc: x-velocity restart field file.}
       v_file: {legacy: V_FILE, default: ~, units: ~, doc: y-velocity restart field file.}
@@ -585,9 +585,9 @@ sections:
     required: true
     doc: "Output control — cadence, format, folder, plus means/vessel/arrival-time sub-blocks."
     keys:
-      arrival_time.min_height: {legacy: ArrTimeMin, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
+      arrival_time.min_height: {legacy: ArrTimeMinH, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
       checkpoint: {legacy: ~, default: ~, units: ~, doc: Directory to write the hot-start checkpoint set (core.bin) at run end.}
-      depth_out: {legacy: OUT_DEPTH, default: false, units: ~, doc: Write the still-water depth field.}
+      depth_out: {legacy: DEPTH_OUT, default: false, units: ~, doc: Write the still-water depth field.}
       field_io_type: {legacy: FIELD_IO_TYPE, default: ASCII, units: ~, values: [ASCII, BINARY, NETCDF, PNETCDF], doc: Field output format (NETCDF needs a netcdf-fortran build; PNETCDF writes classic CDF-5 collectively and needs a PnetCDF build).}
       layout: {legacy: ~, default: chunked, units: ~, values: [single, per_stream, chunked], doc: NetCDF file topology; single = one output.nc with streams as groups, per_stream = data.nc + diagnostics.nc, chunked = field files split in time with a size-derived window.}
       max_file_size: {legacy: ~, default: 50.0, units: GB, doc: Chunk roll-over size; also the predicted-size warning threshold for single/per_stream.}

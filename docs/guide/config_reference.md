@@ -99,7 +99,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `cfl` | `0.5` | `CFL` | — | CFL number for the adaptive timestep. |
-| `flux_solver` | `hllc` | `CONSTR` | — | Approximate Riemann solver. One of `hllc` \| `hll`. |
+| `flux_solver` | `hllc` | `CONSTRUCTION` | — | Approximate Riemann solver. One of `hllc` \| `hll`. |
 | `froude_cap` | `3.0` | `FroudeCap` | — | Maximum Froude number (velocity limiter). |
 | `min_depth` | `0.1` | `MinDepth` | m | Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc). |
 | `tridiag.chunk` | `48` | — | — | Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (wheat sweep flat over 16-64). |
@@ -115,7 +115,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `coriolis.f` | — | — | s-1 | Constant Coriolis parameter (f-plane; overrides latitude). |
 | `coriolis.latitude` | — | — | degrees_north | Reference latitude for the f-plane Coriolis parameter. |
 | `bathy_correction` | `false` | `BATHY_CORRECTION` | — | Apply the bathymetry smoothing/correction pass. |
-| `bathy_depth` | — | `Depth_Flat` | m | Still-water depth for a flat bottom. |
+| `bathy_depth` | — | `DEPTH_FLAT` | m | Still-water depth for a flat bottom. |
 | `bathy_file` | — | `DEPTH_FILE` | — | Bathymetry data file. |
 | `bathy_slope` | — | `SLP` | — | Bed slope for a sloping-beach bathymetry. |
 | `bathy_slope_x0` | — | `Xslp` | m | x location where the slope begins. |
@@ -129,8 +129,8 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `dy` | — | `DY` | m | Grid spacing in y. |
 | `grid_nx` | — | `Mglob` | — | Number of grid cells in x (global). |
 | `grid_ny` | — | `Nglob` | — | Number of grid cells in y (global). |
-| `nx_proc` | — | `px` | — | MPI process count in x (absent = auto-decompose). |
-| `ny_proc` | — | `py` | — | MPI process count in y (absent = auto-decompose). |
+| `nx_proc` | — | `PX` | — | MPI process count in x (absent = auto-decompose). |
+| `ny_proc` | — | `PY` | — | MPI process count in y (absent = auto-decompose). |
 
 ## `simulation:`
 
@@ -143,7 +143,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `title` | — | `TITLE` | — | Run title (reserved for NetCDF global attrs). |
 | `total_time` | — | `TOTAL_TIME` | s | Total simulated duration. |
 | `time_stepping.dt` | — | `DT_fixed` | s | Fixed timestep value (with fixed_dt). |
-| `time_stepping.fixed_dt` | `false` | `FIXED_DT` | — | Use a fixed timestep instead of adaptive CFL. |
+| `time_stepping.fixed_dt` | `false` | — | — | Use a fixed timestep instead of adaptive CFL. |
 
 ## `initial:`
 
@@ -156,8 +156,8 @@ Initial condition — block presence selects the type (solitary/sine_mode/fields
 | `fields.format` | — | — | — | Field-file format override (default from the extension). One of `ascii` \| `binary` \| `netcdf`. |
 | `fields.u` | — | — | — | Initial x-velocity field ref (with fields.v; absent = still). |
 | `fields.v` | — | — | — | Initial y-velocity field ref (with fields.u). |
-| `hump.amplitude` | — | `AMP_SOLI` | m | Hump amplitude. |
-| `hump.radius` | — | `GauRadius` | m | Gaussian hump radius. |
+| `hump.amplitude` | — | `AMP` | m | Hump amplitude. |
+| `hump.radius` | — | — | m | Gaussian hump radius. |
 | `hump.shape` | — | — | — | Hump shape. One of `rect` \| `gaussian` \| `dipole`. |
 | `hump.width` | — | `WID` | m | Hump width. |
 | `hump.x_center` | — | `Xc` | m | Hump center x. |
@@ -167,13 +167,13 @@ Initial condition — block presence selects the type (solitary/sine_mode/fields
 | `n_wave.gamma` | — | `gamma_Nwave` | — | N-wave shape parameter. |
 | `n_wave.x1` | — | `x1_Nwave` | m | N-wave leading position. |
 | `n_wave.x2` | — | `x2_Nwave` | m | N-wave trailing position. |
-| `sine_mode.amplitude` | `0.0` | `AMP_SOLI` | m | Standing sine-mode amplitude. |
-| `sine_mode.depth` | `0.0` | `DEP_SOLI` | m | Sine-mode still-water depth. |
-| `sine_mode.mode_x` | `1` | `MODE_X` | — | Sine mode number in x. |
-| `sine_mode.mode_y` | `0` | `MODE_Y` | — | Sine mode number in y. |
-| `solitary.amplitude` | `0.0` | `AMP_SOLI` | m | Solitary-wave amplitude. |
-| `solitary.depth` | `0.0` | `DEP_SOLI` | m | Solitary-wave still-water depth. |
-| `solitary.direction` | `+x` | `SolitaryPositiveDirection` | — | Solitary-wave propagation direction. One of `+x` \| `-x` \| `+y` \| `-y`. |
+| `sine_mode.amplitude` | `0.0` | `AMP` | m | Standing sine-mode amplitude. |
+| `sine_mode.depth` | `0.0` | `DEP` | m | Sine-mode still-water depth. |
+| `sine_mode.mode_x` | `1` | — | — | Sine mode number in x. |
+| `sine_mode.mode_y` | `0` | — | — | Sine mode number in y. |
+| `solitary.amplitude` | `0.0` | `AMP` | m | Solitary-wave amplitude. |
+| `solitary.depth` | `0.0` | `DEP` | m | Solitary-wave still-water depth. |
+| `solitary.direction` | `+x` | — | — | Solitary-wave propagation direction. One of `+x` \| `-x` \| `+y` \| `-y`. |
 | `solitary.x_center` | `0.0` | `XWAVEMAKER` | m | Solitary-wave initial crest x. |
 | `solitary.angle` | — | — | deg | Oblique crest angle from +x (presence selects the doubly-periodic tiled train; excludes direction). |
 | `solitary.y_center` | `0.0` | — | m | Solitary-wave initial crest y (angle only). |
@@ -185,10 +185,10 @@ Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `dispersion.beta_ref` | `-0.531` | `Beta_ref` | — | Reference depth level for the Boussinesq operator. |
-| `dispersion.gamma1` | — | `gamma1` | — | Dispersion coefficient Gamma1 (overrides the scheme preset). |
-| `dispersion.gamma2` | — | `gamma2` | — | Dispersion coefficient Gamma2 (overrides the scheme preset). |
-| `dispersion.gamma3` | — | `gamma3` | — | Dispersion coefficient Gamma3 (overrides the scheme preset). |
-| `dispersion.scheme` | `fully_nonlinear` | `DISPERSION` | — | Dispersion preset for Gamma1/2/3. One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
+| `dispersion.gamma1` | — | `Gamma1` | — | Dispersion coefficient Gamma1 (overrides the scheme preset). |
+| `dispersion.gamma2` | — | `Gamma2` | — | Dispersion coefficient Gamma2 (overrides the scheme preset). |
+| `dispersion.gamma3` | — | `Gamma3` | — | Dispersion coefficient Gamma3 (overrides the scheme preset). |
+| `dispersion.scheme` | `fully_nonlinear` | — | — | Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
 | `dispersion.swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | eta/depth ratio above which cells switch to shallow-water equations. |
 | `dispersion.swe_eta_ramp` | `0.0` | — | — | eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch. |
 
@@ -218,7 +218,7 @@ Bottom friction — exactly one of cd, manning (n), or file; section absent = ze
 |---|---|---|---|---|
 | `cd` | — | `Cd` | — | Constant quadratic bottom-drag coefficient. |
 | `manning` | — | — | s m^{-1/3} | Manning roughness n (converted to Cd per cell). |
-| `file` | — | `CD_FILE` | — | Spatially varying Cd map file (init-gated pending). |
+| `file` | — | `FRICTION_FILE` | — | Spatially varying Cd map file (init-gated pending). |
 
 ## `obstacle:`
 
@@ -239,7 +239,7 @@ Atmospheric forcing — presence-derived sub-models (gaussian/wind/holland/slide
 | `gaussian.file` | — | `METEO_GAUSIAN_FILE` | — | Gaussian pressure-disturbance file (presence enables; forces pressure coupling). |
 | `wind.file` | — | `CONSTANT_WIND_FILE` | — | Constant wind-field file (presence enables wind stress). |
 | `wind.cd` | `0.002` | `Cdw` | — | Wind drag coefficient. |
-| `wind.wave_interaction` | `false` | `WindWaveInteraction` | — | Modulate wind stress by the wave field. |
+| `wind.wave_interaction` | `false` | — | — | Modulate wind stress by the wave field. |
 | `wind.crest_percent` | — | `WindCrestPercent` | — | Fraction of crest exposed to wind (requires wave_interaction). |
 | `holland.file` | — | `STORM_FILE` | — | Holland-model storm-track file. |
 | `holland.air_pressure` | `false` | `AirPressure` | — | Apply the storm pressure coupling. |
@@ -295,7 +295,7 @@ Moving vessels — per-hull files in a folder; propeller and deep-draft options.
 |---|---|---|---|---|
 | `folder` | — | `VESSEL_FOLDER` | — | Directory of per-hull vessel_NNNNN files. |
 | `count` | `1` | `NumVessel` | — | Number of vessels. |
-| `propeller` | `false` | `PROPELLER` | — | Enable propeller jets (must match the build's -DPROPELLER). |
+| `propeller` | `false` | — | — | Enable propeller jets (must match the build's -DPROPELLER). |
 | `deep_draft.clearance` | — | `CLEARANCE` | m | Keel clearance above the bed (required for deep_draft). |
 | `deep_draft.mask` | `true` | `MaskMethod` | — | Mask cells fully blocked by the hull. |
 | `deep_draft.cd` | — | `CdDeepDraft` | — | Hull drag coefficient (presence enables hull drag). |
@@ -322,8 +322,8 @@ Sediment — single grain size, morphology, avalanching, cohesive, and flow-feed
 | `bedload` | `false` | `BedLoad` | — | Include bed-load transport. |
 | `shields_cr_bedload` | — | `Shields_cr_bedload` | — | Critical Shields for bed load (absent = shields_cr). |
 | `morph_factor` | `1` | `Morph_factor` | — | Morphological acceleration factor. |
-| `hard_bottom.file` | — | `Mask_s_File` | — | Non-erodible hard-bottom mask file (required). |
-| `avalanche.tan_phi` | — | `tan_phi` | — | Tangent of the repose angle (required for avalanche). |
+| `hard_bottom.file` | — | `Hard_bottom_file` | — | Non-erodible hard-bottom mask file (required). |
+| `avalanche.tan_phi` | — | `Tan_phi` | — | Tangent of the repose angle (required for avalanche). |
 | `avalanche.interval` | — | `Aval_interval` | s | Avalanche relaxation interval (absent = every step). |
 | `cohesive.soft_bed` | `true` | `SoftBed` | — | Track a consolidating soft-bed layer. |
 | `cohesive.tau_cr` | — | `Tau_cr_coh` | m2/s2 | Critical erosion shear stress (required for cohesive). |
@@ -356,7 +356,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `bed_deformation` | `false` | `BED_DEFORMATION` | — | Apply bed deformation on restart. |
 | `eta_file` | — | `ETA_FILE` | — | Surface-elevation restart field file. |
 | `mask_file` | — | `MASK_FILE` | — | Wet/dry mask restart field file. |
-| `output_start_number` | `0` | `FileNumber_HOTSTART` | — | First output frame number after restart. |
+| `output_start_number` | `0` | — | — | First output frame number after restart. |
 | `time` | `0.0` | `HotStartTime` | s | Simulation time at the restart instant. |
 | `u_file` | — | `U_FILE` | — | x-velocity restart field file. |
 | `v_file` | — | `V_FILE` | — | y-velocity restart field file. |
@@ -367,9 +367,9 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `arrival_time.min_height` | `0.001` | `ArrTimeMin` | m | Elevation threshold defining first wave arrival. |
+| `arrival_time.min_height` | `0.001` | `ArrTimeMinH` | m | Elevation threshold defining first wave arrival. |
 | `checkpoint` | — | — | — | Directory to write the hot-start checkpoint set (core.bin) at run end. |
-| `depth_out` | `false` | `OUT_DEPTH` | — | Write the still-water depth field. |
+| `depth_out` | `false` | `DEPTH_OUT` | — | Write the still-water depth field. |
 | `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format (NETCDF needs a netcdf-fortran build; PNETCDF writes classic CDF-5 collectively and needs a PnetCDF build). One of `ASCII` \| `BINARY` \| `NETCDF` \| `PNETCDF`. |
 | `layout` | `chunked` | — | — | NetCDF file topology; single = one output.nc with streams as groups One of `single` \| `per_stream` \| `chunked`. |
 | `max_file_size` | `50.0` | — | GB | Chunk roll-over size; also the predicted-size warning threshold for single/per_stream. |
