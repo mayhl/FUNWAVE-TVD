@@ -9,6 +9,9 @@
 !    cell_size: [dx, dy]        OR dx_file/dy_file for variable spacing
 !    grid_size: [nx, ny]        required for flat and slope bathymetry types
 !    origin: [x0, y0]           optional, default [0, 0]
+!    water_level: <real>        optional, default 0 — still-water offset
+!                               above the bathy datum (nee WaterLevel);
+!                               applied by main after bathy correction
 !    decomposition:
 !      nx_proc: <int>
 !      ny_proc: <int>
@@ -39,6 +42,7 @@ module model_geometry_mod
    use core_path_mod, only: type_path
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
+   use model_config_defaults_mod, only: DEF_GRID_WATER_LEVEL
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR
 
    implicit none
@@ -60,6 +64,10 @@ module model_geometry_mod
 
       ! Grid origin
       real(SP) :: x0 = 0.0_SP, y0 = 0.0_SP
+
+      ! Still-water level above the bathy datum (nee WaterLevel); main
+      ! adds it to depth + wavemaker reference depths after correction
+      real(SP) :: water_level = 0.0_SP
 
       ! Integer grid dimensions (required for flat/slope; derived otherwise)
       integer :: grid_nx = 0, grid_ny = 0
@@ -128,6 +136,10 @@ contains
          this%x0 = origin(1)
          this%y0 = origin(2)
       end if
+
+      ! --- Still-water level (optional) ---
+      call sub_env%yaml%read("water_level", val=this%water_level, &
+                             default=DEF_GRID_WATER_LEVEL)
 
       ! --- Decomposition (optional) ---
       ! NOTE: plain read into temps + validate/assign only when present -- an empty
@@ -259,7 +271,8 @@ contains
    !              $$ d_{1/2} = \tfrac{1}{2}(3 d_1 - d_2) $$
    ! depth_x/depth_y are (mloc,nloc): the legacy Mloc1/Nloc1 high-edge
    ! face is dropped — kernels read faces up to ie+1/je+1 <= mloc/nloc.
-   ! Legacy WaterLevel offset is not yet in the YAML schema (assumed 0).
+   ! water_level lands later — main adds it after bathy correction and
+   ! re-staggers, keeping the legacy init.F order.
    ! ----------------------------------------------------------------
    subroutine geometry_init_depth(this, grid, depth, depth_x, depth_y)
       class(type_model_geometry), intent(in)    :: this

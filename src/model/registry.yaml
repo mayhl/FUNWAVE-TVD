@@ -375,6 +375,7 @@ sections:
       crs.vertical_datum: {legacy: ~, default: ~, units: ~, doc: "Vertical datum name that depths/eta reference (e.g. NAVD88, IGLD85 LWD); output-stamp provenance only."}
       dx: {legacy: DX, default: ~, units: m, latex: $\Delta x$, doc: Grid spacing in x.}
       dy: {legacy: DY, default: ~, units: m, latex: $\Delta y$, doc: Grid spacing in y.}
+      water_level: {legacy: WaterLevel, default: 0.0, units: m, latex: $\eta_0$, doc: "Still-water level above the bathymetry datum; added to depth and wavemaker reference depths at init, so output eta is referenced to this level. Survives hotstart (reference-frame property, not an IC)."}
       grid_nx: {legacy: Mglob, default: ~, units: ~, latex: $N_x$, doc: Number of grid cells in x (global).}
       grid_ny: {legacy: Nglob, default: ~, units: ~, latex: $N_y$, doc: Number of grid cells in y (global).}
       nx_proc: {legacy: PX, default: ~, units: ~, latex: $P_x$, doc: MPI process count in x (absent = auto-decompose).}
@@ -394,9 +395,8 @@ sections:
 
   # ── initial ──
   initial:
-    doc: "Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave) + still-water level."
+    doc: "Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave). Still-water level lives in grid.water_level."
     keys:
-      water_level: {legacy: WaterLevel, default: 0.0, units: m, latex: $\eta_0$, doc: Uniform still-water level offset (non-zero init-gated pending).}
       fields.eta: {legacy: ~, default: ~, units: ~, doc: "Initial surface-elevation field ref (path, or container#/group/var once NetCDF input lands)."}
       fields.format: {legacy: ~, default: ~, units: ~, values: [ascii, binary, netcdf], doc: Field-file format override (default from the extension).}
       fields.u: {legacy: ~, default: ~, units: ~, doc: Initial x-velocity field ref (with fields.v; absent = still).}

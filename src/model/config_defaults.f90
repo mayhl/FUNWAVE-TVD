@@ -57,6 +57,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_GRID_CRS_ORIGIN_X = "0.0"
    character(*), parameter :: DEF_GRID_CRS_ORIGIN_Y = "0.0"
    character(*), parameter :: DEF_GRID_CRS_ROTATION = "0.0"
+   character(*), parameter :: DEF_GRID_WATER_LEVEL = "0.0"
    ! ── hot_start ──
    character(*), parameter :: DEF_HOT_START_BED_DEFORMATION = "NO"
    character(*), parameter :: DEF_HOT_START_OUTPUT_START_NUMBER = "0"
@@ -71,7 +72,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_INITIAL_SOLITARY_DIRECTION = "+x"
    character(*), parameter :: DEF_INITIAL_SOLITARY_X_CENTER = "0.0"
    character(*), parameter :: DEF_INITIAL_SOLITARY_Y_CENTER = "0.0"
-   character(*), parameter :: DEF_INITIAL_WATER_LEVEL = "0.0"
    ! ── meteo ──
    character(*), parameter :: DEF_METEO_HOLLAND_AIR_PRESSURE = "NO"
    character(*), parameter :: DEF_METEO_HOLLAND_CD = "0.002"

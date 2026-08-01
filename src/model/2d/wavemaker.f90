@@ -214,6 +214,7 @@ module model_wavemaker_mod
 
    contains
       procedure :: read_input => wavemaker_read_input
+      procedure :: apply_water_level => wavemaker_apply_water_level
       procedure :: init_compute => wavemaker_init_compute
       procedure :: update_source => wavemaker_update_source
       procedure :: apply_boundary => wavemaker_apply_boundary
@@ -823,6 +824,23 @@ contains
       end if
 
    end subroutine wavemaker_read_entry
+
+   ! ----------------------------------------------------------------
+   ! Still-water offset on the reference depths (legacy init.F:801-810):
+   ! the source-box depth shifts always, the boundary-series depth only
+   ! for the LEFT_BC_IRR family (modern ABS — its DepthWaveMaker is the
+   ! legacy Dep_Ser source).  Called by main between bathy correction
+   ! and init_compute, so the spectral solves see the shifted depths.
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_apply_water_level(this, water_level)
+      class(type_model_wavemaker), intent(inout) :: this
+      real(SP), intent(in) :: water_level
+
+      this%DEP_WK = this%DEP_WK + water_level
+      if (this%wavemaker_type == "ABS") &
+         this%DepthWaveMaker = this%DepthWaveMaker + water_level
+
+   end subroutine wavemaker_apply_water_level
 
    ! ----------------------------------------------------------------
    ! Internal-source wavemaker setup (legacy WAVEMAKER_INITIALIZATION,
@@ -1930,7 +1948,7 @@ contains
    ! WaveCompFile instead (legacy io.F block + CALCULATE_DATA2D_Cm_Sm);
    ! the file header then overrides Nfreq.
    ! Legacy adds WaterLevel to Dep_Ser for LEFT_BC_IRR (init.F:807) —
-   ! WaterLevel is not in the YAML schema yet (assumed 0).
+   ! landed here via apply_water_level shifting DepthWaveMaker first.
    ! ----------------------------------------------------------------
    subroutine boundary_init_compute(this, grid, periodic, env, beta_ref)
       use core_grid_mod, only: type_grid_2d

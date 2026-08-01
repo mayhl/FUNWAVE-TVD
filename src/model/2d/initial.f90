@@ -10,7 +10,6 @@
 !  with a wavemaker: section — the sections are independent.
 !
 !  YAML block: initial:         (block presence selects the type)
-!    water_level: <length>      default 0 — PORT GAP, non-zero gates pending
 !    solitary:  {amplitude, depth, x_center, direction: +x|-x,
 !                angle, y_center}
 !    sine_mode: {amplitude, depth, mode_x (default 1), mode_y (default 0)}
@@ -20,6 +19,8 @@
 !               grid.bathymetry, not here.
 !    hump:      pending (INI_REC/GAU/DIP not in apply_ic yet)
 !    n_wave:    pending
+!  The still-water offset lives in grid.water_level (it survives
+!  hotstart, so it is not an IC); a water_level key here errors.
 !
 !  HISTORY :
 !    07/21/2026  Michael-Angelo Y.H. Lam
@@ -40,8 +41,7 @@ module model_initial_mod
                                         DEF_INITIAL_SOLITARY_DEPTH, &
                                         DEF_INITIAL_SOLITARY_DIRECTION, &
                                         DEF_INITIAL_SOLITARY_X_CENTER, &
-                                        DEF_INITIAL_SOLITARY_Y_CENTER, &
-                                        DEF_INITIAL_WATER_LEVEL
+                                        DEF_INITIAL_SOLITARY_Y_CENTER
 
    implicit none
 
@@ -103,8 +103,8 @@ contains
    ! ----------------------------------------------------------------
    ! initial: section — block presence selects the IC type.  solitary
    ! + sine_mode are live in apply_ic; hump + n_wave gate pending.
-   ! water_level is a PORT GAP: legacy added it to Depth/DEP_WK/Dep_Ser
-   ! (old init.F:807-810) and the modern engine never wired it.
+   ! water_level moved to grid: — a key here gets a redirect error, not
+   ! the silent-ignore the YAML layer would otherwise give a dead key.
    ! ----------------------------------------------------------------
    subroutine initial_read_input(this, env)
       use core_yaml_file_mod, only: type_yaml_reader
@@ -123,10 +123,10 @@ contains
       if (no_ini) return
 
       call ini_env%yaml%read("water_level", silent=no_key, val=water_level, &
-                             default=DEF_INITIAL_WATER_LEVEL)
-      if (water_level /= 0.0_SP) then
-         call env%log%exit_on_error("initial/water_level: pending — the"// &
-                                    " legacy still-water offset is not wired yet")
+                             default="0.0")
+      if (.not. no_key) then
+         call env%log%exit_on_error("initial/water_level: moved — set"// &
+                                    " grid.water_level instead")
       end if
 
       blk_yaml = ini_env%yaml%cast_dictionary("solitary", no_blk)

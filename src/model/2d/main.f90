@@ -260,8 +260,19 @@ contains
          if (this%subgrid%out_porosity) call write_porosity(this)
       end if
       ! legacy order: correction sits between the ghost fill and the
-      ! (re)staggering; WaterLevel (when wired) comes after correction
+      ! (re)staggering; the still-water offset comes after correction
+      ! (init.F:799-810) and shifts the wavemaker reference depths too
+      ! FUTURE: stamp water_level next to vertical_datum in the NetCDF
+      ! output globals once the georef quartet lands
       if (this%geometry%bathy_correction) call apply_bathy_correction(this)
+      if (this%geometry%water_level /= 0.0_SP) then
+         this%fields%depth = this%fields%depth + this%geometry%water_level
+         call stagger_depth(this%grid%lp, this%fields%depth, &
+                            this%fields%depth_x, this%fields%depth_y)
+         do i = 1, size(this%wavemakers)
+            call this%wavemakers(i)%apply_water_level(this%geometry%water_level)
+         end do
+      end if
       ! apply_ic zeroes eta/u/v before its solitary branch, so the hot
       ! start loads AFTER it (legacy zeroes long before INI_UVZ; bed
       ! deformation never refreshes DepthX/DepthY).  Solitary IC plus

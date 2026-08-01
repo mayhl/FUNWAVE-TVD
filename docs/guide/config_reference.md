@@ -127,6 +127,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `crs.vertical_datum` | — | — | — | Vertical datum name that depths/eta reference (e.g. NAVD88, IGLD85 LWD); output-stamp provenance only. |
 | `dx` | — | `DX` | m | Grid spacing in x. |
 | `dy` | — | `DY` | m | Grid spacing in y. |
+| `water_level` | `0.0` | `WaterLevel` | m | Still-water level above the bathymetry datum; added to depth and wavemaker reference depths at init, so output eta is referenced to this level. Survives hotstart (reference-frame property, not an IC). |
 | `grid_nx` | — | `Mglob` | — | Number of grid cells in x (global). |
 | `grid_ny` | — | `Nglob` | — | Number of grid cells in y (global). |
 | `nx_proc` | — | `PX` | — | MPI process count in x (absent = auto-decompose). |
@@ -147,11 +148,10 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 
 ## `initial:`
 
-Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave) + still-water level.
+Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave). Still-water level lives in grid.water_level.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `water_level` | `0.0` | `WaterLevel` | m | Uniform still-water level offset (non-zero init-gated pending). |
 | `fields.eta` | — | — | — | Initial surface-elevation field ref (path, or container#/group/var once NetCDF input lands). |
 | `fields.format` | — | — | — | Field-file format override (default from the extension). One of `ascii` \| `binary` \| `netcdf`. |
 | `fields.u` | — | — | — | Initial x-velocity field ref (with fields.v; absent = still). |
