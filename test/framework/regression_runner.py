@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import importlib
 import copy
+from collections import deque
 from dataclasses import dataclass
 from pathlib import Path
 import yaml
@@ -178,12 +179,18 @@ class RegressionRunner(BaseRunner):
             progress.remove_task(config_task)
 
             build_task = progress.add_task(f"make   {tag}  compiling...  [dim]0%[/dim]", total=100)
+            # stderr merged into stdout: an unread stderr PIPE fills at 64KB on
+            # warning-heavy ifx builds and deadlocks make mid-link (ld blocks on
+            # write, the board wedges silently with a partial binary)
             make_proc = subprocess.Popen(
-                ["make", "-C", build_dir, "-j8"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                ["make", "-C", build_dir, "-j8"], stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
             )
 
+            tail = deque(maxlen=80)
             while make_proc.poll() is None:
                 line = make_proc.stdout.readline()
+                if line:
+                    tail.append(line)
                 if "[" in line and "%" in line:
                     try:
                         percent = int(line.split("[")[1].split("%")[0].strip())
@@ -194,8 +201,8 @@ class RegressionRunner(BaseRunner):
                         pass
 
             if make_proc.returncode != 0:
-                # captured stderr is invisible on a headless board otherwise
-                err = make_proc.stderr.read() if make_proc.stderr else ""
+                # captured output is invisible on a headless board otherwise
+                err = "".join(tail) + (make_proc.stdout.read() or "")
                 print(f"make failed for {tag}:\n{err[-3000:]}")
                 raise subprocess.CalledProcessError(make_proc.returncode, "make")
 
