@@ -190,7 +190,7 @@ Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE
 | `dispersion.gamma3` | — | `Gamma3` | — | Dispersion coefficient Gamma3 (overrides the scheme preset). |
 | `dispersion.scheme` | `fully_nonlinear` | — | — | Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
 | `dispersion.swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | eta/depth ratio above which cells switch to shallow-water equations. |
-| `dispersion.swe_eta_ramp` | `0.0` | — | — | eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch. |
+| `dispersion.swe_eta_ramp` | `0.1` | — | — | eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch. |
 
 ## `breaking:`
 

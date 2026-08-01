@@ -433,7 +433,7 @@ sections:
       dispersion.gamma3: {legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: Dispersion coefficient Gamma3 (overrides the scheme preset).}
       dispersion.scheme: {legacy: ~, default: fully_nonlinear, units: ~, values: [fully_nonlinear, weakly_nonlinear, linear, nswe], doc: Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values).}
       dispersion.swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: eta/depth ratio above which cells switch to shallow-water equations.}
-      dispersion.swe_eta_ramp: {legacy: ~, default: 0.0, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch.}
+      dispersion.swe_eta_ramp: {legacy: ~, default: 0.10, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch.}
 
   # ── breaking ──
   breaking:

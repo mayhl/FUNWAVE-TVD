@@ -101,7 +101,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.8"
-   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP = "0.0"
+   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP = "0.1"
    ! ── sediment ──
    character(*), parameter :: DEF_SEDIMENT_BED_CHANGE = "NO"
    character(*), parameter :: DEF_SEDIMENT_BEDLOAD = "NO"

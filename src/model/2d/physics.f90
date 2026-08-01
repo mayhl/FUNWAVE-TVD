@@ -68,8 +68,10 @@ module model_physics_mod
       real(SP) :: Gamma3 = 1.0_SP
       logical  :: viscosity_breaking = .true.   ! set from breaking.model in model_setup
       real(SP) :: SWE_ETA_DEP = 0.80_SP
-      ! smoothstep taper width below SWE_ETA_DEP; 0 = legacy hard switch
-      real(SP) :: SWE_ETA_RAMP = 0.0_SP
+      ! smoothstep taper width below SWE_ETA_DEP; 0 = legacy hard switch.
+      ! Initializer must track the registry default -- the reads sit inside
+      ! the dispersion: block guard, so block-less decks land here
+      real(SP) :: SWE_ETA_RAMP = 0.1_SP
 
       ! f-plane Coriolis (legacy has the source term in the spherical
       ! branch only; [[design-grid-crs]] decouples f from the metric —
