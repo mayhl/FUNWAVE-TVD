@@ -29,7 +29,8 @@ wavemaker:
 boundaries:
   west:
     sponge:
-      width: 100.0
+      # 120 m clears the lambda_low advisory (102.3 m at T=12 s, h=8 m)
+      width: 120.0
       direct:
         r: 0.85
         a: 5.0
