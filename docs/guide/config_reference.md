@@ -191,8 +191,6 @@ Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE
 | `dispersion.gamma2` | — | `Gamma2` | — | Dispersion coefficient Gamma2 (overrides the scheme preset). |
 | `dispersion.gamma3` | — | `Gamma3` | — | Dispersion coefficient Gamma3 (overrides the scheme preset). |
 | `dispersion.scheme` | `fully_nonlinear` | — | — | Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
-| `dispersion.swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | eta/depth ratio above which cells switch to shallow-water equations. |
-| `dispersion.swe_eta_ramp` | `0.1` | — | — | eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch. |
 
 ## `breaking:`
 
@@ -205,8 +203,10 @@ Wave breaking — dissipation model, roller, and thresholds (core physics, not p
 | `nu_bkg` | `0.0` | `nu_bkg` | m2 s-1 | Background eddy viscosity added everywhere. |
 | `show_breaking` | `true` | `SHOW_BREAKING` | — | Output the breaking-index field. |
 | `model` | `eddy_viscosity` | `VISCOSITY_BREAKING` | — | Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. One of `eddy_viscosity` \| `shock_capturing` \| `wavemaker_viscosity`. |
-| `visbrk` | `0.0` | `visbrk` | m2 s-1 | Breaking eddy-viscosity coefficient. |
+| `visbrk` | `0.0` | `visbrk` | m2 s-1 | Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model). |
 | `roller` | `false` | `ROLLER` | — | Enable the surface roller (forces model eddy_viscosity |
+| `swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion. |
+| `swe_eta_ramp` | `0.1` | — | — | eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity). |
 
 ## `friction:`
 

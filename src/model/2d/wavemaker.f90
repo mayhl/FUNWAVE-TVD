@@ -55,6 +55,7 @@ module model_wavemaker_mod
    use core_constants_mod, only: SP, PI, DEG2RAD
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
+   use model_breaking_mod, only: type_model_breaking
    use model_tide_mod, only: type_model_tide
 
    use model_config_defaults_mod, only: DEF_WAVEMAKER_SOURCE_DELTA, &
@@ -564,10 +565,13 @@ contains
    ! entries are per-face, any number); names must be unique (faces
    ! resolve by name).
    ! ----------------------------------------------------------------
-   subroutine read_wavemakers(env, wms)
+   ! breaking reads BEFORE wavemakers (main's order) so the zone-override
+   ! keys can be variant-gated on breaking%model like the in-block ones
+   subroutine read_wavemakers(env, wms, breaking)
       use core_yaml_file_mod, only: type_yaml_reader
       type(type_env), intent(inout), target :: env
       type(type_model_wavemaker), allocatable, intent(out) :: wms(:)
+      type(type_model_breaking), intent(in) :: breaking
 
       type(type_yaml_reader), allocatable :: entries(:)
       logical :: no_wm
@@ -584,7 +588,7 @@ contains
       do k = 1, size(wms)
          wms(k)%wavemaker_type = "nothing"
          wms(k)%is_activated = .true.
-         call wavemaker_read_entry(wms(k), env, entries(k), k)
+         call wavemaker_read_entry(wms(k), env, entries(k), k, breaking)
          if (.not. wms(k)%boundary_candidate .and. &
              wms(k)%wavemaker_type /= "LEF_SOL") n_internal = n_internal + 1
       end do
@@ -603,12 +607,14 @@ contains
 
    end subroutine read_wavemakers
 
-   subroutine wavemaker_read_entry(this, env, wm, idx)
+   subroutine wavemaker_read_entry(this, env, wm, idx, breaking)
       use core_yaml_file_mod, only: type_yaml_reader
       class(type_model_wavemaker), intent(inout) :: this
       type(type_env), intent(inout), target :: env
       type(type_yaml_reader), intent(inout) :: wm
       integer, intent(in) :: idx
+      ! absent (single-entry/test path) = zone keys read unconditionally
+      type(type_model_breaking), intent(in), optional :: breaking
 
       type(type_yaml_reader) :: spec_yaml, blk, brk_yaml
       character(:), allocatable :: stype, method, legacy_type, normalize
@@ -824,14 +830,30 @@ contains
 
          ! zone breaking overrides (nee WAVEMAKER_Cbrk/WAVEMAKER_visbrk);
          ! main bridges them into the breaking component until the
-         ! coefficient-field assembler lands
+         ! coefficient-field assembler lands.  Per-key variant gating
+         ! mirrors the breaking: block: cbrk needs the breaker kernel,
+         ! visbrk the wavemaker_viscosity threshold pair
          brk_yaml = blk%cast_dictionary("breaking", no_brk)
          if (.not. no_brk) then
             this%has_breaking_override = .true.
-            call brk_yaml%read("cbrk", silent=no_key, val=this%breaking_cbrk, &
-                               default=DEF_WAVEMAKER_SOURCE_BREAKING_CBRK)
-            call brk_yaml%read("visbrk", silent=no_key, val=this%breaking_visbrk, &
-                               default=DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK)
+            block
+               logical :: cbrk_applies, visbrk_applies
+               cbrk_applies = .true.
+               visbrk_applies = .true.
+               if (present(breaking)) then
+                  cbrk_applies = trim(breaking%model) == "eddy_viscosity" &
+                                 .or. breaking%show_breaking
+                  visbrk_applies = trim(breaking%model) == "wavemaker_viscosity"
+               end if
+               if (cbrk_applies) then
+                  call brk_yaml%read("cbrk", silent=no_key, val=this%breaking_cbrk, &
+                                     default=DEF_WAVEMAKER_SOURCE_BREAKING_CBRK)
+               end if
+               if (visbrk_applies) then
+                  call brk_yaml%read("visbrk", silent=no_key, val=this%breaking_visbrk, &
+                                     default=DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK)
+               end if
+            end block
          end if
       end if
 

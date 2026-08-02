@@ -710,7 +710,7 @@ contains
                                num%MinDepthFrc, this%breaking%cbrk1, &
                                this%breaking%cbrk2, this%breaking%wavemaker_cbrk, &
                                this%breaking%nu_bkg, VIS_SCHEME_DEFAULT, &
-                               phy%SWE_ETA_DEP, this%in_wm_zone, &
+                               this%breaking%swe_eta_dep, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
                                this%undertow_u, this%undertow_v)
          elseif (this%breaking%wavemaker_vis) then
@@ -830,7 +830,7 @@ contains
          if (.not. (phy%viscosity_breaking .and. this%m9_settled &
                     .and. .not. ves_mask_on(this))) then
             call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
-                              num%MinDepthFrc, phy%SWE_ETA_DEP, &
+                              num%MinDepthFrc, this%breaking%swe_eta_dep, &
                               phy%viscosity_breaking)
 
             ! 18c quirk-drop, honouring the kernel_masks caller contract:
@@ -849,7 +849,7 @@ contains
 
             ! real dispersion-gate weight off the settled mask9 (halos valid)
             call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
-                                   phy%SWE_ETA_DEP, phy%SWE_ETA_RAMP, &
+                                   this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
                                    phy%viscosity_breaking, f%swe_w)
             ! latch only once the vessel is NOT blanking mask9 — else a
             ! mid-run deactivation (is_activated -> F) would leave m9_settled
@@ -889,7 +889,7 @@ contains
          ! writes the continuous run carries but the interior checkpoint
          ! misses; the ring exchange then matches the sync_from_flux tail
          call update_mask9(this%grid%lp, f%eta, f%depth, f%mask, f%mask9, &
-                           this%numerics%MinDepthFrc, phy%SWE_ETA_DEP, &
+                           this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
                            phy%viscosity_breaking)
          block
             real(SP), allocatable :: rmask(:, :)
@@ -898,8 +898,8 @@ contains
             f%mask9 = nint(rmask)
          end block
          call update_swe_weight(f%eta, f%depth, f%mask9, &
-                                this%numerics%MinDepthFrc, phy%SWE_ETA_DEP, &
-                                phy%SWE_ETA_RAMP, phy%viscosity_breaking, &
+                                this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
+                                this%breaking%swe_eta_ramp, phy%viscosity_breaking, &
                                 f%swe_w)
 
          ! carried fws face restore (18c): the first stage's etat reads the

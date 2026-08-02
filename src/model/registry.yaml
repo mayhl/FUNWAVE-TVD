@@ -434,8 +434,6 @@ sections:
       dispersion.gamma2: {legacy: Gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: Dispersion coefficient Gamma2 (overrides the scheme preset).}
       dispersion.gamma3: {legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: Dispersion coefficient Gamma3 (overrides the scheme preset).}
       dispersion.scheme: {legacy: ~, default: fully_nonlinear, units: ~, values: [fully_nonlinear, weakly_nonlinear, linear, nswe], doc: Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values).}
-      dispersion.swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: eta/depth ratio above which cells switch to shallow-water equations.}
-      dispersion.swe_eta_ramp: {legacy: ~, default: 0.10, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: eta/depth width of the smoothstep taper below swe_eta_dep; 0 = legacy hard switch.}
 
   # ── breaking ──
   breaking:
@@ -446,8 +444,10 @@ sections:
       nu_bkg: {legacy: nu_bkg, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{bkg}}$', doc: Background eddy viscosity added everywhere.}
       show_breaking: {legacy: SHOW_BREAKING, default: true, units: ~, doc: Output the breaking-index field.}
       model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing, wavemaker_viscosity], doc: "Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone."}
-      visbrk: {legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: Breaking eddy-viscosity coefficient.}
+      visbrk: {legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: "Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model)."}
       roller: {legacy: ROLLER, default: false, units: ~, doc: Enable the surface roller (forces model eddy_viscosity, as legacy).}
+      swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: "Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion."}
+      swe_eta_ramp: {legacy: ~, default: 0.10, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: "eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity)."}
 
   # ── friction ──
   friction:

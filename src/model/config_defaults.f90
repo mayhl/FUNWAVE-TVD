@@ -40,6 +40,8 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_NU_BKG = "0.0"
    character(*), parameter :: DEF_BREAKING_ROLLER = "NO"
    character(*), parameter :: DEF_BREAKING_SHOW_BREAKING = "YES"
+   character(*), parameter :: DEF_BREAKING_SWE_ETA_DEP = "0.8"
+   character(*), parameter :: DEF_BREAKING_SWE_ETA_RAMP = "0.1"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"
    ! ── foam ──
    character(*), parameter :: DEF_FOAM_BURST_TIME_NON_BREAKING = "1.0"
@@ -96,8 +98,6 @@ module model_config_defaults_mod
    ! ── physics ──
    character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"
-   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_DEP = "0.8"
-   character(*), parameter :: DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP = "0.1"
    ! ── sediment ──
    character(*), parameter :: DEF_SEDIMENT_BED_CHANGE = "NO"
    character(*), parameter :: DEF_SEDIMENT_BEDLOAD = "NO"

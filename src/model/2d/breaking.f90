@@ -16,6 +16,15 @@
 !    cbrk2:         <real>   cessation breaking threshold,       default 0.35
 !    visbrk:        <real>   breaking viscosity,                 default 0.0
 !    nu_bkg:        <real>   background viscosity floor,         default 0.0
+!    swe_eta_dep:   <real>   bore-regime eta/h threshold,        default 0.8
+!    swe_eta_ramp:  <real>   SWE-gate smoothstep taper width,    default 0.1
+!
+!  Variant keys are read CONDITIONALLY so the unread-key detector flags
+!  inapplicable knobs: cbrk1/cbrk2 need the breaker kernel (eddy_viscosity
+!  or show_breaking), swe_eta_ramp needs the SWE gate (not eddy_viscosity —
+!  mask9 is forced 1 there), visbrk is the wavemaker_viscosity threshold.
+!  swe_eta_dep reads always (gate threshold AND the viscous breaker's
+!  extra onset criterion).
 !
 !  The wavemaker-zone overrides (nee WAVEMAKER_Cbrk/WAVEMAKER_visbrk) moved
 !  to wavemaker.source.breaking; main bridges them into the fields here
@@ -35,7 +44,8 @@ module model_breaking_mod
    use model_config_defaults_mod, only: DEF_BREAKING_CBRK1, DEF_BREAKING_CBRK2, &
                                         DEF_BREAKING_MODEL, &
                                         DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER, &
-                                        DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK
+                                        DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK, &
+                                        DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP
 
    implicit none
 
@@ -67,6 +77,13 @@ module model_breaking_mod
 
       real(SP) :: nu_bkg = 0.0_SP   ! background kinematic viscosity floor for nu_break
 
+      ! SWE-transition gate (nee physics.dispersion keys): the gate IS the
+      ! shock-capturing breaking mechanism; dep doubles as the viscous
+      ! breaker's onset criterion.  Initializers must track the registry
+      ! defaults -- block-less decks land here
+      real(SP) :: swe_eta_dep = 0.8_SP
+      real(SP) :: swe_eta_ramp = 0.1_SP
+
    contains
       procedure :: read_input => breaking_read_input
    end type type_model_breaking
@@ -91,10 +108,23 @@ contains
       call sub_env%yaml%read("roller", val=this%roller, default=DEF_BREAKING_ROLLER)
       call sub_env%yaml%read("show_breaking", val=this%show_breaking, default=DEF_BREAKING_SHOW_BREAKING)
 
-      call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default=DEF_BREAKING_CBRK1)
-      call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default=DEF_BREAKING_CBRK2)
-      call sub_env%yaml%read("visbrk", silent=no_key, val=this%visbrk, default=DEF_BREAKING_VISBRK)
       call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default=DEF_BREAKING_NU_BKG)
+      call sub_env%yaml%read("swe_eta_dep", silent=no_key, val=this%swe_eta_dep, &
+                             default=DEF_BREAKING_SWE_ETA_DEP)
+
+      ! variant keys — conditionally read so the unread-key detector flags
+      ! knobs inapplicable to the selected model
+      if (trim(this%model) == "eddy_viscosity" .or. this%show_breaking) then
+         call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default=DEF_BREAKING_CBRK1)
+         call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default=DEF_BREAKING_CBRK2)
+      end if
+      if (trim(this%model) /= "eddy_viscosity") then
+         call sub_env%yaml%read("swe_eta_ramp", silent=no_key, val=this%swe_eta_ramp, &
+                                default=DEF_BREAKING_SWE_ETA_RAMP)
+      end if
+      if (trim(this%model) == "wavemaker_viscosity") then
+         call sub_env%yaml%read("visbrk", silent=no_key, val=this%visbrk, default=DEF_BREAKING_VISBRK)
+      end if
 
       ! the enum IS the legacy WAVEMAKER_VIS x VISCOSITY_BREAKING exclusion
       this%wavemaker_vis = trim(this%model) == "wavemaker_viscosity"

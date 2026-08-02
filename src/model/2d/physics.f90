@@ -41,9 +41,7 @@ module model_physics_mod
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_PHYSICS_DISPERSION_BETA_REF, &
-                                        DEF_PHYSICS_DISPERSION_SCHEME, &
-                                        DEF_PHYSICS_DISPERSION_SWE_ETA_DEP, &
-                                        DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP
+                                        DEF_PHYSICS_DISPERSION_SCHEME
 
    implicit none
 
@@ -67,11 +65,6 @@ module model_physics_mod
       real(SP) :: Beta_ref = -0.531_SP
       real(SP) :: Gamma3 = 1.0_SP
       logical  :: viscosity_breaking = .true.   ! set from breaking.model in model_setup
-      real(SP) :: SWE_ETA_DEP = 0.80_SP
-      ! smoothstep taper width below SWE_ETA_DEP; 0 = legacy hard switch.
-      ! Initializer must track the registry default -- the reads sit inside
-      ! the dispersion: block guard, so block-less decks land here
-      real(SP) :: SWE_ETA_RAMP = 0.1_SP
 
       ! f-plane Coriolis (legacy has the source term in the spherical
       ! branch only; [[design-grid-crs]] decouples f from the metric —
@@ -152,10 +145,9 @@ contains
          if (.not. no_key) this%Gamma3 = g_tmp
          call disp_yaml%read("beta_ref", silent=no_key, val=this%Beta_ref, &
                              default=DEF_PHYSICS_DISPERSION_BETA_REF)
-         call disp_yaml%read("swe_eta_dep", silent=no_key, val=this%SWE_ETA_DEP, &
-                             default=DEF_PHYSICS_DISPERSION_SWE_ETA_DEP)
-         call disp_yaml%read("swe_eta_ramp", silent=no_key, val=this%SWE_ETA_RAMP, &
-                             default=DEF_PHYSICS_DISPERSION_SWE_ETA_RAMP)
+         ! swe_eta_dep/swe_eta_ramp moved to breaking: (the gate IS the
+         ! shock-capturing breaking mechanism; dep doubles as the viscous
+         ! breaker's onset criterion)
       end if
 
    end subroutine physics_read_input
