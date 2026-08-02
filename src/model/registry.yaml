@@ -355,12 +355,23 @@ sections:
     keys:
       coriolis.f: {legacy: ~, default: ~, units: s-1, latex: $f$, doc: Constant Coriolis parameter (f-plane; overrides latitude).}
       coriolis.latitude: {legacy: ~, default: ~, units: degrees_north, latex: $\varphi$, doc: Reference latitude for the f-plane Coriolis parameter.}
-      bathy_correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass.}
-      bathy_depth: {legacy: DEPTH_FLAT, default: ~, units: m, latex: $d_0$, doc: Still-water depth for a flat bottom.}
-      bathy_file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: Bathymetry data file.}
-      bathy_slope: {legacy: SLP, default: ~, units: ~, latex: $s$, doc: Bed slope for a sloping-beach bathymetry.}
-      bathy_slope_x0: {legacy: Xslp, default: ~, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
-      bathy_type: {legacy: DEPTH_TYPE, default: flat, units: ~, values: [flat, slope, data], doc: Bathymetry generator.}
+      cell_size: {legacy: ~, default: ~, units: m, latex: '$[\Delta x, \Delta y]$', doc: "Uniform grid spacing [dx, dy] (nee DX/DY); alternative to dx_file/dy_file."}
+      dx_file: {legacy: ~, default: ~, units: ~, doc: "Variable x-spacing file (with dy_file; alternative to cell_size). Not yet implemented in the new path."}
+      dy_file: {legacy: ~, default: ~, units: ~, doc: "Variable y-spacing file (with dx_file)."}
+      n_cells: {legacy: ~, default: ~, units: ~, latex: '$[N_x, N_y]$', doc: "Global domain size [nx, ny] (nee Mglob/Nglob; grid_size). Required for flat/slope bathymetry; file bathymetry takes its dims from bathymetry.nx/ny."}
+      n_procs: {legacy: ~, default: ~, units: ~, latex: '$[P_x, P_y]$', doc: "MPI decomposition [px, py] (nee PX/PY; decomposition.nx_proc/ny_proc); absent = auto-decompose."}
+      origin: {legacy: ~, default: ~, units: m, latex: '$[x_0, y_0]$', doc: "Local coordinates [x0, y0] of the cell (1,1) centre; default [0, 0]."}
+      bathymetry.type: {legacy: DEPTH_TYPE, default: file, units: ~, values: [flat, file, slope], doc: Bathymetry source.}
+      bathymetry.depth: {legacy: DEPTH_FLAT, default: ~, units: m, latex: $d_0$, doc: Still-water depth (flat and slope types).}
+      bathymetry.slope: {legacy: SLP, default: ~, units: ~, latex: $s$, doc: Bed slope for a sloping-beach bathymetry.}
+      bathymetry.x0: {legacy: Xslp, default: 0.0, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
+      bathymetry.file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: Bathymetry data file (file type).}
+      bathymetry.file_type: {legacy: ~, default: ascii, units: ~, values: [ascii], doc: Bathymetry file format.}
+      bathymetry.nx: {legacy: ~, default: ~, units: ~, doc: "x dimension of the headerless ASCII depth file; doubles as the domain nx (file type, required)."}
+      bathymetry.ny: {legacy: ~, default: ~, units: ~, doc: "y dimension of the headerless ASCII depth file; doubles as the domain ny (file type, required)."}
+      bathymetry.correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass (file type).}
+      bathymetry.smooth_below_depth: {legacy: ~, default: ~, units: m, doc: "Correction-pass smoothing floor; absent = off (-LARGE sentinel)."}
+      bathymetry.slope_cap: {legacy: ~, default: 1.0, units: ~, doc: Correction-pass maximum bed slope.}
       # crs: georef of the (possibly rotated) rectilinear grid — the shared
       # funtools<->engine contract; supersedes the ad-hoc X_origin/Y_origin/
       # EPSG/rotation_deg keys funtools emitted into input.txt.  World from
@@ -375,13 +386,7 @@ sections:
       crs.origin_y: {legacy: ~, default: 0.0, units: m, latex: $y_0$, doc: "Projected northing of the cell (1,1) centre."}
       crs.rotation: {legacy: ~, default: 0.0, units: deg, latex: $\theta_g$, doc: "Grid +x axis angle, CCW from projected east (math convention, NOT compass azimuth); 0 = axis-aligned."}
       crs.vertical_datum: {legacy: ~, default: ~, units: ~, doc: "Vertical datum name that depths/eta reference (e.g. NAVD88, IGLD85 LWD); output-stamp provenance only."}
-      dx: {legacy: DX, default: ~, units: m, latex: $\Delta x$, doc: Grid spacing in x.}
-      dy: {legacy: DY, default: ~, units: m, latex: $\Delta y$, doc: Grid spacing in y.}
       water_level: {legacy: WaterLevel, default: 0.0, units: m, latex: $\eta_0$, doc: "Still-water level above the bathymetry datum; added to depth and wavemaker reference depths at init, so output eta is referenced to this level. Survives hotstart (reference-frame property, not an IC)."}
-      grid_nx: {legacy: Mglob, default: ~, units: ~, latex: $N_x$, doc: Number of grid cells in x (global).}
-      grid_ny: {legacy: Nglob, default: ~, units: ~, latex: $N_y$, doc: Number of grid cells in y (global).}
-      nx_proc: {legacy: PX, default: ~, units: ~, latex: $P_x$, doc: MPI process count in x (absent = auto-decompose).}
-      ny_proc: {legacy: PY, default: ~, units: ~, latex: $P_y$, doc: MPI process count in y (absent = auto-decompose).}
 
   # ── simulation ──
   simulation:
@@ -426,17 +431,19 @@ sections:
       solitary.y_center: {legacy: ~, default: 0.0, units: m, doc: Solitary-wave initial crest y (angle only).}
 
   # ── physics ──
-  physics:
-    doc: "Physics — Boussinesq dispersion (named scheme XOR an explicit atomic Gamma triple)."
+  # nee physics: — the wrapper held nothing but dispersion.*, so the
+  # mechanism is a top-level section, sibling to breaking/friction
+  dispersion:
+    doc: "Boussinesq dispersion — named scheme XOR an explicit atomic Gamma triple."
     keys:
-      dispersion.beta_ref: {legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
+      beta_ref: {legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
       # gamma triple: atomic (any present => all three) and exclusive with
       # scheme: — expert mode states the whole triple; dispersion stays ON
       # (kernels-off NSWE is reachable only via scheme: nswe)
-      dispersion.gamma1: {legacy: Gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: "Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme)."}
-      dispersion.gamma2: {legacy: Gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: "Dispersion coefficient (atomic triple)."}
-      dispersion.gamma3: {legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: "Dispersion coefficient (atomic triple)."}
-      dispersion.scheme:
+      gamma1: {legacy: Gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: "Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme)."}
+      gamma2: {legacy: Gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: "Dispersion coefficient (atomic triple)."}
+      gamma3: {legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: "Dispersion coefficient (atomic triple)."}
+      scheme:
         legacy: ~
         default: fully_nonlinear
         units: ~

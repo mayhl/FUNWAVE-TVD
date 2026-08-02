@@ -371,7 +371,8 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     geo = cfg.get("grid", cfg.get("geometry", {}))
     out = cfg.get("output", {})
 
-    grid_size = geo.get("grid_size", [0, 0])  # [nx, ny] or [nx, ny, nz]
+    # n_cells (2-D schema) with grid_size fallback (ref side + 3-D geometry:)
+    grid_size = geo.get("n_cells", geo.get("grid_size", [0, 0]))  # [nx, ny] or [nx, ny, nz]
     cell_size = geo.get("cell_size", [1.0, 1.0])  # [dx, dy]
 
     result_folder = out.get("result_folder", "output").rstrip("/")

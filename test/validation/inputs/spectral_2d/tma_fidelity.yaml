@@ -23,7 +23,7 @@
 # inside the oracle's variance window and deflated Hm0.
 grid:
   cell_size: [2.0, 2.0]
-  grid_size: [450, 5]
+  n_cells: [450, 5]
   bathymetry:
     type: flat
     depth: 8.0

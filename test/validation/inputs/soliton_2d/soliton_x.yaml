@@ -8,7 +8,7 @@
 # profile.  a/h = 0.1; one transit = L/c ~ 30.4 s, run ~3 transits.
 grid:
   cell_size: [0.2, 0.2]
-  grid_size: [500, 4]
+  n_cells: [500, 4]
   bathymetry:
     type: flat
     depth: 1.0

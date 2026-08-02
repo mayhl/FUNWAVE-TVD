@@ -42,6 +42,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_SWE_ETA_DEP = "0.8"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_RAMP = "0.1"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"
+   ! ── dispersion ──
+   character(*), parameter :: DEF_DISPERSION_BETA_REF = "-0.531"
+   character(*), parameter :: DEF_DISPERSION_SCHEME = "fully_nonlinear"
    ! ── foam ──
    character(*), parameter :: DEF_FOAM_BURST_TIME_NON_BREAKING = "1.0"
    character(*), parameter :: DEF_FOAM_CD = "0.5"
@@ -49,8 +52,11 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_FOAM_SOURCE_COEF = "0.05"
    character(*), parameter :: DEF_FOAM_TIME_SCALE = "3.8"
    ! ── grid ──
-   character(*), parameter :: DEF_GRID_BATHY_CORRECTION = "NO"
-   character(*), parameter :: DEF_GRID_BATHY_TYPE = "flat"
+   character(*), parameter :: DEF_GRID_BATHYMETRY_CORRECTION = "NO"
+   character(*), parameter :: DEF_GRID_BATHYMETRY_FILE_TYPE = "ascii"
+   character(*), parameter :: DEF_GRID_BATHYMETRY_SLOPE_CAP = "1.0"
+   character(*), parameter :: DEF_GRID_BATHYMETRY_TYPE = "file"
+   character(*), parameter :: DEF_GRID_BATHYMETRY_X0 = "0.0"
    character(*), parameter :: DEF_GRID_CRS_ORIGIN_X = "0.0"
    character(*), parameter :: DEF_GRID_CRS_ORIGIN_Y = "0.0"
    character(*), parameter :: DEF_GRID_CRS_ROTATION = "0.0"
@@ -94,9 +100,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_OUTPUT_MAX_FILE_SIZE = "50.0"
    character(*), parameter :: DEF_OUTPUT_MEANS_STEADY_TIME = "0.0"
    character(*), parameter :: DEF_OUTPUT_RESULT_FOLDER = "./output/"
-   ! ── physics ──
-   character(*), parameter :: DEF_PHYSICS_DISPERSION_BETA_REF = "-0.531"
-   character(*), parameter :: DEF_PHYSICS_DISPERSION_SCHEME = "fully_nonlinear"
    ! ── sediment ──
    character(*), parameter :: DEF_SEDIMENT_BED_CHANGE = "NO"
    character(*), parameter :: DEF_SEDIMENT_BEDLOAD = "NO"

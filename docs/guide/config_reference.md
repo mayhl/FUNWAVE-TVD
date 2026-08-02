@@ -116,24 +116,29 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 |---|---|---|---|---|
 | `coriolis.f` | — | — | s-1 | Constant Coriolis parameter (f-plane; overrides latitude). |
 | `coriolis.latitude` | — | — | degrees_north | Reference latitude for the f-plane Coriolis parameter. |
-| `bathy_correction` | `false` | `BATHY_CORRECTION` | — | Apply the bathymetry smoothing/correction pass. |
-| `bathy_depth` | — | `DEPTH_FLAT` | m | Still-water depth for a flat bottom. |
-| `bathy_file` | — | `DEPTH_FILE` | — | Bathymetry data file. |
-| `bathy_slope` | — | `SLP` | — | Bed slope for a sloping-beach bathymetry. |
-| `bathy_slope_x0` | — | `Xslp` | m | x location where the slope begins. |
-| `bathy_type` | `flat` | `DEPTH_TYPE` | — | Bathymetry generator. One of `flat` \| `slope` \| `data`. |
+| `cell_size` | — | — | m | Uniform grid spacing [dx, dy] (nee DX/DY); alternative to dx_file/dy_file. |
+| `dx_file` | — | — | — | Variable x-spacing file (with dy_file; alternative to cell_size). Not yet implemented in the new path. |
+| `dy_file` | — | — | — | Variable y-spacing file (with dx_file). |
+| `n_cells` | — | — | — | Global domain size [nx, ny] (nee Mglob/Nglob; grid_size). Required for flat/slope bathymetry; file bathymetry takes its dims from bathymetry.nx/ny. |
+| `n_procs` | — | — | — | MPI decomposition [px, py] (nee PX/PY; decomposition.nx_proc/ny_proc); absent = auto-decompose. |
+| `origin` | — | — | m | Local coordinates [x0, y0] of the cell (1,1) centre; default [0, 0]. |
+| `bathymetry.type` | `file` | `DEPTH_TYPE` | — | Bathymetry source. One of `flat` \| `file` \| `slope`. |
+| `bathymetry.depth` | — | `DEPTH_FLAT` | m | Still-water depth (flat and slope types). |
+| `bathymetry.slope` | — | `SLP` | — | Bed slope for a sloping-beach bathymetry. |
+| `bathymetry.x0` | `0.0` | `Xslp` | m | x location where the slope begins. |
+| `bathymetry.file` | — | `DEPTH_FILE` | — | Bathymetry data file (file type). |
+| `bathymetry.file_type` | `ascii` | — | — | Bathymetry file format. One of `ascii`. |
+| `bathymetry.nx` | — | — | — | x dimension of the headerless ASCII depth file; doubles as the domain nx (file type, required). |
+| `bathymetry.ny` | — | — | — | y dimension of the headerless ASCII depth file; doubles as the domain ny (file type, required). |
+| `bathymetry.correction` | `false` | `BATHY_CORRECTION` | — | Apply the bathymetry smoothing/correction pass (file type). |
+| `bathymetry.smooth_below_depth` | — | — | m | Correction-pass smoothing floor; absent = off (-LARGE sentinel). |
+| `bathymetry.slope_cap` | `1.0` | — | — | Correction-pass maximum bed slope. |
 | `crs.epsg` | — | — | — | EPSG code of the projected horizontal CRS in metres; presence georeferences the grid (absent = local unreferenced). |
 | `crs.origin_x` | `0.0` | — | m | Projected easting of the cell (1,1) centre. |
 | `crs.origin_y` | `0.0` | — | m | Projected northing of the cell (1,1) centre. |
 | `crs.rotation` | `0.0` | — | deg | Grid +x axis angle, CCW from projected east (math convention, NOT compass azimuth); 0 = axis-aligned. |
 | `crs.vertical_datum` | — | — | — | Vertical datum name that depths/eta reference (e.g. NAVD88, IGLD85 LWD); output-stamp provenance only. |
-| `dx` | — | `DX` | m | Grid spacing in x. |
-| `dy` | — | `DY` | m | Grid spacing in y. |
 | `water_level` | `0.0` | `WaterLevel` | m | Still-water level above the bathymetry datum; added to depth and wavemaker reference depths at init, so output eta is referenced to this level. Survives hotstart (reference-frame property, not an IC). |
-| `grid_nx` | — | `Mglob` | — | Number of grid cells in x (global). |
-| `grid_ny` | — | `Nglob` | — | Number of grid cells in y (global). |
-| `nx_proc` | — | `PX` | — | MPI process count in x (absent = auto-decompose). |
-| `ny_proc` | — | `PY` | — | MPI process count in y (absent = auto-decompose). |
 
 ## `simulation:`
 
@@ -180,17 +185,17 @@ Initial condition — block presence selects the type (solitary/sine_mode/fields
 | `solitary.angle` | — | — | deg | Oblique crest angle from +x (presence selects the doubly-periodic tiled train; excludes direction). |
 | `solitary.y_center` | `0.0` | — | m | Solitary-wave initial crest y (angle only). |
 
-## `physics:`
+## `dispersion:`
 
-Physics — Boussinesq dispersion (named scheme XOR an explicit atomic Gamma triple).
+Boussinesq dispersion — named scheme XOR an explicit atomic Gamma triple.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `dispersion.beta_ref` | `-0.531` | `Beta_ref` | — | Reference depth level for the Boussinesq operator. |
-| `dispersion.gamma1` | — | `Gamma1` | — | Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme). |
-| `dispersion.gamma2` | — | `Gamma2` | — | Dispersion coefficient (atomic triple). |
-| `dispersion.gamma3` | — | `Gamma3` | — | Dispersion coefficient (atomic triple). |
-| `dispersion.scheme` | `fully_nonlinear` | — | — | Named dispersion preset for the Gamma triple; exclusive with explicit gammas. No 1:1 legacy keyword (legacy encoded this via DISPERSION + the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
+| `beta_ref` | `-0.531` | `Beta_ref` | — | Reference depth level for the Boussinesq operator. |
+| `gamma1` | — | `Gamma1` | — | Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme). |
+| `gamma2` | — | `Gamma2` | — | Dispersion coefficient (atomic triple). |
+| `gamma3` | — | `Gamma3` | — | Dispersion coefficient (atomic triple). |
+| `scheme` | `fully_nonlinear` | — | — | Named dispersion preset for the Gamma triple; exclusive with explicit gammas. No 1:1 legacy keyword (legacy encoded this via DISPERSION + the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
 
 ## `breaking:`
 

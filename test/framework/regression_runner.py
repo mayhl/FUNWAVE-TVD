@@ -245,7 +245,7 @@ class RegressionRunner(BaseRunner):
         for item in os.listdir(input_dir):
             src = os.path.join(input_dir, item)
             # native-YAML deck stages verbatim (no legacy DT-strip / PX-PY
-            # rewrite — new-schema decks omit decomposition: for auto).
+            # rewrite — new-schema decks omit n_procs: for auto).
             # ONLY the sim's own deck: metadata readers and oracles resolve
             # the run deck as the single *.yaml in the run dir.
             if os.path.isfile(src) and item.endswith(".yaml"):
@@ -419,7 +419,8 @@ class RegressionRunner(BaseRunner):
             try:
                 with open(input_path) as f:
                     cfg = yaml.safe_load(f)
-                gs = cfg["grid"]["grid_size"]
+                g = cfg["grid"]
+                gs = g["n_cells"] if "n_cells" in g else g["grid_size"]
             except (OSError, KeyError, TypeError, yaml.YAMLError):
                 return None
             return int(gs[0]), int(gs[1]), int(gs[2]) if len(gs) > 2 else 1

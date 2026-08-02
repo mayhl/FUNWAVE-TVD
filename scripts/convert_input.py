@@ -476,17 +476,14 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     mg = pop_val("Mglob")
     ng = pop_val("Nglob")
     if mg is not None and ng is not None:
-        geo["grid_size"] = [mg, ng]
+        geo["n_cells"] = [mg, ng]
 
+    # n_procs is an atomic pair; a lone PX/PY has no answer for the other
+    # axis, so it falls through to auto-decompose
     px = pop_val("PX")
     py = pop_val("PY")
-    if px is not None or py is not None:
-        decomp: dict = {}
-        if px is not None:
-            decomp["nx_proc"] = px
-        if py is not None:
-            decomp["ny_proc"] = py
-        geo["decomposition"] = decomp
+    if px is not None and py is not None:
+        geo["n_procs"] = [px, py]
 
     bathy: dict = {"type": depth_type}
     if depth_type == "file":
@@ -706,23 +703,23 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         out.setdefault("boundaries", {})["periodic"] = ["y"]
     wl = pop_val("WATER_LEVEL")
     if wl is not None:
-        out["initial"] = {"water_level": wl}
+        geo["water_level"] = wl
 
     disp: dict = {}
     if not pop_bool("DISPERSION", True):
         disp["scheme"] = "nswe"
-    for k, yk in (
-        ("Gamma1", "gamma1"),
-        ("Gamma2", "gamma2"),
-        ("Gamma3", "gamma3"),
-        ("Beta_ref", "beta_ref"),
-        ("SWE_ETA_DEP", "swe_eta_dep"),
-    ):
-        v = pop_val(k)
-        if v is not None:
-            disp[yk] = v
+        for k in ("Gamma1", "Gamma2", "Gamma3"):
+            pop_val(k)  # kernels off — the preset owns the triple
+    else:
+        gam = {yk: pop_val(k) for k, yk in
+               (("Gamma1", "gamma1"), ("Gamma2", "gamma2"), ("Gamma3", "gamma3"))}
+        if any(v is not None for v in gam.values()):
+            disp.update({yk: (1.0 if v is None else v) for yk, v in gam.items()})
+    v = pop_val("Beta_ref")
+    if v is not None:
+        disp["beta_ref"] = v
     if disp:
-        out["physics"] = {"dispersion": disp}
+        out["dispersion"] = disp
 
     # ---- numerics ----------------------------------------------------------
     # Time_Scheme dropped: the modern stepper is RK3-only (falls through to
@@ -747,29 +744,32 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
 
     # ---- breaking ----------------------------------------------------------
     br: dict = {}
-    # nee VISCOSITY_BREAKING (T -> eddy_viscosity, default; F -> shock_capturing)
+    # nee VISCOSITY_BREAKING (T -> eddy_viscosity, default; F -> shock_capturing);
+    # WAVEMAKER_VIS folds in as the third model (shock globally + Kennedy zone)
     if not pop_bool("VISCOSITY_BREAKING", True):
         br["model"] = "shock_capturing"
+    if pop_bool("WAVEMAKER_VIS"):
+        br["model"] = "wavemaker_viscosity"
     roller = pop_bool("ROLLER")
     if roller:
         br["roller"] = True
-    sb = pop_bool("SHOW_BREAKING", True)
-    if not sb:
-        br["show_breaking"] = False
+    # SHOW_BREAKING retired — the engine derives the diagnostics pass
+    pop_bool("SHOW_BREAKING", True)
     for k, yk in (
-        ("Cbrk1", "Cbrk1"),
-        ("Cbrk2", "Cbrk2"),
-        ("WAVEMAKER_Cbrk", "WAVEMAKER_Cbrk"),
+        ("Cbrk1", "cbrk1"),
+        ("Cbrk2", "cbrk2"),
         ("visbrk", "visbrk"),
-        ("WAVEMAKER_visbrk", "WAVEMAKER_visbrk"),
         ("nu_bkg", "nu_bkg"),
+        ("SWE_ETA_DEP", "swe_eta_dep"),
     ):
         v = pop_val(k)
         if v is not None:
             br[yk] = v
-    wvis = pop_bool("WAVEMAKER_VIS")
-    if wvis:
-        br["WAVEMAKER_VIS"] = True
+    # zone overrides live on the wavemaker source block now
+    for k, yk in (("WAVEMAKER_Cbrk", "cbrk"), ("WAVEMAKER_visbrk", "visbrk")):
+        v = pop_val(k)
+        if v is not None and isinstance(out.get("wavemaker"), dict):
+            out["wavemaker"].setdefault("source", {}).setdefault("breaking", {})[yk] = v
     if br:
         out["breaking"] = br
 

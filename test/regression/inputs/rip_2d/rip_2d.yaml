@@ -5,7 +5,7 @@
 
 grid:
   cell_size: [1.0, 2.0]
-  grid_size: [512, 250]
+  n_cells: [512, 250]
   bathymetry:
     type: file
     file: depth_a15.txt

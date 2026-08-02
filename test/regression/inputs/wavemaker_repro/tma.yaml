@@ -7,10 +7,8 @@
 # also guards rank-consistency of the drawn phases, not just run-to-run repeat.
 grid:
   cell_size: [2.0, 2.0]
-  grid_size: [120, 10]
-  decomposition:
-    nx_proc: 1
-    ny_proc: 2
+  n_cells: [120, 10]
+  n_procs: [1, 2]
   bathymetry:
     type: flat
     depth: 8.0

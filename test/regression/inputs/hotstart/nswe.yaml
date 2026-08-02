@@ -4,10 +4,8 @@
 # the harness asserts a zero tolerance for this case.
 grid:
   cell_size: [1.0, 1.0]
-  grid_size: [200, 4]
-  decomposition:
-    nx_proc: 1
-    ny_proc: 1
+  n_cells: [200, 4]
+  n_procs: [1, 1]
   bathymetry:
     type: flat
     depth: 10.0
@@ -24,9 +22,8 @@ initial:
     x_center: 60.0
 boundaries:
   periodic: [y]
-physics:
-  dispersion:
-    scheme: nswe
+dispersion:
+  scheme: nswe
 numerics:
   cfl: 0.5
   min_depth: 0.01

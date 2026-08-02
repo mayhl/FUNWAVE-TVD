@@ -7,7 +7,7 @@
 # the 5 % period gate instantly.
 grid:
   cell_size: [0.2, 0.2]
-  grid_size: [100, 3]
+  n_cells: [100, 3]
   bathymetry:
     type: flat
     depth: 12.0
@@ -18,9 +18,8 @@ simulation:
 initial:
   sine_mode:
     amplitude: 0.01
-physics:
-  dispersion:
-    scheme: linear
+dispersion:
+  scheme: linear
 numerics:
   cfl: 0.5
   froude_cap: 3.0

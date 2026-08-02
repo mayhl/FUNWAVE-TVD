@@ -7,10 +7,8 @@
 # Fixed dt + np=1 keep the legs on identical step boundaries.
 grid:
   cell_size: [1.0, 1.0]
-  grid_size: [200, 4]
-  decomposition:
-    nx_proc: 1
-    ny_proc: 1
+  n_cells: [200, 4]
+  n_procs: [1, 1]
   bathymetry:
     type: flat
     depth: 10.0

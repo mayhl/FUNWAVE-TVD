@@ -117,7 +117,7 @@ def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, i
         cfg = yaml.safe_load(fh)
 
     geo = cfg.get("grid", {})
-    gs = geo.get("grid_size", [1, 1])
+    gs = geo.get("n_cells", geo.get("grid_size", [1, 1]))
     cs = geo.get("cell_size", [1.0, 1.0])
     lx = float(gs[0]) * float(cs[0])
     ly = float(gs[1]) * float(cs[1])
@@ -135,7 +135,8 @@ def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, i
     mode_x = int(sine.get("mode_x", 1))
     mode_y = int(sine.get("mode_y", 0))
 
-    disp = cfg.get("physics", {}).get("dispersion", {})
+    # top-level dispersion: (nee physics.dispersion — kept as fallback)
+    disp = cfg.get("dispersion", cfg.get("physics", {}).get("dispersion", {}))
     beta_ref = float(disp.get("beta_ref", BETA_REF_DEFAULT))
     scheme = str(disp.get("scheme", "fully_nonlinear"))
     return h, lx, ly, beta_ref, mode_x, mode_y, scheme

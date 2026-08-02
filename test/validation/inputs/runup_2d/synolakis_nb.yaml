@@ -8,7 +8,7 @@
 # sits at x = 79.85 m; the dry beach extends to +0.41 m for headroom.
 grid:
   cell_size: [0.1, 0.1]
-  grid_size: [880, 4]
+  n_cells: [880, 4]
   bathymetry:
     type: slope
     depth: 1.0

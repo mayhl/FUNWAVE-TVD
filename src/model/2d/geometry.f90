@@ -7,14 +7,15 @@
 !
 !  YAML block: grid:          (nee geometry:; the 3-D model keeps geometry:)
 !    cell_size: [dx, dy]        OR dx_file/dy_file for variable spacing
-!    grid_size: [nx, ny]        required for flat and slope bathymetry types
+!    n_cells: [nx, ny]          required for flat and slope bathymetry types
+!                               (nee grid_size; file type sizes from
+!                               bathymetry nx/ny)
 !    origin: [x0, y0]           optional, default [0, 0]
 !    water_level: <real>        optional, default 0 — still-water offset
 !                               above the bathy datum (nee WaterLevel);
 !                               applied by main after bathy correction
-!    decomposition:
-!      nx_proc: <int>
-!      ny_proc: <int>
+!    n_procs: [px, py]          optional, absent = auto-decompose
+!                               (nee decomposition nx_proc/ny_proc)
 !    bathymetry:
 !      type: flat | file | slope
 !      depth: <real>            flat and slope
@@ -101,12 +102,11 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      type(type_yaml_reader) :: bathy_yaml, decomp_yaml
+      type(type_yaml_reader) :: bathy_yaml
       real(SP), allocatable :: cell_size(:), origin(:)
-      integer, allocatable :: grid_size(:)
-      integer :: tmp_nx, tmp_ny
+      integer, allocatable :: n_cells(:), n_procs(:)
       logical :: no_cell_size, no_origin, no_decomp
-      logical :: no_nx_proc, no_ny_proc, no_dx_file, no_dy_file
+      logical :: no_dx_file, no_dy_file
       logical :: no_bathy_nx, no_bathy_ny
 
       sub_env = get_sub_env(env, "grid")
@@ -146,26 +146,16 @@ contains
       call sub_env%yaml%mark_reserved("crs")
 
       ! --- Decomposition (optional) ---
-      ! NOTE: plain read into temps + validate/assign only when present -- an empty
-      ! decomposition: block (both keys absent) must fall through to auto-decompose,
-      ! but read_positive would wipe this%nx_proc's 0 sentinel (intent(out)) to
-      ! garbage on that path and then abort on its own positivity check
-      decomp_yaml = sub_env%yaml%cast_dictionary("decomposition", no_decomp)
+      ! a bare pair (nee decomposition nx_proc/ny_proc) — either present
+      ! and valid or absent (auto), no half-states to guard
+      call sub_env%yaml%read("n_procs", silent=no_decomp, val=n_procs)
       if (.not. no_decomp) then
-         call decomp_yaml%read("nx_proc", silent=no_nx_proc, val=tmp_nx)
-         call decomp_yaml%read("ny_proc", silent=no_ny_proc, val=tmp_ny)
-         if (no_nx_proc .neqv. no_ny_proc) then
+         if (n_procs(1) <= 0 .or. n_procs(2) <= 0) then
             call sub_env%log%exit_on_error( &
-               "geometry/decomposition: nx_proc and ny_proc must both be specified")
+               "geometry/n_procs: process counts must be positive")
          end if
-         if (.not. no_nx_proc) then
-            if (tmp_nx <= 0 .or. tmp_ny <= 0) then
-               call sub_env%log%exit_on_error( &
-                  "geometry/decomposition: nx_proc and ny_proc must be positive")
-            end if
-            this%nx_proc = tmp_nx
-            this%ny_proc = tmp_ny
-         end if
+         this%nx_proc = n_procs(1)
+         this%ny_proc = n_procs(2)
       end if
 
       ! --- Bathymetry ---
@@ -195,17 +185,17 @@ contains
 
       case ("flat")
          call bathy_yaml%read_positive("depth", val=this%bathy_depth)
-         call sub_env%yaml%read("grid_size", val=grid_size)
-         this%grid_nx = grid_size(1)
-         this%grid_ny = grid_size(2)
+         call sub_env%yaml%read("n_cells", val=n_cells)
+         this%grid_nx = n_cells(1)
+         this%grid_ny = n_cells(2)
 
       case ("slope")
          call bathy_yaml%read_positive("depth", val=this%bathy_depth)
          call bathy_yaml%read("slope", val=this%bathy_slope)
          call bathy_yaml%read("x0", val=this%bathy_slope_x0, default="0.0")
-         call sub_env%yaml%read("grid_size", val=grid_size)
-         this%grid_nx = grid_size(1)
-         this%grid_ny = grid_size(2)
+         call sub_env%yaml%read("n_cells", val=n_cells)
+         this%grid_nx = n_cells(1)
+         this%grid_ny = n_cells(2)
       end select
 
    end subroutine geometry_read_input

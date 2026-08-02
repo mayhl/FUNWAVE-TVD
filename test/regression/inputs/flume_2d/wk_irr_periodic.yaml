@@ -5,10 +5,8 @@
 
 grid:
   cell_size: [2.0, 2.0]
-  grid_size: [250, 50]
-  decomposition:
-    nx_proc: 4
-    ny_proc: 2
+  n_cells: [250, 50]
+  n_procs: [4, 2]
   bathymetry:
     type: slope
     depth: 8.0

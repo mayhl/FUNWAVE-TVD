@@ -1,10 +1,8 @@
 # Fixture for test_model_setup — solitary IC on a flat 4-rank flume
 grid:
   cell_size: [1.0, 1.0]
-  grid_size: [40, 4]
-  decomposition:
-    nx_proc: 4
-    ny_proc: 1
+  n_cells: [40, 4]
+  n_procs: [4, 1]
   bathymetry:
     type: flat
     depth: 10.0

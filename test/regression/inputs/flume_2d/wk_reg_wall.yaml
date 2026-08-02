@@ -5,7 +5,7 @@
 
 grid:
   cell_size: [2.0, 2.0]
-  grid_size: [250, 100]
+  n_cells: [250, 100]
   bathymetry:
     type: slope
     depth: 8.0

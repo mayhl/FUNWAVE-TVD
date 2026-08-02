@@ -6,7 +6,7 @@
 # gates celerity, amplitude decay, and shape on the row profile.
 grid:
   cell_size: [0.2, 0.2]
-  grid_size: [200, 200]
+  n_cells: [200, 200]
   bathymetry:
     type: flat
     depth: 1.0
