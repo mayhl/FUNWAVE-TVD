@@ -94,6 +94,8 @@ contains
 
       ! Initialise environment once — owns MPI, YAML, and logging for this run.
       call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path=trim(log_path))
+      ! --validate promotes the unread-key report from warning to abort
+      env%yaml%unread_strict = validate
 
       ! Peek at grid_size to decide dimensionality: 2 elements → 2D path,
       ! 3 elements → 3D path.  The 2D schema owns grid:; the 3D schema

@@ -141,6 +141,10 @@ contains
       call sub_env%yaml%read("water_level", val=this%water_level, &
                              default=DEF_GRID_WATER_LEVEL)
 
+      ! crs is metadata-only until the output stamp lands -- reserve it so
+      ! unread-key detection stays quiet on georeferenced decks
+      call sub_env%yaml%mark_reserved("crs")
+
       ! --- Decomposition (optional) ---
       ! NOTE: plain read into temps + validate/assign only when present -- an empty
       ! decomposition: block (both keys absent) must fall through to auto-decompose,

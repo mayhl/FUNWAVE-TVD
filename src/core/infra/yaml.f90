@@ -9,7 +9,8 @@ module core_yaml_file_mod
 
    use fortran_yaml_c, only: YamlFile, dp, &
                              type_node, type_dictionary, type_error, &
-                             type_list, type_list_item, type_scalar
+                             type_list, type_list_item, type_scalar, &
+                             type_key_value_pair
    implicit none
 
    private
@@ -18,12 +19,25 @@ module core_yaml_file_mod
    type(type_log_writer), TARGET :: log_buff
    character(LABEL_SIZE), parameter :: log_label = "config"
 
+   ! Unread-key detection (decided 2026-07-24): every consuming access marks
+   ! the node's parse path in a set shared by all clones of one parsed file;
+   ! finalize walks the tree leaves against it.  No key list to maintain --
+   ! the readers ARE the schema.  Entries ending "/*" reserve a subtree
+   ! (schema-known but intentionally unconsumed, e.g. grid.crs).
+   type type_visited_set
+      integer :: n = 0
+      character(MESSAGE_SIZE), allocatable :: paths(:)
+   end type type_visited_set
+
    type type_yaml_reader
       logical :: is_io_node = .False.
+      ! --validate aborts on unread keys; runtime only warns
+      logical :: unread_strict = .false.
       character(MESSAGE_SIZE):: path = ""
       type(type_log_writer), pointer, public :: log
       type(type_comm), pointer, public :: comm
       class(type_dictionary), pointer :: root => null()
+      type(type_visited_set), pointer :: visited => null()
       type(YamlFile):: file
 
    contains
@@ -33,6 +47,9 @@ module core_yaml_file_mod
       procedure, public :: finalize
       procedure, public :: transfer_ownership
       procedure, public :: clone
+      procedure, public :: mark_reserved
+      procedure :: mark_read
+      procedure :: report_unread
 
       procedure :: parse_error_message
       procedure :: prep_msg
@@ -147,6 +164,9 @@ contains
          call this%log%exit_on_error("Input file does not appear to be a valid YAML file.")
       end select
 
+      allocate (this%visited)
+      allocate (this%visited%paths(64))
+
    end subroutine init
 
    function clone(this, node) result(reader)
@@ -157,6 +177,8 @@ contains
       reader%log => this%log
       reader%comm => this%comm
       reader%root => node
+      reader%visited => this%visited
+      reader%unread_strict = this%unread_strict
    end function clone
 
    function is_dictionary_node(this, key, silent) result(val)
@@ -168,6 +190,7 @@ contains
       class(type_node), pointer :: node
       character(:), allocatable :: buff
 
+      call this%mark_read(key)
       node => this%root%get(key)
 
       if (associated(node)) then
@@ -202,6 +225,7 @@ contains
       character(*), intent(in) :: key
       logical, optional, intent(out) :: is_empty
       logical :: val
+      call this%mark_read(key)
       val = associated(this%root%get(key))
    end function has_key
 
@@ -215,6 +239,7 @@ contains
 
       logical, parameter :: is_required = .true.
 
+      call this%mark_read(key)
       node => this%root%get_dictionary(key, is_required, io_err)
 
       if (allocated(io_err)) then
@@ -247,6 +272,7 @@ contains
       type(type_list_item), pointer :: item
       integer :: i
 
+      call this%mark_read(key)
       node => this%root%get(key)
       is_empty = .not. associated(node)
       if (is_empty) then
@@ -322,6 +348,7 @@ contains
       ! even on a missing key (wiping val with garbage), and on ifx the
       ! allocatable error dummy may stay unallocated through the
       ! fortran-yaml-c call chain
+      call this%mark_read(key)
       if (associated(this%root%get(key))) then
          val = this%root%get_integer(key, error=io_err)
       else
@@ -508,6 +535,7 @@ contains
          is_default = .false.
          if (present(silent)) silent = .false.
       else
+         call this%mark_read(key)
          if (associated(this%root%get(key))) then
             val = this%root%get_real(key, error=io_err)
          else
@@ -631,6 +659,7 @@ contains
       logical :: is_default
       character(len=:), allocatable :: msg
 
+      call this%mark_read(key)
       if (associated(this%root%get(key))) then
          val = this%root%get_logical(key, error=io_err)
       else
@@ -662,6 +691,7 @@ contains
       logical :: is_default
       character(len=:), allocatable :: msg
 
+      call this%mark_read(key)
       if (associated(this%root%get(key))) then
          val = this%root%get_string(key, error=io_err)
       else
@@ -848,6 +878,9 @@ contains
             call this%root%set_string(key, default)
             node => this%root%get(key)
             node%path = this%root%path//"/"//key
+            ! the injected default is a new tree node -- mark it or every
+            ! defaulted key walks as a false-positive unread leaf
+            call this%mark_read(key)
          else
             is_default = .false.
             buff = this%prep_extern_msg(key, io_err%message)
@@ -941,6 +974,7 @@ contains
       class(type_scalar), pointer :: item_scalar
       integer :: n, i
 
+      call this%mark_read(key)
       node => this%root%get(key)
       if (.not. associated(node)) then
          if (present(silent)) then
@@ -986,6 +1020,7 @@ contains
       class(type_scalar), pointer :: item_scalar
       integer :: n, i, stat
 
+      call this%mark_read(key)
       node => this%root%get(key)
       if (.not. associated(node)) then
          if (present(silent)) then
@@ -1032,6 +1067,7 @@ contains
       class(type_scalar), pointer :: item_scalar
       integer :: n, i, stat
 
+      call this%mark_read(key)
       node => this%root%get(key)
       if (.not. associated(node)) then
          if (present(silent)) then
@@ -1067,12 +1103,160 @@ contains
       end select
    end subroutine read_real_array
 
+   !----------------------------------------------------------------------
+   ! Unread-key detection machinery.  mark_read stamps the fetched node's
+   ! parse path into the shared visited set; mark_reserved stamps a "/*"
+   ! wildcard covering a schema-known but intentionally-unconsumed subtree;
+   ! report_unread (finalize) walks the tree leaves and reports the rest:
+   ! runtime = io-node warning block, unread_strict (--validate) = abort.
+   !----------------------------------------------------------------------
+
+   subroutine visited_add(set, path)
+      type(type_visited_set), intent(inout) :: set
+      character(*), intent(in) :: path
+      character(MESSAGE_SIZE), allocatable :: tmp(:)
+      integer :: i
+
+      do i = 1, set%n
+         if (trim(set%paths(i)) == path) return
+      end do
+      if (set%n == size(set%paths)) then
+         allocate (tmp(2*set%n))
+         tmp(1:set%n) = set%paths
+         call move_alloc(tmp, set%paths)
+      end if
+      set%n = set%n + 1
+      set%paths(set%n) = path
+   end subroutine visited_add
+
+   function visited_covers(set, path) result(covered)
+      type(type_visited_set), intent(in) :: set
+      character(*), intent(in) :: path
+      logical :: covered
+      integer :: i, n
+
+      covered = .true.
+      do i = 1, set%n
+         if (trim(set%paths(i)) == path) return
+         n = len_trim(set%paths(i))
+         if (n >= 2) then
+            if (set%paths(i) (n - 1:n) == "/*" .and. len(path) >= n - 1) then
+               if (path(1:n - 1) == set%paths(i) (1:n - 1)) return
+            end if
+         end if
+      end do
+      covered = .false.
+   end function visited_covers
+
+   subroutine mark_read(this, key)
+      class(type_yaml_reader), intent(in) :: this
+      character(*), intent(in) :: key
+      class(type_node), pointer :: node
+
+      if (.not. associated(this%visited)) return
+      if (.not. associated(this%root)) return
+      node => this%root%get(key)
+      if (.not. associated(node)) return
+      if (.not. allocated(node%path)) return
+      call visited_add(this%visited, node%path)
+   end subroutine mark_read
+
+   subroutine mark_reserved(this, key)
+      class(type_yaml_reader), intent(in) :: this
+      character(*), intent(in) :: key
+      class(type_node), pointer :: node
+
+      if (.not. associated(this%visited)) return
+      if (.not. associated(this%root)) return
+      node => this%root%get(key)
+      if (.not. associated(node)) return
+      if (.not. allocated(node%path)) return
+      call visited_add(this%visited, trim(node%path)//"/*")
+   end subroutine mark_reserved
+
+   recursive subroutine collect_unread(node, set, unread)
+      class(type_node), intent(in) :: node
+      type(type_visited_set), intent(in) :: set
+      type(type_visited_set), intent(inout) :: unread
+
+      type(type_key_value_pair), pointer :: pair
+      type(type_list_item), pointer :: item
+      logical :: all_scalar
+
+      select type (node)
+      class is (type_dictionary)
+         pair => node%first
+         do while (associated(pair))
+            call collect_unread(pair%value, set, unread)
+            pair => pair%next
+         end do
+      class is (type_list)
+         ! a scalar-only list is one leaf at the list's own path (array
+         ! reads mark the list node, not its items)
+         all_scalar = .true.
+         item => node%first
+         do while (associated(item))
+            select type (n_ => item%node)
+            class is (type_scalar)
+            class default
+               all_scalar = .false.
+            end select
+            item => item%next
+         end do
+         if (all_scalar) then
+            if (allocated(node%path)) then
+               if (.not. visited_covers(set, node%path)) &
+                  call visited_add(unread, node%path)
+            end if
+         else
+            item => node%first
+            do while (associated(item))
+               call collect_unread(item%node, set, unread)
+               item => item%next
+            end do
+         end if
+      class default
+         if (allocated(node%path)) then
+            if (.not. visited_covers(set, node%path)) &
+               call visited_add(unread, node%path)
+         end if
+      end select
+   end subroutine collect_unread
+
+   subroutine report_unread(this)
+      class(type_yaml_reader), intent(inout) :: this
+      type(type_visited_set) :: unread
+      character(MESSAGE_SIZE) :: msg
+      integer :: i
+
+      if (.not. associated(this%visited)) return
+      if (.not. associated(this%root)) return
+      allocate (unread%paths(16))
+      call collect_unread(this%root, this%visited, unread)
+      if (unread%n == 0) return
+
+      if (this%comm%is_io_node()) then
+         call this%log%warning("config keys read by no component -- misplaced,"// &
+                               " misspelled, or inapplicable to this configuration:")
+         do i = 1, unread%n
+            call this%log%warning("  "//trim(unread%paths(i)))
+         end do
+      end if
+      if (this%unread_strict) then
+         write (msg, "(a,i0,a)") "validation failed -- ", unread%n, &
+            " config key(s) read by no component (list above)"
+         call this%log%exit_on_error(trim(msg))
+      end if
+   end subroutine report_unread
+
    subroutine finalize(this)
       class(type_yaml_reader), intent(inout) :: this
       if (associated(this%root)) then
+         call this%report_unread()
          call this%root%finalize()
          nullify (this%root)
       end if
+      if (associated(this%visited)) deallocate (this%visited)
    end subroutine finalize
 
    ! Transfer ownership of the YAML tree to another yaml_reader that was
