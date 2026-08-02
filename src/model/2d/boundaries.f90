@@ -12,6 +12,16 @@
 !    relaxation_cells: <int>     forcing relaxation-strip width in cells,
 !                                default 30 (nee WaveMakerPointNum)
 !    west: / east: / south: / north:
+!    sponge:                     OPTIONAL shared coefficient defaults every
+!      direct: {r, a}            face sponge inherits PER-KEY (a face
+!      friction: {cd}            sub-block overrides only the keys it
+!      diffusion: {nu}           states); a shared mechanism block turns
+!                                that mechanism on for every face sponge.
+!                                A face mechanism also takes a BOOLEAN:
+!                                on = enable with inherited/default
+!                                coefficients, off = opt out of the
+!                                shared template (mapping-only here)
+!    <face>:
 !      sponge:
 !        width: <m>              strip width (required, > 0)
 !        direct:    {r: 0.85, a: 5.0}    Larsen-Dancy damping (nee R/A_sponge)
@@ -91,6 +101,17 @@ module model_boundaries_mod
    character(14), parameter :: DERIVED_NAME(3) = &
                                ['wall          ', 'sponge        ', 'relaxation    ']
 
+   ! shared sponge coefficients (boundaries.sponge): seeds mirror the
+   ! per-face registry defaults; a present shared sub-block flips the
+   ! mechanism on for every face sponge and replaces the seed values
+   character(len=9), parameter :: MECH_KEY(3) = &
+                                  [character(len=9) :: "direct", "friction", "diffusion"]
+
+   type :: type_sponge_defaults
+      logical  :: direct = .false., friction = .false., diffusion = .false.
+      real(SP) :: r = 0.85_SP, a = 5.0_SP, cd = 0.0_SP, nu = 0.1_SP
+   end type type_sponge_defaults
+
 contains
 
    subroutine boundaries_read_input(env, sponge, tide, physics, wavemakers)
@@ -102,6 +123,7 @@ contains
 
       type(type_env) :: bnd_env
       type(type_yaml_reader) :: face_yaml
+      type(type_sponge_defaults) :: defs
       type(type_string), allocatable :: axes(:)
       character(:), allocatable :: assert_val
       logical :: no_bnd, no_face, no_key
@@ -139,6 +161,9 @@ contains
       call bnd_env%yaml%read("relaxation_cells", silent=no_key, val=tide%iwidth, &
                              default=DEF_BOUNDARIES_RELAXATION_CELLS)
 
+      ! ── shared sponge coefficients (optional; faces inherit per-key) ──
+      call read_shared_sponge(env, bnd_env%yaml, defs)
+
       ! ── per-face blocks ────────────────────────────────────────────────
       do f = FACE_W, FACE_N
          face_yaml = bnd_env%yaml%cast_dictionary(trim(FACE_KEY(f)), no_face)
@@ -161,7 +186,7 @@ contains
                                       tide%tidal_bc_gen_abs)
             derived(f) = BC_RELAX
          else
-            call read_face_sponge(env, face_yaml, sponge, f)
+            call read_face_sponge(env, face_yaml, sponge, f, defs)
 
             ! derivation table (design-config-reorg)
             if (forced(f)) then
@@ -226,14 +251,16 @@ contains
 
    ! ── face sub-block readers ──────────────────────────────────────────────
 
-   subroutine read_face_sponge(env, face_yaml, sponge, f)
+   subroutine read_face_sponge(env, face_yaml, sponge, f, defs)
       type(type_env), intent(inout) :: env
       type(type_yaml_reader), intent(inout) :: face_yaml
       type(type_model_sponge), intent(inout) :: sponge
       integer, intent(in) :: f
+      type(type_sponge_defaults), intent(in) :: defs
 
       type(type_yaml_reader) :: sp_yaml, sub_yaml
-      logical :: no_sp, no_blk, no_key
+      real(SP) :: tmp
+      logical :: no_sp, no_key, on, has_blk
 
       sp_yaml = face_yaml%cast_dictionary("sponge", no_sp)
       if (no_sp) return
@@ -243,23 +270,41 @@ contains
          call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
                                     "/sponge: needs width > 0")
 
-      sub_yaml = sp_yaml%cast_dictionary("direct", no_blk)
-      if (.not. no_blk) then
+      ! each mechanism: a face mapping = on + per-key coefficient override;
+      ! a face boolean = on (inherited/default coefficients) or off (opt
+      ! out of the shared template); absent = the shared state.  Seeds come
+      ! from the shared defaults (tmp guards the intent(out) wipe)
+      call mech_gate(sp_yaml, "direct", defs%direct, on, sub_yaml, has_blk)
+      if (on) then
          sponge%direct_on(f) = .true.
-         call sub_yaml%read("r", silent=no_key, val=sponge%r_direct(f), default=D_R)
-         call sub_yaml%read("a", silent=no_key, val=sponge%a_direct(f), default=D_A)
+         sponge%r_direct(f) = defs%r
+         sponge%a_direct(f) = defs%a
+         if (has_blk) then
+            call sub_yaml%read("r", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%r_direct(f) = tmp
+            call sub_yaml%read("a", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%a_direct(f) = tmp
+         end if
       end if
 
-      sub_yaml = sp_yaml%cast_dictionary("friction", no_blk)
-      if (.not. no_blk) then
+      call mech_gate(sp_yaml, "friction", defs%friction, on, sub_yaml, has_blk)
+      if (on) then
          sponge%friction_on(f) = .true.
-         call sub_yaml%read("cd", silent=no_key, val=sponge%cd_fric(f), default=D_CD)
+         sponge%cd_fric(f) = defs%cd
+         if (has_blk) then
+            call sub_yaml%read("cd", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%cd_fric(f) = tmp
+         end if
       end if
 
-      sub_yaml = sp_yaml%cast_dictionary("diffusion", no_blk)
-      if (.not. no_blk) then
+      call mech_gate(sp_yaml, "diffusion", defs%diffusion, on, sub_yaml, has_blk)
+      if (on) then
          sponge%diffusion_on(f) = .true.
-         call sub_yaml%read("nu", silent=no_key, val=sponge%nu_diff(f), default=D_NU)
+         sponge%nu_diff(f) = defs%nu
+         if (has_blk) then
+            call sub_yaml%read("nu", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%nu_diff(f) = tmp
+         end if
       end if
 
       if (.not. (sponge%direct_on(f) .or. sponge%friction_on(f) &
@@ -268,6 +313,94 @@ contains
                                     "/sponge: needs at least one of direct/friction/diffusion")
 
    end subroutine read_face_sponge
+
+   ! ----------------------------------------------------------------
+   ! Resolve one face mechanism key: mapping = on (+ has_blk for the
+   ! coefficient overrides), boolean = forced on/off, absent = the
+   ! shared template state.  cast_dictionary flags a non-mapping value
+   ! silently, so the boolean read only fires when the cast missed.
+   ! ----------------------------------------------------------------
+   subroutine mech_gate(sp_yaml, key, shared_on, on, sub_yaml, has_blk)
+      type(type_yaml_reader), intent(inout) :: sp_yaml
+      character(*), intent(in) :: key
+      logical, intent(in) :: shared_on
+      logical, intent(out) :: on, has_blk
+      type(type_yaml_reader), intent(out) :: sub_yaml
+
+      logical :: no_blk, no_key, flag
+
+      sub_yaml = sp_yaml%cast_dictionary(key, no_blk)
+      has_blk = .not. no_blk
+      if (has_blk) then
+         on = .true.
+         return
+      end if
+      call sp_yaml%read(key, silent=no_key, val=flag)
+      if (no_key) then
+         on = shared_on
+      else
+         on = flag
+      end if
+
+   end subroutine mech_gate
+
+   ! ----------------------------------------------------------------
+   ! boundaries.sponge — the OPTIONAL shared coefficient block every
+   ! face sponge inherits per-key.  Presence of a mechanism sub-block
+   ! here turns that mechanism on for every face sponge; a face opts
+   ! out with <mechanism>: off.  Mapping-only at this level.
+   ! ----------------------------------------------------------------
+   subroutine read_shared_sponge(env, yaml, defs)
+      type(type_env), intent(inout) :: env
+      type(type_yaml_reader), intent(inout) :: yaml
+      type(type_sponge_defaults), intent(out) :: defs
+
+      type(type_yaml_reader) :: sp_yaml, sub_yaml
+      real(SP) :: tmp
+      logical :: no_sp, no_blk, no_key
+      integer :: i
+
+      sp_yaml = yaml%cast_dictionary("sponge", no_sp)
+      if (no_sp) return
+
+      ! booleans are a FACE grammar; here absent already means off
+      do i = 1, size(MECH_KEY)
+         sub_yaml = sp_yaml%cast_dictionary(trim(MECH_KEY(i)), no_blk)
+         if (no_blk .and. sp_yaml%has_key(trim(MECH_KEY(i)))) then
+            call env%log%exit_on_error("boundaries/sponge/"// &
+                                       trim(MECH_KEY(i))// &
+                                       ": takes a mapping (absent = off)")
+         end if
+      end do
+
+      sub_yaml = sp_yaml%cast_dictionary("direct", no_blk)
+      if (.not. no_blk) then
+         defs%direct = .true.
+         call sub_yaml%read("r", silent=no_key, val=tmp)
+         if (.not. no_key) defs%r = tmp
+         call sub_yaml%read("a", silent=no_key, val=tmp)
+         if (.not. no_key) defs%a = tmp
+      end if
+
+      sub_yaml = sp_yaml%cast_dictionary("friction", no_blk)
+      if (.not. no_blk) then
+         defs%friction = .true.
+         call sub_yaml%read("cd", silent=no_key, val=tmp)
+         if (.not. no_key) defs%cd = tmp
+      end if
+
+      sub_yaml = sp_yaml%cast_dictionary("diffusion", no_blk)
+      if (.not. no_blk) then
+         defs%diffusion = .true.
+         call sub_yaml%read("nu", silent=no_key, val=tmp)
+         if (.not. no_key) defs%nu = tmp
+      end if
+
+      if (.not. (defs%direct .or. defs%friction .or. defs%diffusion)) &
+         call env%log%exit_on_error( &
+         "boundaries/sponge: needs at least one of direct/friction/diffusion")
+
+   end subroutine read_shared_sponge
 
    subroutine read_face_forcing(env, face_yaml, tide, wavemakers, f, &
                                 forced, wm_forced, wm_idx, has_file, has_const)

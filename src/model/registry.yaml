@@ -232,6 +232,15 @@ sections:
         default: 30
         units: ~
         doc: "Width in cells of the forcing relaxation strip."
+      # shared sponge coefficients: every face sponge inherits these PER-KEY
+      # (a face sub-block overrides only the keys it states); a mechanism
+      # block present here turns that mechanism on for every face sponge.
+      # Face mechanism keys also take a boolean: on = enable with the
+      # inherited/default coefficients, off = opt out of the shared template
+      sponge.direct.r: {legacy: ~, default: ~, units: ~, latex: '$R_s$', doc: "Shared direct-sponge damping ratio all face sponges inherit."}
+      sponge.direct.a: {legacy: ~, default: ~, units: ~, latex: '$A_s$', doc: "Shared direct-sponge damping exponent."}
+      sponge.friction.cd: {legacy: ~, default: ~, units: ~, doc: "Shared friction-sponge drag coefficient."}
+      sponge.diffusion.nu: {legacy: ~, default: ~, units: 'm2 s-1', doc: "Shared diffusion-sponge viscosity."}
     per_face:
       faces: [west, east, south, north] # {face}=west  {Face}=West  {F}=W
       keys:

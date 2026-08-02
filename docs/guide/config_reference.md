@@ -76,6 +76,10 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 |---|---|---|---|---|
 | `periodic` | — | `PERIODIC` | — | Axis-level periodic pair list, x and/or y (e.g. [y] or [x, y]). |
 | `relaxation_cells` | `30` | `WaveMakerPointNum` | — | Width in cells of the forcing relaxation strip. |
+| `sponge.direct.r` | — | — | — | Shared direct-sponge damping ratio all face sponges inherit. |
+| `sponge.direct.a` | — | — | — | Shared direct-sponge damping exponent. |
+| `sponge.friction.cd` | — | — | — | Shared friction-sponge drag coefficient. |
+| `sponge.diffusion.nu` | — | — | m2 s-1 | Shared diffusion-sponge viscosity. |
 
 ### Per-face keys (`west:` / `east:` / `south:` / `north:`)
 
