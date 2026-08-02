@@ -39,7 +39,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_MODEL = "eddy_viscosity"
    character(*), parameter :: DEF_BREAKING_NU_BKG = "0.0"
    character(*), parameter :: DEF_BREAKING_ROLLER = "NO"
-   character(*), parameter :: DEF_BREAKING_SHOW_BREAKING = "YES"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_DEP = "0.8"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_RAMP = "0.1"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"

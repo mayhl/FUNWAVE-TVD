@@ -182,15 +182,15 @@ Initial condition — block presence selects the type (solitary/sine_mode/fields
 
 ## `physics:`
 
-Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE transition depth.
+Physics — Boussinesq dispersion (named scheme XOR an explicit atomic Gamma triple).
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `dispersion.beta_ref` | `-0.531` | `Beta_ref` | — | Reference depth level for the Boussinesq operator. |
-| `dispersion.gamma1` | — | `Gamma1` | — | Dispersion coefficient Gamma1 (overrides the scheme preset). |
-| `dispersion.gamma2` | — | `Gamma2` | — | Dispersion coefficient Gamma2 (overrides the scheme preset). |
-| `dispersion.gamma3` | — | `Gamma3` | — | Dispersion coefficient Gamma3 (overrides the scheme preset). |
-| `dispersion.scheme` | `fully_nonlinear` | — | — | Dispersion preset for Gamma1/2/3; no 1:1 legacy keyword (legacy encoded this via the DISPERSION on/off logical plus the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
+| `dispersion.gamma1` | — | `Gamma1` | — | Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme). |
+| `dispersion.gamma2` | — | `Gamma2` | — | Dispersion coefficient (atomic triple). |
+| `dispersion.gamma3` | — | `Gamma3` | — | Dispersion coefficient (atomic triple). |
+| `dispersion.scheme` | `fully_nonlinear` | — | — | Named dispersion preset for the Gamma triple; exclusive with explicit gammas. No 1:1 legacy keyword (legacy encoded this via DISPERSION + the Gamma values). One of `fully_nonlinear` \| `weakly_nonlinear` \| `linear` \| `nswe`. |
 
 ## `breaking:`
 
@@ -201,7 +201,6 @@ Wave breaking — dissipation model, roller, and thresholds (core physics, not p
 | `cbrk1` | `0.65` | `Cbrk1` | — | Breaking onset threshold coefficient. |
 | `cbrk2` | `0.35` | `Cbrk2` | — | Breaking cessation threshold coefficient. |
 | `nu_bkg` | `0.0` | `nu_bkg` | m2 s-1 | Background eddy viscosity added everywhere. |
-| `show_breaking` | `true` | `SHOW_BREAKING` | — | Output the breaking-index field. |
 | `model` | `eddy_viscosity` | `VISCOSITY_BREAKING` | — | Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. One of `eddy_viscosity` \| `shock_capturing` \| `wavemaker_viscosity`. |
 | `visbrk` | `0.0` | `visbrk` | m2 s-1 | Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model). |
 | `roller` | `false` | `ROLLER` | — | Enable the surface roller (forces model eddy_viscosity |

@@ -237,7 +237,14 @@ contains
       ! show/display scheme — every downstream consumer (allocations,
       ! stepper dispatch, output gates) reads the forced values
       if (this%breaking%roller) this%physics%viscosity_breaking = .true.
-      if (this%physics%viscosity_breaking) this%breaking%show_breaking = .true.
+      ! show_breaking is DERIVED (key retired): the breaker-diagnostics pass
+      ! runs when it IS the physics (viscosity breaking, incl. the roller
+      ! forcing above) or when a breaker field is requested for output —
+      ! verified solution-neutral bitwise in show-only mode
+      this%breaking%show_breaking = this%physics%viscosity_breaking &
+                                    .or. this%output%OUT_AGE &
+                                    .or. this%output%OUT_ROLLER &
+                                    .or. this%output%OUT_UNDERTOW
 
       ! wavemaker-zone breaking overrides ride the wavemaker entry
       ! (source.breaking) but land in the global breaking fields until the

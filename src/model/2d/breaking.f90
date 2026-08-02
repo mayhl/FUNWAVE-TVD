@@ -44,7 +44,7 @@ module model_breaking_mod
    use model_config_defaults_mod, only: DEF_BREAKING_CBRK1, DEF_BREAKING_CBRK2, &
                                         DEF_BREAKING_MODEL, &
                                         DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER, &
-                                        DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK, &
+                                        DEF_BREAKING_VISBRK, &
                                         DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP
 
    implicit none
@@ -65,7 +65,10 @@ module model_breaking_mod
       character(:), allocatable :: model
 
       logical  :: roller = .false.
-      logical  :: show_breaking = .true.
+      ! DERIVED, not a deck key: main sets it from viscosity_breaking +
+      ! the AGE/ROLLER/UNDERTOW output requests (show-only pass is
+      ! solution-neutral; off by default = skip the diagnostics cost)
+      logical  :: show_breaking = .false.
 
       real(SP) :: cbrk1 = 0.65_SP
       real(SP) :: cbrk2 = 0.35_SP
@@ -106,15 +109,21 @@ contains
       call sub_env%yaml%read_enum("model", BREAKING_MODELS, val=this%model, &
                                   default=DEF_BREAKING_MODEL)
       call sub_env%yaml%read("roller", val=this%roller, default=DEF_BREAKING_ROLLER)
-      call sub_env%yaml%read("show_breaking", val=this%show_breaking, default=DEF_BREAKING_SHOW_BREAKING)
+      if (sub_env%yaml%has_key("show_breaking")) then
+         call env%log%exit_on_error("breaking/show_breaking: retired — the"// &
+                                    " breaker-diagnostics pass is derived from the model and"// &
+                                    " the AGE/ROLLER/UNDERTOW output requests")
+      end if
 
       call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default=DEF_BREAKING_NU_BKG)
       call sub_env%yaml%read("swe_eta_dep", silent=no_key, val=this%swe_eta_dep, &
                              default=DEF_BREAKING_SWE_ETA_DEP)
 
       ! variant keys — conditionally read so the unread-key detector flags
-      ! knobs inapplicable to the selected model
-      if (trim(this%model) == "eddy_viscosity" .or. this%show_breaking) then
+      ! knobs inapplicable to the selected model.  cbrk1/cbrk2 stay live
+      ! under shock_capturing too: the display breaker may run (derived
+      ! show_breaking, known only after output reads) and uses them
+      if (trim(this%model) /= "wavemaker_viscosity") then
          call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default=DEF_BREAKING_CBRK1)
          call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default=DEF_BREAKING_CBRK2)
       end if

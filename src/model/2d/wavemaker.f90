@@ -841,8 +841,9 @@ contains
                cbrk_applies = .true.
                visbrk_applies = .true.
                if (present(breaking)) then
-                  cbrk_applies = trim(breaking%model) == "eddy_viscosity" &
-                                 .or. breaking%show_breaking
+                  ! mirrors the breaking: block gating (show_breaking is
+                  ! derived after output reads, so gate on model alone)
+                  cbrk_applies = trim(breaking%model) /= "wavemaker_viscosity"
                   visbrk_applies = trim(breaking%model) == "wavemaker_viscosity"
                end if
                if (cbrk_applies) then

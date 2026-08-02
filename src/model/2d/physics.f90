@@ -13,13 +13,12 @@
 !                                weakly_nonlinear -> 1, 1, 0
 !                                linear           -> 1, 0, 1
 !                                nswe             -> 0, 0, 1  + dispersion terms off
-!      gamma1:      <real>     dispersion coefficient — explicit override of the preset
-!      gamma2:      <real>     nonlinearity coefficient (CART) — override
-!      gamma3:      <real>     linearity switch coefficient — override
+!      gamma1/2/3:  <real>     expert mode — the full triple, ATOMIC (all
+!                              three or none) and exclusive with scheme:;
+!                              dispersion kernels stay on (NSWE = scheme only)
 !      beta_ref:    <real>     reference level (CART/ZALPHA),  default -0.531
-!      swe_eta_dep: <real>     SWE transition depth fraction,  default 0.8
-!                              (project standard since 2026-07-16; legacy
-!                              default was 0.7)
+!  swe_eta_dep/swe_eta_ramp live in breaking: (the SWE gate is the
+!  shock-capturing breaking mechanism)
 !
 !  Also read here as a stop-gap adapter (final owner comes later in the
 !  config reorg; see design notes):
@@ -86,7 +85,9 @@ contains
       type(type_yaml_reader) :: disp_yaml, cor_yaml
       character(:), allocatable :: scheme
       logical :: is_empty, no_key, no_grid, no_disp, no_cor, no_f, no_lat
-      real(SP) :: lat, g_tmp
+      logical :: has_scheme, no_g1, no_g2, no_g3
+      integer :: n_gamma
+      real(SP) :: lat, g1_tmp, g2_tmp, g3_tmp
 
       ! boundaries.periodic is read by model_boundaries_mod, which writes
       ! this%periodic AFTER this reader runs — keep this the storage slot
@@ -119,30 +120,46 @@ contains
 
       disp_yaml = sub_env%yaml%cast_dictionary("dispersion", no_disp)
       if (.not. no_disp) then
-         call disp_yaml%read_enum("scheme", DISPERSION_SCHEMES, val=scheme, &
-                                  default=DEF_PHYSICS_DISPERSION_SCHEME)
-         select case (trim(scheme))
-         case ("fully_nonlinear")
-            ! declaration defaults already 1, 1, 1
-         case ("weakly_nonlinear")
-            this%Gamma3 = 0.0_SP
-         case ("linear")
-            this%Gamma2 = 0.0_SP
-         case ("nswe")
-            this%Gamma1 = 0.0_SP
-            this%Gamma2 = 0.0_SP
-            this%dispersion = .false.
-         end select
-         ! explicit coefficient overrides on top of the scheme preset.
-         ! NOTE: yaml read val is intent(out) — a silent-miss WIPES the
-         ! passed component (the slope_cap->0 trap), so read into a temp
-         ! and assign only when the key is present
-         call disp_yaml%read("gamma1", silent=no_key, val=g_tmp)
-         if (.not. no_key) this%Gamma1 = g_tmp
-         call disp_yaml%read("gamma2", silent=no_key, val=g_tmp)
-         if (.not. no_key) this%Gamma2 = g_tmp
-         call disp_yaml%read("gamma3", silent=no_key, val=g_tmp)
-         if (.not. no_key) this%Gamma3 = g_tmp
+         ! scheme XOR the full gamma triple, presence-derived and atomic:
+         ! a partial triple has no answer for its missing components, and
+         ! preset+patch hybrids hide the effective triple — expert decks
+         ! state all three, everyone else names a scheme
+         has_scheme = disp_yaml%has_key("scheme")
+         call disp_yaml%read("gamma1", silent=no_g1, val=g1_tmp)
+         call disp_yaml%read("gamma2", silent=no_g2, val=g2_tmp)
+         call disp_yaml%read("gamma3", silent=no_g3, val=g3_tmp)
+         n_gamma = count([.not. no_g1,.not. no_g2,.not. no_g3])
+         if (n_gamma /= 0 .and. n_gamma /= 3) then
+            call env%log%exit_on_error("physics/dispersion: gamma1/gamma2/"// &
+                                       "gamma3 must be given together")
+         end if
+         if (has_scheme .and. n_gamma == 3) then
+            call env%log%exit_on_error("physics/dispersion: set exactly one"// &
+                                       " of scheme or the gamma triple")
+         end if
+
+         if (n_gamma == 3) then
+            ! expert mode: raw triple, dispersion stays on (nswe = kernels
+            ! OFF is reachable only via the scheme)
+            this%Gamma1 = g1_tmp
+            this%Gamma2 = g2_tmp
+            this%Gamma3 = g3_tmp
+         else
+            call disp_yaml%read_enum("scheme", DISPERSION_SCHEMES, val=scheme, &
+                                     default=DEF_PHYSICS_DISPERSION_SCHEME)
+            select case (trim(scheme))
+            case ("fully_nonlinear")
+               ! declaration defaults already 1, 1, 1
+            case ("weakly_nonlinear")
+               this%Gamma3 = 0.0_SP
+            case ("linear")
+               this%Gamma2 = 0.0_SP
+            case ("nswe")
+               this%Gamma1 = 0.0_SP
+               this%Gamma2 = 0.0_SP
+               this%dispersion = .false.
+            end select
+         end if
          call disp_yaml%read("beta_ref", silent=no_key, val=this%Beta_ref, &
                              default=DEF_PHYSICS_DISPERSION_BETA_REF)
          ! swe_eta_dep/swe_eta_ramp moved to breaking: (the gate IS the
