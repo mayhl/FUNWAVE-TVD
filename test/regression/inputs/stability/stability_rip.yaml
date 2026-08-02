@@ -67,8 +67,8 @@ numerics:
   min_depth: 0.01
 breaking:
   model: shock_capturing
-  Cbrk1: 0.65
-  Cbrk2: 0.35
+  cbrk1: 0.65
+  cbrk2: 0.35
 output:
   interval: 40.0
   result_folder: output/

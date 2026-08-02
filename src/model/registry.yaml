@@ -209,6 +209,8 @@ sections:
       source.y_width: { legacy: Ywidth_WK, default: 999999.0, units: m, doc: "Source-box alongshore width (large = full span)." }
       source.time_ramp: { legacy: Time_ramp, default: 0.0, units: s, doc: "Source ramp-up time." }
       source.current_cd: { legacy: WaveMakerCd, default: ~, units: ~, doc: "Current-balance drag (presence enables; nee WaveMakerCurrentBalance)." }
+      source.breaking.cbrk: { legacy: WAVEMAKER_Cbrk, default: 1.0, units: ~, latex: '$C_{\mathrm{brk,wm}}$', doc: "Zone breaking-onset coefficient (Cbrk family vs sqrt(gH), not a scale on cbrk1)." }
+      source.breaking.visbrk: { legacy: WAVEMAKER_visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk,wm}}$', doc: "Zone breaking-viscosity coefficient." }
       limiter.crest: { legacy: CrestLimit, default: ~, units: m, doc: "Crest elevation limit (presence => eta limiter)." }
       limiter.trough: { legacy: TroughLimit, default: ~, units: m, doc: "Trough elevation limit." }
 
@@ -437,19 +439,15 @@ sections:
 
   # ── breaking ──
   breaking:
-    doc: "Wave breaking — dissipation model, roller, and wavemaker-region overrides (core physics, not presence-gated)."
+    doc: "Wave breaking — dissipation model, roller, and thresholds (core physics, not presence-gated). Wavemaker-zone overrides live in wavemaker.source.breaking."
     keys:
       cbrk1: {legacy: Cbrk1, default: 0.65, units: ~, latex: '$C_{\mathrm{brk1}}$', doc: Breaking onset threshold coefficient.}
       cbrk2: {legacy: Cbrk2, default: 0.35, units: ~, latex: '$C_{\mathrm{brk2}}$', doc: Breaking cessation threshold coefficient.}
       nu_bkg: {legacy: nu_bkg, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{bkg}}$', doc: Background eddy viscosity added everywhere.}
-      roller: {legacy: ROLLER, default: false, units: ~, doc: Enable surface-roller momentum flux.}
       show_breaking: {legacy: SHOW_BREAKING, default: true, units: ~, doc: Output the breaking-index field.}
-      model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing], doc: Breaking dissipation model.}
+      model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing, wavemaker_viscosity], doc: "Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone."}
       visbrk: {legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: Breaking eddy-viscosity coefficient.}
-      wavemaker_cbrk: {legacy: WAVEMAKER_Cbrk, default: 1.0, units: ~, latex: '$C_{\mathrm{brk,wm}}$', doc: Breaking threshold scale inside the wavemaker region.}
-      wavemaker_vis: {legacy: WAVEMAKER_VIS, default: false, units: ~, doc: Enable extra viscosity in the wavemaker region.}
-      wavemaker_visbrk: {legacy: WAVEMAKER_visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk,wm}}$', doc: Breaking viscosity coefficient in the wavemaker region.}
-      roller_effect: {legacy: ROLLER_EFFECT, default: false, units: ~, doc: Apply the roller effect to the momentum equations.}
+      roller: {legacy: ROLLER, default: false, units: ~, doc: Enable the surface roller (forces model eddy_viscosity, as legacy).}
 
   # ── friction ──
   friction:

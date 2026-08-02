@@ -235,6 +235,16 @@ contains
       if (this%breaking%roller) this%physics%viscosity_breaking = .true.
       if (this%physics%viscosity_breaking) this%breaking%show_breaking = .true.
 
+      ! wavemaker-zone breaking overrides ride the wavemaker entry
+      ! (source.breaking) but land in the global breaking fields until the
+      ! coefficient-field assembler exists
+      do i = 1, size(this%wavemakers)
+         if (this%wavemakers(i)%has_breaking_override) then
+            this%breaking%wavemaker_cbrk = this%wavemakers(i)%breaking_cbrk
+            this%breaking%wavemaker_visbrk = this%wavemakers(i)%breaking_visbrk
+         end if
+      end do
+
       call this%geometry%build_grid(this%env%comm, this%grid, &
                                     periodic_y=this%physics%periodic, &
                                     periodic_x=this%physics%periodic_x)
@@ -242,7 +252,7 @@ contains
       ! WAVEMAKER_VIS and the show-only display mode need nu_break/age
       ! too (legacy allocates the breaking arrays for all options since
       ! fyshi 01/15/2024)
-      if (this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS &
+      if (this%physics%viscosity_breaking .or. this%breaking%wavemaker_vis &
           .or. this%breaking%show_breaking) then
          call this%fields%alloc_breaking(this%grid)
       end if

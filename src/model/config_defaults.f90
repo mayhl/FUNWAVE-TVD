@@ -39,12 +39,8 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_MODEL = "eddy_viscosity"
    character(*), parameter :: DEF_BREAKING_NU_BKG = "0.0"
    character(*), parameter :: DEF_BREAKING_ROLLER = "NO"
-   character(*), parameter :: DEF_BREAKING_ROLLER_EFFECT = "NO"
    character(*), parameter :: DEF_BREAKING_SHOW_BREAKING = "YES"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"
-   character(*), parameter :: DEF_BREAKING_WAVEMAKER_CBRK = "1.0"
-   character(*), parameter :: DEF_BREAKING_WAVEMAKER_VIS = "NO"
-   character(*), parameter :: DEF_BREAKING_WAVEMAKER_VISBRK = "0.0"
    ! ── foam ──
    character(*), parameter :: DEF_FOAM_BURST_TIME_NON_BREAKING = "1.0"
    character(*), parameter :: DEF_FOAM_CD = "0.5"
@@ -136,6 +132,8 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_VESSEL_DEEP_DRAFT_MASK = "YES"
    character(*), parameter :: DEF_VESSEL_PROPELLER = "NO"
    ! ── wavemaker ──
+   character(*), parameter :: DEF_WAVEMAKER_SOURCE_BREAKING_CBRK = "1.0"
+   character(*), parameter :: DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_DELTA = "0.5"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_DEPTH = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_TIME_RAMP = "0.0"

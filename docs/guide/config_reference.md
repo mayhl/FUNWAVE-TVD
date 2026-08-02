@@ -63,6 +63,8 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `source.y_width` | `999999.0` | `Ywidth_WK` | m | Source-box alongshore width (large = full span). |
 | `source.time_ramp` | `0.0` | `Time_ramp` | s | Source ramp-up time. |
 | `source.current_cd` | — | `WaveMakerCd` | — | Current-balance drag (presence enables; nee WaveMakerCurrentBalance). |
+| `source.breaking.cbrk` | `1.0` | `WAVEMAKER_Cbrk` | — | Zone breaking-onset coefficient (Cbrk family vs sqrt(gH), not a scale on cbrk1). |
+| `source.breaking.visbrk` | `0.0` | `WAVEMAKER_visbrk` | m2 s-1 | Zone breaking-viscosity coefficient. |
 | `limiter.crest` | — | `CrestLimit` | m | Crest elevation limit (presence => eta limiter). |
 | `limiter.trough` | — | `TroughLimit` | m | Trough elevation limit. |
 
@@ -194,21 +196,17 @@ Physics — Boussinesq dispersion scheme (Gamma presets + overrides) and the SWE
 
 ## `breaking:`
 
-Wave breaking — dissipation model, roller, and wavemaker-region overrides (core physics, not presence-gated).
+Wave breaking — dissipation model, roller, and thresholds (core physics, not presence-gated). Wavemaker-zone overrides live in wavemaker.source.breaking.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `cbrk1` | `0.65` | `Cbrk1` | — | Breaking onset threshold coefficient. |
 | `cbrk2` | `0.35` | `Cbrk2` | — | Breaking cessation threshold coefficient. |
 | `nu_bkg` | `0.0` | `nu_bkg` | m2 s-1 | Background eddy viscosity added everywhere. |
-| `roller` | `false` | `ROLLER` | — | Enable surface-roller momentum flux. |
 | `show_breaking` | `true` | `SHOW_BREAKING` | — | Output the breaking-index field. |
-| `model` | `eddy_viscosity` | `VISCOSITY_BREAKING` | — | Breaking dissipation model. One of `eddy_viscosity` \| `shock_capturing`. |
+| `model` | `eddy_viscosity` | `VISCOSITY_BREAKING` | — | Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. One of `eddy_viscosity` \| `shock_capturing` \| `wavemaker_viscosity`. |
 | `visbrk` | `0.0` | `visbrk` | m2 s-1 | Breaking eddy-viscosity coefficient. |
-| `wavemaker_cbrk` | `1.0` | `WAVEMAKER_Cbrk` | — | Breaking threshold scale inside the wavemaker region. |
-| `wavemaker_vis` | `false` | `WAVEMAKER_VIS` | — | Enable extra viscosity in the wavemaker region. |
-| `wavemaker_visbrk` | `0.0` | `WAVEMAKER_visbrk` | m2 s-1 | Breaking viscosity coefficient in the wavemaker region. |
-| `roller_effect` | `false` | `ROLLER_EFFECT` | — | Apply the roller effect to the momentum equations. |
+| `roller` | `false` | `ROLLER` | — | Enable the surface roller (forces model eddy_viscosity |
 
 ## `friction:`
 

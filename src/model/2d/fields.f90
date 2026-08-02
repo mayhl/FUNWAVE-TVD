@@ -127,7 +127,7 @@ contains
    end subroutine fields_alloc
 
    !> Allocate breaking-physics arrays.  Call after alloc() when any breaker
-   !> mode is active (viscosity, WAVEMAKER_VIS, or the show-only display mode).
+   !> mode is active (viscosity, wavemaker_vis, or the show-only display mode).
    subroutine fields_alloc_breaking(this, grid)
       class(type_fields_2d), intent(inout) :: this
       type(type_grid_2d), intent(in)    :: grid

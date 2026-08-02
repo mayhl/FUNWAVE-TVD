@@ -58,6 +58,8 @@ module model_wavemaker_mod
    use model_tide_mod, only: type_model_tide
 
    use model_config_defaults_mod, only: DEF_WAVEMAKER_SOURCE_DELTA, &
+                                        DEF_WAVEMAKER_SOURCE_BREAKING_CBRK, &
+                                        DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK, &
                                         DEF_WAVEMAKER_SOURCE_DEPTH, &
                                         DEF_WAVEMAKER_SOURCE_TIME_RAMP, &
                                         DEF_WAVEMAKER_SOURCE_X_CENTER, &
@@ -111,6 +113,12 @@ module model_wavemaker_mod
       real(SP) :: Time_ramp = 0.0_SP
       real(SP) :: Delta_WK = 0.5_SP
       real(SP) :: Ywidth_WK = 999999.0_SP   ! LARGE in old code
+
+      ! Zone breaking overrides — source.breaking (nee WAVEMAKER_Cbrk/
+      ! WAVEMAKER_visbrk); global scalars until the field assembler
+      logical  :: has_breaking_override = .false.
+      real(SP) :: breaking_cbrk = 1.0_SP
+      real(SP) :: breaking_visbrk = 0.0_SP
 
       ! Solitary wave lag — LEF_SOL (the IC solitary fields live in
       ! model_initial_mod)
@@ -602,11 +610,11 @@ contains
       type(type_yaml_reader), intent(inout) :: wm
       integer, intent(in) :: idx
 
-      type(type_yaml_reader) :: spec_yaml, blk
+      type(type_yaml_reader) :: spec_yaml, blk, brk_yaml
       character(:), allocatable :: stype, method, legacy_type, normalize
       character(8) :: def_bins
       logical :: no_key, has_dir
-      logical :: no_spec, no_blk, no_freq, no_per
+      logical :: no_spec, no_blk, no_freq, no_per, no_brk
       real(SP) :: p_tmp
 
       call wm%read_string("name", silent=no_key, val=this%name)
@@ -813,6 +821,18 @@ contains
          call blk%read("current_cd", silent=no_key, val=this%WaveMakerCd)
          this%WaveMakerCurrentBalance = .not. no_key
          this%DepthWaveMaker = this%DEP_WK
+
+         ! zone breaking overrides (nee WAVEMAKER_Cbrk/WAVEMAKER_visbrk);
+         ! main bridges them into the breaking component until the
+         ! coefficient-field assembler lands
+         brk_yaml = blk%cast_dictionary("breaking", no_brk)
+         if (.not. no_brk) then
+            this%has_breaking_override = .true.
+            call brk_yaml%read("cbrk", silent=no_key, val=this%breaking_cbrk, &
+                               default=DEF_WAVEMAKER_SOURCE_BREAKING_CBRK)
+            call brk_yaml%read("visbrk", silent=no_key, val=this%breaking_visbrk, &
+                               default=DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK)
+         end if
       end if
 
       ! ── limiter — presence = eta limiter (nee ETA_LIMITER) ────────

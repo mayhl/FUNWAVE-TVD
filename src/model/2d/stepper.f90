@@ -172,7 +172,7 @@ module model_stepper_2d_mod
       logical, allocatable :: in_wm_zone(:, :)         ! breaker's wavemaker-zone flags
 
       ! Breaker dispatch (legacy WAVE_BREAKING head): viscosity mode or
-      ! the show-only display mode; WAVEMAKER_VIS keeps priority over
+      ! the show-only display mode; wavemaker_vis keeps priority over
       ! show in modern (deliberate 19c deviation from the ykchoi trap)
       logical :: run_breaker = .false.
 
@@ -317,10 +317,10 @@ contains
 
       ! legacy EXCHANGE ghost gates (old/bc.F:441-449): AGE_BREAKING
       ! travels only under VISCOSITY_BREAKING, nu_break also under
-      ! WAVEMAKER_VIS — the show-only display mode exchanges NEITHER
+      ! wavemaker_vis — the show-only display mode exchanges NEITHER
       ! (its age ghosts stay locally-written/zero, seams included)
       this%bc%exch_age = physics%viscosity_breaking
-      this%bc%exch_nu = physics%viscosity_breaking .or. breaking%WAVEMAKER_VIS
+      this%bc%exch_nu = physics%viscosity_breaking .or. breaking%wavemaker_vis
 
       ! the legacy per-wavemaker T_brk assignments were dead (see the
       ! T_BRK_LEGACY note) — 20 is the only threshold
@@ -424,16 +424,18 @@ contains
 
       ! legacy io.F refuses the combination (VISCOSITY_WMAKER replaces
       ! the breaking-age scheme, it does not stack on it)
-      if (this%physics%viscosity_breaking .and. this%breaking%WAVEMAKER_VIS) then
-         error stop "stepper: viscosity_breaking and WAVEMAKER_VIS are mutually exclusive"
+      if (this%physics%viscosity_breaking .and. this%breaking%wavemaker_vis) then
+         ! the model enum made this structural — only roller forcing
+         ! eddy viscosity on top of wavemaker_viscosity can land here
+         error stop "stepper: roller forces eddy viscosity — incompatible with the wavemaker_viscosity model"
       end if
 
       ! legacy WAVE_BREAKING dispatch: SHOW_BREAKING runs BREAKING
       ! (show_breaking is forced by viscosity_breaking in model_setup);
-      ! in modern WAVEMAKER_VIS wins over show (19c deviation)
+      ! in modern wavemaker_vis wins over show (19c deviation)
       this%run_breaker = this%physics%viscosity_breaking &
                          .or. (this%breaking%show_breaking &
-                               .and. .not. this%breaking%WAVEMAKER_VIS)
+                               .and. .not. this%breaking%wavemaker_vis)
 
       ! legacy allocates + zeroes ROLLER_FLUX/UNDERTOW unconditionally,
       ! so OUT_ROLLER/OUT_UNDERTOW without a running breaker still
@@ -444,19 +446,19 @@ contains
          allocate (this%undertow_u(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_v(mloc, nloc), source=0.0_SP)
       end if
-      if (this%run_breaker .or. this%breaking%WAVEMAKER_VIS) then
+      if (this%run_breaker .or. this%breaking%wavemaker_vis) then
          allocate (this%in_wm_zone(mloc, nloc))
          this%in_wm_zone = .false.
          if (associated(this%wm_src)) call this%wm_src%fill_in_zone(this%in_wm_zone)
       end if
       ! Legacy assembles nu_vis as
-      !     nu_vis = nu_break [+ VisVessel_2D]   under VISCOSITY_BREAKING/WAVEMAKER_VIS
+      !     nu_vis = nu_break [+ VisVessel_2D]   under VISCOSITY_BREAKING/WAVEMAKER_VIS (legacy)
       !     nu_vis = nu_vis + nu_sponge          under DIFFUSION_SPONGE
       ! so the vessel term rides INSIDE the breaking branch and is silently
       ! dropped when breaking viscosity is off (ledger 6g-5).  Allocate the
       ! combined array whenever more than one contributor is live; the
       ! single-source cases still alias in merge_nu_vis.
-      if (((this%physics%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) &
+      if (((this%physics%viscosity_breaking .or. this%breaking%wavemaker_vis) &
            .and. this%sponge%any_diffusion()) .or. ves_vis_on(this)) then
          allocate (this%nu_vis(mloc, nloc), source=0.0_SP)
       end if
@@ -616,7 +618,7 @@ contains
          ! head): nu_break, then the deep-draft hull, then the sponge
          if (allocated(this%nu_vis)) then
             this%nu_vis = 0.0_SP
-            if (phy%viscosity_breaking .or. this%breaking%WAVEMAKER_VIS) then
+            if (phy%viscosity_breaking .or. this%breaking%wavemaker_vis) then
                this%nu_vis = f%nu_break
                if (ves_vis_on(this)) then
                   this%nu_vis = this%nu_vis + this%vessel%vis_2d
@@ -705,18 +707,18 @@ contains
             call wave_breaking(lp, this%etax, this%etay, this%etat, &
                                f%eta, f%depth, f%h, f%u, f%v, this%means%etamean, &
                                this%dx, this%dy, dt, this%t_brk, &
-                               num%MinDepthFrc, this%breaking%Cbrk1, &
-                               this%breaking%Cbrk2, this%breaking%WAVEMAKER_Cbrk, &
+                               num%MinDepthFrc, this%breaking%cbrk1, &
+                               this%breaking%cbrk2, this%breaking%wavemaker_cbrk, &
                                this%breaking%nu_bkg, VIS_SCHEME_DEFAULT, &
                                phy%SWE_ETA_DEP, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
                                this%undertow_u, this%undertow_v)
-         elseif (this%breaking%WAVEMAKER_VIS) then
+         elseif (this%breaking%wavemaker_vis) then
             ! legacy WAVE_BREAKING second branch: zone-only viscosity,
             ! no age tracking
             call viscosity_wmaker(lp, this%etat, f%eta, f%depth, f%h, &
                                   this%breaking%visbrk, &
-                                  this%breaking%WAVEMAKER_visbrk, &
+                                  this%breaking%wavemaker_visbrk, &
                                   this%breaking%nu_bkg, num%MinDepthFrc, &
                                   this%in_wm_zone, f%nu_break)
          end if
@@ -1257,7 +1259,7 @@ contains
       logical :: has_break
 
       has_break = this%physics%viscosity_breaking &
-                  .or. this%breaking%WAVEMAKER_VIS
+                  .or. this%breaking%wavemaker_vis
       if (allocated(this%nu_vis)) then
          nu => this%nu_vis
       elseif (has_break) then

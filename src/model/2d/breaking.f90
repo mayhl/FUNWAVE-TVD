@@ -6,17 +6,21 @@
 !  Wave breaking parameters YAML reader
 !
 !  YAML block: breaking:       (top-level; omit to use defaults)
-!    roller_effect:    <bool>   enable roller effect,             default NO
-!    show_breaking:    <bool>   enable breaking detection,        default YES
-!    Cbrk1:            <real>   onset breaking threshold,         default 0.65
-!    Cbrk2:            <real>   cessation breaking threshold,     default 0.35
-!    WAVEMAKER_Cbrk:   <real>   breaking threshold near wavemaker, default 1.0
-!    WAVEMAKER_VIS:    <bool>   wavemaker viscosity (deprecated), default NO
-!    visbrk:           <real>   breaking viscosity,               default 0.0
-!    WAVEMAKER_visbrk: <real>   wavemaker breaking viscosity,     default 0.0
+!    model:         <enum>   eddy_viscosity | shock_capturing |
+!                            wavemaker_viscosity (nee WAVEMAKER_VIS:
+!                            shock-capturing globally + zone viscosity)
+!    roller:        <bool>   enable the surface roller (nee ROLLER;
+!                            forces eddy_viscosity, as legacy), default NO
+!    show_breaking: <bool>   enable breaking detection,          default YES
+!    cbrk1:         <real>   onset breaking threshold,           default 0.65
+!    cbrk2:         <real>   cessation breaking threshold,       default 0.35
+!    visbrk:        <real>   breaking viscosity,                 default 0.0
+!    nu_bkg:        <real>   background viscosity floor,         default 0.0
 !
-!  Note: WAVEMAKER_VIS and viscosity_breaking (physics:) are mutually exclusive.
-!        The conflict check is enforced in io.F.
+!  The wavemaker-zone overrides (nee WAVEMAKER_Cbrk/WAVEMAKER_visbrk) moved
+!  to wavemaker.source.breaking; main bridges them into the fields here
+!  until the coefficient-field assembler lands.  The enum makes the legacy
+!  WAVEMAKER_VIS x VISCOSITY_BREAKING exclusion structural.
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -30,19 +34,17 @@ module model_breaking_mod
 
    use model_config_defaults_mod, only: DEF_BREAKING_CBRK1, DEF_BREAKING_CBRK2, &
                                         DEF_BREAKING_MODEL, &
-                                        DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER_EFFECT, &
-                                        DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK, &
-                                        DEF_BREAKING_WAVEMAKER_CBRK, &
-                                        DEF_BREAKING_WAVEMAKER_VIS, &
-                                        DEF_BREAKING_WAVEMAKER_VISBRK
+                                        DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER, &
+                                        DEF_BREAKING_SHOW_BREAKING, DEF_BREAKING_VISBRK
 
    implicit none
 
    private
    public :: type_model_breaking
 
-   character(len=16), parameter :: BREAKING_MODELS(2) = &
-                                   [character(len=16) :: "eddy_viscosity", "shock_capturing"]
+   character(len=20), parameter :: BREAKING_MODELS(3) = &
+                                   [character(len=20) :: "eddy_viscosity", "shock_capturing", &
+                                                          "wavemaker_viscosity"]
 
    type, extends(type_model_base) :: type_model_breaking
 
@@ -55,13 +57,13 @@ module model_breaking_mod
       logical  :: roller = .false.
       logical  :: show_breaking = .true.
 
-      real(SP) :: Cbrk1 = 0.65_SP
-      real(SP) :: Cbrk2 = 0.35_SP
-      real(SP) :: WAVEMAKER_Cbrk = 1.0_SP
+      real(SP) :: cbrk1 = 0.65_SP
+      real(SP) :: cbrk2 = 0.35_SP
+      real(SP) :: wavemaker_cbrk = 1.0_SP
 
-      logical  :: WAVEMAKER_VIS = .false.
+      logical  :: wavemaker_vis = .false.
       real(SP) :: visbrk = 0.0_SP
-      real(SP) :: WAVEMAKER_visbrk = 0.0_SP
+      real(SP) :: wavemaker_visbrk = 0.0_SP
 
       real(SP) :: nu_bkg = 0.0_SP   ! background kinematic viscosity floor for nu_break
 
@@ -86,17 +88,16 @@ contains
 
       call sub_env%yaml%read_enum("model", BREAKING_MODELS, val=this%model, &
                                   default=DEF_BREAKING_MODEL)
-      call sub_env%yaml%read("roller_effect", val=this%roller, default=DEF_BREAKING_ROLLER_EFFECT)
+      call sub_env%yaml%read("roller", val=this%roller, default=DEF_BREAKING_ROLLER)
       call sub_env%yaml%read("show_breaking", val=this%show_breaking, default=DEF_BREAKING_SHOW_BREAKING)
 
-      call sub_env%yaml%read("Cbrk1", silent=no_key, val=this%Cbrk1, default=DEF_BREAKING_CBRK1)
-      call sub_env%yaml%read("Cbrk2", silent=no_key, val=this%Cbrk2, default=DEF_BREAKING_CBRK2)
-      call sub_env%yaml%read("WAVEMAKER_Cbrk", silent=no_key, val=this%WAVEMAKER_Cbrk, default=DEF_BREAKING_WAVEMAKER_CBRK)
-
-      call sub_env%yaml%read("WAVEMAKER_VIS", val=this%WAVEMAKER_VIS, default=DEF_BREAKING_WAVEMAKER_VIS)
+      call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default=DEF_BREAKING_CBRK1)
+      call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default=DEF_BREAKING_CBRK2)
       call sub_env%yaml%read("visbrk", silent=no_key, val=this%visbrk, default=DEF_BREAKING_VISBRK)
-      call sub_env%yaml%read("WAVEMAKER_visbrk", silent=no_key, val=this%WAVEMAKER_visbrk, default=DEF_BREAKING_WAVEMAKER_VISBRK)
       call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default=DEF_BREAKING_NU_BKG)
+
+      ! the enum IS the legacy WAVEMAKER_VIS x VISCOSITY_BREAKING exclusion
+      this%wavemaker_vis = trim(this%model) == "wavemaker_viscosity"
 
    end subroutine breaking_read_input
 
