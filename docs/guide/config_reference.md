@@ -379,6 +379,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `means.steady_time` | `0.0` | `STEADY_TIME` | s | Time to begin time-averaging. |
 | `means.interval` | — | `T_INTV_mean` | s | Averaging output cadence. |
 | `interval` | — | `PLOT_INTV` | s | Global field-output cadence. |
+| `variables` | — | — | — | Field arrays written each interval (field-registry names, e.g. ETA/U/V/Hmax); absent = no field output. Replaces the legacy per-variable flags. |
 | `blowup_threshold` | — | `EtaBlowVal` | m | Elevation above which the run aborts (absent = 100*max\|Depth\|). |
 | `vessel.interval` | — | `PLOT_INTV_VESSEL` | s | Vessel resistance-series output cadence. |
 | `geometries.name` | — | — | — | Point-set name (referenced by channels.geometry). |

@@ -618,6 +618,7 @@ sections:
       means.steady_time: {legacy: STEADY_TIME, default: 0.0, units: s, latex: '$T_{\mathrm{steady}}$', doc: Time to begin time-averaging.}
       means.interval: {legacy: T_INTV_mean, default: ~, units: s, latex: '$T_{\mathrm{mean}}$', doc: Averaging output cadence.}
       interval: {legacy: PLOT_INTV, default: ~, units: s, latex: '$\Delta t_{\mathrm{out}}$', doc: Global field-output cadence.}
+      variables: {legacy: ~, default: ~, units: ~, doc: "Field arrays written each interval (field-registry names, e.g. ETA/U/V/Hmax); absent = no field output. Replaces the legacy per-variable flags."}
       blowup_threshold: {legacy: EtaBlowVal, default: ~, units: m, doc: Elevation above which the run aborts (absent = 100*max|Depth|).}
       vessel.interval: {legacy: PLOT_INTV_VESSEL, default: ~, units: s, doc: Vessel resistance-series output cadence.}
       # geometries:/channels: are lists of named entries (keys below are per entry)
