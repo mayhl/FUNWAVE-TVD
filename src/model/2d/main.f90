@@ -425,7 +425,7 @@ contains
       call this%env%comm%barrier()
 
       ! legacy PutFile honours FIELD_IO_TYPE for these too
-      select case (this%output%field_io_type(1:1))
+      select case (this%output%format(1:1))
       case ("B", "b")
          fmt = "binary"
       case default
@@ -465,7 +465,7 @@ contains
       end if
       call this%env%comm%barrier()
 
-      select case (this%output%field_io_type(1:1))
+      select case (this%output%format(1:1))
       case ("B", "b")
          fmt = "binary"
       case default
@@ -950,7 +950,7 @@ contains
          end if
          call this%env%comm%barrier()
 
-         select case (out%field_io_type(1:1))
+         select case (out%format(1:1))
          case ("B", "b")
             fmt = "binary"
          case ("N", "n")
@@ -1138,7 +1138,7 @@ contains
    end subroutine build_point_channels
 
    ! Point-channel format: the explicit format: key, else the deck
-   ! default derived from field_io_type.  PNETCDF also implies netcdf
+   ! default derived from the deck format.  pnetcdf also implies netcdf
    ! points — the parallel writer is field-only, points stay serial.
    function point_format(this, k) result(fmt)
       class(type_model_main), intent(in) :: this
@@ -1148,7 +1148,7 @@ contains
       if (len_trim(this%output%channels(k)%format) > 0) then
          fmt = trim(this%output%channels(k)%format)
       else
-         select case (this%output%field_io_type(1:1))
+         select case (this%output%format(1:1))
          case ("N", "n", "P", "p")
             fmt = "netcdf"
          case default

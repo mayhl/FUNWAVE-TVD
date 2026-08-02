@@ -109,7 +109,7 @@ contains
       this%folder = trim(output%result_folder)
       if (this%folder(len(this%folder):len(this%folder)) /= "/") &
          this%folder = this%folder//"/"
-      select case (output%field_io_type(1:1))
+      select case (output%format(1:1))
       case ("B", "b")
          this%fmt = "binary"
       case default

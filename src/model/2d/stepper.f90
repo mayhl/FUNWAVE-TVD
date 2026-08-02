@@ -522,9 +522,7 @@ contains
       real(SP), intent(out) :: dt
 
       associate (f => this%fields)
-         call this%numerics%estimate_dt(this%grid, f%u, f%v, f%h, &
-                                        this%simulation%fixed_dt, &
-                                        this%simulation%dt_fixed, dt)
+         call this%numerics%estimate_dt(this%grid, f%u, f%v, f%h, dt)
       end associate
       this%dt_step = dt
 

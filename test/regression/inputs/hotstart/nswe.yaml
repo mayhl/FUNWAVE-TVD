@@ -12,9 +12,6 @@ grid:
 simulation:
   title: hotstart_nswe
   total_time: 4.0
-  time_stepping:
-    fixed_dt: yes
-    dt: 0.02
 initial:
   solitary:
     amplitude: 0.5
@@ -25,7 +22,7 @@ boundaries:
 dispersion:
   scheme: nswe
 numerics:
-  cfl: 0.5
+  dt: 0.02
   min_depth: 0.01
 output:
   result_folder: ./out/

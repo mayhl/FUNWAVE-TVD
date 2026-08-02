@@ -53,6 +53,6 @@ breaking:
 output:
   interval: 20.0
   result_folder: output/
-  field_io_type: BINARY
+  format: binary
   depth_out: true
   variables: [U, V, ETA, ETAscreen, Hmax, Hmin, Umax, MASK]

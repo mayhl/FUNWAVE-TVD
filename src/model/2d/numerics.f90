@@ -7,6 +7,10 @@
 !
 !  YAML block: numerics:
 !    cfl:            <real>    CFL number,                             default 0.5
+!    dt:             <time>    presence = fixed timestep (s); absent = adaptive
+!                              CFL stepping.  Exclusive with an explicit cfl:
+!                              the default cfl still caps a fixed dt by halving
+!                              (nee simulation: time_stepping: fixed_dt/dt)
 !    flux_solver:    <string>  'hllc' | 'hll',                         default hllc
 !    froude_cap:     <real>    maximum Froude number,                  default 3.0
 !    min_depth:      <real>    wet/dry + friction floor (m),           default 0.1
@@ -21,8 +25,8 @@
 !  MinDepth/MinDepthFrc to their minimum (old io.F), so the pair was one
 !  value in practice.
 !
-!  Note: fixed_dt / dt live in simulation: > time_stepping:.  The arrival
-!  time map moved to output: > arrival_time: (it is an output product).
+!  Note: the arrival time map moved to output: > arrival_time: (it is an
+!  output product).
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -51,6 +55,9 @@ module model_numerics_mod
       character(:), allocatable :: high_order     ! YAML key: reconstruction
 
       real(SP) :: CFL = 0.5_SP
+      ! dt: presence derives fixed-step mode (nee simulation time_stepping)
+      logical  :: fixed_dt = .false.
+      real(SP) :: dt_fixed = 0.0_SP
       real(SP) :: FroudeCap = 3.0_SP
       real(SP) :: MinDepth = 0.1_SP
       real(SP) :: MinDepthFrc = 0.1_SP   ! kept == MinDepth (single min_depth key)
@@ -72,7 +79,7 @@ contains
       type(type_yaml_reader) :: tri_yaml
       integer :: tri_chunk, tri_min_py
       character(96) :: msg
-      logical :: no_num, no_key, no_tri
+      logical :: no_num, no_key, no_tri, no_cfl, no_dt
 
       ! Set string defaults before possible early return so consumers always get valid values
       this%construction = "HLLC"
@@ -88,7 +95,18 @@ contains
       this%construction = upcase(this%construction)
       this%high_order = upcase(this%high_order)
 
-      call sub_env%yaml%read("cfl", silent=no_key, val=this%CFL, default=DEF_NUMERICS_CFL)
+      call sub_env%yaml%read("cfl", silent=no_cfl, val=this%CFL, default=DEF_NUMERICS_CFL)
+      ! dt presence = fixed-step mode; an EXPLICIT cfl alongside it is
+      ! contradictory config (the default cfl still caps dt by halving)
+      call sub_env%yaml%read("dt", silent=no_dt, val=this%dt_fixed)
+      this%fixed_dt = .not. no_dt
+      if (this%fixed_dt) then
+         if (this%dt_fixed <= 0.0_SP) &
+            call sub_env%log%exit_on_error("numerics: dt must be > 0")
+         if (.not. no_cfl) call sub_env%log%exit_on_error( &
+            "numerics: cfl and dt are exclusive -- dt fixes the step"// &
+            " (the default cfl caps it); drop one")
+      end if
       call sub_env%yaml%read("froude_cap", silent=no_key, val=this%FroudeCap, default=DEF_NUMERICS_FROUDE_CAP)
       ! single wet/dry + friction floor; legacy folded the MinDepth/
       ! MinDepthFrc pair to their minimum so they were one value in practice
@@ -137,7 +155,7 @@ contains
    ! global minimum is unchanged.  Unlike legacy, TIME is not advanced
    ! here — the stepper owns time.
    ! ----------------------------------------------------------------
-   subroutine numerics_estimate_dt(this, grid, u, v, h, fixed_dt, dt_fixed, dt)
+   subroutine numerics_estimate_dt(this, grid, u, v, h, dt)
       use, intrinsic :: iso_fortran_env, only: real64
       use core_constants_mod, only: GRAV, SMALL, LARGE, MPI_SP
       use core_grid_mod, only: type_grid_2d
@@ -146,8 +164,6 @@ contains
       class(type_model_numerics), intent(in) :: this
       type(type_grid_2d), intent(in) :: grid
       real(SP), intent(in) :: u(:, :), v(:, :), h(:, :)
-      logical, intent(in) :: fixed_dt
-      real(SP), intent(in) :: dt_fixed
       real(SP), intent(out) :: dt
 
       real(SP) :: dt_min, celerity, speed, dt_cfl
@@ -173,8 +189,8 @@ contains
       comm_n(CT_DT_REDUCE) = comm_n(CT_DT_REDUCE) + 1
       dt_cfl = this%CFL*dt_min
 
-      if (fixed_dt) then
-         dt = dt_fixed
+      if (this%fixed_dt) then
+         dt = this%dt_fixed
          do while (dt > dt_cfl)
             dt = dt/2.0_SP
          end do

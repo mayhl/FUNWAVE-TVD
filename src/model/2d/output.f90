@@ -9,7 +9,9 @@
 !    interval:        <real>     field output cadence (s),     REQUIRED
 !                                (nee simulation.output_interval)
 !    result_folder:   <string>   output directory,             default './output/'
-!    field_io_type:   <string>   parallel field I/O format,    default 'ASCII'
+!    format:          <string>   parallel field I/O format,    default 'binary'
+!                                ascii | binary | netcdf | pnetcdf
+!                                (nee field_io_type)
 !    layout:          <string>   netcdf file topology,         default 'chunked'
 !                                single (one output.nc, streams as groups) |
 !                                per_stream (data.nc + diagnostics.nc) |
@@ -60,8 +62,8 @@
 !                                mean/rms over each interval, no snapshots);
 !                                absence => instantaneous snapshot channel
 !        t_start: <real>         default: simulation t_start
-!        format: ascii|netcdf    default follows field_io_type (NETCDF
-!                                => netcdf group in diagnostics.nc,
+!        format: ascii|netcdf    default follows the deck format (netcdf/
+!                                pnetcdf => netcdf group in diagnostics.nc,
 !                                else per-variable <name>_<var>.dat)
 !
 !  HISTORY :
@@ -81,7 +83,7 @@ module model_output_mod
 
    use model_config_defaults_mod, only: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT, &
                                         DEF_OUTPUT_DEPTH_OUT, &
-                                        DEF_OUTPUT_FIELD_IO_TYPE, &
+                                        DEF_OUTPUT_FORMAT, &
                                         DEF_OUTPUT_LAYOUT, &
                                         DEF_OUTPUT_MAX_FILE_SIZE, &
                                         DEF_OUTPUT_MEANS_STEADY_TIME, &
@@ -117,8 +119,8 @@ module model_output_mod
       real(SP) :: interval = 0.0_SP
       real(SP) :: t_start = 0.0_SP
       logical :: has_t_start = .false.
-      ! '' inherits the deck default: netcdf when field_io_type is
-      ! NETCDF, ascii otherwise
+      ! '' inherits the deck default: netcdf when the deck format is
+      ! netcdf/pnetcdf, ascii otherwise
       character(8) :: format = ''
    end type type_channel_config
 
@@ -132,7 +134,7 @@ module model_output_mod
 
       ! Bridge fields for legacy io.F use
       character(:), allocatable :: result_folder
-      character(:), allocatable :: field_io_type
+      character(:), allocatable :: format   ! ascii/binary/netcdf/pnetcdf (nee field_io_type)
 
       ! NetCDF file topology (single/per_stream/chunked) + the chunk
       ! roll-over size, doubling as the predicted-size warning cap (GB)
@@ -241,7 +243,7 @@ contains
 
       ! Initialize string fields before possible early exit so io.F always gets valid values
       this%result_folder = "./output/"
-      this%field_io_type = "ASCII"
+      this%format = "binary"
 
       sub_env = get_sub_env(env, "output", is_empty)
       this%is_activated = .not. is_empty
@@ -255,7 +257,11 @@ contains
       call sub_env%yaml%read("result_folder", val=this%result_folder, default=DEF_OUTPUT_RESULT_FOLDER)
       call sub_env%yaml%read("checkpoint", silent=no_key, val=this%checkpoint, default="")
       this%write_checkpoint = .not. no_key
-      call sub_env%yaml%read("field_io_type", val=this%field_io_type, default=DEF_OUTPUT_FIELD_IO_TYPE)
+      call sub_env%yaml%read("format", val=this%format, default=DEF_OUTPUT_FORMAT)
+      if (this%format /= "ascii" .and. this%format /= "binary" .and. &
+          this%format /= "netcdf" .and. this%format /= "pnetcdf") &
+         call env%log%exit_on_error("output: unknown format '"//this%format// &
+                                    "' -- valid: ascii binary netcdf pnetcdf")
       call sub_env%yaml%read("layout", val=this%layout, default=DEF_OUTPUT_LAYOUT)
       if (this%layout /= "single" .and. this%layout /= "per_stream" .and. &
           this%layout /= "chunked") &
@@ -310,6 +316,8 @@ contains
       call read_channels(this, sub_env, this%min_spacing)
 
       ! Retired key spellings: loud rejection beats silent acceptance
+      call reject_moved_key(sub_env, "field_io_type", &
+                            "format: (lowercase ascii | binary | netcdf | pnetcdf)")
       call reject_moved_key(sub_env, "EtaBlowVal", "blowup_threshold")
       call reject_moved_key(sub_env, "T_INTV_mean", "means: interval")
       call reject_moved_key(sub_env, "STEADY_TIME", "means: steady_time")
@@ -596,7 +604,7 @@ contains
             call entries(k)%read("t_start", silent=no_key, val=cfg%t_start)
             cfg%has_t_start = .not. no_key
 
-            ! optional format: absence inherits the field_io_type default
+            ! optional format: absence inherits the deck-format default
             call entries(k)%read("format", silent=no_key, val=fmt)
             if (.not. no_key) then
                if (fmt /= "ascii" .and. fmt /= "netcdf") &

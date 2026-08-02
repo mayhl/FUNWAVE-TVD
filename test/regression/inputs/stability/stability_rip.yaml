@@ -23,9 +23,6 @@ simulation:
   title: stability_rip
   total_time: 120.0
   screen_interval: 1.0
-  time_stepping:
-    fixed_dt: yes
-    dt: 0.04
 wavemaker:
   spectrum:
     type: tma
@@ -56,7 +53,7 @@ boundaries:
         cd: 1.0
   periodic: [y]
 numerics:
-  cfl: 0.5
+  dt: 0.04
   froude_cap: 1.0
   min_depth: 0.01
 breaking:
@@ -68,5 +65,5 @@ breaking:
 output:
   interval: 40.0
   result_folder: output/
-  field_io_type: BINARY
+  format: binary
   variables: [ETA]

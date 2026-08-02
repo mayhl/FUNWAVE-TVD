@@ -104,7 +104,8 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `cfl` | `0.5` | `CFL` | — | CFL number for the adaptive timestep. |
+| `cfl` | `0.5` | `CFL` | — | CFL number for the adaptive timestep. Exclusive with dt: setting both is a config error. |
+| `dt` | — | `DT_fixed` | s | Presence selects a fixed timestep (nee simulation.time_stepping); the default cfl still caps it by halving. Absent = adaptive CFL stepping. |
 | `flux_solver` | `hllc` | `CONSTRUCTION` | — | Approximate Riemann solver. One of `hllc` \| `hll`. |
 | `froude_cap` | `3.0` | `FroudeCap` | — | Maximum Froude number (velocity limiter). |
 | `min_depth` | `0.1` | `MinDepth` | m | Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc). |
@@ -144,7 +145,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 
 ## `simulation:`
 
-**Required.**  Run control — title, total/start time, screen-log cadence, and time-stepping.
+**Required.**  Run control — title, total/start time, and screen-log cadence. time_stepping is retired: numerics.dt presence selects a fixed step.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
@@ -152,8 +153,6 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `t_start` | `0.0` | `PLOT_START_TIME` | s | Simulation time at which output begins. |
 | `title` | — | `TITLE` | — | Run title (reserved for NetCDF global attrs). |
 | `total_time` | — | `TOTAL_TIME` | s | Total simulated duration. |
-| `time_stepping.dt` | — | `DT_fixed` | s | Fixed timestep value (with fixed_dt). |
-| `time_stepping.fixed_dt` | `false` | — | — | Use a fixed timestep instead of adaptive CFL. |
 
 ## `initial:`
 
@@ -374,7 +373,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `arrival_time.min_height` | `0.001` | `ArrTimeMinH` | m | Elevation threshold defining first wave arrival. |
 | `checkpoint` | — | — | — | Directory to write the hot-start checkpoint set (core.bin) at run end. |
 | `depth_out` | `false` | `DEPTH_OUT` | — | Write the still-water depth field. |
-| `field_io_type` | `ASCII` | `FIELD_IO_TYPE` | — | Field output format (NETCDF needs a netcdf-fortran build; PNETCDF writes classic CDF-5 collectively and needs a PnetCDF build). One of `ASCII` \| `BINARY` \| `NETCDF` \| `PNETCDF`. |
+| `format` | `binary` | `FIELD_IO_TYPE` | — | Field output format (nee field_io_type; netcdf needs a netcdf-fortran build One of `ascii` \| `binary` \| `netcdf` \| `pnetcdf`. |
 | `layout` | `chunked` | — | — | NetCDF file topology; single = one output.nc with streams as groups One of `single` \| `per_stream` \| `chunked`. |
 | `max_file_size` | `50.0` | — | GB | Chunk roll-over size; also the predicted-size warning threshold for single/per_stream. |
 | `result_folder` | `./output/` | `RESULT_FOLDER` | — | Directory for output files. |
@@ -398,5 +397,5 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `channels.interval` | — | — | s | Channel flush cadence. |
 | `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics One of `min` \| `max` \| `mean` \| `rms`. |
 | `channels.t_start` | — | — | s | Channel start time (default simulation t_start). |
-| `channels.format` | — | — | — | Point file format; default follows field_io_type (NETCDF selects a netcdf group in diagnostics.nc One of `ascii` \| `netcdf`. |
+| `channels.format` | — | — | — | Point file format; default follows the deck format (netcdf/pnetcdf selects a netcdf group in diagnostics.nc One of `ascii` \| `netcdf`. |
 

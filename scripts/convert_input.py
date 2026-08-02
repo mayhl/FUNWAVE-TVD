@@ -545,10 +545,6 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     if si is not None:
         sim["screen_interval"] = si
 
-    dt_fixed = pop_val("DT_fixed")  # legacy key: non-zero value implies fixed dt
-    if dt_fixed is not None and dt_fixed != 0.0:
-        sim["time_stepping"] = {"fixed_dt": True, "dt": dt_fixed}
-
     out["simulation"] = sim
 
     # ---- hot_start ---------------------------------------------------------
@@ -730,6 +726,21 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         v = pop_val(k)
         if v is not None:
             nu[yk] = v
+    # DT_fixed lands here (nee simulation time_stepping): presence = fixed
+    # step.  cfl and dt are exclusive in the reader, so an explicit legacy
+    # CFL yields to dt; the halving cap then uses the default 0.5 -- warn
+    # when that changes the cap
+    dt_fixed = pop_val("DT_fixed")  # legacy key: non-zero value implies fixed dt
+    if dt_fixed is not None and dt_fixed != 0.0:
+        cfl = nu.pop("cfl", None)
+        if cfl is not None and cfl != 0.5:
+            print(
+                f"WARNING: DT_fixed with CFL={cfl}: cfl dropped (exclusive"
+                " with numerics dt); the fixed-dt stability cap now uses"
+                " the default 0.5",
+                file=sys.stderr,
+            )
+        nu["dt"] = dt_fixed
     # legacy folded the MinDepth/MinDepthFrc pair to their minimum (old io.F)
     md = pop_val("MinDepth")
     mdf = pop_val("MinDepthFrc")
@@ -777,9 +788,10 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     rf = pop_str("RESULT_FOLDER")
     if rf:
         op["result_folder"] = rf
+    # legacy default is ASCII but the modern default is binary, so the
+    # format is always emitted to preserve the deck's meaning
     fio = pop_str("FIELD_IO_TYPE")
-    if fio:
-        op["field_io_type"] = fio
+    op["format"] = (fio or "ASCII").lower()
     # stations retired -> inline point channel: the "i j" pairs are global
     # interior indices, mapped to cell-centre coords x = (i-1)*dx.
     # NumberStations only gates the block (legacy N < line count truncated;
@@ -1499,8 +1511,8 @@ def _convert_3d(src: Path, dst_yaml: Path) -> None:
     }
     vars_on = [yml for k3d, yml in _3d_var_map.items() if pop_bool(k3d, False)]
     op: dict = {"result_folder": result_folder}
-    if field_io_type != "ASCII":
-        op["field_io_type"] = field_io_type
+    # always emitted: the modern default flipped to binary
+    op["format"] = field_io_type.lower()
     if vars_on:
         op["variables"] = vars_on
     out["output"] = op

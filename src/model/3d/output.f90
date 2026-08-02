@@ -7,7 +7,8 @@
 !
 !  YAML block: output:
 !    result_folder: <string>    default './output/'
-!    field_io_type: <string>    default 'ASCII'
+!    format: <string>           default 'binary' (nee field_io_type;
+!                               stored only -- the 3D writer path is pending)
 !    variables: [DEP, ETA, U, V, W, P, TKE, EPS, S, MU,
 !                BUB, A, F, T, G, SALI, TEMP, RHO]
 !                maps each name → OUT_* flag
@@ -30,7 +31,7 @@ module model_3d_output_mod
    type, extends(type_model_base) :: type_model_3d_output
 
       character(:), allocatable :: result_folder
-      character(:), allocatable :: field_io_type
+      character(:), allocatable :: format   ! nee field_io_type
 
       logical :: out_dep = .false.
       logical :: out_eta = .false.
@@ -67,14 +68,14 @@ contains
       logical :: is_empty, no_vars
 
       this%result_folder = "./output/"
-      this%field_io_type = "ASCII"
+      this%format = "binary"
 
       sub_env = get_sub_env(env, "output", is_empty)
       this%is_activated = .not. is_empty
       if (is_empty) return
 
       call sub_env%yaml%read("result_folder", val=this%result_folder, default="./output/")
-      call sub_env%yaml%read("field_io_type", val=this%field_io_type, default="ASCII")
+      call sub_env%yaml%read("format", val=this%format, default="binary")
 
       call sub_env%yaml%read_string_array("variables", silent=no_vars, val=var_list)
       if (.not. no_vars) then

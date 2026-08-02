@@ -8,7 +8,7 @@
 !  output_channel to compile unchanged.  Every call returns a non-zero
 !  status, so pnc_check reports "built without PnetCDF" and stops at
 !  the first parallel-write request — builds without the library stay
-!  runnable, only field_io_type: PNETCDF dies.
+!  runnable, only format: pnetcdf dies.
 !
 !  HISTORY :
 !    07/22/2026  Michael-Angelo Y.H. Lam

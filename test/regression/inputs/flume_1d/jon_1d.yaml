@@ -51,7 +51,7 @@ breaking:
 output:
   interval: 5.0
   result_folder: output/
-  field_io_type: BINARY
+  format: binary
   means:
     interval: 300.0
     steady_time: 100.0

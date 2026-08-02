@@ -55,7 +55,7 @@ contains
       allocate (v(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
       allocate (h(grid%lp%mloc, grid%lp%nloc), source=DEPTH_SP)
 
-      call num%estimate_dt(grid, u, v, h, fixed_dt=.false., dt_fixed=0.0_SP, dt=dt)
+      call num%estimate_dt(grid, u, v, h, dt=dt)
 
       @assertEqual(CFL_SP*DX_SP/sqrt(GRAV*DEPTH_SP), dt, TOL_SP)
 
@@ -85,7 +85,7 @@ contains
 
       if (comm%rank_id == 0) u(grid%lp%ib, grid%lp%jb) = FAST_U
 
-      call num%estimate_dt(grid, u, v, h, fixed_dt=.false., dt_fixed=0.0_SP, dt=dt)
+      call num%estimate_dt(grid, u, v, h, dt=dt)
 
       @assertEqual(CFL_SP*DX_SP/(FAST_U + sqrt(GRAV*DEPTH_SP)), dt, TOL_SP)
 
@@ -115,7 +115,9 @@ contains
       dt_cfl = CFL_SP*DX_SP/sqrt(GRAV*DEPTH_SP)
       dt_fix = 3.0_SP*dt_cfl
 
-      call num%estimate_dt(grid, u, v, h, fixed_dt=.true., dt_fixed=dt_fix, dt=dt)
+      num%fixed_dt = .true.
+      num%dt_fixed = dt_fix
+      call num%estimate_dt(grid, u, v, h, dt=dt)
 
       ! 3*dt_cfl -> /2 = 1.5*dt_cfl -> /2 = 0.75*dt_cfl <= dt_cfl
       @assertEqual(0.75_SP*dt_cfl, dt, TOL_SP)

@@ -382,7 +382,8 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     if out.get("depth_out", False):
         variables = ["DEPTH_OUT"] + variables
 
-    binary = out.get("field_io_type", "ASCII").upper() == "BINARY"
+    fmt = out.get("format", out.get("field_io_type", "binary"))
+    binary = str(fmt).upper() == "BINARY"
     output_res = int(out.get("output_res", 1))
 
     return RunMetadata(

@@ -14,12 +14,10 @@
 !    screen_interval: <time>      optional, default total_time.  LOGGING
 !                                 cadence, not output -- parks here until a
 !                                 logger/monitor block exists
-!    time_stepping:
-!      fixed_dt: <bool>           optional, default false
-!      dt: <time>                 required if fixed_dt: true
 !
 !  Output cadences (nee output_interval / plot_intv_station /
 !  station_output_buffer) live under output: since the config reorg.
+!  time_stepping: retired -- numerics: dt presence selects a fixed step.
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
@@ -46,8 +44,6 @@ module model_simulation_mod
       real(SP) :: total_time = 0.0_SP
       real(SP) :: t_start = 0.0_SP
       real(SP) :: screen_interval = 0.0_SP
-      logical  :: fixed_dt = .false.
-      real(SP) :: dt_fixed = 0.0_SP
 
    contains
       procedure :: read_input => simulation_read_input
@@ -79,14 +75,11 @@ contains
       call reject_moved_key(sub_env, "station_output_buffer", &
                             "nothing -- channels flush every interval, no buffer")
 
-      ! Time stepping sub-block (optional)
+      ! time_stepping: retired -- dt presence under numerics: derives the mode
       ts_yaml = sub_env%yaml%cast_dictionary("time_stepping", no_ts)
-      if (.not. no_ts) then
-         call ts_yaml%read("fixed_dt", val=this%fixed_dt, default="NO")
-         if (this%fixed_dt) then
-            call ts_yaml%read_positive("dt", val=this%dt_fixed)
-         end if
-      end if
+      if (.not. no_ts) call sub_env%log%exit_on_error( &
+         "simulation: time_stepping retired -- numerics: dt presence selects"// &
+         " a fixed step (absent = adaptive cfl stepping)")
 
    end subroutine simulation_read_input
 

@@ -95,7 +95,7 @@ module model_config_defaults_mod
    ! ── output ──
    character(*), parameter :: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT = "0.001"
    character(*), parameter :: DEF_OUTPUT_DEPTH_OUT = "NO"
-   character(*), parameter :: DEF_OUTPUT_FIELD_IO_TYPE = "ASCII"
+   character(*), parameter :: DEF_OUTPUT_FORMAT = "binary"
    character(*), parameter :: DEF_OUTPUT_LAYOUT = "chunked"
    character(*), parameter :: DEF_OUTPUT_MAX_FILE_SIZE = "50.0"
    character(*), parameter :: DEF_OUTPUT_MEANS_STEADY_TIME = "0.0"
@@ -125,7 +125,6 @@ module model_config_defaults_mod
    ! ── simulation ──
    character(*), parameter :: DEF_SIMULATION_SCREEN_INTERVAL = "1.0"
    character(*), parameter :: DEF_SIMULATION_T_START = "0.0"
-   character(*), parameter :: DEF_SIMULATION_TIME_STEPPING_FIXED_DT = "NO"
    ! ── subgrid ──
    character(*), parameter :: DEF_SUBGRID_RATIO = "1"
    character(*), parameter :: DEF_SUBGRID_WRITE_POROSITY = "NO"
