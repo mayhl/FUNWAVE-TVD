@@ -9,8 +9,6 @@
 !
 !  YAML block: boundaries:       (top-level; omit for all-wall)
 !    periodic: [y]               axis-level list, x and/or y
-!    relaxation_cells: <int>     forcing relaxation-strip width in cells,
-!                                default 30 (nee WaveMakerPointNum)
 !    west: / east: / south: / north:
 !    sponge:                     OPTIONAL shared coefficient defaults every
 !      direct: {r, a}            face sponge inherits PER-KEY (a face
@@ -47,9 +45,16 @@
 !                                routes to the wavemaker's strip (nee
 !                                WidthWaveMaker/R_,A_sponge_wavemaker),
 !                                NOT the sponge model; + eta/file target
-!                                = generating-absorbing (nee GEN_ABS;
-!                                the relaxation_cells tide profile then
-!                                absorbs — no sponge block on the face)
+!                                = generating-absorbing (nee GEN_ABS) —
+!                                the face sponge {width, direct} then
+!                                sizes the tide relaxation profile
+!                                (rung 11; nee WaveMakerPointNum cells +
+!                                hardcoded r 0.85 / a 10)
+!
+!  The tide/gen-abs relaxation strip takes its geometry AND coefficients
+!  from the face sponge block: width (m) -> cells at init, direct.{r, a}
+!  per face with the shared-template inheritance.  relaxation_cells is
+!  retired.
 !
 !  NOTE 1: a sub-block is "present" only as a YAML mapping (direct: {} is
 !    on with defaults; a bare `direct:` null reads as absent).
@@ -74,8 +79,7 @@ module model_boundaries_mod
    use model_tide_mod, only: type_model_tide
    use model_physics_mod, only: type_model_physics
    use model_wavemaker_mod, only: type_model_wavemaker
-   use model_config_defaults_mod, only: DEF_BOUNDARIES_RELAXATION_CELLS, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_WIDTH, &
+   use model_config_defaults_mod, only: DEF_BOUNDARIES_WEST_SPONGE_WIDTH, &
                                         DEF_BOUNDARIES_WEST_SPONGE_DIRECT_R, &
                                         DEF_BOUNDARIES_WEST_SPONGE_DIRECT_A, &
                                         DEF_BOUNDARIES_WEST_SPONGE_FRICTION_CD, &
@@ -129,7 +133,7 @@ contains
       logical :: no_bnd, no_face, no_key
       logical :: forced(4), wm_forced(4), has_file(4), has_const(4)
       integer :: derived(4), wm_idx(4)
-      integer :: f, i
+      integer :: f, i, itmp
 
       derived = BC_WALL
       forced = .false.
@@ -158,8 +162,12 @@ contains
          end do
       end if
 
-      call bnd_env%yaml%read("relaxation_cells", silent=no_key, val=tide%iwidth, &
-                             default=DEF_BOUNDARIES_RELAXATION_CELLS)
+      ! relaxation_cells: retired (rung 11) — the face sponge width sizes
+      ! the strip in metres, resolution-invariantly
+      call bnd_env%yaml%read("relaxation_cells", silent=no_key, val=itmp)
+      if (.not. no_key) call env%log%exit_on_error( &
+         "boundaries: relaxation_cells retired -- the face sponge width (m)"// &
+         " sizes the relaxation strip (nee 30 cells = width: 30*dx)")
 
       ! ── shared sponge coefficients (optional; faces inherit per-key) ──
       call read_shared_sponge(env, bnd_env%yaml, defs)
@@ -180,10 +188,10 @@ contains
 
          if (wm_forced(f)) then
             ! wavemaker-fed face: the sponge block IS the relaxation strip
-            ! (nee WidthWaveMaker/R_,A_sponge_wavemaker) — routed to the
-            ! resolved wavemaker entry, NOT the sponge model
+            ! (nee WidthWaveMaker/R_,A_sponge_wavemaker; gen-abs routes it
+            ! to the tide profile instead) — NOT the sponge model
             call read_wavemaker_strip(env, face_yaml, wavemakers(wm_idx(f)), f, &
-                                      tide%tidal_bc_gen_abs)
+                                      tide, defs)
             derived(f) = BC_RELAX
          else
             call read_face_sponge(env, face_yaml, sponge, f, defs)
@@ -195,6 +203,11 @@ contains
                                              ": forcing without sponge.direct derives a characteristic"// &
                                              " face — pending (add sponge: {width, direct} for relaxation)")
                derived(f) = BC_RELAX
+               ! the tide strip inherits the face sponge geometry +
+               ! direct coefficients (rung 11)
+               tide%width_m(f) = sponge%width(f)
+               tide%r_face(f) = sponge%r_direct(f)
+               tide%a_face(f) = sponge%a_direct(f)
             else if (sponge%width(f) > 0.0_SP) then
                derived(f) = BC_SPONGE
             end if
@@ -247,7 +260,57 @@ contains
          call env%log%warning("boundaries: overlapping corner sponge strips"// &
                               " keep legacy last-write combine; blending is a future policy")
 
+      ! strip-width advisory (--validate only): every absorbing/relaxation
+      ! strip should span the longest energetic wavelength any wavemaker
+      ! puts in the domain, or it re-reflects the low band (rung 11)
+      if (env%yaml%unread_strict) &
+         call check_strip_widths(env, sponge, tide, wavemakers)
+
    end subroutine boundaries_read_input
+
+   ! ── λ_low width advisory: domain-level longest energetic wavelength
+   !    (max over wavemakers of the 2%-quantile low-side wavelength at the
+   !    generation depth) vs every configured strip width.  Warn, never
+   !    error: sizing is the authoring side's job — this only keeps the
+   !    legacy silent-under-absorption mode from coming back ──────────────
+   subroutine check_strip_widths(env, sponge, tide, wavemakers)
+      use model_wavemaker_mod, only: wavemaker_lambda_low
+      type(type_env), intent(inout) :: env
+      type(type_model_sponge), intent(in) :: sponge
+      type(type_model_tide), intent(in) :: tide
+      type(type_model_wavemaker), intent(in) :: wavemakers(:)
+
+      character(160) :: msg
+      real(SP) :: lam, w
+      integer :: i, f
+
+      lam = 0.0_SP
+      do i = 1, size(wavemakers)
+         lam = max(lam, wavemaker_lambda_low(wavemakers(i)))
+      end do
+      if (lam <= 0.0_SP) return
+
+      do f = FACE_W, FACE_N
+         w = max(sponge%width(f), tide%width_m(f))
+         if (w > 0.0_SP .and. w < lam) then
+            write (msg, '(3a,f0.1,a,f0.1,a)') "boundaries/", trim(FACE_KEY(f)), &
+               "/sponge: width ", w, " m < the 2%-quantile low-side wavelength ", &
+               lam, " m -- the strip under-absorbs the longest waves"
+            call env%log%warning(trim(msg))
+         end if
+      end do
+
+      do i = 1, size(wavemakers)
+         w = wavemakers(i)%WidthWaveMaker
+         if (w > 0.0_SP .and. w < lam) then
+            write (msg, '(3a,f0.1,a,f0.1,a)') "wavemaker '", wavemakers(i)%name, &
+               "': strip width ", w, " m < the 2%-quantile low-side wavelength ", &
+               lam, " m -- the strip under-absorbs the longest waves"
+            call env%log%warning(trim(msg))
+         end if
+      end do
+
+   end subroutine check_strip_widths
 
    ! ── face sub-block readers ──────────────────────────────────────────────
 
@@ -564,30 +627,26 @@ contains
    end subroutine bind_face_wavemaker
 
    ! ── relaxation strip of a wavemaker-fed face (nee CALCULATE_SPONGE_MAKER
-   !    inputs WidthWaveMaker/R_,A_sponge_wavemaker) — all keys required:
-   !    legacy leaves them UNDEFINED when omitted, so there is no default
-   !    to honour.  The generating-absorbing form (gen_abs) relaxes through
-   !    the tide relaxation_cells profile instead — a face strip there is
-   !    dead config and rejected ─────────────────────────────────────────
-   subroutine read_wavemaker_strip(env, face_yaml, wavemaker, f, gen_abs)
+   !    inputs WidthWaveMaker/R_,A_sponge_wavemaker) — abs form: all keys
+   !    required, legacy leaves them UNDEFINED when omitted so there is no
+   !    default to honour.  The generating-absorbing form routes the same
+   !    block to the tide profile (rung 11; nee WaveMakerPointNum cells +
+   !    hardcoded r 0.85 / a 10) with per-key shared-template inheritance —
+   !    legacy had no keys there at all ────────────────────────────────────
+   subroutine read_wavemaker_strip(env, face_yaml, wavemaker, f, tide, defs)
       type(type_env), intent(inout) :: env
       type(type_yaml_reader), intent(inout) :: face_yaml
       type(type_model_wavemaker), intent(inout) :: wavemaker
       integer, intent(in) :: f
-      logical, intent(in) :: gen_abs
+      type(type_model_tide), intent(inout) :: tide
+      type(type_sponge_defaults), intent(in) :: defs
 
       type(type_yaml_reader) :: sp_yaml, sub_yaml
-      logical :: no_sp, no_blk
+      real(SP) :: tmp
+      logical :: no_sp, no_blk, no_key
 
       no_blk = .true.
       sp_yaml = face_yaml%cast_dictionary("sponge", no_sp)
-      if (gen_abs) then
-         if (.not. no_sp) &
-            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
-                                       "/sponge: unused under the generating-absorbing"// &
-                                       " form — the relaxation_cells tide profile absorbs")
-         return
-      end if
       if (.not. no_sp) sub_yaml = sp_yaml%cast_dictionary("direct", no_blk)
       if (no_sp .or. no_blk) &
          call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
@@ -595,12 +654,27 @@ contains
                                     " characteristic face — pending (add sponge: {width,"// &
                                     " direct: {r, a}} for relaxation)")
 
-      call sp_yaml%read("width", val=wavemaker%WidthWaveMaker)
-      if (wavemaker%WidthWaveMaker <= 0.0_SP) &
-         call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
-                                    "/sponge: needs width > 0")
-      call sub_yaml%read("r", val=wavemaker%R_sponge_wavemaker)
-      call sub_yaml%read("a", val=wavemaker%A_sponge_wavemaker)
+      if (tide%tidal_bc_gen_abs) then
+         call sp_yaml%read("width", val=tide%width_m(f))
+         if (tide%width_m(f) <= 0.0_SP) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/sponge: needs width > 0")
+         ! per-key inheritance: face key > shared template > registry
+         ! default (defs seeds carry the shared/registry resolution)
+         tide%r_face(f) = defs%r
+         tide%a_face(f) = defs%a
+         call sub_yaml%read("r", silent=no_key, val=tmp)
+         if (.not. no_key) tide%r_face(f) = tmp
+         call sub_yaml%read("a", silent=no_key, val=tmp)
+         if (.not. no_key) tide%a_face(f) = tmp
+      else
+         call sp_yaml%read("width", val=wavemaker%WidthWaveMaker)
+         if (wavemaker%WidthWaveMaker <= 0.0_SP) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/sponge: needs width > 0")
+         call sub_yaml%read("r", val=wavemaker%R_sponge_wavemaker)
+         call sub_yaml%read("a", val=wavemaker%A_sponge_wavemaker)
+      end if
 
       sub_yaml = sp_yaml%cast_dictionary("friction", no_blk)
       if (no_blk) sub_yaml = sp_yaml%cast_dictionary("diffusion", no_blk)

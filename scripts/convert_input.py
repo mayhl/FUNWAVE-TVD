@@ -251,7 +251,7 @@ def _put(dst: dict, block: str, key: str, val):
         dst.setdefault(block, {})[key] = val
 
 
-def _convert_abs(pop_val):
+def _convert_abs(pop_val, dx):
     """Legacy ABS -> spectrum-only wavemaker entry + west face block (config
     reorg rung 3b): the face owns the relaxation strip (nee WidthWaveMaker/
     R_,A_sponge_wavemaker; required keys, no legacy defaults exist) and the
@@ -301,8 +301,10 @@ def _convert_abs(pop_val):
     west: dict = {"forcing": forcing}
 
     # generating-absorbing (nee TIDAL_BC_GEN_ABS): west tide target rides the
-    # forcing block and the relaxation_cells tide profile absorbs — the strip
-    # keys stay unused (legacy reads them into an ignored sponge_maker)
+    # forcing block; the face sponge sizes the tide relaxation profile
+    # (rung 11 -- nee WaveMakerPointNum cells + hardcoded r 0.85 / a 10, so
+    # the legacy numbers are emitted explicitly).  The legacy strip keys
+    # stay unused (read into an ignored sponge_maker)
     gen_abs = pop_val("TIDAL_BC_GEN_ABS")
     if gen_abs:
         pop_val("TideBcType")  # file presence selects DATA like rung 2
@@ -314,6 +316,12 @@ def _convert_abs(pop_val):
             forcing["eta"] = te
         for k in ("WidthWaveMaker", "R_sponge_wavemaker", "A_sponge_wavemaker"):
             pop_val(k)
+        cells = pop_val("WaveMakerPointNum")
+        if dx is not None:
+            west["sponge"] = {
+                "width": (cells if cells is not None else 30) * dx,
+                "direct": {"r": 0.85, "a": 10.0},
+            }
         return wm, west
 
     sponge: dict = {}
@@ -332,7 +340,7 @@ def _convert_abs(pop_val):
     return wm, west
 
 
-def _convert_wavemaker(wm_type: str, pop_val):
+def _convert_wavemaker(wm_type: str, pop_val, dx):
     """Legacy WAVEMAKER type + flat keys -> spectrum/source/limiter entry
     (config reorg rung 3a), plus a boundaries.west block for ABS (rung 3b).
     Returns (wavemaker_entry, west_face_or_None).  ABS_1D/LEFT_BC_IRR keep
@@ -341,7 +349,7 @@ def _convert_wavemaker(wm_type: str, pop_val):
     if wm_type.startswith("ABS") and wm_type != "ABS_1D":
         # legacy dispatch is the PREFIX WaveMaker(1:3)=='ABS' — real decks
         # spell it ABSORBING_GENERATING
-        return _convert_abs(pop_val)
+        return _convert_abs(pop_val, dx)
     if wm_type in ("LEF_SOL", "ABS_1D", "LEFT_BC_IRR"):
         wm = {"type": wm_type}
         for k in _WK_PARAMS.get(wm_type, []):
@@ -619,7 +627,7 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
             out.setdefault("initial", {})["hump"] = hp
         wm_type = "NONE"
     if wm_type.upper() not in ("NONE", "NOTHING"):
-        wm, west = _convert_wavemaker(wm_type, pop_val)
+        wm, west = _convert_wavemaker(wm_type, pop_val, dx)
         if wm is not None:
             out["wavemaker"] = wm
         if west is not None:

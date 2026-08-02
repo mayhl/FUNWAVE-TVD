@@ -8,8 +8,11 @@
 !  Configuration arrives from the boundaries: section reader
 !  (model_boundaries_mod) — this module owns no YAML read since the config
 !  reorg (rung 2): per-face forcing {eta,u,v} constants or file series map
-!  onto the CONSTANT/DATA targets below, boundaries.relaxation_cells onto
-!  iwidth, and tidal_bc_abs derives from forcing + sponge.direct presence.
+!  onto the CONSTANT/DATA targets below, and tidal_bc_abs derives from
+!  forcing + sponge.direct presence.  The strip geometry/coefficients come
+!  from the face sponge block (rung 11): width in metres -> iwidth cells at
+!  init, direct r/a per face (nee global WaveMakerPointNum + the hardcoded
+!  R=0.85/A=10 pair).
 !  GEN_ABS = a wavemaker-fed west face with an eta/file target
 !  (boundaries.west.forcing {wavemaker, eta|file}, reorg rung 3b): the
 !  west tide slot holds/streams the target without the TIDE_BC strip.
@@ -45,15 +48,14 @@ module model_tide_mod
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
+   use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
 
    implicit none
 
    private
    public :: type_model_tide
 
-   ! legacy TIDE_SPONGE constants (mod_tide.F:247-249) and PARAM SMALL
-   real(SP), parameter :: R_SP_TIDE = 0.85_SP
-   real(SP), parameter :: A_SP_TIDE = 10.0_SP
+   ! legacy TIDE_SPONGE profile floor (mod_tide.F:249) and PARAM SMALL
    real(SP), parameter :: LIM_TIDE = 1.0_SP
    real(SP), parameter :: SMALL = 0.000001_SP
 
@@ -67,7 +69,15 @@ module model_tide_mod
       logical :: tidal_bc_gen_abs = .false.
 
       character(len=80) :: tide_bc_type = 'CONSTANT'
-      integer :: iwidth = 30                     ! WaveMakerPointNum
+
+      ! per-face strip geometry + coefficients from the face sponge block
+      ! (rung 11); defaults mirror the legacy hardcodes for never-forced
+      ! faces (their profiles build but never apply).  iwidth derives from
+      ! width_m at init (dx for W/E, dy for S/N)
+      real(SP) :: width_m(4) = 0.0_SP
+      real(SP) :: r_face(4) = 0.85_SP
+      real(SP) :: a_face(4) = 10.0_SP
+      integer  :: iwidth(4) = 30
 
       ! per-boundary enables (legacy default .TRUE., knocked out by a
       ! missing TideX_ETA / TideXFileName)
@@ -125,21 +135,36 @@ contains
    !   $$ r_i = R^{\lfloor 50\,(i + n_{px} M_{glob}/p_x - 1)
    !            /(I_w - 1) \rfloor}, \qquad
    !      s(i) = 1/\max(A^{r_i},\ 1) $$
-   ! with R = 0.85, A = 10 — the exponent is INTEGER division like
-   ! legacy, and every rank fills its whole window (the global offset
-   ! keeps the profile continuous across seams).  NOTE: the serial
-   ! legacy build has a north typo (Nloc - i, mod_tide.F:295); the
-   ! vendored legacy is a PARALLEL build, so the j form is the one
-   ! reproduced here.
+   ! with per-face R/A/I_w from the face sponge block (rung 11; the
+   ! legacy pair was R = 0.85, A = 10 with I_w global) — the exponent is
+   ! INTEGER division like legacy, and every rank fills its whole window
+   ! (the global offset keeps the profile continuous across seams).
+   ! NOTE: the serial legacy build has a north typo (Nloc - i,
+   ! mod_tide.F:295); the vendored legacy is a PARALLEL build, so the j
+   ! form is the one reproduced here.
    ! ----------------------------------------------------------------
    subroutine tide_init_compute(this, grid)
       class(type_model_tide), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
 
-      real(SP) :: ri
-      integer :: i, j, mloc, nloc
+      real(SP) :: ri, d
+      integer :: i, j, f, mloc, nloc
 
       if (.not. this%is_activated) return
+
+      ! width (m) -> strip cells; the profile divides by iwidth-1, so a
+      ! sub-2-cell strip is floored (never applied narrower than legacy
+      ! could express)
+      do f = FACE_W, FACE_N
+         if (this%width_m(f) > 0.0_SP) then
+            if (f == FACE_W .or. f == FACE_E) then
+               d = grid%dx(1, 1)
+            else
+               d = grid%dy(1, 1)
+            end if
+            this%iwidth(f) = max(2, nint(this%width_m(f)/d))
+         end if
+      end do
 
       mloc = grid%lp%mloc
       nloc = grid%lp%nloc
@@ -148,17 +173,18 @@ contains
 
       associate (Mglob => grid%M, Nglob => grid%N, &
                  px => grid%nx_proc, py => grid%ny_proc, &
-                 npx => grid%iproc, npy => grid%jproc, iw => this%iwidth)
+                 npx => grid%iproc, npy => grid%jproc, &
+                 iw => this%iwidth, r => this%r_face, a => this%a_face)
          do j = 1, nloc
             do i = 1, mloc
-               ri = R_SP_TIDE**(50*(i + npx*Mglob/px - 1)/(iw - 1))
-               this%sponge_west(i, j) = max(A_SP_TIDE**ri, LIM_TIDE)
-               ri = R_SP_TIDE**(50*(mloc - i + (px - npx - 1)*Mglob/px)/(iw - 1))
-               this%sponge_east(i, j) = max(A_SP_TIDE**ri, LIM_TIDE)
-               ri = R_SP_TIDE**(50*(j + npy*Nglob/py - 1)/(iw - 1))
-               this%sponge_south(i, j) = max(A_SP_TIDE**ri, LIM_TIDE)
-               ri = R_SP_TIDE**(50*(nloc - j + (py - npy - 1)*Nglob/py)/(iw - 1))
-               this%sponge_north(i, j) = max(A_SP_TIDE**ri, LIM_TIDE)
+               ri = r(FACE_W)**(50*(i + npx*Mglob/px - 1)/(iw(FACE_W) - 1))
+               this%sponge_west(i, j) = max(a(FACE_W)**ri, LIM_TIDE)
+               ri = r(FACE_E)**(50*(mloc - i + (px - npx - 1)*Mglob/px)/(iw(FACE_E) - 1))
+               this%sponge_east(i, j) = max(a(FACE_E)**ri, LIM_TIDE)
+               ri = r(FACE_S)**(50*(j + npy*Nglob/py - 1)/(iw(FACE_S) - 1))
+               this%sponge_south(i, j) = max(a(FACE_S)**ri, LIM_TIDE)
+               ri = r(FACE_N)**(50*(nloc - j + (py - npy - 1)*Nglob/py)/(iw(FACE_N) - 1))
+               this%sponge_north(i, j) = max(a(FACE_N)**ri, LIM_TIDE)
             end do
          end do
       end associate
@@ -330,7 +356,7 @@ contains
 
       if (this%tide_west) then
          do j = 1, nloc
-            do i = 1, min(this%iwidth, mloc)
+            do i = 1, min(this%iwidth(FACE_W), mloc)
                if (mask(i, j) == 1) then
                   eta(i, j) = this%eta_west + (eta(i, j) - this%eta_west)*this%sponge_west(i, j)
                   u(i, j) = this%u_west + (u(i, j) - this%u_west)*this%sponge_west(i, j)
@@ -342,7 +368,7 @@ contains
 
       if (this%tide_east) then
          do j = 1, nloc
-            do i = max(1, mloc - this%iwidth + 1), mloc
+            do i = max(1, mloc - this%iwidth(FACE_E) + 1), mloc
                if (mask(i, j) == 1) then
                   eta(i, j) = this%eta_east + (eta(i, j) - this%eta_east)*this%sponge_east(i, j)
                   u(i, j) = this%u_east + (u(i, j) - this%u_east)*this%sponge_east(i, j)
@@ -353,7 +379,7 @@ contains
       end if
 
       if (this%tide_south) then
-         do j = 1, min(this%iwidth, nloc)
+         do j = 1, min(this%iwidth(FACE_S), nloc)
             do i = 1, mloc
                if (mask(i, j) == 1) then
                   eta(i, j) = this%eta_south + (eta(i, j) - this%eta_south)*this%sponge_south(i, j)
@@ -365,7 +391,7 @@ contains
       end if
 
       if (this%tide_north) then
-         do j = max(1, nloc - this%iwidth + 1), nloc
+         do j = max(1, nloc - this%iwidth(FACE_N) + 1), nloc
             do i = 1, mloc
                if (mask(i, j) == 1) then
                   eta(i, j) = this%eta_north + (eta(i, j) - this%eta_north)*this%sponge_north(i, j)

@@ -91,6 +91,7 @@ module model_wavemaker_mod
    public :: type_model_wavemaker
    public :: read_wavemakers
    public :: wk_regular_coefficients
+   public :: wavemaker_lambda_low
 
    ! Default wavemaker phase-RNG seed — matches the legacy WAVE_COHERENCE
    ! fixed-seed convention (a fixed, nonzero value keeps runs reproducible).
@@ -2750,6 +2751,94 @@ contains
              *gamma_spec**(exp(-(fre/fm - 1.0_SP)**2/(2.0_SP*sigma_spec**2)))
 
    end function tma_density
+
+   ! ----------------------------------------------------------------
+   ! λ_low: the low-side cumulative-variance quantile wavelength of
+   ! this wavemaker's spectrum at its generation depth — how wide an
+   ! absorbing/relaxation strip must be to absorb the longest energetic
+   ! waves (rung 11 --validate advisory).  The 2% quantile degenerates
+   ! to ~1.2 λ_p for narrow seas and moves below a swell peak in
+   ! bimodal ones; it is insensitive to the configured band edge (an
+   ! energy-empty tail contributes nothing to the running sum).  0 =
+   ! not applicable (transient/file types) or not computable.
+   ! ----------------------------------------------------------------
+   function wavemaker_lambda_low(this) result(lam)
+      class(type_model_wavemaker), intent(in) :: this
+      real(SP) :: lam
+
+      real(SP), parameter :: Q_LOW = 0.02_SP
+      integer, parameter :: NBIN = 400
+      real(SP) :: h, f, df, e(NBIN), total, cum, f_q
+      logical :: is_jonswap
+      integer :: i
+
+      lam = 0.0_SP
+      h = this%DEP_WK
+      if (this%abs_source .or. this%left_bc_source) then
+         if (this%DepthWaveMaker > 0.0_SP) h = this%DepthWaveMaker
+      end if
+      if (h <= 0.0_SP) return
+
+      select case (this%wavemaker_type)
+      case ("WK_REG")
+         if (this%Tperiod > 0.0_SP) lam = dispersion_wavelength(1.0_SP/this%Tperiod, h)
+      case ("WK_IRR", "TMA_1D", "JON_1D", "JON_2D", "WK_NEW_IRR", &
+            "ABS", "LEFT_BC_IRR")
+         if (this%FreqMin <= 0.0_SP .or. this%FreqMax <= this%FreqMin &
+             .or. this%FreqPeak <= 0.0_SP) return
+         if (this%abs_source .or. this%left_bc_source) then
+            is_jonswap = .false.
+            if (allocated(this%WAVE_DATA_TYPE)) then
+               if (len(this%WAVE_DATA_TYPE) >= 3) &
+                  is_jonswap = this%WAVE_DATA_TYPE(1:3) == "JON"
+            end if
+         else
+            is_jonswap = this%wavemaker_type(1:3) == "JON"
+         end if
+         df = (this%FreqMax - this%FreqMin)/real(NBIN, SP)
+         total = 0.0_SP
+         do i = 1, NBIN
+            f = this%FreqMin + (real(i, SP) - 0.5_SP)*df
+            e(i) = tma_density(is_jonswap, f, this%FreqPeak, h, this%GammaTMA)*df
+            total = total + e(i)
+         end do
+         if (total <= 0.0_SP) return
+         cum = 0.0_SP
+         f_q = this%FreqMin
+         do i = 1, NBIN
+            cum = cum + e(i)
+            if (cum >= Q_LOW*total) then
+               f_q = this%FreqMin + (real(i, SP) - 0.5_SP)*df
+               exit
+            end if
+         end do
+         lam = dispersion_wavelength(f_q, h)
+      case default
+         ! WK_TIME / DATA2D file spectra: axis scan is a future rung
+         lam = 0.0_SP
+      end select
+
+   end function wavemaker_lambda_low
+
+   ! linear-dispersion wavelength via damped fixed-point on
+   !   $$ k = \omega^2 / (g \tanh kh) $$
+   function dispersion_wavelength(f, h) result(lam)
+      use core_constants_mod, only: GRAV
+      real(SP), intent(in) :: f, h
+      real(SP) :: lam
+
+      real(SP) :: omega, k, k_new
+      integer :: it
+
+      omega = 2.0_SP*PI*f
+      k = omega*omega/GRAV
+      do it = 1, 100
+         k_new = omega*omega/(GRAV*tanh(k*h))
+         k = 0.5_SP*(k + k_new)
+      end do
+      lam = 2.0_SP*PI/k
+
+   end function dispersion_wavelength
 
    function jonswap_density(this, f) result(s)
       class(type_spectrum_jonswap), intent(in) :: this

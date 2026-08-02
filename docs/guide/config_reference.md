@@ -75,7 +75,6 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `periodic` | — | `PERIODIC` | — | Axis-level periodic pair list, x and/or y (e.g. [y] or [x, y]). |
-| `relaxation_cells` | `30` | `WaveMakerPointNum` | — | Width in cells of the forcing relaxation strip. |
 | `sponge.direct.r` | — | — | — | Shared direct-sponge damping ratio all face sponges inherit. |
 | `sponge.direct.a` | — | — | — | Shared direct-sponge damping exponent. |
 | `sponge.friction.cd` | — | — | — | Shared friction-sponge drag coefficient. |
@@ -86,7 +85,7 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `<face>.type` | — | — | — | Optional BC assertion; errors at init if it disagrees with the derived BC. |
-| `<face>.sponge.width` | `0.0` | `Sponge_<face>_width` | m | Absorbing sponge strip width (0 = no sponge). |
+| `<face>.sponge.width` | `0.0` | `Sponge_<face>_width` | m | Absorbing sponge strip width (0 = no sponge). On a forced or wavemaker-fed face this also sizes the relaxation strip (cells = width/dx at init). |
 | `<face>.sponge.direct.r` | `0.85` | `R_sponge` | — | Direct-sponge damping ratio. |
 | `<face>.sponge.direct.a` | `5.0` | `A_sponge` | — | Direct-sponge damping exponent. |
 | `<face>.sponge.friction.cd` | `0.0` | `CDsponge` | — | Sponge bottom-friction coefficient. |

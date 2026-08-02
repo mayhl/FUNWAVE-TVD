@@ -22,7 +22,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_DIRECT_R = "0.85"
    character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_FRICTION_CD = "0.0"
    character(*), parameter :: DEF_BOUNDARIES_NORTH_SPONGE_WIDTH = "0.0"
-   character(*), parameter :: DEF_BOUNDARIES_RELAXATION_CELLS = "30"
    character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_DIFFUSION_NU = "0.1"
    character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_DIRECT_A = "5.0"
    character(*), parameter :: DEF_BOUNDARIES_SOUTH_SPONGE_DIRECT_R = "0.85"

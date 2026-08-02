@@ -227,11 +227,8 @@ sections:
         default: ~
         units: ~
         doc: "Axis-level periodic pair list, x and/or y (e.g. [y] or [x, y])."
-      relaxation_cells:
-        legacy: WaveMakerPointNum
-        default: 30
-        units: ~
-        doc: "Width in cells of the forcing relaxation strip."
+      # relaxation_cells retired (rung 11): the face sponge width (m) sizes
+      # the forcing relaxation strip -- nee WaveMakerPointNum, 30 cells
       # shared sponge coefficients: every face sponge inherits these PER-KEY
       # (a face sub-block overrides only the keys it states); a mechanism
       # block present here turns that mechanism on for every face sponge.
@@ -254,7 +251,7 @@ sections:
           default: 0.0
           units: "m"
           latex: "$W_{s,{F}}$"
-          doc: "Absorbing sponge strip width (0 = no sponge)."
+          doc: "Absorbing sponge strip width (0 = no sponge). On a forced or wavemaker-fed face this also sizes the relaxation strip (cells = width/dx at init)."
         sponge.direct.r:
           legacy: R_sponge
           default: 0.85
