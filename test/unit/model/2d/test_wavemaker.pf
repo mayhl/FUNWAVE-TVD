@@ -9,6 +9,7 @@ module test_wavemaker
    use core_log_io_mod,     only: new_log_writer
    use core_grid_mod,       only: type_grid_2d
    use model_initial_mod,   only: type_model_initial
+   use model_breaking_mod, only: type_model_breaking
    use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers
 
    implicit none
@@ -206,6 +207,7 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_env) :: env
       type(type_model_initial) :: ini
+      type(type_model_breaking) :: brk
       type(type_model_wavemaker), allocatable :: wms(:)
 
       call new_env(env, label='test_coexist', yaml_path='test_coexist.yaml', &
@@ -215,7 +217,9 @@ contains
       @assertTrue(ini%is_activated)
       @assertEqual('INI_SOLITARY', ini%ic_type)
 
-      call read_wavemakers(env, wms)
+      ! breaking gates the zone-override keys (main reads it first)
+      call brk%read_input(env)
+      call read_wavemakers(env, wms, brk)
       @assertEqual(2, size(wms))
       @assertTrue(wms(1)%boundary_candidate)
       @assertEqual('PENDING_BOUNDARY', wms(1)%wavemaker_type)
