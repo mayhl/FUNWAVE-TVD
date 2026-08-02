@@ -502,10 +502,7 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         scap = pop_val("SlopeCap")
         if scap is not None:
             bathy["slope_cap"] = scap
-        if mg is not None:
-            bathy["nx"] = mg
-        if ng is not None:
-            bathy["ny"] = ng
+        # dims ride the unified grid.n_cells (already emitted from Mglob/Nglob)
     else:
         pop("DEPTH_FILE")
         pop("DEPTH_FTYPE")

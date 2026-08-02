@@ -358,7 +358,7 @@ sections:
       cell_size: {legacy: ~, default: ~, units: m, latex: '$[\Delta x, \Delta y]$', doc: "Uniform grid spacing [dx, dy] (nee DX/DY); alternative to dx_file/dy_file."}
       dx_file: {legacy: ~, default: ~, units: ~, doc: "Variable x-spacing file (with dy_file; alternative to cell_size). Not yet implemented in the new path."}
       dy_file: {legacy: ~, default: ~, units: ~, doc: "Variable y-spacing file (with dx_file)."}
-      n_cells: {legacy: ~, default: ~, units: ~, latex: '$[N_x, N_y]$', doc: "Global domain size [nx, ny] (nee Mglob/Nglob; grid_size). Required for flat/slope bathymetry; file bathymetry takes its dims from bathymetry.nx/ny."}
+      n_cells: {legacy: ~, default: ~, units: ~, latex: '$[N_x, N_y]$', doc: "Global domain size [nx, ny] (nee Mglob/Nglob; grid_size; bathymetry.nx/ny). Required for flat/slope; for file bathymetry absent = inferred from the file (ASCII dimension scan) and present = an origin-anchored subset window, fit-checked under --validate."}
       n_procs: {legacy: ~, default: ~, units: ~, latex: '$[P_x, P_y]$', doc: "MPI decomposition [px, py] (nee PX/PY; decomposition.nx_proc/ny_proc); absent = auto-decompose."}
       origin: {legacy: ~, default: ~, units: m, latex: '$[x_0, y_0]$', doc: "Local coordinates [x0, y0] of the cell (1,1) centre; default [0, 0]."}
       bathymetry.type: {legacy: DEPTH_TYPE, default: file, units: ~, values: [flat, file, slope], doc: Bathymetry source.}
@@ -367,8 +367,6 @@ sections:
       bathymetry.x0: {legacy: Xslp, default: 0.0, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
       bathymetry.file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: Bathymetry data file (file type).}
       bathymetry.file_type: {legacy: ~, default: ascii, units: ~, values: [ascii], doc: Bathymetry file format.}
-      bathymetry.nx: {legacy: ~, default: ~, units: ~, doc: "x dimension of the headerless ASCII depth file; doubles as the domain nx (file type, required)."}
-      bathymetry.ny: {legacy: ~, default: ~, units: ~, doc: "y dimension of the headerless ASCII depth file; doubles as the domain ny (file type, required)."}
       bathymetry.correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass (file type).}
       bathymetry.smooth_below_depth: {legacy: ~, default: ~, units: m, doc: "Correction-pass smoothing floor; absent = off (-LARGE sentinel)."}
       bathymetry.slope_cap: {legacy: ~, default: 1.0, units: ~, doc: Correction-pass maximum bed slope.}

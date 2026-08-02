@@ -19,8 +19,6 @@ grid:
   bathymetry:
     type: file
     file: depth_sentinel.txt
-    nx: 1136
-    ny: 400
 simulation:
   title: stability_rip
   total_time: 120.0

@@ -9,8 +9,6 @@ grid:
   bathymetry:
     type: file
     file: depth_a15.txt
-    nx: 512
-    ny: 250
 simulation:
   title: rip_2d
   total_time: 200.0

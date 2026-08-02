@@ -119,7 +119,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `cell_size` | — | — | m | Uniform grid spacing [dx, dy] (nee DX/DY); alternative to dx_file/dy_file. |
 | `dx_file` | — | — | — | Variable x-spacing file (with dy_file; alternative to cell_size). Not yet implemented in the new path. |
 | `dy_file` | — | — | — | Variable y-spacing file (with dx_file). |
-| `n_cells` | — | — | — | Global domain size [nx, ny] (nee Mglob/Nglob; grid_size). Required for flat/slope bathymetry; file bathymetry takes its dims from bathymetry.nx/ny. |
+| `n_cells` | — | — | — | Global domain size [nx, ny] (nee Mglob/Nglob; grid_size; bathymetry.nx/ny). Required for flat/slope; for file bathymetry absent = inferred from the file (ASCII dimension scan) and present = an origin-anchored subset window, fit-checked under --validate. |
 | `n_procs` | — | — | — | MPI decomposition [px, py] (nee PX/PY; decomposition.nx_proc/ny_proc); absent = auto-decompose. |
 | `origin` | — | — | m | Local coordinates [x0, y0] of the cell (1,1) centre; default [0, 0]. |
 | `bathymetry.type` | `file` | `DEPTH_TYPE` | — | Bathymetry source. One of `flat` \| `file` \| `slope`. |
@@ -128,8 +128,6 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `bathymetry.x0` | `0.0` | `Xslp` | m | x location where the slope begins. |
 | `bathymetry.file` | — | `DEPTH_FILE` | — | Bathymetry data file (file type). |
 | `bathymetry.file_type` | `ascii` | — | — | Bathymetry file format. One of `ascii`. |
-| `bathymetry.nx` | — | — | — | x dimension of the headerless ASCII depth file; doubles as the domain nx (file type, required). |
-| `bathymetry.ny` | — | — | — | y dimension of the headerless ASCII depth file; doubles as the domain ny (file type, required). |
 | `bathymetry.correction` | `false` | `BATHY_CORRECTION` | — | Apply the bathymetry smoothing/correction pass (file type). |
 | `bathymetry.smooth_below_depth` | — | — | m | Correction-pass smoothing floor; absent = off (-LARGE sentinel). |
 | `bathymetry.slope_cap` | `1.0` | — | — | Correction-pass maximum bed slope. |
