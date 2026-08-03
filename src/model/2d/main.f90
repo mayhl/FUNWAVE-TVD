@@ -852,110 +852,16 @@ contains
    ! interface fluxes ride the stepper's register_output entries.
    ! ----------------------------------------------------------------
    subroutine build_field_channel(this, mgr)
-      use core_output_channel_mod, only: type_var_meta
-      use model_field_metadata_mod, only: field_meta
+      use core_output_gatherer_mod, only: type_output_gatherer
       class(type_model_main), intent(inout), target :: this
       type(type_output_manager), intent(inout) :: mgr
 
-      character(len=16) :: vars(40), prefs(40)
-      character(len=8) :: stats(1)
       character(:), allocatable :: folder, fmt
-      character(len=160) :: msg
-      real(SP) :: dummy_coord(1)
       type(type_path) :: outdir
-      type(type_var_meta) :: vmeta(40)
-      real(SP) :: cap_bytes, rate, duration, chunk_win
-      integer :: nv, iv, unit, field_root, n_win
+      integer :: unit
       logical :: ok
 
       associate (out => this%output)
-
-         nv = 0
-         if (out%OUT_ETA) call add_var(vars, prefs, nv, "eta", "eta")
-         if (out%OUT_U) call add_var(vars, prefs, nv, "u", "u")
-         if (out%OUT_V) call add_var(vars, prefs, nv, "v", "v")
-         if (out%OUT_Hmax) call add_var(vars, prefs, nv, "h_max", "hmax")
-         if (out%OUT_Hmin) call add_var(vars, prefs, nv, "h_min", "hmin")
-         if (out%OUT_Umax) call add_var(vars, prefs, nv, "u_max", "umax")
-         if (out%OUT_MFmax) call add_var(vars, prefs, nv, "mf_max", "MFmax")
-         if (out%OUT_VORmax) call add_var(vars, prefs, nv, "vort_max", "VORmax")
-         if (this%output%out_arr_time) call add_var(vars, prefs, nv, "arr_time", "time")
-         ! Legacy gates the nubrk write on VISCOSITY_BREAKING, not OUT_NU alone
-         if (out%OUT_NU .and. this%physics%viscosity_breaking) &
-            call add_var(vars, prefs, nv, "nu_break", "nubrk")
-         ! Legacy gates the age write on SHOW_BREAKING (io.F:1442-1447);
-         ! roller/undertow write whenever flagged (zero-filled files
-         ! when no breaker runs, like legacy's unconditional arrays)
-         if (out%OUT_AGE .and. this%breaking%show_breaking) &
-            call add_var(vars, prefs, nv, "age_break", "age")
-         if (out%OUT_ROLLER) call add_var(vars, prefs, nv, "roller_flux", "roller")
-         if (out%OUT_UNDERTOW) then
-            call add_var(vars, prefs, nv, "undertow_u", "U_undertow")
-            call add_var(vars, prefs, nv, "undertow_v", "V_undertow")
-         end if
-         ! legacy PREVIEW writes FoamEta_ with no OUT_ gate — a -DFOAM
-         ! build always dumps it
-         if (this%foam%is_activated) &
-            call add_var(vars, prefs, nv, "eta_foam", "FoamEta")
-         ! Pves_/VesUp_/VesVp_ (nee legacy PREVIEW under OUT_VESSEL, now
-         ! explicit variables: entries).  The jet pair is the ONLY observable
-         ! the propeller has -- it feeds nothing back into the flow -- so
-         ! without these a dead jet and a live one are indistinguishable.
-         if ((out%OUT_Pves .or. out%OUT_VesUp .or. out%OUT_VesVp) &
-             .and. .not. this%vessel%is_activated) &
-            call this%env%log%exit_on_error( &
-            "output: variables: Pves/VesUp/VesVp require the vessel: section")
-         if ((out%OUT_VesUp .or. out%OUT_VesVp) &
-             .and. .not. this%vessel%propeller) &
-            call this%env%log%exit_on_error( &
-            "output: variables: VesUp/VesVp require vessel: propeller: true")
-         if (out%OUT_Pves) call add_var(vars, prefs, nv, "vessel_pressure", "Pves")
-         if (out%OUT_VesUp) call add_var(vars, prefs, nv, "vessel_up", "VesUp")
-         if (out%OUT_VesVp) call add_var(vars, prefs, nv, "vessel_vp", "VesVp")
-         ! Pstorm_ (nee legacy OUTPUT_METEO under OUT_METEO, io.F:1709-1726)
-         ! exists for every spatial pressure model; wind-only fields have no
-         ! Pstorm.  Ustorm_/Vstorm_ are the Holland gradient wind.
-         if (out%OUT_Pstorm) then
-            if (.not. (this%meteo%is_activated &
-                       .and. (this%meteo%meteo_gausian &
-                              .or. this%meteo%wind_holland_model &
-                              .or. this%meteo%slide_model))) &
-               call this%env%log%exit_on_error( &
-               "output: variables: Pstorm requires a meteo pressure model "// &
-               "(gaussian/holland/slide)")
-            call add_var(vars, prefs, nv, "meteo_pressure", "Pstorm")
-         end if
-         if (out%OUT_Ustorm .or. out%OUT_Vstorm) then
-            if (.not. (this%meteo%is_activated .and. this%meteo%wind_holland_model)) &
-               call this%env%log%exit_on_error( &
-               "output: variables: Ustorm/Vstorm require meteo: holland:")
-            if (out%OUT_Ustorm) call add_var(vars, prefs, nv, "meteo_wind_u", "Ustorm")
-            if (out%OUT_Vstorm) call add_var(vars, prefs, nv, "meteo_wind_v", "Vstorm")
-         end if
-         ! legacy writes its sediment fields straight out of PREVIEW, ungated
-         ! (OUTPUT_SEDIMENT, which PLOT_INTV_SEDIMENT gates, is an empty stub),
-         ! so every one of these rides the ordinary plot cadence.  dep_ is the
-         ! evolving bed — the only observable of the morphology.
-         if (this%sediment%is_activated) then
-            call add_var(vars, prefs, nv, "sediment_c", "C")
-            call add_var(vars, prefs, nv, "sediment_pickup", "Pick")
-            call add_var(vars, prefs, nv, "sediment_depo", "Depo")
-            call add_var(vars, prefs, nv, "sediment_pavg", "Pavg")
-            call add_var(vars, prefs, nv, "sediment_davg", "Davg")
-            call add_var(vars, prefs, nv, "sediment_dchgs", "DchgS")
-            call add_var(vars, prefs, nv, "sediment_dchgb", "DchgB")
-            call add_var(vars, prefs, nv, "sediment_bedfx", "BedFx")
-            call add_var(vars, prefs, nv, "sediment_bedfy", "BedFy")
-            call add_var(vars, prefs, nv, "sediment_bedstr", "BedStr")
-            call add_var(vars, prefs, nv, "sediment_aval", "Aval")
-            call add_var(vars, prefs, nv, "sediment_avalac", "AvalAc")
-            call add_var(vars, prefs, nv, "depth", "dep")
-         end if
-         if (out%OUT_MASK) call add_var(vars, prefs, nv, "mask", "mask")
-         if (out%OUT_MASK9) call add_var(vars, prefs, nv, "mask9", "mask9")
-         ! Legacy P/Q are the interface fluxes, not the registry p/q (Ubar)
-         if (out%OUT_P) call add_var(vars, prefs, nv, "p_flux", "p")
-         if (out%OUT_Q) call add_var(vars, prefs, nv, "q_flux", "q")
 
          folder = trim(out%result_folder)
          if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
@@ -979,89 +885,30 @@ contains
             fmt = "ascii"
          end select
 
-         ! layout: netcdf file topology for the field stream (points
-         ! always group into the shared root; ascii/binary field files
-         ! are per-flush and ignore the knob)
-         field_root = -1
-         chunk_win = 0.0_SP
-         if (fmt == "netcdf" .or. fmt == "pnetcdf") then
-            cap_bytes = out%max_file_size*1024.0_SP**3
-            rate = real(nv, SP)*real(this%grid%M, SP)*real(this%grid%N, SP) &
-                   *8.0_SP/out%interval
-            duration = this%simulation%total_time - this%simulation%t_start
-            select case (out%layout)
-            case ("single")
-               ! classic CDF-5 has no groups, so the shared-root layout
-               ! cannot host a pnetcdf stream
-               if (fmt == "pnetcdf") call this%env%log%exit_on_error( &
-                  "output: layout: single needs netcdf groups -- "// &
-                  "PNETCDF supports per_stream or chunked")
-               call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
-               field_root = mgr%diag_ncid
-            case ("chunked")
-               ! size-derived window, rounded down to the flush cadence;
-               ! a window covering the whole run (final forced frame
-               ! included) collapses to one file
-               n_win = int(min(cap_bytes/rate, duration)/out%interval)
-               if (real(n_win, SP)*out%interval >= duration) n_win = n_win + 1
-               chunk_win = real(max(1, n_win), SP)*out%interval
-               write (msg, '(A,F0.1,A,F0.3,A)') &
-                  "output: chunked field files span ", chunk_win, &
-                  " s (~", rate*chunk_win/1024.0_SP**3, " GB each)"
-               call this%env%log%info(trim(msg))
-            end select
-            if (out%layout /= "chunked" .and. rate*duration > cap_bytes) then
-               write (msg, '(A,F0.1,A,F0.1,A)') &
-                  "output: predicted field stream size ", &
-                  rate*duration/1024.0_SP**3, " GB exceeds max_file_size ", &
-                  out%max_file_size, " GB -- consider layout: chunked"
-               call this%env%log%warning(trim(msg))
-            end if
-         end if
-
-         stats(1) = " "
-         dummy_coord(1) = 0.0_SP
-
-         ! CF attrs from the registry catalog; uncataloged names stay blank
-         do iv = 1, nv
-            vmeta(iv) = field_meta(trim(vars(iv)))
-         end do
-
-         allocate (mgr%channels(1 + this%output%n_channels))
-         mgr%n_channels = 1
-         call mgr%channels(1)%init(id="field", geom_type="field", &
-                                   variables=vars, n_vars=nv, &
-                                   statistics=stats, n_stats=0, &
-                                   snapshot=.true., &
-                                   t_start=this%simulation%t_start, &
-                                   interval=this%output%interval, &
-                                   result_folder=folder, format=fmt, &
-                                   coords_x=dummy_coord, coords_y=dummy_coord, &
-                                   n_coords=0, grid=this%grid, &
-                                   comm=this%env%comm, &
-                                   file_prefixes=prefs, &
-                                   icount_start=merge( &
-                                   this%hot_start%output_start_number - 1, &
-                                   -1, this%hot_start%is_activated), &
-                                   var_meta=vmeta, diag_ncid=field_root, &
-                                   chunk_window=chunk_win)
+         ! channels own every stream since the flags-list retirement;
+         ! the manager array sizes to the deck's channel count
+         allocate (mgr%channels(max(1, this%output%n_channels)))
+         mgr%n_channels = 0
 
          ! legacy PREVIEW first-frame block: OUT_DEPTH .OR. BREAKWATER
          ! writes BOTH dep.out and cd_breakwater.out (zeros when no
-         ! breakwater)
+         ! breakwater).  Statics ride their own gatherer since the
+         ! channels took over the streams.
          if (out%depth_out .or. this%obstacle%breakwater) then
-            call write_static_field(this, mgr%channels(1), &
-                                    "depth", folder//"dep.out", fmt)
             block
+               type(type_output_gatherer) :: statics
                real(SP), allocatable :: zeros(:, :)
+               call statics%init_field(this%grid, this%env%comm)
+               call write_static_field(this, statics, &
+                                       "depth", folder//"dep.out", fmt)
                if (allocated(this%obstacle%cd_breakwater)) then
-                  call gather_write(this, mgr%channels(1)%gatherer, &
+                  call gather_write(this, statics, &
                                     this%obstacle%cd_breakwater, &
                                     folder//"cd_breakwater.out", fmt)
                else
                   allocate (zeros(this%grid%lp%mloc, this%grid%lp%nloc), &
                             source=0.0_SP)
-                  call gather_write(this, mgr%channels(1)%gatherer, zeros, &
+                  call gather_write(this, statics, zeros, &
                                     folder//"cd_breakwater.out", fmt)
                end if
             end block
@@ -1091,8 +938,9 @@ contains
       type(type_var_meta), allocatable :: vmeta(:)
       type(type_channel_derived), allocatable :: dspecs(:)
       character(:), allocatable :: pfmt
+      real(SP) :: cwin
       logical :: is_field
-      integer :: k, iv, kc, n_owned, ierr, idn, ip, isrc
+      integer :: k, iv, kc, n_owned, ierr, idn, ip, isrc, froot, ic0
       character(16) :: owned_str, total_str
 
       ! Vector-derived scratch: register once when any channel asks;
@@ -1165,15 +1013,23 @@ contains
                                                   stat=PROD_STAT(ip), scale=PROD_SCALE(ip))
             end do
 
-            ! field channels: deck-format inheritance includes binary;
-            ! netcdf/pnetcdf field channels pend the layout wiring
+            ! field channels inherit the full deck format set; netcdf
+            ! layouts wire per channel (nee the legacy stream's block):
+            ! single = a group <id> in shared output.nc, chunked = a
+            ! size-derived window, per_stream = one <id>.nc
+            froot = -1
+            cwin = 0.0_SP
+            ic0 = 0
             if (is_field) then
                pfmt = trim(cfg%format)
                if (len_trim(pfmt) == 0) pfmt = trim(this%output%format)
-               if (pfmt /= "ascii" .and. pfmt /= "binary") &
-                  call this%env%log%exit_on_error("output: channels: '"//cfg%name// &
-                                                  "': field channel inherits deck format '"// &
-                                                  pfmt//"' -- pending; set format: ascii|binary")
+               ! legacy frame-counter base: files start at _00000; a
+               ! hotstart resumes the numbering where it left off
+               ic0 = merge(this%hot_start%output_start_number - 1, -1, &
+                           this%hot_start%is_activated)
+               if (pfmt == "netcdf" .or. pfmt == "pnetcdf") then
+                  call wire_field_netcdf(this, mgr, cfg, folder, pfmt, froot, cwin)
+               end if
             else
                pfmt = point_format(this, k)
             end if
@@ -1193,7 +1049,9 @@ contains
                                        coords_x=geom%x, coords_y=geom%y, &
                                        n_coords=size(geom%x), grid=this%grid, &
                                        comm=this%env%comm, var_meta=vmeta, &
-                                       diag_ncid=mgr%diag_ncid, &
+                                       icount_start=ic0, &
+                                       diag_ncid=merge(froot, mgr%diag_ncid, froot >= 0), &
+                                       chunk_window=cwin, &
                                        hidden=cfg%hidden, &
                                        derived=dspecs, n_derived=cfg%n_derived)
             mgr%n_channels = kc
@@ -1215,6 +1073,56 @@ contains
       end do
 
    end subroutine build_point_channels
+
+   ! netcdf layout wiring for one field channel (nee the legacy field
+   ! stream's block): resolves the shared root / chunk window and logs
+   ! the size prediction against max_file_size
+   subroutine wire_field_netcdf(this, mgr, cfg, folder, pfmt, froot, cwin)
+      use model_output_mod, only: type_channel_config
+      class(type_model_main), intent(inout) :: this
+      type(type_output_manager), intent(inout) :: mgr
+      type(type_channel_config), intent(in) :: cfg
+      character(*), intent(in) :: folder, pfmt
+      integer, intent(out) :: froot
+      real(SP), intent(out) :: cwin
+
+      character(len=160) :: msg
+      real(SP) :: cap_bytes, rate, duration
+      integer :: n_win, nv
+
+      froot = -1
+      cwin = 0.0_SP
+      nv = count(.not. cfg%hidden)*(1 + cfg%n_stats) + cfg%n_derived
+      cap_bytes = this%output%max_file_size*1024.0_SP**3
+      rate = real(nv, SP)*real(this%grid%M, SP)*real(this%grid%N, SP) &
+             *8.0_SP/cfg%interval
+      duration = this%simulation%total_time - this%simulation%t_start
+
+      select case (this%output%layout)
+      case ("single")
+         if (pfmt == "pnetcdf") call this%env%log%exit_on_error( &
+            "output: layout: single needs netcdf groups -- "// &
+            "PNETCDF supports per_stream or chunked")
+         call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
+         froot = mgr%diag_ncid
+      case ("chunked")
+         n_win = int(min(cap_bytes/rate, duration)/cfg%interval)
+         if (real(n_win, SP)*cfg%interval >= duration) n_win = n_win + 1
+         cwin = real(max(1, n_win), SP)*cfg%interval
+         write (msg, '(3a,F0.1,a,F0.3,a)') "output: channel '", trim(cfg%name), &
+            "' chunked files span ", cwin, " s (~", &
+            rate*cwin/1024.0_SP**3, " GB each)"
+         call this%env%log%info(trim(msg))
+      end select
+      if (this%output%layout /= "chunked" .and. rate*duration > cap_bytes) then
+         write (msg, '(3a,F0.1,a,F0.1,a)') "output: channel '", trim(cfg%name), &
+            "' predicted stream size ", rate*duration/1024.0_SP**3, &
+            " GB exceeds max_file_size ", this%output%max_file_size, &
+            " GB -- consider layout: chunked"
+         call this%env%log%warning(trim(msg))
+      end if
+
+   end subroutine wire_field_netcdf
 
    ! field_meta plus the vector-derived names it cannot know about
    function derived_aware_meta(name) result(m)
@@ -1257,10 +1165,11 @@ contains
 
    ! Gather one registry field and write it as a static (non-series)
    ! file — legacy dep.out.  Reuses the field channel's gatherer.
-   subroutine write_static_field(this, ch, var, fname, fmt)
+   subroutine write_static_field(this, gatherer, var, fname, fmt)
       use core_constants_mod, only: N_GHOST
+      use core_output_gatherer_mod, only: type_output_gatherer
       class(type_model_main), intent(inout), target :: this
-      type(type_output_channel), intent(inout) :: ch
+      type(type_output_gatherer), intent(in) :: gatherer
       character(*), intent(in) :: var, fname, fmt
 
       real(SP), pointer :: fld(:, :)
@@ -1268,25 +1177,16 @@ contains
 
       fld => this%registry%get(var)
       if (this%env%comm%is_io_node()) then
-         allocate (glob(ch%gatherer%M, ch%gatherer%N))
+         allocate (glob(gatherer%M, gatherer%N))
       else
          allocate (glob(1, 1))
       end if
       associate (ng => N_GHOST, nx => this%grid%local_nx, ny => this%grid%local_ny)
-         call ch%gatherer%gather_field(fld(ng + 1:ng + nx, ng + 1:ng + ny), &
-                                       glob, this%env%comm)
+         call gatherer%gather_field(fld(ng + 1:ng + nx, ng + 1:ng + ny), &
+                                    glob, this%env%comm)
       end associate
       if (this%env%comm%is_io_node()) call write_field_file(fname, glob, fmt)
    end subroutine write_static_field
-
-   subroutine add_var(vars, prefs, nv, name, prefix)
-      character(len=*), intent(inout) :: vars(:), prefs(:)
-      integer, intent(inout) :: nv
-      character(len=*), intent(in) :: name, prefix
-      nv = nv + 1
-      vars(nv) = name
-      prefs(nv) = prefix
-   end subroutine add_var
 
    subroutine model_finalize(this)
       use mpi_f08, only: MPI_Finalize, MPI_COMM_WORLD

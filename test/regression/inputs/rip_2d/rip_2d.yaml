@@ -51,8 +51,11 @@ breaking:
   cbrk1: 0.65
   cbrk2: 0.35
 output:
-  interval: 20.0
   result_folder: output/
   format: binary
   depth_out: true
-  variables: [U, V, ETA, ETAscreen, Hmax, Hmin, Umax, MASK]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [u, v, eta, h_max, h_min, u_max, mask]
+      interval: 20.0

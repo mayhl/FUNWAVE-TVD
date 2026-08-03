@@ -53,8 +53,11 @@ breaking:
   cbrk1: 0.65
   cbrk2: 0.35
 output:
-  interval: 24.0
   result_folder: output/
   format: binary
   checkpoint: ./chk
-  variables: [ETA]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 24.0

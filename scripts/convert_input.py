@@ -76,45 +76,48 @@ def _auto(s: str):
 # OUT_NU was keyed as 'OUT_NU' in old format; renamed to 'NU' in new YAML.
 # ---------------------------------------------------------------------------
 
-_VAR_FLAGS: dict[str, str] = {
-    "U": "U",
-    "V": "V",
-    "ETA": "ETA",
-    "ETAscreen": "ETAscreen",
-    "Hmax": "Hmax",
-    "Hmin": "Hmin",
-    "Umax": "Umax",
-    "MFmax": "MFmax",
-    "VORmax": "VORmax",
-    "MASK": "MASK",
-    "MASK9": "MASK9",
-    "Umean": "Umean",
-    "Vmean": "Vmean",
-    "ETAmean": "ETAmean",
-    "WaveHeight": "WaveHeight",
-    "SXL": "SXL",
-    "SXR": "SXR",
-    "SYL": "SYL",
-    "SYR": "SYR",
-    "SourceX": "SourceX",
-    "SourceY": "SourceY",
-    "FrcX": "FrcX",
-    "FrcY": "FrcY",
-    "BrkdisX": "BrkdisX",
-    "BrkdisY": "BrkdisY",
-    "P": "P",
-    "Q": "Q",
-    "Fx": "Fx",
-    "Fy": "Fy",
-    "Gx": "Gx",
-    "Gy": "Gy",
-    "AGE": "AGE",
-    "ROLLER": "ROLLER",  # also a breaking physics flag — see convert()
-    "UNDERTOW": "UNDERTOW",
-    "OUT_NU": "NU",  # renamed: OUT_NU → NU
-    "TMP": "TMP",
-    "Radiation": "Radiation",
+# registry-name spellings (channels migration): legacy flag -> channel
+# variable.  The means quartet routes to a statistics channel instead;
+# names mapping to ~ are dead in the modern engine (no writer) and drop
+# with a conversion note.
+_VAR_FLAGS: dict[str, str | None] = {
+    "U": "u",
+    "V": "v",
+    "ETA": "eta",
+    "ETAscreen": None,
+    "Hmax": "h_max",
+    "Hmin": "h_min",
+    "Umax": "u_max",
+    "MFmax": "mf_max",
+    "VORmax": "vort_max",
+    "MASK": "mask",
+    "MASK9": "mask9",
+    "SXL": None,
+    "SXR": None,
+    "SYL": None,
+    "SYR": None,
+    "SourceX": None,
+    "SourceY": None,
+    "FrcX": None,
+    "FrcY": None,
+    "BrkdisX": None,
+    "BrkdisY": None,
+    "P": "p_flux",
+    "Q": "q_flux",
+    "Fx": None,
+    "Fy": None,
+    "Gx": None,
+    "Gy": None,
+    "AGE": "age_break",
+    "ROLLER": "roller_flux",  # also a breaking physics flag — see convert()
+    "UNDERTOW": "undertow_u",  # expands to the u/v pair below
+    "OUT_NU": "nu_break",
+    "TMP": None,
+    "Radiation": None,
 }
+
+# the means quartet: gathered separately into the statistics channel
+_MEAN_FLAGS = ("Umean", "Vmean", "ETAmean", "WaveHeight")
 
 # ---------------------------------------------------------------------------
 # Wavemaker parameter sets per type
@@ -791,8 +794,6 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
 
     # ---- output ------------------------------------------------------------
     op: dict = {}
-    if plot_intv is not None:
-        op["interval"] = plot_intv
     rf = pop_str("RESULT_FOLDER")
     if rf:
         op["result_folder"] = rf
@@ -832,15 +833,22 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     ebv = pop_val("EtaBlowVal")
     if ebv is not None:
         op["blowup_threshold"] = ebv
-    # means: presence block; absent legacy keys fall to the legacy LARGE
-    # defaults so a half-specified deck stays bitwise (window never closes)
+    # means quartet + window keys -> a statistics field channel (hsig =
+    # 4.004 std(eta), the legacy SigWaveHeight constant)
     ti = pop_val("T_INTV_mean")
     st = pop_val("STEADY_TIME")
-    if ti is not None or st is not None:
-        op["means"] = {
-            "interval": ti if ti is not None else 999999.0,
-            "steady_time": st if st is not None else 999999.0,
-        }
+    mean_vars = [k for k in _MEAN_FLAGS if _bool(pop(k) or "F")]
+    if mean_vars and ti is not None:
+        mv = ["eta", "u", "v"]
+        chan = {"name": "means", "geometry": "field", "variables": mv,
+                "statistics": ["mean"], "interval": ti}
+        if "WaveHeight" in mean_vars:
+            chan["variables"] = mv + ["hsig"]
+        if st is not None:
+            chan["t_start"] = st
+        op.setdefault("channels", []).append(chan)
+    elif mean_vars or ti is not None or st is not None:
+        unknown.append("means quartet without T_INTV_mean (window never closed) -- dropped")
 
     # first-arrival map (nee numerics OUT_Time/ArrTimeMin); min_height is
     # always written so the block never serialises as a bare null key
@@ -855,16 +863,23 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     if depth_out:
         op["depth_out"] = True
 
-    # OUT_* flags → variables list
+    # OUT_* flags -> the fields channel (registry-name variables)
     variables: list[str] = []
     for old_key, new_name in _VAR_FLAGS.items():
         v = pop(old_key)
         if v is not None and _bool(v):
-            # ROLLER also drives breaking.roller (already consumed above);
-            # here we only add to variables if the output flag is true.
+            if new_name is None:
+                unknown.append(f"{old_key} (dead in the modern engine: no writer) -- dropped")
+                continue
+            # ROLLER also drives breaking.roller (already consumed above)
             variables.append(new_name)
-    if variables:
-        op["variables"] = variables
+            if new_name == "undertow_u":
+                variables.append("undertow_v")
+    if variables and plot_intv is not None:
+        op.setdefault("channels", []).insert(0, {
+            "name": "fields", "geometry": "field",
+            "variables": variables, "interval": plot_intv,
+        })
 
     if op:
         out["output"] = op

@@ -45,11 +45,17 @@ breaking:
   cbrk1: 0.65
   cbrk2: 0.35
 output:
-  interval: 5.0
   result_folder: output/
   format: binary
-  means:
-    interval: 100.0
-    steady_time: 100.0
   depth_out: true
-  variables: [U, V, ETA, ETAscreen, Hmax, Hmin, Umax, MASK, MASK9, Umean, Vmean, ETAmean, WaveHeight, P, Q]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [u, v, eta, h_max, h_min, u_max, mask, mask9, p_flux, q_flux]
+      interval: 5.0
+    - name: means  # nee means block + *mean variables; hsig = 4.004 std(eta)
+      geometry: field
+      variables: [eta, u, v, hsig]
+      statistics: [mean]
+      t_start: 100.0
+      interval: 100.0

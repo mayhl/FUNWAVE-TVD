@@ -22,8 +22,19 @@ if TYPE_CHECKING:
 # 3D prefixes: sourced from src/model/3d/old/io.F  (_%04d naming)
 FIELD_PREFIXES: frozenset[str] = frozenset(
     [
-        # 2D model outputs
+        # 2D model outputs (registry-name spellings since the channels
+        # migration; the legacy prefixes stay for old ref trees)
         "eta",
+        "h_max",
+        "h_min",
+        "u_max",
+        "mf_max",
+        "vort_max",
+        "p_flux",
+        "q_flux",
+        "arr_time",
+        "velocity.mag",
+        "velocity.dir",
         "etasrn",
         "u",
         "v",
@@ -103,6 +114,12 @@ DEFAULT_FLOOR: float = 1e-4
 # Prefixes written at T_INTV_mean after STEADY_TIME (wave-averaged statistics).
 STATS_PREFIXES: frozenset[str] = frozenset(
     [
+        # channel-stat spellings (<var>_<stat> since the channels migration)
+        "eta_mean",
+        "u_mean",
+        "v_mean",
+        "eta_std",
+        "hsig",
         "umean",
         "vmean",
         "etamean",
@@ -378,7 +395,21 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     result_folder = out.get("result_folder", "output").rstrip("/")
     output_dir = (run_dir / result_folder).resolve()
 
+    # channels-primary since the output migration: union the field-channel
+    # products (visible variables, <var>_<stat> stats, derived names);
+    # the flags list survives only in old ref trees
     variables = list(out.get("variables", []))
+    for ch in out.get("channels") or []:
+        if ch.get("geometry") != "field":
+            continue
+        cvars = [v for v in ch.get("variables", []) if v != "hsig"]
+        stats = ch.get("statistics") or []
+        if stats:
+            variables += [f"{v}_{st}" for v in cvars for st in stats]
+        else:
+            variables += cvars
+        if "hsig" in ch.get("variables", []):
+            variables.append("hsig")
     if out.get("depth_out", False):
         variables = ["DEPTH_OUT"] + variables
 

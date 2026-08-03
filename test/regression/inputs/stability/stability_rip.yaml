@@ -63,7 +63,10 @@ breaking:
   swe_eta_dep: 0.6
   swe_eta_ramp: 0.10
 output:
-  interval: 40.0
   result_folder: output/
   format: binary
-  variables: [ETA]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 40.0

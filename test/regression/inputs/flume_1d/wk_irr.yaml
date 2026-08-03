@@ -53,11 +53,11 @@ breaking:
   cbrk1: 0.65
   cbrk2: 0.35
 output:
-  interval: 5.0
   result_folder: output/
   format: binary
-  means:
-    interval: 100.0
-    steady_time: 100.0
   depth_out: true
-  variables: [U, V, ETA, ETAscreen, Hmax, Hmin, Umax, MASK, MASK9, P, Q]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [u, v, eta, h_max, h_min, u_max, mask, mask9, p_flux, q_flux]
+      interval: 5.0

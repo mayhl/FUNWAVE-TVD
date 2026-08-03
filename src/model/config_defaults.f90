@@ -97,7 +97,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_OUTPUT_FORMAT = "binary"
    character(*), parameter :: DEF_OUTPUT_LAYOUT = "chunked"
    character(*), parameter :: DEF_OUTPUT_MAX_FILE_SIZE = "50.0"
-   character(*), parameter :: DEF_OUTPUT_MEANS_STEADY_TIME = "0.0"
    character(*), parameter :: DEF_OUTPUT_RESULT_FOLDER = "./output/"
    ! ── sediment ──
    character(*), parameter :: DEF_SEDIMENT_BED_CHANGE = "NO"

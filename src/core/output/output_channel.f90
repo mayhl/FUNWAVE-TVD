@@ -400,7 +400,7 @@ contains
             if (this%chunk_window > 0.0_SP) then
                call create_chunk_file(this, comm)
             else
-               call this%pnc%create(this%result_folder//'data.nc', &
+               call this%pnc%create(this%result_folder//trim(this%id)//'.nc', &
                                     grid%M, grid%N, grid%dx0, grid%dy0, &
                                     this%nc_names, this%nc_meta, this%nc_n, comm)
             end if
@@ -694,7 +694,7 @@ contains
       else if (this%chunk_window > 0.0_SP) then
          call create_chunk_file(this)
       else
-         call this%nc%create(this%result_folder//'data.nc', grid%M, grid%N, &
+         call this%nc%create(this%result_folder//trim(this%id)//'.nc', grid%M, grid%N, &
                              grid%dx0, grid%dy0, this%nc_names, this%nc_meta, &
                              this%nc_n)
       end if

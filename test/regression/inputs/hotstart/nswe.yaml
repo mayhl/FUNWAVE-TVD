@@ -26,5 +26,8 @@ numerics:
   min_depth: 0.01
 output:
   result_folder: ./out/
-  interval: 4.0
-  variables: [ETA]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 4.0

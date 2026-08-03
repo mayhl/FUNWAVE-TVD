@@ -22,8 +22,11 @@ numerics:
   cfl: 0.5
   min_depth: 0.01
 output:
-  interval: 1.0
-  variables: [ETA]
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 1.0
   geometries:
     - name: gauge_pair
       type: station

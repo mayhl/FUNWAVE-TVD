@@ -86,7 +86,6 @@ module model_output_mod
                                         DEF_OUTPUT_FORMAT, &
                                         DEF_OUTPUT_LAYOUT, &
                                         DEF_OUTPUT_MAX_FILE_SIZE, &
-                                        DEF_OUTPUT_MEANS_STEADY_TIME, &
                                         DEF_OUTPUT_RESULT_FOLDER
 
    implicit none
@@ -243,7 +242,11 @@ module model_output_mod
       logical :: OUT_VesUp = .false.
       logical :: OUT_VesVp = .false.
 
-      ! Wave-averaged output window (nee T_INTV_mean/STEADY_TIME); 999999
+      ! Wave-averaged window params: CONFIG-ORPHANED since the means:
+      ! retirement (channels own averaged output).  The means module
+      ! stays for its physics hooks (roller/meteo etamean) but never
+      ! activates at these defaults -- a physics-owned mean is the
+      ! punch-listed replacement.  (nee T_INTV_mean/STEADY_TIME); 999999
       ! component defaults = averaging disabled when the means: block is absent
       real(SP) :: T_INTV_mean = 999999.0_SP
       real(SP) :: STEADY_TIME = 999999.0_SP
@@ -260,9 +263,8 @@ contains
 
       type(type_env) :: sub_env
       type(type_yaml_reader) :: blk_yaml
-      type(type_string), allocatable :: var_list(:)
       integer :: iv
-      logical :: is_empty, no_key, no_vars, no_blk
+      logical :: is_empty, no_key, no_blk
 
       ! Initialize string fields before possible early exit so io.F always gets valid values
       this%result_folder = "./output/"
@@ -274,9 +276,7 @@ contains
       if (allocated(this%channels)) deallocate (this%channels)
       if (allocated(this%geometries)) deallocate (this%geometries)
       if (is_empty) call env%log%exit_on_error( &
-         "output: section is required -- at minimum set interval:")
-
-      call sub_env%yaml%read_positive("interval", val=this%interval)
+         "output: section is required -- at minimum one channels: entry")
       call sub_env%yaml%read("result_folder", val=this%result_folder, default=DEF_OUTPUT_RESULT_FOLDER)
       call sub_env%yaml%read("checkpoint", silent=no_key, val=this%checkpoint, default="")
       this%write_checkpoint = .not. no_key
@@ -308,13 +308,12 @@ contains
          "output: stations: retired -- use channels: with a station geometry"// &
          " (x/y in metres; legacy i j maps to x = (i-1)*dx, y = (j-1)*dy)")
 
-      ! means: block presence enables the wave-averaged window
+      ! means: retired -- a windowed field channel supersedes it
       blk_yaml = sub_env%yaml%cast_dictionary("means", no_blk)
-      if (.not. no_blk) then
-         call blk_yaml%read_positive("interval", val=this%T_INTV_mean)
-         call blk_yaml%read("steady_time", silent=no_key, val=this%STEADY_TIME, &
-                            default=DEF_OUTPUT_MEANS_STEADY_TIME)
-      end if
+      if (.not. no_blk) call env%log%exit_on_error( &
+         "output: means retired -- use a field channel: channels: [{name: means,"// &
+         " geometry: field, variables: [eta, u, v, hsig], statistics: [mean],"// &
+         " t_start: <steady_time>, interval: <interval>}]")
 
       ! vessel: block presence enables the resistance time series
       blk_yaml = sub_env%yaml%cast_dictionary("vessel", no_blk)
@@ -339,6 +338,12 @@ contains
       call read_channels(this, sub_env, this%min_spacing)
 
       ! Retired key spellings: loud rejection beats silent acceptance
+      call reject_moved_key(sub_env, "interval", &
+                            "it on your field channel (channels: - {name: fields,"// &
+                            " geometry: field, variables: [...], interval: ...})")
+      call reject_string_list_key(sub_env, "variables", &
+                                  "registry names on a channel (ETA -> eta, Hmax -> h_max,"// &
+                                  " Umean -> a statistics: [mean] channel, WaveHeight -> hsig)")
       call reject_moved_key(sub_env, "field_io_type", &
                             "format: (lowercase ascii | binary | netcdf | pnetcdf)")
       call reject_moved_key(sub_env, "EtaBlowVal", "blowup_threshold")
@@ -349,61 +354,48 @@ contains
       call reject_moved_key(sub_env, "output_res", &
                             "nothing -- the stride was never consumed; subsample downstream")
 
-      call sub_env%yaml%read_string_array("variables", silent=no_vars, val=var_list)
-      if (.not. no_vars) then
-         do iv = 1, size(var_list)
-            select case (trim(var_list(iv)%s))
-            case ("U"); this%OUT_U = .true.
-            case ("V"); this%OUT_V = .true.
-            case ("ETA"); this%OUT_ETA = .true.
-            case ("ETAscreen"); this%OUT_EtaScreen = .true.
-            case ("Hmax"); this%OUT_Hmax = .true.
-            case ("Hmin"); this%OUT_Hmin = .true.
-            case ("Umax"); this%OUT_Umax = .true.
-            case ("MFmax"); this%OUT_MFmax = .true.
-            case ("VORmax"); this%OUT_VORmax = .true.
-            case ("MASK"); this%OUT_MASK = .true.
-            case ("MASK9"); this%OUT_MASK9 = .true.
-            case ("Umean"); this%OUT_Umean = .true.
-            case ("Vmean"); this%OUT_Vmean = .true.
-            case ("ETAmean"); this%OUT_ETAmean = .true.
-            case ("WaveHeight"); this%OUT_WaveHeight = .true.
-            case ("SXL"); this%OUT_SXL = .true.
-            case ("SXR"); this%OUT_SXR = .true.
-            case ("SYL"); this%OUT_SYL = .true.
-            case ("SYR"); this%OUT_SYR = .true.
-            case ("SourceX"); this%OUT_SourceX = .true.
-            case ("SourceY"); this%OUT_SourceY = .true.
-            case ("FrcX"); this%OUT_FrcX = .true.
-            case ("FrcY"); this%OUT_FrcY = .true.
-            case ("BrkdisX"); this%OUT_BrkdisX = .true.
-            case ("BrkdisY"); this%OUT_BrkdisY = .true.
-            case ("P"); this%OUT_P = .true.
-            case ("Q"); this%OUT_Q = .true.
-            case ("Fx"); this%OUT_Fx = .true.
-            case ("Fy"); this%OUT_Fy = .true.
-            case ("Gx"); this%OUT_Gx = .true.
-            case ("Gy"); this%OUT_Gy = .true.
-            case ("AGE"); this%OUT_AGE = .true.
-            case ("ROLLER"); this%OUT_ROLLER = .true.
-            case ("UNDERTOW"); this%OUT_UNDERTOW = .true.
-            case ("NU"); this%OUT_NU = .true.
-            case ("TMP"); this%OUT_TMP = .true.
-            case ("Radiation"); this%OUT_Radiation = .true.
-            case ("Pstorm"); this%OUT_Pstorm = .true.
-            case ("Ustorm"); this%OUT_Ustorm = .true.
-            case ("Vstorm"); this%OUT_Vstorm = .true.
-            case ("Pves"); this%OUT_Pves = .true.
-            case ("VesUp"); this%OUT_VesUp = .true.
-            case ("VesVp"); this%OUT_VesVp = .true.
-            case default
-               call env%log%exit_on_error( &
-                  "output: variables: unknown name '"//trim(var_list(iv)%s)//"'")
-            end select
-         end do
-      end if
+      ! demand flags: channels drive the accumulator/copy machinery the
+      ! flags list used to gate (running envelopes, mask copies, meteo
+      ! staging).  Derived from the registry names the channels reference.
+      do iv = 1, this%n_channels
+         call derive_demand_flags(this, this%channels(iv))
+      end do
 
    end subroutine output_read_input
+
+   ! Registry names -> internal demand flags (nee the variables: list).
+   ! Only the names whose machinery is gated need mapping; plain fields
+   ! (eta/u/v/p_flux/...) are always registered.
+   subroutine derive_demand_flags(this, cfg)
+      type(type_model_output), intent(inout) :: this
+      type(type_channel_config), intent(in) :: cfg
+
+      integer :: iv
+
+      do iv = 1, size(cfg%variables)
+         select case (trim(cfg%variables(iv)))
+         case ("h_max"); this%OUT_Hmax = .true.
+         case ("h_min"); this%OUT_Hmin = .true.
+         case ("u_max"); this%OUT_Umax = .true.
+         case ("mf_max"); this%OUT_MFmax = .true.
+         case ("vort_max"); this%OUT_VORmax = .true.
+         case ("mask"); this%OUT_MASK = .true.
+         case ("mask9"); this%OUT_MASK9 = .true.
+         case ("nu_break"); this%OUT_NU = .true.
+         case ("age_break"); this%OUT_AGE = .true.
+         case ("roller_flux"); this%OUT_ROLLER = .true.
+         case ("undertow_u", "undertow_v"); this%OUT_UNDERTOW = .true.
+         case ("meteo_pressure"); this%OUT_Pstorm = .true.
+         case ("meteo_wind_u"); this%OUT_Ustorm = .true.
+         case ("meteo_wind_v"); this%OUT_Vstorm = .true.
+         case ("vessel_pressure"); this%OUT_Pves = .true.
+         case ("vessel_up"); this%OUT_VesUp = .true.
+         case ("vessel_vp"); this%OUT_VesVp = .true.
+         case ("arr_time"); this%out_arr_time = .true.
+         end select
+      end do
+
+   end subroutine derive_demand_flags
 
    subroutine read_geometries(this, sub_env, min_spacing)
       type(type_model_output), intent(inout) :: this
@@ -650,16 +642,16 @@ contains
             cfg%has_t_start = .not. no_key
 
             ! optional format: absence inherits the deck-format default.
-            ! Field-geometry channels take binary too; netcdf field
-            ! channels are pending the layout wiring (board 2)
+            ! Field-geometry channels take the full set; points stay
+            ! ascii/netcdf (groups in diagnostics.nc)
             call entries(k)%read("format", silent=no_key, val=fmt)
             if (.not. no_key) then
                if (this%geometries(cfg%geom_idx)%geom_type == "field") then
-                  if (fmt /= "ascii" .and. fmt /= "binary") &
+                  if (fmt /= "ascii" .and. fmt /= "binary" .and. &
+                      fmt /= "netcdf" .and. fmt /= "pnetcdf") &
                      call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
-                                                    "': field-channel format '"//fmt// &
-                                                    "' -- valid today: ascii binary"// &
-                                                    " (netcdf pending)")
+                                                    "': unknown field-channel format '"//fmt// &
+                                                    "' -- valid: ascii binary netcdf pnetcdf")
                else if (fmt /= "ascii" .and. fmt /= "netcdf") then
                   call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
                                                  "': unknown format '"//fmt// &
@@ -781,6 +773,20 @@ contains
          "output: "//old_key//" moved -- set "//new_home)
 
    end subroutine reject_moved_key
+
+   ! list-valued retired key (reject_moved_key reads scalars only)
+   subroutine reject_string_list_key(sub_env, old_key, new_home)
+      type(type_env), intent(inout) :: sub_env
+      character(*), intent(in) :: old_key, new_home
+
+      type(type_string), allocatable :: tmp(:)
+      logical :: no_key
+
+      call sub_env%yaml%read_string_array(old_key, silent=no_key, val=tmp)
+      if (.not. no_key) call sub_env%log%exit_on_error( &
+         "output: "//old_key//" retired -- list "//new_home)
+
+   end subroutine reject_string_list_key
 
    ! Legacy INITIALIZATION (init.F:850):
    !     EtaBlowVal = 100 * MAXVAL(abs(Depth(Ibeg:Iend, Jbeg:Jend)))
