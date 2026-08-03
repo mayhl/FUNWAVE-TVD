@@ -93,11 +93,28 @@ module model_output_mod
 
    private
    public :: type_output_geometry, type_channel_config, type_model_output
+   public :: VEC_DERIVED, PROD_DERIVED, PROD_SRC, PROD_STAT, PROD_SCALE
 
-   character(len=10), parameter :: GEOM_TYPES(2) = &
-                                   [character(len=10) :: "station", "transect"]
-   character(len=8), parameter :: STAT_TYPES(4) = &
-                                  [character(len=8) :: "min", "max", "mean", "rms"]
+   character(len=10), parameter :: GEOM_TYPES(3) = &
+                                   [character(len=10) :: "station", "transect", "field"]
+   character(len=8), parameter :: STAT_TYPES(5) = &
+                                  [character(len=8) :: "min", "max", "mean", "rms", "std"]
+
+   ! Vector-derived instantaneous variables (registry vectors: velocity =
+   ! [u, v]): the builder registers per-step scratch fields under these
+   ! names.  dir is circular — statistics on it are rejected at read.
+   character(len=32), parameter :: VEC_DERIVED(2) = &
+                                   [character(len=32) :: "velocity.mag", "velocity.dir"]
+
+   ! Product-derived catalogue: out = scale * stat(source), evaluated at
+   ! flush over the window.  hsig = 4.004 std(eta) — the Rayleigh H_1/3
+   ! constant (Longuet-Higgins); 4.0 would be the spectral Hm0 convention
+   ! (registry doc records the choice).  Sources ride hidden accumulators
+   ! when not requested themselves.
+   character(len=8), parameter :: PROD_DERIVED(1) = [character(len=8) :: "hsig"]
+   character(len=8), parameter :: PROD_SRC(1) = [character(len=8) :: "eta"]
+   character(len=8), parameter :: PROD_STAT(1) = [character(len=8) :: "std"]
+   real(SP), parameter :: PROD_SCALE(1) = [4.004_SP]
 
    ! Named point set: station coords verbatim, transect expanded to its
    ! n_points samples at read time (channels only see resolved coords)
@@ -111,6 +128,12 @@ module model_output_mod
       character(:), allocatable :: name
       integer :: geom_idx = 0
       character(32), allocatable :: variables(:)
+      ! parallel to variables: hidden = accumulate only (derived source
+      ! auto-added, never written)
+      logical, allocatable :: hidden(:)
+      ! product-derived requests (catalogue names, e.g. hsig)
+      character(8), allocatable :: derived(:)
+      integer :: n_derived = 0
       character(8), allocatable :: statistics(:)
       integer :: n_stats = 0
       ! statistics presence derives the channel kind: windowed channels
@@ -416,6 +439,14 @@ contains
          end do
       end do
 
+      ! 'field' is the reserved whole-domain reference (geometry: field)
+      do k = 1, size(this%geometries)
+         if (this%geometries(k)%name == "field" .and. &
+             this%geometries(k)%geom_type /= "field") &
+            call sub_env%log%exit_on_error("output: geometries: the name 'field'"// &
+                                           " is reserved for the whole-domain geometry")
+      end do
+
    end subroutine read_geometries
 
    ! Shared by named geometries: entries and channel-inline geometry
@@ -480,6 +511,15 @@ contains
             g%x(i) = p0(1) + frac*(p1(1) - p0(1))
             g%y(i) = p0(2) + frac*(p1(2) - p0(2))
          end do
+
+      case ("field")
+         ! whole-domain geometry: every interior cell, no coordinates
+         if (entry%has_key("x") .or. entry%has_key("y") .or. &
+             entry%has_key("file") .or. entry%has_key("start") .or. &
+             entry%has_key("end") .or. entry%has_key("n_points")) &
+            call sub_env%log%exit_on_error("output: "//ctx// &
+                                           ": field geometry takes no coordinate keys")
+         allocate (g%x(0), g%y(0))
       end select
 
    end subroutine parse_geometry
@@ -578,6 +618,17 @@ contains
                do g = 1, size(this%geometries)
                   if (this%geometries(g)%name == gname) cfg%geom_idx = g
                end do
+               if (cfg%geom_idx == 0 .and. gname == "field") then
+                  ! reserved name: implicit whole-domain geometry
+                  block
+                     type(type_output_geometry) :: g_field
+                     g_field%name = "field"
+                     g_field%geom_type = "field"
+                     allocate (g_field%x(0), g_field%y(0))
+                     this%geometries = [this%geometries, g_field]
+                  end block
+                  cfg%geom_idx = size(this%geometries)
+               end if
                if (cfg%geom_idx == 0) then
                   valid = ""
                   do g = 1, size(this%geometries)
@@ -585,32 +636,35 @@ contains
                   end do
                   call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
                                                  "': unknown geometry '"//gname// &
-                                                 "' -- defined:"//valid)
+                                                 "' -- defined:"//valid//" field")
                end if
             end if
 
             call entries(k)%read_string_array("variables", silent=no_key, val=names)
             if (no_key .or. size(names) == 0) call sub_env%log%exit_on_error( &
                "output: channels: '"//cfg%name//"': variables: is required")
-            allocate (cfg%variables(size(names)))
-            do iv = 1, size(names)
-               if (len_trim(names(iv)%s) > len(cfg%variables)) &
-                  call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
-                                                 "': variable name too long: "//trim(names(iv)%s))
-               cfg%variables(iv) = trim(names(iv)%s)
-            end do
+            call split_channel_variables(sub_env, cfg, names)
 
             call entries(k)%read_positive("interval", val=cfg%interval)
             call entries(k)%read("t_start", silent=no_key, val=cfg%t_start)
             cfg%has_t_start = .not. no_key
 
-            ! optional format: absence inherits the deck-format default
+            ! optional format: absence inherits the deck-format default.
+            ! Field-geometry channels take binary too; netcdf field
+            ! channels are pending the layout wiring (board 2)
             call entries(k)%read("format", silent=no_key, val=fmt)
             if (.not. no_key) then
-               if (fmt /= "ascii" .and. fmt /= "netcdf") &
+               if (this%geometries(cfg%geom_idx)%geom_type == "field") then
+                  if (fmt /= "ascii" .and. fmt /= "binary") &
+                     call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                    "': field-channel format '"//fmt// &
+                                                    "' -- valid today: ascii binary"// &
+                                                    " (netcdf pending)")
+               else if (fmt /= "ascii" .and. fmt /= "netcdf") then
                   call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
                                                  "': unknown format '"//fmt// &
                                                  "' -- valid: ascii netcdf")
+               end if
                cfg%format = fmt
             end if
 
@@ -627,12 +681,25 @@ contains
                   if (.not. any(STAT_TYPES == trim(names(iv)%s))) &
                      call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
                                                     "': unknown statistic '"//trim(names(iv)%s)// &
-                                                    "' -- valid: min max mean rms")
+                                                    "' -- valid: min max mean rms std")
                   cfg%statistics(iv) = trim(names(iv)%s)
                end do
                cfg%n_stats = size(names)
                cfg%snapshot = .false.
+               ! direction is circular: the mean of angles is meaningless --
+               ! take the direction OF the mean components instead
+               do iv = 1, size(cfg%variables)
+                  if (cfg%variables(iv) == "velocity.dir") &
+                     call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                    "': statistics on velocity.dir are"// &
+                                                    " circular -- derive the direction of the"// &
+                                                    " mean components instead")
+               end do
             end if
+            ! a derived-only channel is windowed even without statistics:
+            ! nothing visible remains to snapshot
+            if (cfg%n_derived > 0 .and. .not. any(.not. cfg%hidden)) &
+               cfg%snapshot = .false.
          end associate
       end do
 
@@ -645,6 +712,62 @@ contains
       end do
 
    end subroutine read_channels
+
+   ! Split the deck variables list: plain and vector-derived names stay
+   ! (the builder validates them against the field registry / scratch
+   ! set); product-derived names (the catalogue: hsig) move to
+   ! cfg%derived, with each source auto-added HIDDEN when not already
+   ! requested — accumulated for the product, never written itself.
+   subroutine split_channel_variables(sub_env, cfg, names)
+      type(type_env), intent(inout) :: sub_env
+      type(type_channel_config), intent(inout) :: cfg
+      type(type_string), intent(in) :: names(:)
+
+      character(32) :: vars(size(names) + size(PROD_DERIVED))
+      logical :: hid(size(names) + size(PROD_DERIVED))
+      character(8) :: der(size(PROD_DERIVED))
+      integer :: iv, k, ip, nv, nd
+
+      nv = 0
+      nd = 0
+      do iv = 1, size(names)
+         if (len_trim(names(iv)%s) > 32) &
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                           "': variable name too long: "//trim(names(iv)%s))
+         ip = 0
+         do k = 1, size(PROD_DERIVED)
+            if (trim(names(iv)%s) == trim(PROD_DERIVED(k))) ip = k
+         end do
+         if (ip > 0) then
+            if (any(der(1:nd) == PROD_DERIVED(ip))) &
+               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                              "': duplicate variable "//trim(PROD_DERIVED(ip)))
+            nd = nd + 1
+            der(nd) = PROD_DERIVED(ip)
+         else
+            nv = nv + 1
+            vars(nv) = trim(names(iv)%s)
+            hid(nv) = .false.
+         end if
+      end do
+      do k = 1, nd
+         do ip = 1, size(PROD_DERIVED)
+            if (der(k) == PROD_DERIVED(ip)) exit
+         end do
+         if (.not. any(vars(1:nv) == PROD_SRC(ip))) then
+            nv = nv + 1
+            vars(nv) = PROD_SRC(ip)
+            hid(nv) = .true.
+         end if
+      end do
+
+      allocate (cfg%variables(nv), cfg%hidden(nv), cfg%derived(nd))
+      cfg%variables = vars(1:nv)
+      cfg%hidden = hid(1:nv)
+      cfg%derived = der(1:nd)
+      cfg%n_derived = nd
+
+   end subroutine split_channel_variables
 
    subroutine reject_moved_key(sub_env, old_key, new_home)
       type(type_env), intent(inout) :: sub_env

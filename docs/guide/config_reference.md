@@ -391,10 +391,10 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `geometries.end` | — | — | m | Transect end point [x, y]. |
 | `geometries.n_points` | — | — | — | Transect sample count >= 2 (absent = sampled at min(dx, dy)). |
 | `channels.name` | — | — | — | Channel name (file stem \<name>_\<var>.dat). |
-| `channels.geometry` | — | — | — | Name of the geometries entry to sample (or inline the geometry keys on the channel instead). |
-| `channels.variables` | — | — | — | Field-registry variable names to output. |
+| `channels.geometry` | — | — | — | Name of the geometries entry to sample, or the reserved name 'field' for the whole domain (or inline the geometry keys on the channel instead). |
+| `channels.variables` | — | — | — | Field-registry variable names, vector-derived names (velocity.mag, velocity.dir -- registry vectors: velocity = [u, v]; statistics on .dir are rejected, direction is circular), and product-derived names (hsig = 4.004*std(eta), the Rayleigh H_1/3 constant; its eta source accumulates hidden when not itself requested). |
 | `channels.interval` | — | — | s | Channel flush cadence. |
-| `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics One of `min` \| `max` \| `mean` \| `rms`. |
+| `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous. std is about the window mean (rms includes it); shifted moments keep single precision safe. One of `min` \| `max` \| `mean` \| `rms` \| `std`. |
 | `channels.t_start` | — | — | s | Channel start time (default simulation t_start). |
 | `channels.format` | — | — | — | Point file format; default follows the deck format (netcdf/pnetcdf selects a netcdf group in diagnostics.nc One of `ascii` \| `netcdf`. |
 

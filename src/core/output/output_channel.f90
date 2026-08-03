@@ -85,7 +85,7 @@ module core_output_channel_mod
    integer, parameter :: STATNAME_LEN = 8
    integer, parameter :: ID_LEN = 64
    integer, parameter :: VARS_MAX = 32
-   integer, parameter :: STATS_MAX = 4
+   integer, parameter :: STATS_MAX = 5
    integer, parameter :: META_LEN = 64
 
    ! CF attributes for one variable; a blank component writes no attr.
@@ -157,6 +157,19 @@ module core_output_channel_mod
       procedure :: close => pnc_close
    end type type_pnetcdf_field_writer
 
+   ! Product-derived output: a flush-time formula over one accumulator
+   ! product — out = scale * get_stat(stat) of variable iv (e.g. hsig =
+   ! 4.004 * std(eta)).  The source variable may be hidden (accumulated
+   ! but not itself written).
+   type, public :: type_channel_derived
+      character(VARNAME_LEN)  :: name = ''
+      integer                 :: iv = 0
+      character(STATNAME_LEN) :: stat = ''
+      real(SP)                :: scale = 1.0_SP
+   end type type_channel_derived
+
+   integer, parameter :: DERIVED_MAX = 8
+
    type :: type_output_channel
       character(ID_LEN)              :: id = ''
       character(ID_LEN)              :: geom_type = ''  ! 'field', 'station', 'transect'
@@ -169,6 +182,10 @@ module core_output_channel_mod
       type(type_var_meta)            :: meta(VARS_MAX)
       integer                        :: n_vars = 0
       integer                        :: n_stats = 0
+      ! hidden variables accumulate (derived sources) but never write
+      logical                        :: hidden(VARS_MAX) = .false.
+      integer                        :: n_derived = 0
+      type(type_channel_derived)     :: derived(DERIVED_MAX)
       logical                        :: snapshot = .true.
       real(SP)                       :: t_start = 0.0_SP
       real(SP)                       :: interval = 0.0_SP
@@ -239,7 +256,7 @@ contains
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
                            file_prefixes, icount_start, var_meta, diag_ncid, &
-                           chunk_window)
+                           chunk_window, hidden, derived, n_derived)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -262,8 +279,12 @@ contains
       integer, intent(in), optional :: diag_ncid
       ! Field netcdf layout 'chunked': time span per file (s)
       real(SP), intent(in), optional :: chunk_window
+      ! Hidden mask (accumulate only) + product-derived output specs
+      logical, intent(in), optional :: hidden(*)
+      type(type_channel_derived), intent(in), optional :: derived(*)
+      integer, intent(in), optional :: n_derived
 
-      integer :: iv, is
+      integer :: iv, is, id_
       integer, allocatable :: pids(:)
 
       this%id = id
@@ -274,6 +295,15 @@ contains
       this%interval = interval
       this%n_vars = n_vars
       this%n_stats = n_stats
+      this%hidden(1:n_vars) = .false.
+      if (present(hidden)) this%hidden(1:n_vars) = hidden(1:n_vars)
+      this%n_derived = 0
+      if (present(n_derived)) then
+         if (n_derived > DERIVED_MAX) &
+            error stop "output_channel: derived list exceeds DERIVED_MAX"
+         this%n_derived = n_derived
+         this%derived(1:n_derived) = derived(1:n_derived)
+      end if
       this%local_nx = grid%local_nx
       this%local_ny = grid%local_ny
       this%result_folder = trim(result_folder)
@@ -380,6 +410,12 @@ contains
          error stop 'type_output_channel: unknown geometry type: '//trim(geom_type)
       end select
 
+      ! product-derived sources: ensure the required statistic storage
+      ! exists on the source accumulator (its variable may be hidden)
+      do id_ = 1, this%n_derived
+         call this%accum(this%derived(id_)%iv)%allocate_stat(trim(this%derived(id_)%stat))
+      end do
+
    end subroutine channel_init
 
    ! Called every timestep. Accumulates from registry; flushes when triggered.
@@ -437,13 +473,14 @@ contains
       ! --- Snapshot: write current field directly from registry ---
       if (do_flush .and. this%snapshot) then
          do iv = 1, this%n_vars
+            if (this%hidden(iv)) cycle
             fld => registry%get(trim(this%variables(iv)))
             call channel_write_snapshot(this, iv, fld, t, comm)
          end do
       end if
 
-      ! --- Accumulate for statistics ---
-      if (this%n_stats > 0) then
+      ! --- Accumulate for statistics (derived sources included) ---
+      if (this%n_stats > 0 .or. this%n_derived > 0) then
          select case (trim(this%geom_type))
          case ('station', 'transect')
             allocate (interp_vals(this%n_local), interp_2d(this%n_local, 1))
@@ -468,10 +505,19 @@ contains
       end if
 
       ! --- Flush statistics at interval (first flush closes a
-      !     degenerate single-step window: reset without writing) ---
-      if (do_flush .and. this%n_stats > 0) then
+      !     degenerate single-step window: reset without writing).
+      !     Derived products read the accumulators, so resets come last ---
+      if (do_flush .and. (this%n_stats > 0 .or. this%n_derived > 0)) then
+         if (this%stats_primed) then
+            do iv = 1, this%n_vars
+               if (this%hidden(iv)) cycle
+               call channel_write_stats(this, iv, t, comm)
+            end do
+            do iv = 1, this%n_derived
+               call channel_write_derived(this, iv, t, comm)
+            end do
+         end if
          do iv = 1, this%n_vars
-            if (this%stats_primed) call channel_write_stats(this, iv, t, comm)
             call this%accum(iv)%reset()
          end do
       end if
@@ -527,6 +573,27 @@ contains
       end do
    end subroutine channel_write_stats
 
+   ! Write one product-derived output: scale * get_stat(stat) of the
+   ! source accumulator, under the derived name (e.g. hsig_NNNNN).
+   subroutine channel_write_derived(this, id, t, comm)
+      class(type_output_channel), intent(inout) :: this
+      integer, intent(in)    :: id
+      real(SP), intent(in)    :: t
+      type(type_comm), intent(inout) :: comm
+
+      real(SP), allocatable :: stat_vals(:, :)
+
+      associate (d => this%derived(id))
+         stat_vals = d%scale*this%accum(d%iv)%get_stat(trim(d%stat))
+         select case (trim(this%geom_type))
+         case ('field')
+            call channel_flush_field(this, stat_vals, trim(d%name), comm)
+         case ('station', 'transect')
+            call channel_flush_points(this, stat_vals(:, 1), trim(d%name), t, comm)
+         end select
+      end associate
+   end subroutine channel_write_derived
+
    ! Write one field-geometry interior array as <name>_NNNNN.
    ! binary: collective MPI-IO, every rank writes its tile in place;
    ! ascii: gather to the IO rank, serial formatted write.
@@ -578,11 +645,14 @@ contains
 
       integer :: iv, is, n
 
-      ! statistic variables inherit the base variable's attrs
-      allocate (this%nc_names(this%n_vars*(1 + this%n_stats)))
-      allocate (this%nc_meta(this%n_vars*(1 + this%n_stats)))
+      ! statistic variables inherit the base variable's attrs; hidden
+      ! variables (derived sources) define nothing; derived outputs
+      ! define under their own name with the source variable's attrs
+      allocate (this%nc_names(this%n_vars*(1 + this%n_stats) + this%n_derived))
+      allocate (this%nc_meta(this%n_vars*(1 + this%n_stats) + this%n_derived))
       n = 0
       do iv = 1, this%n_vars
+         if (this%hidden(iv)) cycle
          if (this%snapshot) then
             n = n + 1
             this%nc_names(n) = trim(this%prefixes(iv))
@@ -593,6 +663,11 @@ contains
             this%nc_names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
             this%nc_meta(n) = this%meta(iv)
          end do
+      end do
+      do is = 1, this%n_derived
+         n = n + 1
+         this%nc_names(n) = trim(this%derived(is)%name)
+         this%nc_meta(n) = this%meta(this%derived(is)%iv)
       end do
       this%nc_n = n
    end subroutine build_nc_varlist
@@ -708,6 +783,8 @@ contains
          cm = 'time: maximum'
       case ('mean')
          cm = 'time: mean'
+      case ('std')
+         cm = 'time: standard_deviation'
       case default   ! 'rms'
          cm = 'time: root_mean_square'
       end select

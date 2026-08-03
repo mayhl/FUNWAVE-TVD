@@ -639,9 +639,9 @@ sections:
       geometries.end: {legacy: ~, default: ~, units: m, doc: "Transect end point [x, y]."}
       geometries.n_points: {legacy: ~, default: ~, units: ~, doc: "Transect sample count >= 2 (absent = sampled at min(dx, dy))."}
       channels.name: {legacy: ~, default: ~, units: ~, doc: Channel name (file stem <name>_<var>.dat).}
-      channels.geometry: {legacy: ~, default: ~, units: ~, doc: Name of the geometries entry to sample (or inline the geometry keys on the channel instead).}
-      channels.variables: {legacy: ~, default: ~, units: ~, doc: Field-registry variable names to output.}
+      channels.geometry: {legacy: ~, default: ~, units: ~, doc: "Name of the geometries entry to sample, or the reserved name 'field' for the whole domain (or inline the geometry keys on the channel instead)."}
+      channels.variables: {legacy: ~, default: ~, units: ~, doc: "Field-registry variable names, vector-derived names (velocity.mag, velocity.dir -- registry vectors: velocity = [u, v]; statistics on .dir are rejected, direction is circular), and product-derived names (hsig = 4.004*std(eta), the Rayleigh H_1/3 constant; its eta source accumulates hidden when not itself requested)."}
       channels.interval: {legacy: ~, default: ~, units: s, doc: Channel flush cadence.}
-      channels.statistics: {legacy: ~, default: ~, units: ~, values: [min, max, mean, rms], doc: Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous.}
+      channels.statistics: {legacy: ~, default: ~, units: ~, values: [min, max, mean, rms, std], doc: "Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous. std is about the window mean (rms includes it); shifted moments keep single precision safe."}
       channels.t_start: {legacy: ~, default: ~, units: s, doc: Channel start time (default simulation t_start).}
       channels.format: {legacy: ~, default: ~, units: ~, values: [ascii, netcdf], doc: Point file format; default follows the deck format (netcdf/pnetcdf selects a netcdf group in diagnostics.nc, anything else ascii .dat files).}

@@ -4,12 +4,12 @@ module test_output_channel
    use mpi_f08
    use pFUnit
    use netcdf
-   use core_constants_mod,       only: SP, N_GHOST
-   use core_comm_mod,            only: type_comm, new_comm
-   use core_grid_mod,            only: type_grid_2d
-   use core_field_registry_mod,  only: type_field_registry
-   use core_output_channel_mod,  only: type_output_channel, type_var_meta, &
-                                       open_diagnostics_file, close_diagnostics_file
+   use core_constants_mod, only: SP, N_GHOST
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_grid_2d
+   use core_field_registry_mod, only: type_field_registry
+   use core_output_channel_mod, only: type_output_channel, type_var_meta, type_channel_derived, &
+                                      open_diagnostics_file, close_diagnostics_file
    implicit none
 
    integer, parameter :: TEST_M = 8
@@ -24,14 +24,14 @@ contains
    ! Node (ig, jg) sits at x = ig-1, y = jg-1.
    subroutine open_grid(this, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
       type(MPI_Comm) :: mcomm
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
-      grid%M       = TEST_M
-      grid%N       = TEST_N
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = 2
       grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
@@ -42,7 +42,7 @@ contains
    ! (linear, so bilinear interpolation reproduces it exactly).
    subroutine fill_linear(grid, fld)
       type(type_grid_2d), intent(in)    :: grid
-      real(SP),           intent(inout) :: fld(:,:)
+      real(SP), intent(inout) :: fld(:, :)
       integer  :: i, j
       real(SP) :: x, y
 
@@ -56,10 +56,10 @@ contains
    end subroutine fill_linear
 
    subroutine alloc_field(grid, fld)
-      type(type_grid_2d),    intent(in)    :: grid
-      real(SP), allocatable, intent(inout) :: fld(:,:)
-      allocate(fld(grid%local_nx + 2*N_GHOST, grid%local_ny + 2*N_GHOST), &
-               source=0.0_SP)
+      type(type_grid_2d), intent(in)    :: grid
+      real(SP), allocatable, intent(inout) :: fld(:, :)
+      allocate (fld(grid%local_nx + 2*N_GHOST, grid%local_ny + 2*N_GHOST), &
+                source=0.0_SP)
    end subroutine alloc_field
 
    ! ----------------------------------------------------------------
@@ -73,7 +73,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       real(SP) :: cx(1), cy(1), row(TEST_M), x, y
@@ -84,8 +84,8 @@ contains
       call fill_linear(grid, eta)
       call reg%register('eta', eta)
 
-      vars(1) = 'eta';  stats(1) = ''
-      cx = 0.0_SP;  cy = 0.0_SP
+      vars(1) = 'eta'; stats(1) = ''
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='snap_f', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -116,14 +116,14 @@ contains
    ! (the MPI-IO subarray view must place j-offset tiles correctly).
    subroutine open_grid_2x2(this, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
       type(MPI_Comm) :: mcomm
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
-      grid%M       = TEST_M
-      grid%N       = TEST_N
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = 2
       grid%ny_proc = 2
       call grid%setup(comm, create_partition=.false.)
@@ -143,7 +143,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), x, y
@@ -154,8 +154,8 @@ contains
       call fill_linear(grid, eta)
       call reg%register('eta', eta)
 
-      vars(1) = 'eta';  stats(1) = ''
-      cx = 0.0_SP;  cy = 0.0_SP
+      vars(1) = 'eta'; stats(1) = ''
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='snap_b', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -173,7 +173,7 @@ contains
             do i = 1, TEST_M
                x = real(i - 1, SP)
                y = real(j - 1, SP)
-               @assertEqual(2.0_SP*x + 3.0_SP*y, glob(i,j), tolerance=1e-6_SP)
+               @assertEqual(2.0_SP*x + 3.0_SP*y, glob(i, j), tolerance=1e-6_SP)
             end do
          end do
       end if
@@ -195,7 +195,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), x, y
@@ -206,8 +206,8 @@ contains
       call fill_linear(grid, eta)
       call reg%register('eta', eta)
 
-      vars(1) = 'eta';  stats(1) = ''
-      cx = 0.0_SP;  cy = 0.0_SP
+      vars(1) = 'eta'; stats(1) = ''
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='snap_b4', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -226,7 +226,7 @@ contains
             do i = 1, TEST_M
                x = real(i - 1, SP)
                y = real(j - 1, SP)
-               @assertEqual(2.0_SP*x + 3.0_SP*y, glob(i,j), tolerance=1e-6_SP)
+               @assertEqual(2.0_SP*x + 3.0_SP*y, glob(i, j), tolerance=1e-6_SP)
             end do
          end do
       end if
@@ -248,7 +248,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       character(64) :: att
@@ -261,10 +261,10 @@ contains
       call fill_linear(grid, eta)
       call reg%register('eta', eta)
 
-      vars(1) = 'eta';  stats(1) = ''
+      vars(1) = 'eta'; stats(1) = ''
       vmeta(1)%units = 'm'
       vmeta(1)%standard_name = 'sea_surface_height_above_mean_sea_level'
-      cx = 0.0_SP;  cy = 0.0_SP
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='snap_nc', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -308,7 +308,7 @@ contains
             do i = 1, TEST_M
                x = real(i - 1, SP)
                y = real(j - 1, SP)
-               @assertEqual(2.0_SP*(2.0_SP*x + 3.0_SP*y), glob(i,j), tolerance=1e-12_SP)
+               @assertEqual(2.0_SP*(2.0_SP*x + 3.0_SP*y), glob(i, j), tolerance=1e-12_SP)
             end do
          end do
 
@@ -333,7 +333,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       real(SP) :: cx(2), cy(2), tval, v1, v2
@@ -347,7 +347,7 @@ contains
       ! point 1 at (5, 2) -> rank 1; point 2 at (2, 1) -> rank 0
       cx = [5.0_SP, 2.0_SP]
       cy = [2.0_SP, 1.0_SP]
-      vars(1) = 'eta';  stats(1) = ''
+      vars(1) = 'eta'; stats(1) = ''
       call ch%init(id='sta', geom_type='station', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -387,7 +387,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       real(SP) :: cx(1), cy(1), row(TEST_M)
@@ -397,8 +397,8 @@ contains
       call alloc_field(grid, eta)
       call reg%register('eta', eta)
 
-      vars(1) = 'eta';  stats(1) = 'mean'
-      cx = 0.0_SP;  cy = 0.0_SP
+      vars(1) = 'eta'; stats(1) = 'mean'
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='avg_f', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=1, snapshot=.false., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -435,6 +435,75 @@ contains
    end subroutine test_field_mean
 
    ! ----------------------------------------------------------------
+   ! product-derived hsig on a hidden source: variables carry only the
+   ! hidden eta accumulator; the flush writes hsig_00002 =
+   ! 4.004 * std(window samples) and NO eta stat/snapshot files.
+   ! Window 2 samples 4 and 8 (equal dt): std = 2 -> hsig = 8.008
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_derived_hsig(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      type(type_channel_derived)  :: dspec(1)
+      real(SP), allocatable, target :: eta(:, :)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      logical  :: hid(1)
+      real(SP) :: cx(1), cy(1), row(TEST_M)
+      integer  :: j, unit
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta'; stats(1) = ''
+      hid(1) = .true.
+      dspec(1) = type_channel_derived(name='hsig', iv=1, stat='std', scale=4.004_SP)
+      cx = 0.0_SP; cy = 0.0_SP
+      call ch%init(id='waves', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=0, snapshot=.false., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='ascii', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   hidden=hid, derived=dspec, n_derived=1)
+
+      eta = 2.0_SP
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      eta = 4.0_SP
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      eta = 8.0_SP
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+
+      if (comm%is_io_node()) then
+         block
+            logical :: exists
+            ! degenerate first window dropped; hidden source writes nothing
+            inquire (file='./hsig_00001', exist=exists)
+            @assertFalse(exists)
+            inquire (file='./eta_00002', exist=exists)
+            @assertFalse(exists)
+            inquire (file='./eta_std_00002', exist=exists)
+            @assertFalse(exists)
+         end block
+
+         ! window 2: samples 4 and 8, std = 2, hsig = 4.004 * 2
+         open (newunit=unit, file='./hsig_00002', status='old', action='read')
+         do j = 1, TEST_N
+            read (unit, *) row
+         end do
+         close (unit, status='delete')
+         @assertEqual(8.008_SP, row(TEST_M), tolerance=1e-3_SP)
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_derived_hsig
+
+   ! ----------------------------------------------------------------
    ! netcdf point channels: two groups share one diagnostics.nc — the
    ! snapshot group records every flush with cell_methods "time: point";
    ! the windowed group drops its degenerate first flush and carries
@@ -447,12 +516,12 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: snap, win
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       character(64) :: att
       type(type_var_meta) :: vmeta(1)
-      real(SP) :: cx(2), cy(2), t3(3), t2(2), vals(2), bnds(2,2)
+      real(SP) :: cx(2), cy(2), t3(3), t2(2), vals(2), bnds(2, 2)
       integer  :: diag, ncid, grp, dimid, varid, nlen
 
       call open_grid(this, grid, comm)
@@ -556,10 +625,10 @@ contains
          @assertEqual(2.0_SP, t2(2), tolerance=1e-12_SP)
          @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'time_bnds', varid))
          @assertEqual(NF90_NOERR, nf90_get_var(grp, varid, bnds))
-         @assertEqual(0.0_SP, bnds(1,1), tolerance=1e-12_SP)
-         @assertEqual(1.0_SP, bnds(2,1), tolerance=1e-12_SP)
-         @assertEqual(1.0_SP, bnds(1,2), tolerance=1e-12_SP)
-         @assertEqual(2.0_SP, bnds(2,2), tolerance=1e-12_SP)
+         @assertEqual(0.0_SP, bnds(1, 1), tolerance=1e-12_SP)
+         @assertEqual(1.0_SP, bnds(2, 1), tolerance=1e-12_SP)
+         @assertEqual(1.0_SP, bnds(1, 2), tolerance=1e-12_SP)
+         @assertEqual(2.0_SP, bnds(2, 2), tolerance=1e-12_SP)
          @assertEqual(NF90_NOERR, nf90_inq_varid(grp, 'eta_max', varid))
          att = ''
          @assertEqual(NF90_NOERR, nf90_get_att(grp, varid, 'cell_methods', att))
@@ -590,7 +659,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       character(*), parameter :: F2 = './chk_00000001.0-00000002.0.nc'
@@ -602,8 +671,8 @@ contains
       call alloc_field(grid, eta)
       call reg%register('eta', eta)
 
-      vars(1) = 'eta';  stats(1) = ''
-      cx = 0.0_SP;  cy = 0.0_SP
+      vars(1) = 'eta'; stats(1) = ''
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='chk', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &
@@ -667,7 +736,7 @@ contains
       type(type_grid_2d)          :: grid
       type(type_field_registry)   :: reg
       type(type_output_channel)   :: ch
-      real(SP), allocatable, target :: eta(:,:)
+      real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
       real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N)
@@ -680,8 +749,8 @@ contains
       diag = -1
       if (comm%is_io_node()) diag = open_diagnostics_file('./output_root.nc')
 
-      vars(1) = 'eta';  stats(1) = ''
-      cx = 0.0_SP;  cy = 0.0_SP
+      vars(1) = 'eta'; stats(1) = ''
+      cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='fld', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
                    t_start=0.0_SP, interval=1.0_SP, &

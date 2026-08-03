@@ -13,7 +13,7 @@
 
 module model_main_mod
 
-   use core_constants_mod, only: SP, LARGE
+   use core_constants_mod, only: SP, LARGE, DEG2RAD
    use core_env_mod, only: type_env, new_env
    use core_comm_mod, only: type_comm
    use core_grid_mod, only: type_grid_2d
@@ -63,6 +63,10 @@ module model_main_mod
       type(type_comm), pointer :: comm => null()
       type(type_model_tracer), pointer :: tracer => null()
       type(type_model_vessel), pointer :: vessel => null()
+      ! vector-derived scratch refresh hooks (null unless channels ask)
+      type(type_fields_2d), pointer :: fields => null()
+      real(SP), pointer :: vec_mag(:, :) => null()
+      real(SP), pointer :: vec_dir(:, :) => null()
    contains
       procedure :: step => output_monitor_step
    end type type_output_monitor
@@ -101,6 +105,11 @@ module model_main_mod
       ! Checkpoint restart: the interface flux workspace (p_flux/q_flux) loaded
       ! from core.bin, staged here until register_output wires the registry
       real(SP), allocatable     :: chk_pflux(:, :), chk_qflux(:, :)
+      ! Vector-derived output scratch (velocity.mag/.dir): registered when
+      ! a channel requests them, refreshed before every manager step
+      logical                   :: need_vec_mag = .false.
+      logical                   :: need_vec_dir = .false.
+      real(SP), allocatable     :: vec_mag(:, :), vec_dir(:, :)
       ! Time-averaged statistics (legacy MIXING_STUFF port) — engine
       ! path only, initialised in run()
       type(type_model_means)    :: means
@@ -769,6 +778,9 @@ contains
       monitor%comm => this%env%comm
       monitor%tracer => this%tracer
       monitor%vessel => this%vessel
+      monitor%fields => this%fields
+      if (this%need_vec_mag) monitor%vec_mag => this%vec_mag
+      if (this%need_vec_dir) monitor%vec_dir => this%vec_dir
 
       call engine%init(merge(this%hot_start%time, 0.0_SP, &
                              this%hot_start%is_activated), &
@@ -804,6 +816,12 @@ contains
 
       forced = .false.
       if (present(force)) forced = force
+
+      ! vector-derived scratch refresh (flat, only when channels ask)
+      if (associated(this%vec_mag)) &
+         this%vec_mag = sqrt(this%fields%u**2 + this%fields%v**2)
+      if (associated(this%vec_dir)) &
+         this%vec_dir = atan2(this%fields%v, this%fields%u)/DEG2RAD
 
       call this%mgr%step(t, dt, this%registry, this%comm, force=forced)
       ! the forced final flush covers field frames only: tracer/vessel
@@ -1062,21 +1080,50 @@ contains
    ! ----------------------------------------------------------------
    subroutine build_point_channels(this, mgr, folder)
       use mpi_f08
-      use core_output_channel_mod, only: type_var_meta
+      use core_output_channel_mod, only: type_var_meta, type_channel_derived
       use model_field_metadata_mod, only: field_meta
+      use model_output_mod, only: VEC_DERIVED, PROD_DERIVED, PROD_SRC, &
+                                  PROD_STAT, PROD_SCALE
       class(type_model_main), intent(inout), target :: this
       type(type_output_manager), intent(inout) :: mgr
       character(*), intent(in) :: folder
 
       type(type_var_meta), allocatable :: vmeta(:)
+      type(type_channel_derived), allocatable :: dspecs(:)
       character(:), allocatable :: pfmt
-      integer :: k, iv, kc, n_owned, ierr
+      logical :: is_field
+      integer :: k, iv, kc, n_owned, ierr, idn, ip, isrc
       character(16) :: owned_str, total_str
 
-      ! Shared root: created once when any channel resolves to netcdf
-      ! (per-channel format:, else the deck default).  Layout 'single'
-      ! shares output.nc with the field stream; otherwise diagnostics.nc.
+      ! Vector-derived scratch: register once when any channel asks;
+      ! refreshed each manager step (zero until the first step)
       do k = 1, this%output%n_channels
+         do iv = 1, size(this%output%channels(k)%variables)
+            select case (trim(this%output%channels(k)%variables(iv)))
+            case ("velocity.mag")
+               this%need_vec_mag = .true.
+            case ("velocity.dir")
+               this%need_vec_dir = .true.
+            end select
+         end do
+      end do
+      if (this%need_vec_mag) then
+         allocate (this%vec_mag, mold=this%fields%u)
+         this%vec_mag = 0.0_SP
+         call this%registry%register("velocity.mag", this%vec_mag)
+      end if
+      if (this%need_vec_dir) then
+         allocate (this%vec_dir, mold=this%fields%u)
+         this%vec_dir = 0.0_SP
+         call this%registry%register("velocity.dir", this%vec_dir)
+      end if
+
+      ! Shared root: created once when any POINT channel resolves to
+      ! netcdf (per-channel format:, else the deck default).  Layout
+      ! 'single' shares output.nc with the field stream.
+      do k = 1, this%output%n_channels
+         if (this%output%geometries(this%output%channels(k)%geom_idx)%geom_type &
+             == "field") cycle
          if (point_format(this, k) == "netcdf") then
             if (this%output%layout == "single") then
                call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
@@ -1090,6 +1137,7 @@ contains
       do k = 1, this%output%n_channels
          associate (cfg => this%output%channels(k), &
                     geom => this%output%geometries(this%output%channels(k)%geom_idx))
+            is_field = geom%geom_type == "field"
 
             do iv = 1, size(cfg%variables)
                if (.not. this%registry%has(trim(cfg%variables(iv)))) &
@@ -1099,11 +1147,38 @@ contains
             end do
             allocate (vmeta(size(cfg%variables)))
             do iv = 1, size(cfg%variables)
-               vmeta(iv) = field_meta(trim(cfg%variables(iv)))
+               vmeta(iv) = derived_aware_meta(trim(cfg%variables(iv)))
             end do
 
+            ! catalogue requests -> runtime derived specs (source index
+            ! resolved within this channel's variables list)
+            allocate (dspecs(max(1, cfg%n_derived)))
+            do idn = 1, cfg%n_derived
+               do ip = 1, size(PROD_DERIVED)
+                  if (cfg%derived(idn) == PROD_DERIVED(ip)) exit
+               end do
+               isrc = 0
+               do iv = 1, size(cfg%variables)
+                  if (trim(cfg%variables(iv)) == trim(PROD_SRC(ip))) isrc = iv
+               end do
+               dspecs(idn) = type_channel_derived(name=PROD_DERIVED(ip), iv=isrc, &
+                                                  stat=PROD_STAT(ip), scale=PROD_SCALE(ip))
+            end do
+
+            ! field channels: deck-format inheritance includes binary;
+            ! netcdf/pnetcdf field channels pend the layout wiring
+            if (is_field) then
+               pfmt = trim(cfg%format)
+               if (len_trim(pfmt) == 0) pfmt = trim(this%output%format)
+               if (pfmt /= "ascii" .and. pfmt /= "binary") &
+                  call this%env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                  "': field channel inherits deck format '"// &
+                                                  pfmt//"' -- pending; set format: ascii|binary")
+            else
+               pfmt = point_format(this, k)
+            end if
+
             kc = mgr%n_channels + 1
-            pfmt = point_format(this, k)
             call mgr%channels(kc)%init(id=cfg%name, geom_type=geom%geom_type, &
                                        variables=cfg%variables, &
                                        n_vars=size(cfg%variables), &
@@ -1118,24 +1193,47 @@ contains
                                        coords_x=geom%x, coords_y=geom%y, &
                                        n_coords=size(geom%x), grid=this%grid, &
                                        comm=this%env%comm, var_meta=vmeta, &
-                                       diag_ncid=mgr%diag_ncid)
+                                       diag_ncid=mgr%diag_ncid, &
+                                       hidden=cfg%hidden, &
+                                       derived=dspecs, n_derived=cfg%n_derived)
             mgr%n_channels = kc
-            deallocate (vmeta)
+            deallocate (vmeta, dspecs)
 
-            call MPI_Allreduce(mgr%channels(kc)%n_local, n_owned, 1, &
-                               MPI_INTEGER, MPI_SUM, this%env%comm%id, ierr)
-            if (n_owned /= size(geom%x)) then
-               write (owned_str, '(I0)') n_owned
-               write (total_str, '(I0)') size(geom%x)
-               call this%env%log%exit_on_error("output: channels: '"//cfg%name// &
-                                               "': only "//trim(owned_str)//" of "// &
-                                               trim(total_str)//" points of geometry '"// &
-                                               geom%name//"' fall inside the domain")
+            if (.not. is_field) then
+               call MPI_Allreduce(mgr%channels(kc)%n_local, n_owned, 1, &
+                                  MPI_INTEGER, MPI_SUM, this%env%comm%id, ierr)
+               if (n_owned /= size(geom%x)) then
+                  write (owned_str, '(I0)') n_owned
+                  write (total_str, '(I0)') size(geom%x)
+                  call this%env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                  "': only "//trim(owned_str)//" of "// &
+                                                  trim(total_str)//" points of geometry '"// &
+                                                  geom%name//"' fall inside the domain")
+               end if
             end if
          end associate
       end do
 
    end subroutine build_point_channels
+
+   ! field_meta plus the vector-derived names it cannot know about
+   function derived_aware_meta(name) result(m)
+      use core_output_channel_mod, only: type_var_meta
+      use model_field_metadata_mod, only: field_meta
+      character(*), intent(in) :: name
+      type(type_var_meta) :: m
+
+      select case (trim(name))
+      case ("velocity.mag")
+         m%units = "m s-1"
+         m%long_name = "depth-averaged speed"
+      case ("velocity.dir")
+         m%units = "degree"
+         m%long_name = "depth-averaged velocity direction"
+      case default
+         m = field_meta(name)
+      end select
+   end function derived_aware_meta
 
    ! Point-channel format: the explicit format: key, else the deck
    ! default derived from the deck format.  pnetcdf also implies netcdf
