@@ -58,9 +58,9 @@ simulations:
       statistics: test.regression.postproc.statistics_compare
     tolerances:
       # v, q omitted — near-zero in 1D periodic flume (Y-direction noise)
-      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4 }
+      field: { eta: 1.0e-4, u: 1.0e-3, h_max: 1.0e-4, h_min: 1.0e-4, u_max: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p_flux: 1.0e-4 }
       # vmean, vlagm omitted — same reason as v/q above
-      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, etamean: 1.0e-4, Hrms: 2.0e-4, Havg: 2.0e-4, Hsig: 1.0e-4 }
+      statistics: { u_mean: 2.0e-2, eta_mean: 1.0e-4, hsig: 1.0e-4 }
 
   # ── flume_1d_irr: IRR wavemaker — code-path coverage only, no stats ──────
   # Stats (spectral shape, Hm0) belong in the validation framework.
@@ -76,7 +76,7 @@ simulations:
     tolerances:
       # v, q omitted — near-zero in 1D periodic flume (Y-direction noise)
       # mask9/p calibrated to measured floors (means 5.3e-4/1.6e-4, ledger-16 noise class)
-      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-3, p: 5.0e-4 }
+      field: { eta: 1.0e-4, u: 1.0e-3, h_max: 1.0e-4, h_min: 1.0e-4, u_max: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-3, p_flux: 5.0e-4 }
 
   # ── flume_1d_spectral: spectral wavemakers — code-path coverage only ─────
   # T_INTV_mean removed from inputs; spectral stats belong in validation.
@@ -91,7 +91,7 @@ simulations:
       field: test.regression.postproc.field_compare
     tolerances:
       # mask9/hmin calibrated to measured floors (ledger-16 noise class; tma_1d hmin mean 1.05e-4)
-      field: { eta: 5.0e-4, u: 5.0e-3, hmax: 1.0e-4, hmin: 2.0e-4, umax: 1.0e-3, mask: 2.0e-3, mask9: 1.0e-3, p: 5.0e-4 }
+      field: { eta: 5.0e-4, u: 5.0e-3, h_max: 1.0e-4, h_min: 2.0e-4, u_max: 1.0e-3, mask: 2.0e-3, mask9: 1.0e-3, p_flux: 5.0e-4 }
 
   # flume_2d_wk_reg: wall BC (PERIODIC=F), oblique regular wave (Theta=20°).
   # Two variants: bare walls and walls + south/north sponge.
@@ -109,8 +109,8 @@ simulations:
       field: test.regression.postproc.field_compare
       statistics: test.regression.postproc.statistics_compare
     tolerances:
-      field: { eta: 1.0e-4, u: 1.0e-3, v: 1.0e-3, hmax: 1.0e-4, hmin: 1.0e-4, umax: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p: 1.0e-4, q: 1.0e-3 }
-      statistics: { umean: 2.0e-2, ulagm: 2.0e-2, vmean: 2.0e-2, vlagm: 2.0e-2, etamean: 1.0e-4, Hrms: 2.0e-4, Havg: 2.0e-4, Hsig: 1.0e-4 }
+      field: { eta: 1.0e-4, u: 1.0e-3, v: 1.0e-3, h_max: 1.0e-4, h_min: 1.0e-4, u_max: 1.0e-3, mask: 1.0e-3, mask9: 1.0e-4, p_flux: 1.0e-4, q_flux: 1.0e-3 }
+      statistics: { u_mean: 2.0e-2, v_mean: 2.0e-2, eta_mean: 1.0e-4, hsig: 1.0e-4 }
 
   # flume_2d_irr: IRR wavemaker, PERIODIC=T, ThetaPeak=0 — code-path coverage only.
   # Tests PY=2 MPI decomp + Nglob=50 + wk_irr spectral wavemaker + 2D slope path.
@@ -131,7 +131,7 @@ simulations:
       field: test.regression.postproc.field_compare
     tolerances:
       # v/q omitted — near-zero with ThetaPeak=0.
-      field: { eta: 3.0e-3, u: 1.5e-2, hmax: 1.5e-3, hmin: 1.5e-3, umax: 5.0e-3, mask: 2.0e-3, mask9: 3.0e-4, p: 3.0e-3 }
+      field: { eta: 3.0e-3, u: 1.5e-2, h_max: 1.5e-3, h_min: 1.5e-3, u_max: 5.0e-3, mask: 2.0e-3, mask9: 3.0e-4, p_flux: 3.0e-3 }
 
   # solitary_flat_1d: INI_SOLITARY on flat bottom — wavemaker-free physics path.
   # Exercises core flux divergence (ESTIMATE_HUV else branch) + dispersion tridiagonal.
@@ -157,7 +157,7 @@ simulations:
     postprocess:
       field: test.regression.postproc.field_compare
     tolerances:
-      field: { eta: 1.0e-4, u: 1.0e-3, hmax: 1.0e-4, hmin: 2.0e-4, umax: 1.0e-3, mask: 1.0e-4, p: 1.0e-4 }
+      field: { eta: 1.0e-4, u: 1.0e-3, h_max: 1.0e-4, h_min: 2.0e-4, u_max: 1.0e-3, mask: 1.0e-4, p_flux: 1.0e-4 }
 
   # rip_2d: DATA bathymetry reader + y-varying 2D depth (rip channels, bar).
   # Cd=0.0 — clean bathy test; friction is a separate concern.
@@ -176,7 +176,7 @@ simulations:
     postprocess:
       field: test.regression.postproc.field_compare
     tolerances:
-      field: { eta: 2.0e-2, u: 3.0e-2, v: 3.0e-2, hmax: 3.0e-3, hmin: 3.0e-3, umax: 1.0e-2, mask: 2.0e-3 }
+      field: { eta: 2.0e-2, u: 3.0e-2, v: 3.0e-2, h_max: 3.0e-3, h_min: 3.0e-3, u_max: 1.0e-2, mask: 2.0e-3 }
 
   # hotstart_{bouss,nswe}: checkpoint round-trip self-consistency (no ref branch).
   # A continuous run (0->T) and a checkpoint+restart pair (0->T/2, then restart
@@ -255,6 +255,25 @@ simulations:
     # side.  0.011 would false-fail the healthy arm on ifx.
     tolerances:
       stability: { min_dt: 0.006, max_abs_eta: 30.0 }
+
+  # channel_stats: no-reference oracle for the windowed channel products.
+  # Fixed dt with the snapshot cadence EQUAL to dt, so postproc recomputes
+  # the dt-weighted mean/std/hsig from the exact accumulator sample set
+  # (float64) and asserts the engine's shifted-moment float32 products at
+  # roundoff-level tolerance -- the durable replacement for the retired
+  # means.f90 comparison target.
+  - name: channel_stats
+    exe_type: central-random
+    input: test/regression/inputs/channel_stats
+    input_files: [channel_stats.yaml]
+    decomp: [2, 1]
+    binary: funwave
+    output_dir: output
+    tags: [statistics, 2d]
+    postprocess:
+      channel_stats: test.regression.postproc.channel_stats_oracle
+    tolerances:
+      channel_stats: { rtol: 1.0e-4 }
 
   - name: standing_wave_3d_10m
     exe_type: central-3d

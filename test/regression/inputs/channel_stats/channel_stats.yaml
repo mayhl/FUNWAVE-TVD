@@ -1,0 +1,38 @@
+# Channel-statistics oracle — tiny fixed-dt case whose snapshot cadence
+# EQUALS dt, so postproc recomputes the dt-weighted windowed mean/std/hsig
+# from the exact sample set the accumulators saw (roundoff-level assert;
+# replaces the retired means.f90 as the comparison target).
+grid:
+  cell_size: [1.0, 1.0]
+  n_cells: [200, 4]
+  bathymetry:
+    type: flat
+    depth: 10.0
+simulation:
+  title: channel_stats
+  total_time: 4.0
+initial:
+  solitary:
+    amplitude: 0.5
+    depth: 10.0
+    x_center: 60.0
+boundaries:
+  periodic: [y]
+dispersion:
+  scheme: nswe
+numerics:
+  dt: 0.02
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  format: binary
+  channels:
+    - name: fields # snapshot cadence = dt: the oracle's sample set
+      geometry: field
+      variables: [eta, u]
+      interval: 0.02
+    - name: waves
+      geometry: field
+      variables: [eta, u, hsig]
+      statistics: [mean, std]
+      interval: 1.0
