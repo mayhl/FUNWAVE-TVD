@@ -54,6 +54,12 @@ module core_solver_tridiag_mod
    ! churn.  Message buffers are shared by both all-to-all phases.
    real(SP), allocatable :: ts_sbuf(:), ts_rbuf(:)
    real(SP), allocatable :: ts_la(:, :), ts_lc(:, :), ts_l1(:, :), ts_l2(:, :)
+   ! Transpose-path decomposition metadata — geometry-only (py, mx, ny),
+   ! so cached across calls; the (py, mx, ny) key guards re-derivation
+   ! (and its Allgather) if a differently-shaped grid ever calls in
+   integer, allocatable :: ts_wq(:), ts_x0(:), ts_nyp(:), ts_yoff(:)
+   integer :: ts_key_py = -1, ts_key_mx = -1, ts_key_ny = -1
+   integer :: ts_nyg = 0, ts_wme = 0
 
 contains
 
@@ -714,7 +720,6 @@ contains
       real(SP), intent(inout), optional :: d2(:, :)
       real(SP), intent(out), optional :: f2(:, :)
 
-      integer, allocatable :: wq(:), x0(:), nyp(:), yoff(:)
       integer, allocatable :: scnt(:), sdsp(:), rcnt(:), rdsp(:)
       integer :: py, me, mx, ny, nyg, nrhs, nfin, w_me
       integer :: r, x, jj, pos, base, rem, ierr, sbn, rbn
@@ -727,33 +732,40 @@ contains
       if (present(d2)) nrhs = 2
       nfin = 2 + nrhs
 
-      allocate (wq(0:py - 1), x0(0:py - 1), nyp(0:py - 1), yoff(0:py - 1))
-      allocate (scnt(0:py - 1), sdsp(0:py - 1), rcnt(0:py - 1), rdsp(0:py - 1))
+      ! x-column shares (near-even) and per-rank y extents — geometry
+      ! only, so derived once and cached (skips the per-call Allgather)
+      if (py /= ts_key_py .or. mx /= ts_key_mx .or. ny /= ts_key_ny) then
+         if (allocated(ts_wq)) deallocate (ts_wq, ts_x0, ts_nyp, ts_yoff)
+         allocate (ts_wq(0:py - 1), ts_x0(0:py - 1), ts_nyp(0:py - 1), ts_yoff(0:py - 1))
+         base = mx/py
+         rem = mod(mx, py)
+         do r = 0, py - 1
+            ts_wq(r) = base
+            if (r < rem) ts_wq(r) = ts_wq(r) + 1
+         end do
+         ts_x0(0) = 0
+         do r = 1, py - 1
+            ts_x0(r) = ts_x0(r - 1) + ts_wq(r - 1)
+         end do
+         call MPI_Allgather(ny, 1, MPI_INTEGER, ts_nyp, 1, MPI_INTEGER, &
+                            grid%col_comm, ierr)
+         ts_yoff(0) = 0
+         do r = 1, py - 1
+            ts_yoff(r) = ts_yoff(r - 1) + ts_nyp(r - 1)
+         end do
+         ts_nyg = ts_yoff(py - 1) + ts_nyp(py - 1)
+         ts_wme = ts_wq(me)
+         ts_key_py = py; ts_key_mx = mx; ts_key_ny = ny
+      end if
+      nyg = ts_nyg
+      w_me = ts_wme
 
-      ! x-column shares (near-even) and per-rank y extents
-      base = mx/py
-      rem = mod(mx, py)
-      do r = 0, py - 1
-         wq(r) = base
-         if (r < rem) wq(r) = wq(r) + 1
-      end do
-      x0(0) = 0
-      do r = 1, py - 1
-         x0(r) = x0(r - 1) + wq(r - 1)
-      end do
-      call MPI_Allgather(ny, 1, MPI_INTEGER, nyp, 1, MPI_INTEGER, &
-                         grid%col_comm, ierr)
-      yoff(0) = 0
-      do r = 1, py - 1
-         yoff(r) = yoff(r - 1) + nyp(r - 1)
-      end do
-      nyg = yoff(py - 1) + nyp(py - 1)
-      w_me = wq(me)
+      allocate (scnt(0:py - 1), sdsp(0:py - 1), rcnt(0:py - 1), rdsp(0:py - 1))
 
       ! --- forward all-to-all: a, c, d1[, d2] slabs -> full lines ---
       do r = 0, py - 1
-         scnt(r) = nfin*wq(r)*ny
-         rcnt(r) = nfin*w_me*nyp(r)
+         scnt(r) = nfin*ts_wq(r)*ny
+         rcnt(r) = nfin*w_me*ts_nyp(r)
       end do
       sdsp(0) = 0; rdsp(0) = 0
       do r = 1, py - 1
@@ -782,20 +794,20 @@ contains
       end if
       pos = 0
       do r = 0, py - 1
-         call pack_slab(a, x0(r), wq(r))
-         call pack_slab(c, x0(r), wq(r))
-         call pack_slab(d1, x0(r), wq(r))
-         if (nrhs == 2) call pack_slab(d2, x0(r), wq(r))
+         call pack_slab(a, ts_x0(r), ts_wq(r))
+         call pack_slab(c, ts_x0(r), ts_wq(r))
+         call pack_slab(d1, ts_x0(r), ts_wq(r))
+         if (nrhs == 2) call pack_slab(d2, ts_x0(r), ts_wq(r))
       end do
       call MPI_Alltoallv(ts_sbuf, scnt, sdsp, MPI_SP, ts_rbuf, rcnt, rdsp, MPI_SP, &
                          grid%col_comm, ierr)
 
       pos = 0
       do r = 0, py - 1
-         call unpack_lines(ts_la, yoff(r), nyp(r))
-         call unpack_lines(ts_lc, yoff(r), nyp(r))
-         call unpack_lines(ts_l1, yoff(r), nyp(r))
-         if (nrhs == 2) call unpack_lines(ts_l2, yoff(r), nyp(r))
+         call unpack_lines(ts_la, ts_yoff(r), ts_nyp(r))
+         call unpack_lines(ts_lc, ts_yoff(r), ts_nyp(r))
+         call unpack_lines(ts_l1, ts_yoff(r), ts_nyp(r))
+         if (nrhs == 2) call unpack_lines(ts_l2, ts_yoff(r), ts_nyp(r))
       end do
 
       ! --- one serial Thomas per line; back-sub in place (l -> f).
@@ -832,8 +844,8 @@ contains
 
       ! --- return all-to-all: solved lines -> owner slabs ---
       do r = 0, py - 1
-         scnt(r) = nrhs*w_me*nyp(r)
-         rcnt(r) = nrhs*wq(r)*ny
+         scnt(r) = nrhs*w_me*ts_nyp(r)
+         rcnt(r) = nrhs*ts_wq(r)*ny
       end do
       sdsp(0) = 0; rdsp(0) = 0
       do r = 1, py - 1
@@ -842,15 +854,15 @@ contains
       end do
       pos = 0
       do r = 0, py - 1
-         call pack_lines(ts_l1, yoff(r), nyp(r))
-         if (nrhs == 2) call pack_lines(ts_l2, yoff(r), nyp(r))
+         call pack_lines(ts_l1, ts_yoff(r), ts_nyp(r))
+         if (nrhs == 2) call pack_lines(ts_l2, ts_yoff(r), ts_nyp(r))
       end do
       call MPI_Alltoallv(ts_sbuf, scnt, sdsp, MPI_SP, ts_rbuf, rcnt, rdsp, MPI_SP, &
                          grid%col_comm, ierr)
       pos = 0
       do r = 0, py - 1
-         call unpack_slab(f1, x0(r), wq(r))
-         if (nrhs == 2) call unpack_slab(f2, x0(r), wq(r))
+         call unpack_slab(f1, ts_x0(r), ts_wq(r))
+         if (nrhs == 2) call unpack_slab(f2, ts_x0(r), ts_wq(r))
       end do
 
    contains
@@ -921,7 +933,7 @@ contains
 
       real(SP) :: a_beg(lp%nloc), c_end(lp%nloc)
       real(SP) :: y1_end(lp%nloc), y2_end(lp%nloc), beta(lp%nloc)
-      integer  :: west_rank, east_rank, dest_rank
+      integer  :: west_rank, east_rank
       integer  :: j, k, ierr
       type(MPI_Status) :: stat
 
@@ -1020,15 +1032,10 @@ contains
          end if
 
          ! --- Step 7: broadcast beta along x-row (same jproc) ---
+         ! row_comm root 0 = iproc 0 (Cart_sub keeps iproc ordering);
+         ! O(log px) vs the previous serial send loop from the chain end
          if (grid%nx_proc > 1) then
-            if (grid%iproc == 0) then
-               do k = 1, grid%nx_proc - 1
-                  call MPI_Cart_rank(grid%cart_comm, [k, grid%jproc], dest_rank, ierr)
-                  call MPI_Send(beta, lp%nloc, MPI_SP, dest_rank, 24, grid%cart_comm, ierr)
-               end do
-            else
-               call MPI_Recv(beta, lp%nloc, MPI_SP, west_rank, 24, grid%cart_comm, stat, ierr)
-            end if
+            call MPI_Bcast(beta, lp%nloc, MPI_SP, 0, grid%row_comm, ierr)
          end if
 
          ! --- Step 8: combine ---
@@ -1061,7 +1068,7 @@ contains
 
       real(SP) :: a_beg(lp%mloc), c_end(lp%mloc)
       real(SP) :: y1_end(lp%mloc), y2_end(lp%mloc), beta(lp%mloc)
-      integer  :: south_rank, north_rank, dest_rank
+      integer  :: south_rank, north_rank
       integer  :: i, j, k, ierr
       type(MPI_Status) :: stat
 
@@ -1160,15 +1167,10 @@ contains
          end if
 
          ! --- Step 7: broadcast beta along y-column (same iproc) ---
+         ! col_comm root 0 = jproc 0 (Cart_sub keeps jproc ordering);
+         ! O(log py) vs the previous serial send loop from the chain end
          if (grid%ny_proc > 1) then
-            if (grid%jproc == 0) then
-               do k = 1, grid%ny_proc - 1
-                  call MPI_Cart_rank(grid%cart_comm, [grid%iproc, k], dest_rank, ierr)
-                  call MPI_Send(beta, lp%mloc, MPI_SP, dest_rank, 34, grid%cart_comm, ierr)
-               end do
-            else
-               call MPI_Recv(beta, lp%mloc, MPI_SP, south_rank, 34, grid%cart_comm, stat, ierr)
-            end if
+            call MPI_Bcast(beta, lp%mloc, MPI_SP, 0, grid%col_comm, ierr)
          end if
 
          ! --- Step 8: combine ---

@@ -47,6 +47,9 @@ module core_grid_mod
       ! Column sub-communicator (fixed iproc, every jproc) — the trid_y
       ! transpose path all-to-alls full y-lines inside it
       type(MPI_Comm) :: col_comm
+      ! Row sub-communicator (fixed jproc, every iproc) — the periodic
+      ! trid_x tail broadcasts beta inside it
+      type(MPI_Comm) :: row_comm
       ! MPI neighbor ranks (MPI_PROC_NULL if at domain boundary)
       integer :: back_rank, shore_rank, left_rank, right_rank
       ! Boundary flags
@@ -145,6 +148,8 @@ contains
       ! column sub-comm for the trid_y transpose path; sub-comm ranks
       ! follow jproc order (Cart_sub keeps retained-dimension ordering)
       call MPI_Cart_sub(this%cart_comm, [.false., .true.], this%col_comm, ier)
+      ! row sub-comm for the periodic trid_x beta broadcast (iproc order)
+      call MPI_Cart_sub(this%cart_comm, [.true., .false.], this%row_comm, ier)
 
       this%is_back_boundary = (this%back_rank == MPI_PROC_NULL)
       this%is_shore_boundary = (this%shore_rank == MPI_PROC_NULL)
