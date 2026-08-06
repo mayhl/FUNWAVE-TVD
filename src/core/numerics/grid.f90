@@ -118,7 +118,7 @@ contains
       integer, parameter :: n_dims = 2
       integer, dimension(n_dims) :: dims, coords
       logical, dimension(n_dims) :: periods
-      integer :: ier
+      integer :: ier, cart_rank
       logical :: wrap_y, wrap_x
 
       wrap_y = .false.
@@ -134,11 +134,14 @@ contains
       periods = [wrap_x, wrap_y]
 
       ! Create Cart topology from the caller's comm without mutating it.
-      ! reorder=.false. guarantees Cart ranks == caller ranks, so comm%rank_id
-      ! is valid for MPI_Cart_coords without re-querying.
-      call MPI_Cart_Create(comm%id, n_dims, dims, periods, .false., this%cart_comm, ier)
+      ! reorder=.true. lets the MPI place cart neighbours on nearby hardware
+      ! (cray-mpich honors it); safe because every topology-derived value
+      ! below comes from cart_comm's OWN rank, never comm%rank_id — the
+      ! caller rank survives only for position-free duties (logging, IO root).
+      call MPI_Cart_Create(comm%id, n_dims, dims, periods, .true., this%cart_comm, ier)
 
-      call MPI_Cart_coords(this%cart_comm, comm%rank_id, n_dims, coords, ier)
+      call MPI_Comm_rank(this%cart_comm, cart_rank, ier)
+      call MPI_Cart_coords(this%cart_comm, cart_rank, n_dims, coords, ier)
       this%iproc = coords(1)
       this%jproc = coords(2)
 

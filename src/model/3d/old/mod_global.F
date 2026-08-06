@@ -28,13 +28,13 @@
 # if defined (PARALLEL)
      integer :: myid,ier
      integer :: comm2d
+     integer :: rank2d
      integer :: n_west,n_east,n_suth,n_nrth
      integer :: npx,npy
      integer :: ndims=2
      integer :: NumP
      integer, dimension(2) :: dims,coords
      logical, dimension(2) :: periods
-     logical :: reorder=.true.
 # endif
 
 

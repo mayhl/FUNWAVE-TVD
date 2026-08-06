@@ -673,9 +673,12 @@ END SUBROUTINE INITIALIZATION
      coords(1)=0
      coords(2)=0
 
+! reorder always on; safe because coords/neighbors derive from comm2d
+! ranks below, and IO placement goes by the gathered npxs/npys, not rank
      call MPI_CART_CREATE(MPI_COMM_WORLD,ndims,dims, &
-         periods,reorder,comm2d,ier)
-     call MPI_CART_COORDS(comm2d,myid,2,coords,ier)
+         periods,.true.,comm2d,ier)
+     call MPI_COMM_RANK(comm2d,rank2d,ier)
+     call MPI_CART_COORDS(comm2d,rank2d,2,coords,ier)
 
      npx=coords(1)
      npy=coords(2)
@@ -764,9 +767,9 @@ END SUBROUTINE INDEX_LOCAL
 
 
 SUBROUTINE PARALLEL_CARTESIAN
-    USE GLOBAL,ONLY: PX,PY,dims,periods,coords,ndims,comm2d,ier,myid,&
+    USE GLOBAL,ONLY: PX,PY,dims,periods,coords,ndims,comm2d,rank2d,ier,myid,&
                      coords,n_west, n_east, n_suth, n_nrth,&
-                     NumP,npx,npy,PERIODIC_X,PERIODIC_Y,reorder
+                     NumP,npx,npy,PERIODIC_X,PERIODIC_Y
     USE MPI
     IMPLICIT NONE
 
@@ -780,9 +783,12 @@ SUBROUTINE PARALLEL_CARTESIAN
     coords(1) = 0
     coords(2) = 0
 
+! reorder always on; safe because coords/neighbors derive from comm2d
+! ranks below, and IO placement goes by the gathered npxs/npys, not rank
     call MPI_CART_CREATE( MPI_COMM_WORLD, ndims, dims, &
-         periods, reorder, comm2d, ier )
-    call MPI_CART_COORDS( comm2d, myid, 2, coords, ier)
+         periods, .true., comm2d, ier )
+    call MPI_COMM_RANK( comm2d, rank2d, ier )
+    call MPI_CART_COORDS( comm2d, rank2d, 2, coords, ier)
 
     npx = coords(1)
     npy = coords(2)
