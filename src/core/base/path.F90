@@ -111,7 +111,7 @@ contains
    subroutine path_touch(this)
       class(type_path), intent(in) :: this
       integer :: unit, stat
-      open (newunit=unit, file=trim(this%root), access="append", action="write", iostat=stat)
+      open (newunit=unit, file=trim(this%root), position="append", action="write", iostat=stat)
       if (stat == 0) close (unit)
    end subroutine path_touch
 

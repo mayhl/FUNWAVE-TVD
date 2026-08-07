@@ -78,7 +78,7 @@ contains
       class(*), intent(in) :: var
       character(len=*), intent(in) :: name
       integer :: unit_num = 99
-      open (unit=unit_num, file="dump.bin", status="unknown", access="append", form="unformatted")
+      open (unit=unit_num, file="dump.bin", status="unknown", position="append", form="unformatted")
       write (unit_num) name
       select type (var)
       type is (real(real32)); write (unit_num) var
@@ -92,7 +92,7 @@ contains
       class(*), intent(in) :: var(:)
       character(len=*), intent(in) :: name
       integer :: unit_num = 99
-      open (unit=unit_num, file="dump.bin", status="unknown", access="append", form="unformatted")
+      open (unit=unit_num, file="dump.bin", status="unknown", position="append", form="unformatted")
       write (unit_num) name
       select type (var)
       type is (real(real32)); write (unit_num) var
@@ -106,7 +106,7 @@ contains
       class(*), intent(in) :: var(:, :)
       character(len=*), intent(in) :: name
       integer :: unit_num = 99
-      open (unit=unit_num, file="dump.bin", status="unknown", access="append", form="unformatted")
+      open (unit=unit_num, file="dump.bin", status="unknown", position="append", form="unformatted")
       write (unit_num) name
       select type (var)
       type is (real(real32)); write (unit_num) var

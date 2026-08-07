@@ -12,7 +12,7 @@ contains
       real(8), intent(in) :: var
       character(len=*), intent(in) :: name
       integer :: unit_num = 99
-      open (unit=unit_num, file="dump.bin", status="unknown", access="append", form="unformatted")
+      open (unit=unit_num, file="dump.bin", status="unknown", position="append", form="unformatted")
       write (unit_num) name
       write (unit_num) var
       close (unit_num)
