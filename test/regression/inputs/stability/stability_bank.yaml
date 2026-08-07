@@ -1,0 +1,50 @@
+# Stability sentinel — no-reference lake-at-rest quiescence gate on real bathymetry.
+#
+# Bathymetry: a 256x192 window of the Holland Harbor dx-1.5 production grid
+# (depth_eff[480:672,1150:1406], SWL +0.8 baked in), carrying the channel-bank
+# sliver class from the 2026-08 diagnosis: 1-cell wet slivers (0.04-0.15 m)
+# pinched between dry ground ~+0.9 m above SWL and a 1.5 m/cell depth step.
+# No forcing — the engine must hold the lake at rest.  The well-balanced gate
+# is velocity: the quiescent run settles at max|u| 0.012 / max|v| 0.036 m/s by
+# t=120 (np=4), and a self-excited bank mode shows up as sustained m/s-scale
+# growth long before eta or dt move.  max_abs_eta sits above the static
+# dry-land eta fill (12.87 m = land height, present in every frame).
+#
+# NOTE: the full 1823x1106 domain trips the legacy engine from this state
+# (parity ledger entry 21); the window alone does not — verified quiet in
+# legacy at 256x192 and 512x384 — so this case gates modern's quiescence
+# only, on the geometry class rather than the reproduced blow-up.
+
+grid:
+  cell_size: [1.5, 1.5]
+  n_cells: [256, 192]
+  bathymetry:
+    type: file
+    file: depth_bank.txt
+simulation:
+  title: stability_bank
+  total_time: 120.0
+  screen_interval: 1.0
+numerics:
+  cfl: 0.5
+  froude_cap: 3.0
+  min_depth: 0.05
+  flux_solver: hllc
+  reconstruction: fourth
+dispersion:
+  beta_ref: -0.531
+  scheme: fully_nonlinear
+breaking:
+  model: eddy_viscosity
+  cbrk1: 0.65
+  cbrk2: 0.35
+friction:
+  cd: 0.0025
+output:
+  result_folder: output/
+  format: binary
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta, u, v]
+      interval: 40.0

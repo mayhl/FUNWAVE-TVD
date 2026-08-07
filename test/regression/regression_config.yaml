@@ -256,6 +256,27 @@ simulations:
     tolerances:
       stability: { min_dt: 0.006, max_abs_eta: 30.0 }
 
+  # stability_bank: no-reference lake-at-rest quiescence gate on a real-bathy
+  # window of the Holland dx-1.5 grid (channel-bank sliver class, ledger entry
+  # 21).  No forcing; the gate is the optional max_abs_vel arm of
+  # stability_check — quiescent max|v| 0.036 m/s vs the m/s-scale self-excited
+  # bank mode.  max_abs_eta 15.0 clears the static dry-land eta fill (12.87 m);
+  # min_dt 0.05 sits under the CFL-settled 0.078.  Deck header documents why
+  # this is a modern-only gate (the window does not reproduce the full-domain
+  # legacy trip).
+  - name: stability_bank
+    exe_type: central-random
+    input: test/regression/inputs/stability
+    input_files: [stability_bank.yaml]
+    decomp: [2, 2]
+    binary: funwave
+    output_dir: output
+    tags: [stability, bank, 2d]
+    postprocess:
+      stability: test.regression.postproc.stability_check
+    tolerances:
+      stability: { min_dt: 0.05, max_abs_eta: 15.0, max_abs_vel: 0.15 }
+
   # channel_stats: no-reference oracle for the windowed channel products.
   # Fixed dt with the snapshot cadence EQUAL to dt, so postproc recomputes
   # the dt-weighted mean/std/hsig from the exact accumulator sample set

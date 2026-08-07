@@ -14,6 +14,10 @@ sim's exe entry carries no ref branch).
 Tolerance keys in regression_config.yaml (under tolerances: stability:):
   min_dt      — floor the observed dt must never cross (default: 0.011)
   max_abs_eta — bound on |eta| in the final frame, metres (default: 30.0)
+  max_abs_vel — optional bound on |u|/|v| in the final frame, m/s; checked
+                only when the key is present.  Quiescence gates (lake-at-rest
+                decks) need it — a bounded self-excited velocity mode can sit
+                well under any eta cap while the dt never dips.
 """
 
 from __future__ import annotations
@@ -90,5 +94,28 @@ def run(
         metrics.append(
             MetricResult(variable="eta", stat="max_abs", value=math.inf, passed=False, tolerance=eta_cap)
         )
+
+    # ---- optional velocity quiescence (final u/v frames) -------------
+    if "max_abs_vel" in tol:
+        vel_cap = float(tol["max_abs_vel"])
+        for var in ("u", "v"):
+            files = meta.output_files(var)
+            if files:
+                fld = meta.read_field(files[-1])
+                finite = bool(np.isfinite(fld).all())
+                max_abs = float(np.abs(fld[np.isfinite(fld)]).max()) if np.isfinite(fld).any() else math.inf
+                metrics.append(
+                    MetricResult(
+                        variable=var,
+                        stat="max_abs",
+                        value=max_abs,
+                        passed=finite and max_abs <= vel_cap,
+                        tolerance=vel_cap,
+                    )
+                )
+            else:
+                metrics.append(
+                    MetricResult(variable=var, stat="max_abs", value=math.inf, passed=False, tolerance=vel_cap)
+                )
 
     return SubsectionResult(kind="statistics", label="stability sentinel", metrics=metrics)
