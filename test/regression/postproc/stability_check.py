@@ -38,7 +38,11 @@ def run(
     verbose: bool = False,
 ) -> SubsectionResult:
     dev_dir = Path(dev_dir)
-    tol = tolerances.get("stability", {}) if tolerances else {}
+    # The runner hands over the per-kind dict (tolerances["stability"]) already;
+    # tolerate the outer-dict shape too so direct invocations keep working.
+    tol = tolerances or {}
+    if "stability" in tol and isinstance(tol["stability"], dict):
+        tol = tol["stability"]
     min_dt_floor = float(tol.get("min_dt", 0.011))
     eta_cap = float(tol.get("max_abs_eta", 30.0))
 
