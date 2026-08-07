@@ -22,7 +22,6 @@ module model_main_mod
    use core_output_channel_mod, only: type_output_channel, write_field_file
    use core_stepper_engine_mod, only: type_stepper_engine, type_engine_monitor
    use core_path_mod, only: type_path
-   use probe_mod, only: dump_state, reset_state
 
    use model_geometry_mod, only: type_model_geometry, read_field_ascii, stagger_depth
    use model_simulation_mod, only: type_model_simulation
@@ -127,8 +126,6 @@ contains
       class(type_model_main), intent(inout) :: this
       character(2048) :: yaml_path
 
-      call reset_state()
-      call dump_state(5.0d0, "main_init_test")
       call get_command_argument(1, yaml_path)
 
       ! Initialize environment (Comm, Log, YAML)
@@ -175,9 +172,6 @@ contains
       use core_env_mod, only: get_sub_env
       class(type_model_main), intent(inout) :: this
       type(type_env), intent(inout) :: env
-
-      call reset_state()
-      call dump_state(5.0d0, "main_init_test")
 
       ! Adopt the caller's env (shallow copy; comm/log pointers are shared).
       ! Transfer yaml ownership: nullify env%yaml%file%root so that only
