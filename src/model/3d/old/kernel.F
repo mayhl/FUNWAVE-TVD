@@ -267,17 +267,23 @@
      integer, parameter :: nentries=15
      integer :: i,j,k,n,ivalues,nvalues,neq,ientry,num_iterations,  &
                 precond_id,n_pre,n_post,ierr
-     integer*8 :: grid,stencil,matrix,vec_b,vec_x,solver,precond
+     integer*8, save :: grid,stencil,matrix,vec_b,vec_x
+     integer*8 :: solver,precond
+     logical, save :: built = .false.
      integer :: i_glob(Mloc),j_glob(Nloc),k_glob(Kloc)
-     integer :: ilower(ndim),iupper(ndim),offsets(nentries,ndim),stencil_indices(nentries), &
+     integer, save :: ilower(ndim),iupper(ndim)
+     integer :: offsets(nentries,ndim),stencil_indices(nentries), &
                 periodic_shift(ndim)
      real(SP) :: final_res_norm
-     real(SP), dimension(:), allocatable :: values,Phi
-     integer, dimension(:,:,:), allocatable :: indx 
+     real(SP), dimension(:), allocatable, save :: values,Phi
+     integer, dimension(:,:,:), allocatable, save :: indx
      data ((offsets(i,j),j=1,ndim),i=1,nentries)/0,0,0,1,0,0,0,1,0,0,-1,1,-1,0,1,  &
              0,0,1,1,0,1,0,1,1,-1,0,0,0,-1,0,  &
              0,1,-1,1,0,-1,0,0,-1,-1,0,-1,0,-1,-1/
 
+     ! grid/stencil/matrix/vector objects are stage-invariant: built once and
+     ! reused across calls; only the coefficients and rhs change per RK stage
+     if(.not.built) then
      ! set up a three dimensional grid
      call HYPRE_StructGridCreate(MPI_COMM_WORLD,ndim,grid,ierr)
 
@@ -328,15 +334,12 @@
      ! create matrix object
      call HYPRE_StructMatrixCreate(MPI_COMM_WORLD,grid,stencil,matrix,ierr)
 
-     call HYPRE_StructMatrixInitialize(matrix,ierr)
-
-     ! set the matrix coefficient
-     do i = 1,nentries
-       stencil_indices(i) = i-1
-     enddo
+     ! set up struct vectors for b and x
+     call HYPRE_StructVectorCreate(MPI_COMM_WORLD,grid,vec_b,ierr)
+     call HYPRE_StructVectorCreate(MPI_COMM_WORLD,grid,vec_x,ierr)
 
      allocate(indx(Mloc,Nloc,Kloc))
- 
+
      neq = 0
      do k = Kbeg,Kend
      do j = Jbeg,Jend
@@ -346,9 +349,20 @@
      enddo
      enddo
      enddo
-    
+
      nvalues = (Iend-Ibeg+1)*(Jend-Jbeg+1)*(Kend-Kbeg+1)*nentries
      allocate(values(nvalues))
+     allocate(Phi(neqns))
+
+     built = .true.
+     endif
+
+     call HYPRE_StructMatrixInitialize(matrix,ierr)
+
+     ! set the matrix coefficient
+     do i = 1,nentries
+       stencil_indices(i) = i-1
+     enddo
 
      ivalues = 0
      do k = Kbeg,Kend
@@ -363,24 +377,19 @@
      enddo
 
      call HYPRE_StructMatrixSetBoxValues(matrix,ilower,iupper,nentries,  &
-                                  stencil_indices,values,ierr) 
+                                  stencil_indices,values,ierr)
      call HYPRE_StructMatrixAssemble(matrix,ierr)
      !call HYPRE_StructMatrixPrint(matrix,zero,ierr)
-
-     ! set up struct vectors for b and x
-     call HYPRE_StructVectorCreate(MPI_COMM_WORLD,grid,vec_b,ierr)
-     call HYPRE_StructVectorCreate(MPI_COMM_WORLD,grid,vec_x,ierr)
 
      call HYPRE_StructVectorInitialize(vec_b,ierr)
      call HYPRE_StructVectorInitialize(vec_x,ierr)
 
      ! set the vector coefficients
-     call HYPRE_StructVectorSetBoxValues(vec_b,ilower,iupper,Rhs,ierr)   
-     call HYPRE_StructVectorAssemble(vec_b,ierr)     
+     call HYPRE_StructVectorSetBoxValues(vec_b,ilower,iupper,Rhs,ierr)
+     call HYPRE_StructVectorAssemble(vec_b,ierr)
      !call HYPRE_StructVectorPrint(vec_b,zero,ierr)
 
      ! initial guess
-     allocate(Phi(neqns))
      do k = Kbeg,Kend
      do j = Jbeg,Jend
      do i = Ibeg,Iend
@@ -431,18 +440,10 @@
      enddo
      enddo
 
-     ! free memory
-     call HYPRE_StructGridDestroy(grid,ierr)
-     call HYPRE_StructStencilDestroy(stencil,ierr)
-     call HYPRE_StructMatrixDestroy(matrix,ierr)
-     call HYPRE_StructVectorDestroy(vec_b,ierr)
-     call HYPRE_StructVectorDestroy(vec_x,ierr)
+     ! solver/preconditioner setup depends on the stage coefficients, so only
+     ! these are torn down; the grid-side objects persist for the next stage
      call HYPRE_StructGMRESDestroy(solver,ierr)
      call HYPRE_StructSMGDestroy(precond,ierr)
-
-     deallocate(indx)
-     deallocate(values)
-     deallocate(Phi)
 
 # endif
      return
