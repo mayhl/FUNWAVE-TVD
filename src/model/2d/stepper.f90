@@ -857,7 +857,8 @@ contains
             ! real dispersion-gate weight off the settled mask9 (halos valid)
             call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
                                    this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
-                                   phy%viscosity_breaking, f%swe_w)
+                                   phy%viscosity_breaking, f%swe_w, &
+                                   num%MinDepth, this%breaking%swe_wetdry_ramp)
             ! latch only once the vessel is NOT blanking mask9 — else a
             ! mid-run deactivation (is_activated -> F) would leave m9_settled
             ! true and freeze mask9 with the stale hull zeros; the guard's
@@ -908,7 +909,8 @@ contains
          call update_swe_weight(f%eta, f%depth, f%mask9, &
                                 this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
                                 this%breaking%swe_eta_ramp, phy%viscosity_breaking, &
-                                f%swe_w)
+                                f%swe_w, this%numerics%MinDepth, &
+                                this%breaking%swe_wetdry_ramp)
 
          ! carried fws face restore (18c): the first stage's etat reads the
          ! interface flux one row past the interior, which the interior-only

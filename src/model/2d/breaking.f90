@@ -18,6 +18,7 @@
 !    nu_bkg:        <real>   background viscosity floor,         default 0.0
 !    swe_eta_dep:   <real>   bore-regime eta/h threshold,        default 0.8
 !    swe_eta_ramp:  <real>   SWE-gate smoothstep taper width,    default 0.1
+!    swe_wetdry_ramp: <real> wet/dry dispersion taper (x min_depth), default 0
 !
 !  Variant keys are read CONDITIONALLY so the unread-key detector flags
 !  inapplicable knobs: cbrk1/cbrk2 need the breaker kernel (eddy_viscosity
@@ -45,7 +46,8 @@ module model_breaking_mod
                                         DEF_BREAKING_MODEL, &
                                         DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER, &
                                         DEF_BREAKING_VISBRK, &
-                                        DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP
+                                        DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP, &
+                                        DEF_BREAKING_SWE_WETDRY_RAMP
 
    implicit none
 
@@ -86,6 +88,10 @@ module model_breaking_mod
       ! defaults -- block-less decks land here
       real(SP) :: swe_eta_dep = 0.8_SP
       real(SP) :: swe_eta_ramp = 0.1_SP
+      ! wet/dry-proximity dispersion taper (multiples of min_depth); 0 = off.
+      ! Mode-independent -- the viscous path has no SWE gate, so swash-edge
+      ! mask flips otherwise radiate through the dispersive terms
+      real(SP) :: swe_wetdry_ramp = 0.0_SP
 
    contains
       procedure :: read_input => breaking_read_input
@@ -118,6 +124,8 @@ contains
       call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default=DEF_BREAKING_NU_BKG)
       call sub_env%yaml%read("swe_eta_dep", silent=no_key, val=this%swe_eta_dep, &
                              default=DEF_BREAKING_SWE_ETA_DEP)
+      call sub_env%yaml%read("swe_wetdry_ramp", silent=no_key, val=this%swe_wetdry_ramp, &
+                             default=DEF_BREAKING_SWE_WETDRY_RAMP)
 
       ! variant keys — conditionally read so the unread-key detector flags
       ! knobs inapplicable to the selected model.  cbrk1/cbrk2 stay live
