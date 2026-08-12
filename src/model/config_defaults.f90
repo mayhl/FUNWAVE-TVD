@@ -49,6 +49,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH = "0.0"
    character(*), parameter :: DEF_BOUNDARIES_WEST_SPONGE_WIDTH = "0.0"
    ! ── breaking ──
+   character(*), parameter :: DEF_BREAKING_AGE_PER_STAGE = "YES"
    character(*), parameter :: DEF_BREAKING_CBRK1 = "0.65"
    character(*), parameter :: DEF_BREAKING_CBRK2 = "0.35"
    character(*), parameter :: DEF_BREAKING_MODEL = "eddy_viscosity"
@@ -57,6 +58,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_SWE_ETA_DEP = "0.8"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_RAMP = "0.1"
    character(*), parameter :: DEF_BREAKING_SWE_WETDRY_RAMP = "0.0"
+   character(*), parameter :: DEF_BREAKING_T_BRK = "20.0"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"
    ! ── dispersion ──
    character(*), parameter :: DEF_DISPERSION_BETA_REF = "-0.531"

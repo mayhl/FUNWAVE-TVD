@@ -47,7 +47,8 @@ module model_breaking_mod
                                         DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER, &
                                         DEF_BREAKING_VISBRK, &
                                         DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP, &
-                                        DEF_BREAKING_SWE_WETDRY_RAMP
+                                        DEF_BREAKING_SWE_WETDRY_RAMP, &
+                                        DEF_BREAKING_T_BRK, DEF_BREAKING_AGE_PER_STAGE
 
    implicit none
 
@@ -75,6 +76,13 @@ module model_breaking_mod
       real(SP) :: cbrk1 = 0.65_SP
       real(SP) :: cbrk2 = 0.35_SP
       real(SP) :: wavemaker_cbrk = 1.0_SP
+
+      ! breaking-event age threshold (legacy hard-coded 20 s; the
+      ! per-wavemaker assignments were dead code — parity ledger 17d/e)
+      real(SP) :: t_brk = 20.0_SP
+      ! legacy accrues breaker age every RK stage (3x wall-clock); the
+      ! cbrk defaults were calibrated with it.  false = once per step
+      logical  :: age_per_stage = .true.
 
       logical  :: wavemaker_vis = .false.
       real(SP) :: visbrk = 0.0_SP
@@ -134,6 +142,9 @@ contains
       if (trim(this%model) /= "wavemaker_viscosity") then
          call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default=DEF_BREAKING_CBRK1)
          call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default=DEF_BREAKING_CBRK2)
+         call sub_env%yaml%read("t_brk", silent=no_key, val=this%t_brk, default=DEF_BREAKING_T_BRK)
+         call sub_env%yaml%read("age_per_stage", silent=no_key, val=this%age_per_stage, &
+                                default=DEF_BREAKING_AGE_PER_STAGE)
       end if
       if (trim(this%model) /= "eddy_viscosity") then
          call sub_env%yaml%read("swe_eta_ramp", silent=no_key, val=this%swe_eta_ramp, &

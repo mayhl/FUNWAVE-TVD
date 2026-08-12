@@ -216,6 +216,8 @@ Wave breaking — dissipation model, roller, and thresholds (core physics, not p
 | `swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion. |
 | `swe_eta_ramp` | `0.1` | — | — | eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity). |
 | `swe_wetdry_ramp` | `0.0` | — | — | Wet/dry-proximity dispersion taper: water-column multiples of numerics.min_depth over which swe_w smoothsteps up from 0 at the wet/dry threshold; 0 = off. Applies under every breaking model — the viscous path has no SWE gate, so swash-edge mask flips otherwise radiate through the dispersive terms. |
+| `t_brk` | `20.0` | — | s | Breaking-event age threshold (legacy hard-coded 20 s — the per-wavemaker assignments were dead code). |
+| `age_per_stage` | `true` | — | — | Accrue breaker age every RK stage (legacy behavior: age runs 3x wall-clock; the cbrk defaults were calibrated with it). false = once per time step. |
 
 ## `friction:`
 

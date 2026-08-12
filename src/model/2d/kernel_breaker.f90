@@ -47,7 +47,7 @@ contains
    ! fixes it is the one parity-breaking item, parked for the GPU pass.
    ! ----------------------------------------------------------------
    subroutine wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
-                            dx, dy, dt, t_brk, min_depth_frc, &
+                            dx, dy, dt, t_brk, advance_age, min_depth_frc, &
                             cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, &
                             vis_scheme, swe_eta_dep, in_wm_zone, &
                             nu_break, age, roller_flux, undertow_u, undertow_v)
@@ -57,6 +57,7 @@ contains
       real(SP), intent(in)  :: u(:, :), v(:, :), etamean(:, :)
       real(SP), intent(in)  :: dx(:, :), dy(:, :)
       real(SP), intent(in)  :: dt, t_brk, min_depth_frc
+      logical, intent(in)  :: advance_age
       real(SP), intent(in)  :: cbrk1, cbrk2, wavemaker_cbrk, nu_bkg
       integer, intent(in)  :: vis_scheme
       real(SP), intent(in)  :: swe_eta_dep
@@ -106,7 +107,9 @@ contains
                age(i, j) = dt
             else
                if (age(i, j) > 0.0_SP) then
-                  age(i, j) = age(i, j) + dt
+                  ! legacy quirk: called every RK stage, so age runs 3x
+                  ! wall-clock unless the caller gates the increment
+                  if (advance_age) age(i, j) = age(i, j) + dt
                else
                   c = min(abs(etat(i, j))/slope_mag, sqrt(GRAV*abs(h(i, j))))
                   propxy = sqrt(dxg*dxg + dyg*dyg)/max(c, SMALL)

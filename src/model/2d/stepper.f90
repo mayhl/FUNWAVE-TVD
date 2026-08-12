@@ -78,12 +78,9 @@ module model_stepper_2d_mod
    private
    public :: type_model_stepper_2d
 
-   ! Legacy breaking-age threshold (old/init.F:1235: T_brk = 20 when
-   ! SHOW_BREAKING).  The spectral-wavemaker T_brk assignments are DEAD
-   ! in legacy: WAVEMAKER_INITIALIZATION (init.F:955) runs first and
-   ! init.F:1235 overwrites unconditionally under the same
-   ! SHOW_BREAKING gate, so 20 always wins (parity ledger 17d/e).
-   real(SP), parameter :: T_BRK_LEGACY = 20.0_SP
+   ! breaking-age threshold now rides breaking%t_brk (registry default 20,
+   ! the value legacy hard-coded — its per-wavemaker assignments were dead,
+   ! parity ledger 17d/e)
 
    type, extends(type_stepper_model) :: type_model_stepper_2d
 
@@ -123,8 +120,8 @@ module model_stepper_2d_mod
       real(SP) :: b1 = 0.0_SP, b2 = 0.0_SP
       real(SP) :: beta1 = 0.0_SP, beta2 = 0.0_SP
 
-      ! Breaking-age threshold (legacy T_brk, always 20 — see above)
-      real(SP) :: t_brk = T_BRK_LEGACY
+      ! Breaking-age threshold (legacy T_brk — see above)
+      real(SP) :: t_brk = 20.0_SP
 
       ! dt of the step in flight (estimate_dt -> post_step means/stats)
       real(SP) :: dt_step = 0.0_SP
@@ -322,9 +319,7 @@ contains
       this%bc%exch_age = physics%viscosity_breaking
       this%bc%exch_nu = physics%viscosity_breaking .or. breaking%wavemaker_vis
 
-      ! the legacy per-wavemaker T_brk assignments were dead (see the
-      ! T_BRK_LEGACY note) — 20 is the only threshold
-      this%t_brk = T_BRK_LEGACY
+      this%t_brk = breaking%t_brk
 
       this%west_dirichlet = .false.
       if (grid%is_back_boundary .and. associated(this%wm_bc)) &
@@ -702,9 +697,12 @@ contains
             ! viscosity_breaking feeds nu_break into the momentum
             ! sources (merge_nu_vis) — show-only leaves dynamics alone
             ! TODO(6e+): vis_scheme selection beyond DEFAULT
+            ! age accrues per stage under the legacy quirk knob, else only
+            ! on the final stage (true wall-clock age)
             call wave_breaking(lp, this%etax, this%etay, this%etat, &
                                f%eta, f%depth, f%h, f%u, f%v, this%means%etamean, &
                                this%dx, this%dy, dt, this%t_brk, &
+                               this%breaking%age_per_stage .or. istage == 3, &
                                num%MinDepthFrc, this%breaking%cbrk1, &
                                this%breaking%cbrk2, this%breaking%wavemaker_cbrk, &
                                this%breaking%nu_bkg, VIS_SCHEME_DEFAULT, &
