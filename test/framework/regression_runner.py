@@ -1,3 +1,4 @@
+import json
 import math
 import platform
 import re
@@ -1042,6 +1043,20 @@ class RegressionRunner(BaseRunner):
 
         self._print_summary(sim_results)
 
+        # machine-readable twin of the report (sweep collectors rank on
+        # metric VALUES; the HTML board is presentation-only).  Base is
+        # env-overridable so concurrent boards sharing one repo checkout
+        # do not clobber each other's report files.
+        report_base = Path(os.environ.get("FUNWAVE_REPORT_BASE",
+                                          str(Path(self.repo_root) / "workspaces" / "regression_report")))
+        report_base.parent.mkdir(parents=True, exist_ok=True)
+        report_base.with_suffix(".json").write_text(json.dumps([
+            {"name": r.name, "status": r.status,
+             "metrics": [{"section": s.label, "variable": m.variable, "stat": m.stat,
+                          "value": m.value, "passed": m.passed, "tolerance": m.tolerance}
+                         for s in r.subsections for m in s.metrics]}
+            for r in sim_results], indent=1))
+
         any_failed = any(r.status not in ("PASS", "XFAIL", "COMPLETED") for r in sim_results)
         # TODO: honour --no-auto-report: skip this block when any_failed but flag is set
         if report or pdf or any_failed:
@@ -1055,7 +1070,7 @@ class RegressionRunner(BaseRunner):
                 ref_hash=", ".join((ref_hashes.get(t) or "oracle")[:8] for t in sorted(exe_dirs)),
                 dev_hash=curr_hash,
             )
-            base = Path(self.repo_root) / "workspaces" / "regression_report"
+            base = report_base
             want_pdf = pdf or any_failed
             pdf_path = None
             with Progress(
