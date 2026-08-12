@@ -543,6 +543,13 @@ class RegressionRunner(BaseRunner):
 
         ref_state = "oracle" if oracle_mode else "needs_run"
         ref_input = None if oracle_mode else sim["input_file"]
+        if oracle_mode:
+            # oracle sims have no ref cache to invalidate, so nothing cleaned
+            # this dir on rerun — and the channel writers open position=append,
+            # so a stale run dir silently concatenates runs and the oracle
+            # scores the mixture
+            if os.path.exists(curr_run_dir):
+                shutil.rmtree(curr_run_dir, ignore_errors=True)
         if not oracle_mode:
             stamp_val = f"{dt_mode} np={eff_np}"
             cached = False
