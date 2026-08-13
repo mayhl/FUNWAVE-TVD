@@ -32,7 +32,8 @@
 !      --- spectrum_2d:  file, format (nee WaveCompFile/WAVE_DATA_TYPE)
 !      --- components:   n, period_peak, file
 !      directional: {peak, spread}    presence = 2D spreading; spread REQUIRED
-!      discretization: {freq_bins, theta_bins, equal_energy, method,
+!      discretization: {freq_bins, theta_bins, method,
+!                       equal_energy (none|freq|dir|both; bool = legacy freq),
 !                       coherence_percent}    theta_bins needs directional:
 !    source:                    presence = Wei-Kirby internal source box
 !      x_center, y_center, depth, delta, y_width, time_ramp, current_cd
@@ -174,7 +175,10 @@ module model_wavemaker_mod
       real(SP) :: WidthWaveMaker = 0.0_SP
       real(SP) :: R_sponge_wavemaker = 0.0_SP
       real(SP) :: A_sponge_wavemaker = 0.0_SP
-      logical  :: EqualEnergy = .false.
+      ! equal-energy binning per axis (deck equal_energy: none|freq|dir|both;
+      ! bare true/yes = the pre-enum freq-axis binning)
+      logical  :: eqe_freq = .false.
+      logical  :: eqe_dir = .false.
 
       ! Wavemaker current balance — presence of WaveMakerCd enables balance
       logical  :: WaveMakerCurrentBalance = .false.
@@ -303,7 +307,8 @@ module model_wavemaker_mod
       integer  :: nfreq = 0
       integer  :: ntheta = 1
       real(SP) :: fmin = 0.0_SP, fmax = 0.0_SP   ! generation band [Hz]
-      logical  :: equal_energy = .false.         ! equal-df ladder otherwise
+      logical  :: eqe_freq = .false.             ! equal-df ladder otherwise
+      logical  :: eqe_dir = .false.              ! uniform theta ladder + weights otherwise
       ! one direction per frequency component (nee WK_NEW_*) instead of
       ! the (nfreq x ntheta) directional grid
       logical  :: single_dir_per_freq = .false.
@@ -619,6 +624,7 @@ contains
 
       type(type_yaml_reader) :: spec_yaml, blk, brk_yaml
       character(:), allocatable :: stype, method, legacy_type, normalize
+      character(:), allocatable :: eqe_mode
       character(8) :: def_bins
       logical :: no_key, has_dir
       logical :: no_spec, no_blk, no_freq, no_per, no_brk
@@ -688,20 +694,32 @@ contains
                        default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS)
          if (.not. no_key .and. .not. has_dir) call env%log%exit_on_error( &
             "wavemaker/discretization: theta_bins requires a directional: block")
-         call blk%read("equal_energy", val=this%EqualEnergy, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY)
+         ! per-axis enum; the bool spellings are the pre-enum decks
+         ! (true/yes = the old freq-axis binning)
+         call blk%read_enum("equal_energy", [character(5) :: "none", "freq", &
+                                             "dir", "both", "true", "false", "yes", "no", "NO", "YES"], &
+                            val=eqe_mode, &
+                            default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY)
+         this%eqe_freq = eqe_mode == "freq" .or. eqe_mode == "both" &
+                         .or. eqe_mode == "true" .or. eqe_mode == "yes" &
+                         .or. eqe_mode == "YES"
+         this%eqe_dir = eqe_mode == "dir" .or. eqe_mode == "both"
          call blk%read_enum("method", [character(19) :: "grid", "single_dir_per_freq"], &
                             val=method, default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD)
          call blk%read("coherence_percent", silent=no_key, val=this%alpha_c, &
                        default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT)
          this%single_dir = method == "single_dir_per_freq"
-         ! regime rules: coherence hosts live on the single-dir equal-df ladder
+         ! regime rules: coherence = same-frequency hosts, meaningless on the
+         ! grid whose theta rows are already phase-locked per frequency
          if (this%alpha_c /= 0.0_SP .and. .not. this%single_dir) &
             call env%log%exit_on_error("wavemaker/discretization: coherence_percent"// &
                                        " requires method: single_dir_per_freq")
-         if (this%single_dir .and. this%EqualEnergy) &
-            call env%log%exit_on_error("wavemaker/discretization: single_dir_per_freq"// &
-                                       " uses the equal-df ladder — equal_energy does not apply")
+         if (this%single_dir .and. this%eqe_dir) then
+            call env%log%info("wavemaker/discretization: single_dir_per_freq draws"// &
+                              " directions at equal spreading mass already — equal_energy:"// &
+                              " dir is implied")
+            this%eqe_dir = .false.
+         end if
       else if (has_dir) then
          ! no discretization: block -- directional resolution falls to default
          def_bins = DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS
@@ -786,6 +804,11 @@ contains
       if (this%single_dir .and. stype /= "jonswap" .and. stype /= "tma") &
          call env%log%exit_on_error("wavemaker/discretization: single_dir_per_freq"// &
                                     " needs a density spectrum (jonswap or tma)")
+      ! a file spectrum IS its discretization — re-emit the file with
+      ! equal-energy bins instead of resampling measured data in-engine
+      if (stype == "spectrum_2d" .and. (this%eqe_freq .or. this%eqe_dir)) &
+         call env%log%exit_on_error("wavemaker/discretization: equal_energy does"// &
+                                    " not resample a file spectrum — emit the file with equal-energy bins")
 
       ! ── source — presence = Wei-Kirby internal source function;
       !    absence = boundary feed (nee ABS): a boundaries face must
@@ -1402,7 +1425,8 @@ contains
       disc%ntheta = this%Ntheta
       disc%fmin = this%FreqMin
       disc%fmax = this%FreqMax
-      disc%equal_energy = this%EqualEnergy
+      disc%eqe_freq = this%eqe_freq
+      disc%eqe_dir = this%eqe_dir
       disc%single_dir_per_freq = this%wavemaker_type == "WK_NEW_IRR" &
                                  .or. this%single_dir
       disc%alpha_c = this%alpha_c
@@ -1463,7 +1487,7 @@ contains
       type(type_component_set), intent(inout) :: cs
 
       real(SP) :: freq(disc%nfreq), energy_bin(disc%nfreq)
-      real(SP) :: theta_arr(disc%nfreq), ag(disc%ntheta)
+      real(SP) :: theta_arr(disc%nfreq), ag(disc%ntheta), theta_nodes(disc%ntheta)
       real(SP) :: Ef, alpha_spec, theta, df, alpha_c
       real(SP) :: w_sum, theta_mean
       character(96) :: msg
@@ -1471,10 +1495,18 @@ contains
 
       if (disc%single_dir_per_freq) then
 
-         df = (disc%fmax - disc%fmin)/(real(disc%nfreq, SP) - 1.0_SP)
-         do kf = 1, disc%nfreq
-            freq(kf) = disc%fmin + real(kf - 1, SP)*df
-         end do
+         if (disc%eqe_freq) then
+            ! equal-energy ladder: kills the equal-df repeat period; bin
+            ! energies are uniform and stay with their component through
+            ! the coherence shuffle
+            call freq_bins_equal_energy(spec, disc%nfreq, disc%fmax, &
+                                        disc%fmin, freq, energy_bin, Ef)
+         else
+            df = (disc%fmax - disc%fmin)/(real(disc%nfreq, SP) - 1.0_SP)
+            do kf = 1, disc%nfreq
+               freq(kf) = disc%fmin + real(kf - 1, SP)*df
+            end do
+         end if
 
          ! coherence host anchor: peak-frequency index mod the theta count
          ! (legacy WK_NEW_IRR host spacing, independent of the direction draw)
@@ -1509,13 +1541,16 @@ contains
             call wave_coherence(alpha_c, freq, disc%nfreq, disc%ntheta, &
                                 idx_theta, this%seed, env)
 
-         ! densities on the (possibly moved) frequencies; the direction
-         ! draw carries the spreading, so amplitudes ride S(f) df alone
-         Ef = 0.0_SP
-         do kf = 1, disc%nfreq
-            energy_bin(kf) = spec%density(freq(kf))*df
-            Ef = Ef + energy_bin(kf)
-         end do
+         ! equal-df densities on the (possibly moved) frequencies; the
+         ! direction draw carries the spreading, so amplitudes ride
+         ! S(f) df alone.  Equal-energy bins keep their binner energy.
+         if (.not. disc%eqe_freq) then
+            Ef = 0.0_SP
+            do kf = 1, disc%nfreq
+               energy_bin(kf) = spec%density(freq(kf))*df
+               Ef = Ef + energy_bin(kf)
+            end do
+         end if
 
          alpha_spec = wk_alpha_spec(this, spec, Ef)
 
@@ -1533,7 +1568,7 @@ contains
 
       else
 
-         if (disc%equal_energy) then
+         if (disc%eqe_freq) then
             call freq_bins_equal_energy(spec, disc%nfreq, disc%fmax, &
                                         disc%fmin, freq, energy_bin, Ef)
          else
@@ -1541,7 +1576,14 @@ contains
                                        disc%fmin, freq, energy_bin, Ef)
          end if
 
-         call directional_spreading(disc%ntheta, spread, ag, env)
+         if (disc%eqe_dir .and. disc%ntheta > 1) then
+            ! theta nodes at equal spreading mass, uniform weights —
+            ! every frequency uses all nodes, so no shuffle
+            call stratified_theta(spread, disc%ntheta, theta_nodes, env)
+            ag = 1.0_SP/real(disc%ntheta, SP)
+         else
+            call directional_spreading(disc%ntheta, spread, ag, env)
+         end if
 
          alpha_spec = wk_alpha_spec(this, spec, Ef)
 
@@ -1558,6 +1600,8 @@ contains
                ! amplitude: a = H_each / (2 sqrt 2)
                if (disc%ntheta == 1) then
                   theta = spread%theta_peak
+               else if (disc%eqe_dir) then
+                  theta = theta_nodes(ktheta)
                else
                   theta = -PI/3.0_SP + spread%theta_peak &
                           + 2.0_SP/3.0_SP*PI/(real(disc%ntheta, SP) - 1.0_SP) &
@@ -1594,7 +1638,7 @@ contains
             *180.0_SP/PI, " deg (deck ", this%Sigma_Theta, " deg)"
          call env%log%info(trim(msg))
       end if
-      if (.not. disc%equal_energy) then
+      if (.not. disc%eqe_freq) then
          df = (disc%fmax - disc%fmin)/(real(disc%nfreq, SP) - 1.0_SP)
          write (msg, '(A,F8.1,A)') "wavemaker: equal-df repeat period ", &
             1.0_SP/df, " s"
@@ -2078,7 +2122,7 @@ contains
                                    this%GammaTMA, spec)
       spread = new_wrapped_normal(this%ThetaPeak, this%Sigma_Theta)
 
-      if (this%EqualEnergy) then
+      if (this%eqe_freq) then
          call freq_bins_equal_energy(spec, this%Nfreq, this%FreqMax, &
                                      this%FreqMin, freq, energy_bin, Ef)
       else
@@ -2086,22 +2130,29 @@ contains
                                     this%FreqMin, freq, energy_bin, Ef)
       end if
 
-      call directional_spreading(this%Ntheta, spread, ag, env)
+      if (this%eqe_dir .and. this%Ntheta > 1) then
+         call stratified_theta(spread, this%Ntheta, theta, env)
+         ag = 1.0_SP/real(this%Ntheta, SP)
+      else
+         call directional_spreading(this%Ntheta, spread, ag, env)
+      end if
 
       alpha_spec = wk_alpha_spec(this, spec, Ef)
       alpha1 = alpha + 1.0_SP/3.0_SP
 
-      do ktheta = 1, this%Ntheta
-         if (this%Ntheta == 1) then
-            theta(ktheta) = this%ThetaPeak*PI/180.0_SP
-         else
-            theta(ktheta) = -PI/3.0_SP + this%ThetaPeak*PI/180.0_SP &
-                            + 2.0_SP/3.0_SP*PI/(real(this%Ntheta, SP) - 1.0_SP) &
-                            *(real(ktheta, SP) - 1.0_SP)
-            if (theta(ktheta) > 0.5_SP*PI) theta(ktheta) = 0.5_SP*PI
-            if (theta(ktheta) < -0.5_SP*PI) theta(ktheta) = -0.5_SP*PI
-         end if
-      end do
+      if (.not. (this%eqe_dir .and. this%Ntheta > 1)) then
+         do ktheta = 1, this%Ntheta
+            if (this%Ntheta == 1) then
+               theta(ktheta) = this%ThetaPeak*PI/180.0_SP
+            else
+               theta(ktheta) = -PI/3.0_SP + this%ThetaPeak*PI/180.0_SP &
+                               + 2.0_SP/3.0_SP*PI/(real(this%Ntheta, SP) - 1.0_SP) &
+                               *(real(ktheta, SP) - 1.0_SP)
+               if (theta(ktheta) > 0.5_SP*PI) theta(ktheta) = 0.5_SP*PI
+               if (theta(ktheta) < -0.5_SP*PI) theta(ktheta) = -0.5_SP*PI
+            end if
+         end do
+      end if
 
       do kf = 1, this%Nfreq
          this%Segma_Ser(kf) = 2.0_SP*PI*freq(kf)
@@ -2930,26 +2981,20 @@ contains
    ! the excluded fraction is warned.
    ! ----------------------------------------------------------------
    ! ----------------------------------------------------------------
-   ! Private: one direction per component at equal spreading mass.
-   ! Numerical CDF of $G(\theta)$ over $|\theta| \le \pi/2$ (any
-   ! spreading model), inverse-interpolated at the stratified
-   ! quantiles $p_k = (k - 1/2)/n$, then a seeded Fisher-Yates
-   ! shuffle so the frequency ladder carries no periodic direction
-   ! structure (the legacy cyclic ladder put a dead line every
-   ! ntheta-th frequency).  The shuffle rides its own re-seed (deck
-   ! seed + offset); the caller restores the phase stream after.
+   ! Private: theta nodes at equal spreading mass.  Numerical CDF of
+   ! $G(\theta)$ over $|\theta| \le \pi/2$ (any spreading model),
+   ! inverse-interpolated at the stratified quantiles
+   ! $p_k = (k - 1/2)/n$; nodes come out sorted tail-to-tail.
    ! ----------------------------------------------------------------
-   subroutine equal_energy_directions(spread, n, seed_val, theta_out, env)
+   subroutine stratified_theta(spread, n, theta_out, env)
       integer, parameter :: NSCAN = 2001
-      integer, parameter :: SEED_OFFSET = 7919   ! keep the shuffle stream off the phase/coherence seed
       class(type_dir_spreading), intent(in) :: spread
-      integer, intent(in) :: n, seed_val
+      integer, intent(in) :: n
       real(SP), intent(out) :: theta_out(n)
       type(type_env), intent(inout) :: env
 
-      real(SP) :: th(NSCAN), cdf(NSCAN), dth, p, r, tmp
-      integer, allocatable :: seed(:)
-      integer :: k, j, seed_n
+      real(SP) :: th(NSCAN), cdf(NSCAN), dth, p
+      integer :: k, j
       character(96) :: msg
 
       dth = PI/real(NSCAN - 1, SP)
@@ -2982,6 +3027,29 @@ contains
          theta_out(k) = th(j - 1) + (p - cdf(j - 1)) &
                         /max(cdf(j) - cdf(j - 1), tiny(1.0_SP))*dth
       end do
+
+   end subroutine stratified_theta
+
+   ! ----------------------------------------------------------------
+   ! Private: one direction per component at equal spreading mass —
+   ! the stratified nodes, then a seeded Fisher-Yates shuffle so the
+   ! frequency ladder carries no periodic direction structure (the
+   ! legacy cyclic ladder put a dead line every ntheta-th frequency).
+   ! The shuffle rides its own re-seed (deck seed + offset); the
+   ! caller restores the phase stream after.
+   ! ----------------------------------------------------------------
+   subroutine equal_energy_directions(spread, n, seed_val, theta_out, env)
+      integer, parameter :: SEED_OFFSET = 7919   ! keep the shuffle stream off the phase/coherence seed
+      class(type_dir_spreading), intent(in) :: spread
+      integer, intent(in) :: n, seed_val
+      real(SP), intent(out) :: theta_out(n)
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: r, tmp
+      integer, allocatable :: seed(:)
+      integer :: k, j, seed_n
+
+      call stratified_theta(spread, n, theta_out, env)
 
       call random_seed(size=seed_n)
       allocate (seed(seed_n), source=seed_val + SEED_OFFSET)
