@@ -86,7 +86,8 @@ module model_boundaries_mod
                                         DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU, &
                                         DEF_BOUNDARIES_WEST_SPONGE_PML_R_TARGET, &
                                         DEF_BOUNDARIES_WEST_SPONGE_PML_H_GATE, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH
+                                        DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH, &
+                                        DEF_BOUNDARIES_WEST_SPONGE_PML_CD
 
    implicit none
 
@@ -103,6 +104,7 @@ module model_boundaries_mod
    character(*), parameter :: D_PML_R = DEF_BOUNDARIES_WEST_SPONGE_PML_R_TARGET
    character(*), parameter :: D_PML_HG = DEF_BOUNDARIES_WEST_SPONGE_PML_H_GATE
    character(*), parameter :: D_PML_W = DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH
+   character(*), parameter :: D_PML_CD = DEF_BOUNDARIES_WEST_SPONGE_PML_CD
 
    character(5), parameter :: FACE_KEY(4) = ['west ', 'east ', 'south', 'north']
 
@@ -122,6 +124,7 @@ module model_boundaries_mod
       logical  :: pml = .false.
       real(SP) :: r = 0.85_SP, a = 5.0_SP, cd = 0.0_SP, nu = 0.1_SP
       real(SP) :: pml_r = 0.001_SP, pml_hg = 2.0_SP, pml_w = 0.0_SP
+      real(SP) :: pml_cd = 10.0_SP
    end type type_sponge_defaults
 
 contains
@@ -330,7 +333,8 @@ contains
       type(type_sponge_defaults), intent(in) :: defs
 
       type(type_yaml_reader) :: sp_yaml, sub_yaml
-      real(SP) :: tmp
+      character(96) :: msg
+      real(SP) :: tmp, pml_cd
       logical :: no_sp, no_key, on, has_blk
 
       sp_yaml = face_yaml%cast_dictionary("sponge", no_sp)
@@ -389,6 +393,7 @@ contains
          sponge%pml_r(f) = defs%pml_r
          sponge%pml_hgate(f) = defs%pml_hg
          sponge%pml_width(f) = defs%pml_w
+         pml_cd = defs%pml_cd
          if (has_blk) then
             call sub_yaml%read("r_target", silent=no_key, val=tmp)
             if (.not. no_key) sponge%pml_r(f) = tmp
@@ -396,10 +401,25 @@ contains
             if (.not. no_key) sponge%pml_hgate(f) = tmp
             call sub_yaml%read("width", silent=no_key, val=tmp)
             if (.not. no_key) sponge%pml_width(f) = tmp
+            call sub_yaml%read("cd", silent=no_key, val=tmp)
+            if (.not. no_key) pml_cd = tmp
          end if
          if (sponge%pml_width(f) > sponge%width(f)) &
             call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
                                        "/sponge: pml width exceeds the face sponge width")
+         ! hybrid defaults: half-strip PML + friction taper over the face
+         ! strip -- the inner Boussinesq pre-strip absorbs the kh > 1 band
+         ! before it reaches the SWE interface (bare PML recirculates it);
+         ! an explicit face friction block keeps its own cd
+         if (sponge%pml_width(f) <= 0.0_SP) &
+            sponge%pml_width(f) = 0.5_SP*sponge%width(f)
+         if (pml_cd > 0.0_SP .and. .not. sponge%friction_on(f)) then
+            sponge%friction_on(f) = .true.
+            sponge%cd_fric(f) = pml_cd
+            write (msg, '(a,f0.1,a)') "boundaries: "//trim(FACE_KEY(f))// &
+               " pml hybrid enables the friction taper (cd ", pml_cd, ")"
+            call env%log%info(trim(msg))
+         end if
       end if
 
       if (.not. (sponge%direct_on(f) .or. sponge%friction_on(f) &
@@ -500,6 +520,8 @@ contains
          if (.not. no_key) defs%pml_hg = tmp
          call sub_yaml%read("width", silent=no_key, val=tmp)
          if (.not. no_key) defs%pml_w = tmp
+         call sub_yaml%read("cd", silent=no_key, val=tmp)
+         if (.not. no_key) defs%pml_cd = tmp
       end if
 
       if (.not. (defs%direct .or. defs%friction .or. defs%diffusion .or. defs%pml)) &

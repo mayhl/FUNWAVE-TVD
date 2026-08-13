@@ -92,7 +92,8 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 | `<face>.sponge.diffusion.nu` | `0.1` | `Csp` | — | Sponge diffusion coefficient. |
 | `<face>.sponge.pml.r_target` | `0.001` | — | — | PML target reflection coefficient; sets sigma_max = 3c/(2W) ln(1/R). North/south faces only. |
 | `<face>.sponge.pml.h_gate` | `2.0` | — | m | PML depth gate; sigma tapers smoothly to 0 below this depth so the strip hands off to the beach. |
-| `<face>.sponge.pml.width` | `0.0` | — | m | PML sub-strip width measured inward from the face; 0 spans the full face sponge width. A smaller value confines the PML (and its NSWE zone) to the outer sub-strip so an inner friction strip can absorb the dispersive band first (layered absorber). |
+| `<face>.sponge.pml.width` | `0.0` | — | m | PML sub-strip width measured inward from the face; 0 = half the face sponge width (the hybrid default). Confining the PML (and its NSWE zone) to the outer sub-strip leaves an inner Boussinesq-live pre-strip where the friction taper absorbs the dispersive band before it reaches the SWE interface; set to the face width for a full-strip PML. |
+| `<face>.sponge.pml.cd` | `10.0` | — | — | Friction drag auto-enabled over the face strip when the PML is on — the hybrid absorber's inner pre-strip; eq2d showed the bare PML recirculates the kh > 1 band off its SWE interface. Ignored when the face configures friction explicitly; 0 = pure PML. |
 | `<face>.forcing.eta` | — | `Tide<Face>_ETA` | m | Prescribed surface-elevation forcing (constant; file for a series). |
 | `<face>.forcing.u` | — | `Tide<Face>_U` | m/s | Prescribed x-velocity forcing. |
 | `<face>.forcing.v` | — | `Tide<Face>_V` | m/s | Prescribed y-velocity forcing. |

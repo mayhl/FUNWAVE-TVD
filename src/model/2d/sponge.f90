@@ -308,8 +308,9 @@ contains
             if (this%pml_on(FACE_S)) then
                ! cells from the south boundary (direct-sponge convention);
                ! wp < face width confines sigma to the outer sub-strip
+               ! (reader resolves 0 to the half-strip hybrid default)
                wp = this%pml_width(FACE_S)
-               if (wp <= 0.0_SP) wp = this%width(FACE_S)
+               if (wp <= 0.0_SP) wp = 0.5_SP*this%width(FACE_S)
                dist = real(j + grid%jbegin - 2, SP)*grid%dy0
                shat = (wp - dist)/wp
                if (shat > 0.0_SP) then
@@ -320,7 +321,7 @@ contains
 
             if (this%pml_on(FACE_N)) then
                wp = this%pml_width(FACE_N)
-               if (wp <= 0.0_SP) wp = this%width(FACE_N)
+               if (wp <= 0.0_SP) wp = 0.5_SP*this%width(FACE_N)
                dist = real(nloc_g - j + (grid%ny_proc - grid%jproc - 1)*grid%local_ny, SP) &
                       *grid%dy0
                shat = (wp - dist)/wp
