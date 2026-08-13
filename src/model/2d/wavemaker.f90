@@ -1463,11 +1463,9 @@ contains
       type(type_component_set), intent(inout) :: cs
 
       real(SP) :: freq(disc%nfreq), energy_bin(disc%nfreq)
-      real(SP) :: theta_arr(disc%nfreq), agf(disc%nfreq), ag(disc%ntheta)
-      real(SP) :: Ef, alpha_spec, theta, df
-      real(SP) :: ktheta_temp, sign_kf, alpha_c, correction_coeff
+      real(SP) :: theta_arr(disc%nfreq), ag(disc%ntheta)
+      real(SP) :: Ef, alpha_spec, theta, df, alpha_c
       real(SP) :: w_sum, theta_mean
-      logical :: valid(disc%nfreq)
       character(96) :: msg
       integer :: kf, ktheta, c, idx_theta, displace(1)
 
@@ -1478,47 +1476,28 @@ contains
             freq(kf) = disc%fmin + real(kf - 1, SP)*df
          end do
 
+         ! coherence host anchor: peak-frequency index mod the theta count
+         ! (legacy WK_NEW_IRR host spacing, independent of the direction draw)
          idx_theta = 0
-         valid = .true.
          if (disc%ntheta == 1) then
             ! legacy fills theta(1)/AG(1) only and reads the rest
             ! uninitialized — UB; the peak angle everywhere is the
             ! sensible 1D limit
             theta_arr = spread%theta_peak
-            agf = 1.0_SP
          else
             displace = minloc(abs(freq - spec%fm))
             idx_theta = mod(displace(1), disc%ntheta)
-            do kf = 1, disc%nfreq
-               ktheta_temp = real(mod(kf - idx_theta, disc%ntheta), SP)
-               if (ktheta_temp <= 0.0_SP) &
-                  ktheta_temp = ktheta_temp + real(disc%ntheta, SP)
-               if (mod(kf, 2) == 0) then
-                  sign_kf = 1.0_SP
-               else
-                  sign_kf = -1.0_SP
-               end if
-               theta_arr(kf) = sign_kf*(-PI/2.0_SP &
-                                        + PI*real(floor(ktheta_temp/2.0_SP - 0.5_SP), SP) &
-                                        /(real(disc%ntheta, SP) - 1.0_SP))
-               theta_arr(kf) = theta_arr(kf) + spread%theta_peak
-               ! components beyond +-90 deg are dropped (zero weight, angle
-               ! clamped for the solve); the energy calibration below
-               ! renormalizes over the survivors
-               valid(kf) = abs(theta_arr(kf)) <= 0.5_SP*PI
-               if (theta_arr(kf) > 0.5_SP*PI) theta_arr(kf) = 0.5_SP*PI
-               if (theta_arr(kf) < -0.5_SP*PI) theta_arr(kf) = -0.5_SP*PI
-               agf(kf) = spread%weight(theta_arr(kf), freq(kf))
-            end do
-            agf = abs(agf)
-            if (.not. any(valid)) call env%log%exit_on_error( &
-               "wavemaker: every single-dir component lies beyond +-90 deg (check peak)")
-            if (.not. all(valid)) then
-               where (.not. valid) agf = 0.0_SP
-               write (msg, '(A,I0,A)') "wavemaker: ", count(.not. valid), &
-                  " single-dir components beyond +-90 deg dropped; energy renormalized"
-               call env%log%warning(trim(msg))
-            end if
+            ! One direction per frequency, equal spreading mass, seeded
+            ! shuffle.  The legacy ntheta-cyclic ladder weighted amplitudes
+            ! by G(theta), so cycle slots in the spreading tail carried no
+            ! energy — a periodic dead-line comb every ntheta-th frequency.
+            ! Here the spreading shapes the direction DENSITY instead and
+            ! every line keeps its full S(f) df energy.
+            call equal_energy_directions(spread, disc%nfreq, this%seed, &
+                                         theta_arr, env)
+            ! the shuffle's draws live on their own seed; restore the
+            ! phase stream
+            call seed_wave_phases(this%seed)
          end if
 
          ! coherence shuffle: move components onto host frequencies until
@@ -1530,9 +1509,8 @@ contains
             call wave_coherence(alpha_c, freq, disc%nfreq, disc%ntheta, &
                                 idx_theta, this%seed, env)
 
-         ! densities on the (possibly moved) frequencies; spreading
-         ! weights renormalize against the band energy instead of the
-         ! grid path's bin sum
+         ! densities on the (possibly moved) frequencies; the direction
+         ! draw carries the spreading, so amplitudes ride S(f) df alone
          Ef = 0.0_SP
          do kf = 1, disc%nfreq
             energy_bin(kf) = spec%density(freq(kf))*df
@@ -1540,18 +1518,16 @@ contains
          end do
 
          alpha_spec = wk_alpha_spec(this, spec, Ef)
-         correction_coeff = Ef/dot_product(agf, energy_bin)
 
          call component_set_alloc(cs, disc%nfreq)
          do kf = 1, disc%nfreq
-            agf(kf) = agf(kf)*correction_coeff
             this%omgn_ir(kf) = 2.0_SP*PI*freq(kf)
             cs%freq(kf) = freq(kf)
             cs%omgn(kf) = this%omgn_ir(kf)
             cs%theta(kf) = theta_arr(kf)
             ! legacy folds the Hmo -> Hrms conversion into the half
             ! amplitude: a = H_each / (2 sqrt 2)
-            cs%amp(kf) = 4.0_SP*sqrt(alpha_spec*energy_bin(kf)*agf(kf)) &
+            cs%amp(kf) = 4.0_SP*sqrt(alpha_spec*energy_bin(kf)) &
                          /sqrt(2.0_SP)/2.0_SP
          end do
 
@@ -2953,6 +2929,73 @@ contains
    ! inert (legacy clamped the angle and silently lost the energy);
    ! the excluded fraction is warned.
    ! ----------------------------------------------------------------
+   ! ----------------------------------------------------------------
+   ! Private: one direction per component at equal spreading mass.
+   ! Numerical CDF of $G(\theta)$ over $|\theta| \le \pi/2$ (any
+   ! spreading model), inverse-interpolated at the stratified
+   ! quantiles $p_k = (k - 1/2)/n$, then a seeded Fisher-Yates
+   ! shuffle so the frequency ladder carries no periodic direction
+   ! structure (the legacy cyclic ladder put a dead line every
+   ! ntheta-th frequency).  The shuffle rides its own re-seed (deck
+   ! seed + offset); the caller restores the phase stream after.
+   ! ----------------------------------------------------------------
+   subroutine equal_energy_directions(spread, n, seed_val, theta_out, env)
+      integer, parameter :: NSCAN = 2001
+      integer, parameter :: SEED_OFFSET = 7919   ! keep the shuffle stream off the phase/coherence seed
+      class(type_dir_spreading), intent(in) :: spread
+      integer, intent(in) :: n, seed_val
+      real(SP), intent(out) :: theta_out(n)
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: th(NSCAN), cdf(NSCAN), dth, p, r, tmp
+      integer, allocatable :: seed(:)
+      integer :: k, j, seed_n
+      character(96) :: msg
+
+      dth = PI/real(NSCAN - 1, SP)
+      th(1) = -0.5_SP*PI
+      cdf(1) = 0.0_SP
+      do k = 2, NSCAN
+         th(k) = -0.5_SP*PI + real(k - 1, SP)*dth
+         ! the cosine-series tails can dip negative; clamp like the
+         ! grid path's abs()
+         cdf(k) = cdf(k - 1) + 0.5_SP*dth &
+                  *(max(spread%weight(th(k), 0.0_SP), 0.0_SP) &
+                    + max(spread%weight(th(k - 1), 0.0_SP), 0.0_SP))
+      end do
+      if (cdf(NSCAN) < 1.0e-3_SP) call env%log%exit_on_error( &
+         "wavemaker: spreading mass inside +-90 deg is ~zero (check peak)")
+      if (cdf(NSCAN) < 0.99_SP) then
+         write (msg, '(A,F5.1,A)') "wavemaker: ", &
+            (1.0_SP - cdf(NSCAN))*100.0_SP, &
+            " % of spread weight lies beyond +-90 deg; renormalized"
+         call env%log%warning(trim(msg))
+      end if
+      cdf = cdf/cdf(NSCAN)
+
+      j = 2
+      do k = 1, n
+         p = (real(k, SP) - 0.5_SP)/real(n, SP)
+         do while (cdf(j) < p .and. j < NSCAN)
+            j = j + 1
+         end do
+         theta_out(k) = th(j - 1) + (p - cdf(j - 1)) &
+                        /max(cdf(j) - cdf(j - 1), tiny(1.0_SP))*dth
+      end do
+
+      call random_seed(size=seed_n)
+      allocate (seed(seed_n), source=seed_val + SEED_OFFSET)
+      call random_seed(put=seed)
+      do k = n, 2, -1
+         call random_number(r)
+         j = max(1, min(k, ceiling(r*real(k, SP))))
+         tmp = theta_out(k)
+         theta_out(k) = theta_out(j)
+         theta_out(j) = tmp
+      end do
+
+   end subroutine equal_energy_directions
+
    subroutine directional_spreading(ntheta, spread, ag, env)
       integer, intent(in)  :: ntheta
       class(type_dir_spreading), intent(in) :: spread
