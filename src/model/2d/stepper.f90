@@ -1083,7 +1083,58 @@ contains
                          this%grid%cart_comm, ierr)
       blowup = max_abs_eta > this%output%blowup_threshold
 
+      ! On blow-up, log the offending cell from whichever rank holds the
+      ! global max — the abort message alone gives no location and the
+      ! 2026-08 storm_peak hunt needed a diagnostic rerun just to find it
+      if (blowup) call log_blowup_site(this, max_abs_eta)
+
    end subroutine stepper_post_step
+
+   ! ----------------------------------------------------------------
+   ! Private: locate and log the blow-up cell (global coordinates and
+   ! local water depth).  Only the rank(s) holding the global max write.
+   ! ----------------------------------------------------------------
+   subroutine log_blowup_site(this, global_max)
+      use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+      class(type_model_stepper_2d), intent(inout) :: this
+      real(SP), intent(in) :: global_max
+
+      character(160) :: msg
+      real(SP) :: v, vmax
+      integer :: i, j, imax, jmax
+
+      associate (f => this%fields, lp => this%grid%lp)
+         vmax = -1.0_SP
+         imax = lp%ib
+         jmax = lp%jb
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               v = abs(f%eta(i, j))
+               if (ieee_is_nan(f%eta(i, j))) v = huge(1.0_SP)
+               if (v > vmax) then
+                  vmax = v
+                  imax = i
+                  jmax = j
+               end if
+            end do
+         end do
+         if (vmax >= global_max*0.999999_SP .or. &
+             (vmax == huge(1.0_SP) .and. global_max == huge(1.0_SP))) then
+            write (msg, '(a,es12.5,a,i0,a,i0,a,f0.1,a,f0.1,a,es10.3,a)') &
+               "blow-up site: |eta| = ", vmax, " at global cell (", &
+               this%grid%ibegin + imax - lp%ib + 1, ", ", &
+               this%grid%jbegin + jmax - lp%jb + 1, "), x = ", &
+               (real(this%grid%ibegin + imax - lp%ib, SP) + 0.5_SP)*this%grid%dx0, &
+               " y = ", &
+               (real(this%grid%jbegin + jmax - lp%jb, SP) + 0.5_SP)*this%grid%dy0, &
+               ", depth = ", f%depth(imax, jmax), " m"
+            ! direct write, not env%log: write_log drops non-IO ranks, and
+            ! the site holder is almost never rank 0 -- mpiexec still routes
+            ! every rank's stdout into the job log
+            write (*, '(a)') trim(msg)
+         end if
+      end associate
+   end subroutine log_blowup_site
 
    ! ----------------------------------------------------------------
    ! Private: legacy MAX_MIN_PROPERTY (old/misc.F) — envelope fields
