@@ -65,14 +65,22 @@ module model_sponge_mod
       real(SP) :: cd_fric(4) = 0.0_SP      ! nee CDsponge
       real(SP) :: nu_diff(4) = 0.1_SP      ! nee Csp
 
+      logical  :: pml_on(4) = .false.      ! north/south only (single-direction)
+      real(SP) :: pml_r(4) = 0.001_SP      ! target reflection coefficient
+      real(SP) :: pml_hgate(4) = 2.0_SP    ! depth gate (m); sigma -> 0 shoreward
+      real(SP) :: pml_width(4) = 0.0_SP    ! outer sub-strip (m); 0 = full face width
+
       ! ── Computed state ────────────────────────────────────────────
       ! Ghost-inclusive arrays: (local_nx+2*N_GHOST, local_ny+2*N_GHOST).
       ! coeff:     direct sponge damping ratio (>= 1; 1.0 = no damping).
       ! cd_sponge: friction sponge drag coefficient (>= 0).
       ! nu_sponge: diffusion sponge kinematic viscosity (>= 0).
+      ! sigma_pml: y-PML damping rate (1/s); psi_pml the mass-eq auxiliary
       real(SP), allocatable :: coeff(:, :)
       real(SP), allocatable :: cd_sponge(:, :)
       real(SP), allocatable :: nu_sponge(:, :)
+      real(SP), allocatable :: sigma_pml(:, :)
+      real(SP), allocatable :: psi_pml(:, :)
 
    contains
       procedure :: read_input => sponge_read_input
@@ -82,6 +90,10 @@ module model_sponge_mod
       procedure :: init_compute => sponge_init_compute
       procedure :: merge_friction => sponge_merge_friction
       procedure :: apply => sponge_apply
+      procedure :: any_pml => sponge_any_pml
+      procedure :: init_pml => sponge_init_pml
+      procedure :: apply_pml => sponge_apply_pml
+      procedure :: pml_blank_mask9 => sponge_pml_blank_mask9
       procedure :: free => sponge_free
    end type type_model_sponge
 
@@ -249,6 +261,171 @@ contains
 
    end subroutine sponge_apply
 
+   ! ── PML (y-direction, north/south faces) ─────────────────────────────────
+
+   pure logical function sponge_any_pml(this)
+      class(type_model_sponge), intent(in) :: this
+      sponge_any_pml = any(this%pml_on)
+   end function sponge_any_pml
+
+   !> Build the y-PML damping field.  Single-direction (sigma_y only, N/S
+   !> faces) so no corner tensor terms exist; overlap with a W/E direct
+   !> sponge is plain additive damping.  Quadratic profile grows from the
+   !> interior edge toward the boundary with
+   !>   sigma_max = 3 c / (2 W) * ln(1/R),   c = sqrt(g h_local)
+   !> (the standard polynomial-PML reflection estimate at normal incidence).
+   !> A smoothstep depth gate tapers sigma to zero below h_gate so the
+   !> shoreward strip end hands off to the beach -- no aux dynamics on
+   !> wet/dry cells.  Needs depth, so it runs after bathymetry setup
+   !> (separate from init_compute, whose call site predates depth).
+   subroutine sponge_init_pml(this, grid, depth, env)
+      use core_constants_mod, only: GRAV
+      class(type_model_sponge), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: depth(:, :)
+      type(type_env), intent(inout), optional :: env
+
+      character(96) :: msg
+      real(SP) :: dist, shat, smax, c, s, wp
+      integer  :: ng, mloc_g, nloc_g, i, j
+
+      if (.not. this%any_pml()) return
+
+      ng = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+
+      if (allocated(this%sigma_pml)) deallocate (this%sigma_pml)
+      if (allocated(this%psi_pml)) deallocate (this%psi_pml)
+      allocate (this%sigma_pml(mloc_g, nloc_g), source=0.0_SP)
+      allocate (this%psi_pml(mloc_g, nloc_g), source=0.0_SP)
+
+      do j = 1, nloc_g
+         do i = 1, mloc_g
+            s = 0.0_SP
+            c = sqrt(GRAV*max(depth(i, j), 0.05_SP))
+
+            if (this%pml_on(FACE_S)) then
+               ! cells from the south boundary (direct-sponge convention);
+               ! wp < face width confines sigma to the outer sub-strip
+               wp = this%pml_width(FACE_S)
+               if (wp <= 0.0_SP) wp = this%width(FACE_S)
+               dist = real(j + grid%jbegin - 2, SP)*grid%dy0
+               shat = (wp - dist)/wp
+               if (shat > 0.0_SP) then
+                  smax = 1.5_SP*c/wp*log(1.0_SP/this%pml_r(FACE_S))
+                  s = max(s, smax*shat*shat*depth_gate(depth(i, j), this%pml_hgate(FACE_S)))
+               end if
+            end if
+
+            if (this%pml_on(FACE_N)) then
+               wp = this%pml_width(FACE_N)
+               if (wp <= 0.0_SP) wp = this%width(FACE_N)
+               dist = real(nloc_g - j + (grid%ny_proc - grid%jproc - 1)*grid%local_ny, SP) &
+                      *grid%dy0
+               shat = (wp - dist)/wp
+               if (shat > 0.0_SP) then
+                  smax = 1.5_SP*c/wp*log(1.0_SP/this%pml_r(FACE_N))
+                  s = max(s, smax*shat*shat*depth_gate(depth(i, j), this%pml_hgate(FACE_N)))
+               end if
+            end if
+
+            this%sigma_pml(i, j) = s
+         end do
+      end do
+
+      if (present(env)) then
+         write (msg, '(a,l1,a,l1,a,es9.2,a)') "sponge: y-PML active (south=", &
+            this%pml_on(FACE_S), " north=", this%pml_on(FACE_N), &
+            ", local max sigma ", maxval(this%sigma_pml), " 1/s)"
+         call env%log%info(trim(msg))
+      end if
+
+   end subroutine sponge_init_pml
+
+   !> Force the PML strip to NSWE by blanking mask9 (identity tridiagonal
+   !> rows + dispersion assembly gates -- the existing SWE-fallback path).
+   !> The sigma_y stretch is a PML of the shallow-water system only; with
+   !> the Boussinesq auxiliaries live in-strip the mismatch terms pump
+   !> (measured: blow-up at t~12 s vs clean under scheme: nswe).  The
+   !> static SWE interface at the strip edge partially reflects the
+   !> dispersive tail; sigma = 0 there, and long waves -- the harbor
+   !> concern -- cross it cleanly.  Call after every mask9 rebuild,
+   !> BEFORE update_swe_weight.
+   subroutine sponge_pml_blank_mask9(this, mask9)
+      class(type_model_sponge), intent(in) :: this
+      integer, intent(inout) :: mask9(:, :)
+
+      if (.not. this%any_pml()) return
+      if (.not. allocated(this%sigma_pml)) return
+      where (this%sigma_pml > 0.0_SP) mask9 = 0
+
+   end subroutine sponge_pml_blank_mask9
+
+   !> Smoothstep depth gate: 1 in deep water, 0 below the shallow floor.
+   pure real(SP) function depth_gate(d, h_gate)
+      real(SP), intent(in) :: d, h_gate
+      real(SP) :: t
+      t = min(1.0_SP, max(0.0_SP, d/max(h_gate, 0.01_SP)))
+      depth_gate = t*t*(3.0_SP - 2.0_SP*t)
+   end function depth_gate
+
+   !> Apply the unsplit y-PML as a per-step split correction (final RK
+   !> stage only -- the caller gates on istage).  Derivation: with the
+   !> stretched derivative dy -> (iw/(iw+sigma)) dy the linearized system
+   !> becomes
+   !>   eta_t = -(P_x + Q_y) + psi,   psi_t = sigma (Q_y - psi)
+   !>   Q_t   = ... - sigma Q
+   !> i.e. one strip-local auxiliary psi carrying the removed share of the
+   !> y-divergence, and Rayleigh damping on the y-momentum alone (u and the
+   !> x-divergence are untouched -- that is what distinguishes PML from a
+   !> direct sponge and buys the oblique/broadband absorption).
+   !> psi integrates exactly (exponential); q/v/hv share the decay factor so
+   !> the derived fields stay consistent with the conserved flux.
+   subroutine sponge_apply_pml(this, fields, grid, dt)
+      class(type_model_sponge), intent(inout) :: this
+      type(type_fields_2d), intent(inout) :: fields
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: dt
+
+      real(SP) :: inv_2dy, dyq, decay
+      integer  :: i, j, ng, mloc_g, nloc_g
+
+      if (.not. this%any_pml()) return
+      if (.not. allocated(this%sigma_pml)) return
+
+      ng = N_GHOST
+      mloc_g = grid%local_nx + 2*ng
+      nloc_g = grid%local_ny + 2*ng
+      inv_2dy = 0.5_SP/grid%dy0
+
+      ! pass 1: advance psi from the un-damped flux (ghosts fresh from
+      ! exchange_state; q parity SIGN_ANTI in y matches the derivative)
+      do j = 2, nloc_g - 1
+         do i = 1, mloc_g
+            if (this%sigma_pml(i, j) <= 0.0_SP) cycle
+            dyq = (fields%q(i, j + 1) - fields%q(i, j - 1))*inv_2dy
+            decay = exp(-this%sigma_pml(i, j)*dt)
+            this%psi_pml(i, j) = dyq + (this%psi_pml(i, j) - dyq)*decay
+         end do
+      end do
+
+      ! pass 2: mass correction + y-momentum decay (after every psi has
+      ! read its neighbours' un-damped q)
+      do j = 2, nloc_g - 1
+         do i = 1, mloc_g
+            if (this%sigma_pml(i, j) <= 0.0_SP) cycle
+            decay = exp(-this%sigma_pml(i, j)*dt)
+            if (fields%mask(i, j) > 0) &
+               fields%eta(i, j) = fields%eta(i, j) + dt*this%psi_pml(i, j)
+            fields%q(i, j) = fields%q(i, j)*decay
+            fields%v(i, j) = fields%v(i, j)*decay
+            fields%hv(i, j) = fields%hv(i, j)*decay
+         end do
+      end do
+
+   end subroutine sponge_apply_pml
+
    ! ── Teardown ──────────────────────────────────────────────────────────────
 
    subroutine sponge_free(this)
@@ -256,6 +433,8 @@ contains
       if (allocated(this%coeff)) deallocate (this%coeff)
       if (allocated(this%cd_sponge)) deallocate (this%cd_sponge)
       if (allocated(this%nu_sponge)) deallocate (this%nu_sponge)
+      if (allocated(this%sigma_pml)) deallocate (this%sigma_pml)
+      if (allocated(this%psi_pml)) deallocate (this%psi_pml)
    end subroutine sponge_free
 
    ! ── Private coefficient computation ───────────────────────────────────────

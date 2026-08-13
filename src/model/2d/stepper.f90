@@ -731,6 +731,11 @@ contains
 
          call this%sponge%apply(f, this%grid)
 
+         ! y-PML is a per-STEP split correction: apply once, on the final
+         ! stage's completed state (mid-stage states are alpha/beta blends
+         ! the aux ODE must not see)
+         if (istage == 3) call this%sponge%apply_pml(f, this%grid, dt)
+
       end associate
 
    end subroutine stepper_stage
@@ -845,6 +850,10 @@ contains
                f%mask9 = nint(rmask)
             end block
 
+            ! y-PML strip runs NSWE (sigma is ghost-inclusive and analytic,
+            ! so the blank is rank-consistent without another exchange)
+            call this%sponge%pml_blank_mask9(f%mask9)
+
             ! real dispersion-gate weight off the settled mask9 (halos valid)
             call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
                                    this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
@@ -895,6 +904,7 @@ contains
             call this%grid%halo_exchange(rmask)
             f%mask9 = nint(rmask)
          end block
+         call this%sponge%pml_blank_mask9(f%mask9)
          call update_swe_weight(f%eta, f%depth, f%mask9, &
                                 this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
                                 this%breaking%swe_eta_ramp, phy%viscosity_breaking, &

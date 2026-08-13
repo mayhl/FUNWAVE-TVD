@@ -689,6 +689,9 @@ contains
       call this%setup()
       call this%friction%init_compute(this%grid)
       call this%sponge%init_compute(this%grid)
+      ! y-PML sigma needs depth (local c + the shoreward gate), which
+      ! init_compute's call site predates
+      call this%sponge%init_pml(this%grid, this%fields%depth, this%env)
       ! Sponge friction drag composes additively onto friction's constant base
       ! (ledger 8d: was a max-merge; identical while Cd = 0 in the sponge zone,
       ! as in all current tests); sync_base then hands it to the effective Cd

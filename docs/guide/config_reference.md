@@ -90,6 +90,9 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 | `<face>.sponge.direct.a` | `5.0` | `A_sponge` | — | Direct-sponge damping exponent. |
 | `<face>.sponge.friction.cd` | `0.0` | `CDsponge` | — | Sponge bottom-friction coefficient. |
 | `<face>.sponge.diffusion.nu` | `0.1` | `Csp` | — | Sponge diffusion coefficient. |
+| `<face>.sponge.pml.r_target` | `0.001` | — | — | PML target reflection coefficient; sets sigma_max = 3c/(2W) ln(1/R). North/south faces only. |
+| `<face>.sponge.pml.h_gate` | `2.0` | — | m | PML depth gate; sigma tapers smoothly to 0 below this depth so the strip hands off to the beach. |
+| `<face>.sponge.pml.width` | `0.0` | — | m | PML sub-strip width measured inward from the face; 0 spans the full face sponge width. A smaller value confines the PML (and its NSWE zone) to the outer sub-strip so an inner friction strip can absorb the dispersive band first (layered absorber). |
 | `<face>.forcing.eta` | — | `Tide<Face>_ETA` | m | Prescribed surface-elevation forcing (constant; file for a series). |
 | `<face>.forcing.u` | — | `Tide<Face>_U` | m/s | Prescribed x-velocity forcing. |
 | `<face>.forcing.v` | — | `Tide<Face>_V` | m/s | Prescribed y-velocity forcing. |

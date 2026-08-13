@@ -276,6 +276,24 @@ sections:
           units: ~
           latex: "$C_{\\mathrm{sp}}$"
           doc: "Sponge diffusion coefficient."
+        sponge.pml.r_target:
+          legacy: ~
+          default: 0.001
+          units: ~
+          latex: "$R_{\\mathrm{pml}}$"
+          doc: "PML target reflection coefficient; sets sigma_max = 3c/(2W) ln(1/R). North/south faces only."
+        sponge.pml.h_gate:
+          legacy: ~
+          default: 2.0
+          units: "m"
+          latex: "$h_{\\mathrm{gate}}$"
+          doc: "PML depth gate; sigma tapers smoothly to 0 below this depth so the strip hands off to the beach."
+        sponge.pml.width:
+          legacy: ~
+          default: 0.0
+          units: "m"
+          latex: "$W_{\\mathrm{pml}}$"
+          doc: "PML sub-strip width measured inward from the face; 0 spans the full face sponge width. A smaller value confines the PML (and its NSWE zone) to the outer sub-strip so an inner friction strip can absorb the dispersive band first (layered absorber)."
         forcing.eta:
           legacy: "Tide{Face}_ETA"
           default: ~

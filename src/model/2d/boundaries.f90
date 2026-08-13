@@ -83,7 +83,10 @@ module model_boundaries_mod
                                         DEF_BOUNDARIES_WEST_SPONGE_DIRECT_R, &
                                         DEF_BOUNDARIES_WEST_SPONGE_DIRECT_A, &
                                         DEF_BOUNDARIES_WEST_SPONGE_FRICTION_CD, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU
+                                        DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU, &
+                                        DEF_BOUNDARIES_WEST_SPONGE_PML_R_TARGET, &
+                                        DEF_BOUNDARIES_WEST_SPONGE_PML_H_GATE, &
+                                        DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH
 
    implicit none
 
@@ -97,6 +100,9 @@ module model_boundaries_mod
    character(*), parameter :: D_A = DEF_BOUNDARIES_WEST_SPONGE_DIRECT_A
    character(*), parameter :: D_CD = DEF_BOUNDARIES_WEST_SPONGE_FRICTION_CD
    character(*), parameter :: D_NU = DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU
+   character(*), parameter :: D_PML_R = DEF_BOUNDARIES_WEST_SPONGE_PML_R_TARGET
+   character(*), parameter :: D_PML_HG = DEF_BOUNDARIES_WEST_SPONGE_PML_H_GATE
+   character(*), parameter :: D_PML_W = DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH
 
    character(5), parameter :: FACE_KEY(4) = ['west ', 'east ', 'south', 'north']
 
@@ -108,12 +114,14 @@ module model_boundaries_mod
    ! shared sponge coefficients (boundaries.sponge): seeds mirror the
    ! per-face registry defaults; a present shared sub-block flips the
    ! mechanism on for every face sponge and replaces the seed values
-   character(len=9), parameter :: MECH_KEY(3) = &
-                                  [character(len=9) :: "direct", "friction", "diffusion"]
+   character(len=9), parameter :: MECH_KEY(4) = &
+                                  [character(len=9) :: "direct", "friction", "diffusion", "pml"]
 
    type :: type_sponge_defaults
       logical  :: direct = .false., friction = .false., diffusion = .false.
+      logical  :: pml = .false.
       real(SP) :: r = 0.85_SP, a = 5.0_SP, cd = 0.0_SP, nu = 0.1_SP
+      real(SP) :: pml_r = 0.001_SP, pml_hg = 2.0_SP, pml_w = 0.0_SP
    end type type_sponge_defaults
 
 contains
@@ -370,10 +378,34 @@ contains
          end if
       end if
 
+      call mech_gate(sp_yaml, "pml", defs%pml, on, sub_yaml, has_blk)
+      if (on) then
+         ! single-direction prototype: sigma_y only, so the strip must be
+         ! a lateral face (a W/E pml needs the sigma_x sweep + corners)
+         if (f == FACE_W .or. f == FACE_E) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/sponge: pml is north/south only")
+         sponge%pml_on(f) = .true.
+         sponge%pml_r(f) = defs%pml_r
+         sponge%pml_hgate(f) = defs%pml_hg
+         sponge%pml_width(f) = defs%pml_w
+         if (has_blk) then
+            call sub_yaml%read("r_target", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%pml_r(f) = tmp
+            call sub_yaml%read("h_gate", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%pml_hgate(f) = tmp
+            call sub_yaml%read("width", silent=no_key, val=tmp)
+            if (.not. no_key) sponge%pml_width(f) = tmp
+         end if
+         if (sponge%pml_width(f) > sponge%width(f)) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/sponge: pml width exceeds the face sponge width")
+      end if
+
       if (.not. (sponge%direct_on(f) .or. sponge%friction_on(f) &
-                 .or. sponge%diffusion_on(f))) &
+                 .or. sponge%diffusion_on(f) .or. sponge%pml_on(f))) &
          call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
-                                    "/sponge: needs at least one of direct/friction/diffusion")
+                                    "/sponge: needs at least one of direct/friction/diffusion/pml")
 
    end subroutine read_face_sponge
 
@@ -459,9 +491,20 @@ contains
          if (.not. no_key) defs%nu = tmp
       end if
 
-      if (.not. (defs%direct .or. defs%friction .or. defs%diffusion)) &
+      sub_yaml = sp_yaml%cast_dictionary("pml", no_blk)
+      if (.not. no_blk) then
+         defs%pml = .true.
+         call sub_yaml%read("r_target", silent=no_key, val=tmp)
+         if (.not. no_key) defs%pml_r = tmp
+         call sub_yaml%read("h_gate", silent=no_key, val=tmp)
+         if (.not. no_key) defs%pml_hg = tmp
+         call sub_yaml%read("width", silent=no_key, val=tmp)
+         if (.not. no_key) defs%pml_w = tmp
+      end if
+
+      if (.not. (defs%direct .or. defs%friction .or. defs%diffusion .or. defs%pml)) &
          call env%log%exit_on_error( &
-         "boundaries/sponge: needs at least one of direct/friction/diffusion")
+         "boundaries/sponge: needs at least one of direct/friction/diffusion/pml")
 
    end subroutine read_shared_sponge
 
