@@ -93,6 +93,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_OBSTACLE_BREAKWATER_ABSORB_COEF = "10.0"
    ! ── output ──
    character(*), parameter :: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT = "0.001"
+   character(*), parameter :: DEF_OUTPUT_CHANNELS_PRECISION = "double"
    character(*), parameter :: DEF_OUTPUT_DEPTH_OUT = "NO"
    character(*), parameter :: DEF_OUTPUT_FORMAT = "binary"
    character(*), parameter :: DEF_OUTPUT_LAYOUT = "chunked"

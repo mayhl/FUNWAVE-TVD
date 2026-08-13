@@ -393,4 +393,5 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous. std is about the window mean (rms includes it); shifted moments keep single precision safe. One of `min` \| `max` \| `mean` \| `rms` \| `std`. |
 | `channels.t_start` | — | — | s | Channel start time (default simulation t_start). |
 | `channels.format` | — | — | — | Point file format; default follows the deck format (netcdf/pnetcdf selects a netcdf group in diagnostics.nc One of `ascii` \| `netcdf`. |
+| `channels.precision` | `double` | — | — | Field save precision: single halves binary/netcdf storage for high-cadence channels (ascii text unchanged; double = the model working precision). Every channel writes into result_folder/\<name>/ with its own t.out frame index (frame, t, dt) and, for field channels, a grid.txt. One of `single` \| `double`. |
 

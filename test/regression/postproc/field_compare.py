@@ -271,13 +271,27 @@ def _load_mask(meta: RunMetadata, idx: int) -> np.ndarray | None:
 
 
 def _build_time_map(output_dir: Path, run_dir: Path) -> dict[int, float]:
-    """Parse time_dt.out -> {step_index (0-based): simulation_time}.
+    """Frame index -> simulation time.
 
-    Returns empty dict if absent (e.g. refactored dev version without this file yet).
+    Board-3 layout: each channel folder keeps t.out rows of "frame t dt";
+    the fields channel (any field-channel folder) supplies the map.  Old
+    trees fall back to the retired global time_dt.out (line order = frame
+    order).  Returns empty dict if nothing is found.
     """
+    for p in sorted(output_dir.glob("*/t.out")):
+        result: dict[int, float] = {}
+        for line in p.read_text().splitlines():
+            parts = line.split()
+            if len(parts) >= 2:
+                try:
+                    result[int(parts[0])] = float(parts[1])
+                except ValueError:
+                    pass
+        if result:
+            return result
     for p in [output_dir / "time_dt.out", run_dir / "time_dt.out"]:
         if p.exists():
-            result: dict[int, float] = {}
+            result = {}
             for i, line in enumerate(p.read_text().splitlines()):
                 parts = line.split()
                 if parts:

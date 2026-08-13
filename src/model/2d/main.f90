@@ -833,14 +833,8 @@ contains
          if (associated(this%vessel)) call this%vessel%write_output(t, dt)
       end if
 
-      ! Legacy PREVIEW appends "time dt" to time_dt.out (run dir, not
-      ! result_folder) at every field-frame flush; io rank only here.
-      if (this%mgr%channels(1)%fired .and. this%comm%is_io_node()) then
-         open (newunit=unit, file='time_dt.out', status='unknown', &
-               position='append', action='write')
-         write (unit, *) t, dt
-         close (unit)
-      end if
+      ! (the global time_dt.out retired with board 3: every channel keeps
+      ! its own <id>/t.out frame index)
    end subroutine output_monitor_step
 
    ! ----------------------------------------------------------------
@@ -868,9 +862,6 @@ contains
          if (this%env%comm%is_io_node()) then
             outdir = type_path(folder)
             if (.not. outdir%is_dir()) ok = outdir%mkdir()
-            ! Fresh time_dt.out per run (legacy leaves stale tails behind)
-            open (newunit=unit, file='time_dt.out', status='replace', action='write')
-            close (unit)
          end if
          call this%env%comm%barrier()
 
@@ -1053,7 +1044,8 @@ contains
                                        diag_ncid=merge(froot, mgr%diag_ncid, froot >= 0), &
                                        chunk_window=cwin, &
                                        hidden=cfg%hidden, &
-                                       derived=dspecs, n_derived=cfg%n_derived)
+                                       derived=dspecs, n_derived=cfg%n_derived, &
+                                       single_prec=cfg%single_prec)
             mgr%n_channels = kc
             deallocate (vmeta, dspecs)
 

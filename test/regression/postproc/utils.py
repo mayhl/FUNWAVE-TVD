@@ -274,7 +274,9 @@ class RunMetadata:
             return [p] if p.exists() else []
         prefix = VAR_TO_PREFIX.get(variable, variable)
         pattern = f"{prefix}_[0-9][0-9][0-9][0-9]" if self.is_3d else f"{prefix}_[0-9][0-9][0-9][0-9][0-9]"
-        return sorted(self.output_dir.glob(pattern))
+        # channels own subfolders since board 3; the flat glob keeps old
+        # ref trees readable
+        return sorted(self.output_dir.glob(pattern)) + sorted(self.output_dir.glob(f"*/{pattern}"))
 
     def read_field(self, path: Path) -> "np.ndarray":
         """Read a field file and return a float32 numpy array.
@@ -340,7 +342,15 @@ def get_output_variables(
     allowed = _KIND_MAP.get(kind) if kind else None
 
     prefix_suffixes: dict[str, list[int]] = defaultdict(list)
-    for f in output_dir.iterdir():
+    # channels own subfolders since board 3 (one level); flat entries keep
+    # old ref trees readable.  A prefix appearing in two channel folders
+    # merges -- acceptable while board decks keep variables unique per
+    # channel kind.
+    entries = list(output_dir.iterdir())
+    entries += [f for d in output_dir.iterdir() if d.is_dir() for f in d.iterdir()]
+    for f in entries:
+        if f.is_dir():
+            continue
         m = _TSERIES_RE.match(f.name)
         if not m:
             continue

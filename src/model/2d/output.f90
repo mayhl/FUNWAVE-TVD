@@ -144,6 +144,8 @@ module model_output_mod
       ! '' inherits the deck default: netcdf when the deck format is
       ! netcdf/pnetcdf, ascii otherwise
       character(8) :: format = ''
+      ! single-precision save (binary/netcdf field bytes; ascii unchanged)
+      logical :: single_prec = .false.
    end type type_channel_config
 
    type, extends(type_model_base) :: type_model_output
@@ -659,6 +661,13 @@ contains
                end if
                cfg%format = fmt
             end if
+
+            ! optional precision: single halves binary/netcdf field bytes
+            ! (double = the model working precision, default)
+            call entries(k)%read_enum("precision", &
+                                      [character(6) :: "single", "double"], &
+                                      silent=no_key, val=fmt)
+            if (.not. no_key) cfg%single_prec = fmt == "single"
 
             ! statistics presence derives the channel kind (windowed vs
             ! snapshot); validated against the accumulator's stat set

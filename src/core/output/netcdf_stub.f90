@@ -23,7 +23,7 @@ module netcdf
 
    private
    public :: NF90_NOERR, NF90_CLOBBER, NF90_NETCDF4, NF90_UNLIMITED
-   public :: NF90_DOUBLE, NF90_GLOBAL
+   public :: NF90_FLOAT, NF90_DOUBLE, NF90_GLOBAL
    public :: nf90_create, nf90_def_dim, nf90_def_var, nf90_put_att
    public :: nf90_def_grp, nf90_enddef, nf90_put_var, nf90_close, nf90_strerror
 
@@ -31,6 +31,7 @@ module netcdf
    integer, parameter :: NF90_CLOBBER = 0
    integer, parameter :: NF90_NETCDF4 = 4096
    integer, parameter :: NF90_UNLIMITED = 0
+   integer, parameter :: NF90_FLOAT = 5
    integer, parameter :: NF90_DOUBLE = 6
    integer, parameter :: NF90_GLOBAL = 0
 

@@ -66,6 +66,7 @@ module core_output_channel_mod
    use core_interpolation_mod, only: type_interpolator
    use core_time_utils_mod, only: type_timing_control
    use core_field_registry_mod, only: type_field_registry
+   use core_path_mod, only: type_path
    use core_output_gatherer_mod, only: type_output_gatherer
    use netcdf
    ! shared NF90_* constants come from the netcdf module (PnetCDF's F90
@@ -107,6 +108,8 @@ module core_output_channel_mod
       character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
       integer, allocatable :: varids(:)
       logical :: is_open = .false.
+      ! data vars defined NF90_FLOAT when the channel saves single
+      logical :: single = .false.
       ! .false. when the stream is a group in a shared root file
       ! (layout 'single'): close() only forgets, the manager closes
       logical :: owns_file = .true.
@@ -150,6 +153,8 @@ module core_output_channel_mod
       character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
       integer, allocatable :: varids(:)
       logical :: is_open = .false.
+      ! data vars defined NF90_FLOAT when the channel saves single
+      logical :: single = .false.
    contains
       procedure :: create => pnc_create
       procedure :: begin_frame => pnc_begin_frame
@@ -184,6 +189,9 @@ module core_output_channel_mod
       integer                        :: n_stats = 0
       ! hidden variables accumulate (derived sources) but never write
       logical                        :: hidden(VARS_MAX) = .false.
+      ! single-precision save (binary casts, netcdf/pnetcdf NF90_FLOAT
+      ! vars; ascii text unchanged) -- halves high-cadence field storage
+      logical                        :: single_prec = .false.
       integer                        :: n_derived = 0
       type(type_channel_derived)     :: derived(DERIVED_MAX)
       logical                        :: snapshot = .true.
@@ -256,7 +264,7 @@ contains
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
                            file_prefixes, icount_start, var_meta, diag_ncid, &
-                           chunk_window, hidden, derived, n_derived)
+                           chunk_window, hidden, derived, n_derived, single_prec)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -283,8 +291,11 @@ contains
       logical, intent(in), optional :: hidden(*)
       type(type_channel_derived), intent(in), optional :: derived(*)
       integer, intent(in), optional :: n_derived
+      logical, intent(in), optional :: single_prec
 
-      integer :: iv, is, id_
+      type(type_path) :: chan_dir
+      logical :: dir_ok
+      integer :: iv, is, id_, gunit
       integer, allocatable :: pids(:)
 
       this%id = id
@@ -304,9 +315,20 @@ contains
          this%n_derived = n_derived
          this%derived(1:n_derived) = derived(1:n_derived)
       end if
+      if (present(single_prec)) this%single_prec = single_prec
+      this%nc%single = this%single_prec
+      this%pnc%single = this%single_prec
       this%local_nx = grid%local_nx
       this%local_ny = grid%local_ny
-      this%result_folder = trim(result_folder)
+      ! every channel owns a subfolder (design_output_io group layout):
+      ! result_folder/<id>/ holds the frames, the per-channel t.out index,
+      ! and grid.txt for field channels
+      this%result_folder = trim(result_folder)//trim(id)//'/'
+      if (comm%is_io_node()) then
+         chan_dir = type_path(this%result_folder)
+         if (.not. chan_dir%is_dir()) dir_ok = chan_dir%mkdir()
+      end if
+      call comm%barrier()
       this%icount = 0
       if (present(icount_start)) this%icount = icount_start
 
@@ -372,6 +394,14 @@ contains
          this%j0 = grid%jbegin - 1
          call this%gatherer%init_field(grid, comm)
 
+         ! per-channel grid descriptor (design_output_io group layout)
+         if (comm%is_io_node()) then
+            open (newunit=gunit, file=this%result_folder//'grid.txt', &
+                  status='replace', action='write')
+            write (gunit, '(2I8, 2E16.8)') grid%M, grid%N, grid%dx0, grid%dy0
+            close (gunit)
+         end if
+
          ! Accumulators: (local_nx, local_ny)
          allocate (this%accum(n_vars))
          do iv = 1, n_vars
@@ -428,7 +458,7 @@ contains
       type(type_comm), intent(inout) :: comm
       logical, intent(in), optional :: force
 
-      integer  :: iv
+      integer  :: iv, tunit
       real(SP), pointer :: fld(:, :)
       real(SP), allocatable :: interp_vals(:), interp_2d(:, :)
       logical :: do_flush
@@ -441,6 +471,15 @@ contains
       if (present(force)) do_flush = do_flush .or. force
       if (do_flush) this%icount = this%icount + 1
       this%fired = do_flush
+
+      ! per-channel frame index (nee the global time_dt.out): one line
+      ! per flush -- frame counter, time, dt
+      if (do_flush .and. comm%is_io_node()) then
+         open (newunit=tunit, file=this%result_folder//'t.out', &
+               status='unknown', position='append', action='write')
+         write (tunit, '(I6, 2E16.6)') this%icount, t, dt
+         close (tunit)
+      end if
 
       ! Chunked field stream: a frame at or past the window's right
       ! edge rolls to the next time-aligned file first (chunks cover
@@ -611,7 +650,7 @@ contains
       if (trim(this%format) == 'binary') then
          call write_field_file_mpiio(this%result_folder//name//'_'//cnt, &
                                      vals, this%gatherer%M, this%gatherer%N, &
-                                     this%i0, this%j0, comm)
+                                     this%i0, this%j0, comm, this%single_prec)
          return
       end if
 
@@ -795,19 +834,28 @@ contains
    ! rank's (local_nx, local_ny) interior tile to its 0-based (i0, j0)
    ! subarray offset in the global (M, N) array, then one write_all puts
    ! every tile concurrently — byte-identical to the gathered stream.
-   subroutine write_field_file_mpiio(fname, vals, M, N, i0, j0, comm)
+   subroutine write_field_file_mpiio(fname, vals, M, N, i0, j0, comm, single)
+      use, intrinsic :: iso_fortran_env, only: real32
       character(*), intent(in) :: fname
       real(SP), intent(in) :: vals(:, :)   ! interior tile, ghost-free
       integer, intent(in) :: M, N, i0, j0
       type(type_comm), intent(inout) :: comm
+      logical, intent(in), optional :: single
 
-      type(MPI_Datatype) :: ftype
+      type(MPI_Datatype) :: etype, ftype
       type(MPI_File) :: fh
+      real(real32), allocatable :: vals32(:, :)
       integer(MPI_OFFSET_KIND) :: zero_off
+      logical :: to32
       integer :: ierr
 
+      to32 = .false.
+      if (present(single)) to32 = single
+      etype = MPI_SP
+      if (to32) etype = MPI_REAL4
+
       call MPI_Type_create_subarray(2, [M, N], shape(vals), [i0, j0], &
-                                    MPI_ORDER_FORTRAN, MPI_SP, ftype, ierr)
+                                    MPI_ORDER_FORTRAN, etype, ftype, ierr)
       call MPI_Type_commit(ftype, ierr)
 
       call MPI_File_open(comm%id, fname, MPI_MODE_WRONLY + MPI_MODE_CREATE, &
@@ -817,10 +865,16 @@ contains
       zero_off = 0
       call MPI_File_set_size(fh, zero_off, ierr)
       call MPI_Barrier(comm%id, ierr)
-      call MPI_File_set_view(fh, zero_off, MPI_SP, ftype, 'native', &
+      call MPI_File_set_view(fh, zero_off, etype, ftype, 'native', &
                              MPI_INFO_NULL, ierr)
-      call MPI_File_write_all(fh, vals, size(vals), MPI_SP, &
-                              MPI_STATUS_IGNORE, ierr)
+      if (to32) then
+         vals32 = real(vals, real32)
+         call MPI_File_write_all(fh, vals32, size(vals), MPI_REAL4, &
+                                 MPI_STATUS_IGNORE, ierr)
+      else
+         call MPI_File_write_all(fh, vals, size(vals), MPI_SP, &
+                                 MPI_STATUS_IGNORE, ierr)
+      end if
       call MPI_File_close(fh, ierr)
       call MPI_Type_free(ftype, ierr)
    end subroutine write_field_file_mpiio
@@ -862,7 +916,8 @@ contains
       class(type_output_channel), intent(in) :: this
       character(*), intent(in) :: name
       character(:), allocatable :: fname
-      fname = this%result_folder//trim(this%id)//'_'//trim(name)//'.dat'
+      ! the channel folder carries the identity; no <id>_ prefix
+      fname = this%result_folder//trim(name)//'.dat'
    end function point_file_name
 
    ! Truncate all point files this channel will append to (IO rank only).
@@ -972,7 +1027,8 @@ contains
       allocate (this%names(n_names), this%varids(n_names))
       do i = 1, n_names
          this%names(i) = names(i)
-         call nc_check(nf90_def_var(this%ncid, trim(names(i)), NF90_DOUBLE, &
+         call nc_check(nf90_def_var(this%ncid, trim(names(i)), &
+                                    merge(NF90_FLOAT, NF90_DOUBLE, this%single), &
                                     [x_dim, y_dim, t_dim], this%varids(i)), &
                        'def var '//trim(names(i)))
          if (len_trim(meta(i)%units) > 0) &
@@ -1269,7 +1325,8 @@ contains
       do i = 1, n_names
          this%names(i) = names(i)
          call pnc_check(nf90mpi_def_var(this%ncid, trim(names(i)), &
-                                        NF90_DOUBLE, [x_dim, y_dim, t_dim], &
+                                        merge(NF90_FLOAT, NF90_DOUBLE, this%single), &
+                                        [x_dim, y_dim, t_dim], &
                                         this%varids(i)), &
                         'def var '//trim(names(i)))
          if (len_trim(meta(i)%units) > 0) &

@@ -95,7 +95,7 @@ contains
       call ch%step(0.0_SP, 0.5_SP, reg, comm)
 
       if (comm%is_io_node()) then
-         open (newunit=unit, file='./eta_00001', status='old', action='read')
+         open (newunit=unit, file='./snap_f/eta_00001', status='old', action='read')
          do j = 1, TEST_N
             read (unit, *) row
             do i = 1, TEST_M
@@ -165,7 +165,7 @@ contains
       call ch%step(0.0_SP, 0.5_SP, reg, comm)
 
       if (comm%is_io_node()) then
-         open (newunit=unit, file='./eta_00001', access='stream', &
+         open (newunit=unit, file='./snap_b/eta_00001', access='stream', &
                form='unformatted', status='old', action='read')
          read (unit) glob
          close (unit, status='delete')
@@ -218,7 +218,7 @@ contains
       call comm%barrier()
 
       if (comm%is_io_node()) then
-         open (newunit=unit, file='./eta_00001', access='stream', &
+         open (newunit=unit, file='./snap_b4/eta_00001', access='stream', &
                form='unformatted', status='old', action='read')
          read (unit) glob
          close (unit, status='delete')
@@ -282,7 +282,7 @@ contains
       call comm%barrier()
 
       if (comm%is_io_node()) then
-         @assertEqual(NF90_NOERR, nf90_open('./snap_nc.nc', NF90_NOWRITE, ncid))
+         @assertEqual(NF90_NOERR, nf90_open('./snap_nc/snap_nc.nc', NF90_NOWRITE, ncid))
 
          @assertEqual(NF90_NOERR, nf90_inq_dimid(ncid, 'time', dimid))
          @assertEqual(NF90_NOERR, nf90_inquire_dimension(ncid, dimid, len=nlen))
@@ -313,7 +313,7 @@ contains
          end do
 
          @assertEqual(NF90_NOERR, nf90_close(ncid))
-         open (unit=99, file='./snap_nc.nc', status='old')
+         open (unit=99, file='./snap_nc/snap_nc.nc', status='old')
          close (99, status='delete')
       end if
 
@@ -361,7 +361,7 @@ contains
       call ch%step(1.0_SP, 0.5_SP, reg, comm)
 
       if (comm%is_io_node()) then
-         open (newunit=unit, file='./sta_eta.dat', status='old', action='read')
+         open (newunit=unit, file='./sta/eta.dat', status='old', action='read')
          read (unit, *) tval, v1, v2
          @assertEqual(0.0_SP, tval, tolerance=1e-6_SP)
          @assertEqual(2.0_SP*5.0_SP + 3.0_SP*2.0_SP, v1, tolerance=1e-4_SP)
@@ -416,12 +416,12 @@ contains
          ! window 1 (degenerate single sample at t=0) is dropped
          block
             logical :: exists
-            inquire (file='./eta_mean_00001', exist=exists)
+            inquire (file='./avg_f/eta_mean_00001', exist=exists)
             @assertFalse(exists)
          end block
 
          ! window 2: samples 4 and 8 with equal dt
-         open (newunit=unit, file='./eta_mean_00002', status='old', action='read')
+         open (newunit=unit, file='./avg_f/eta_mean_00002', status='old', action='read')
          do j = 1, TEST_N
             read (unit, *) row
          end do
@@ -481,16 +481,16 @@ contains
          block
             logical :: exists
             ! degenerate first window dropped; hidden source writes nothing
-            inquire (file='./hsig_00001', exist=exists)
+            inquire (file='./waves/hsig_00001', exist=exists)
             @assertFalse(exists)
-            inquire (file='./eta_00002', exist=exists)
+            inquire (file='./waves/eta_00002', exist=exists)
             @assertFalse(exists)
-            inquire (file='./eta_std_00002', exist=exists)
+            inquire (file='./waves/eta_std_00002', exist=exists)
             @assertFalse(exists)
          end block
 
          ! window 2: samples 4 and 8, std = 2, hsig = 4.004 * 2
-         open (newunit=unit, file='./hsig_00002', status='old', action='read')
+         open (newunit=unit, file='./waves/hsig_00002', status='old', action='read')
          do j = 1, TEST_N
             read (unit, *) row
          end do
@@ -662,7 +662,7 @@ contains
       real(SP), allocatable, target :: eta(:, :)
       character(32) :: vars(1)
       character(8)  :: stats(1)
-      character(*), parameter :: F2 = './chk_00000001.0-00000002.0.nc'
+      character(*), parameter :: F2 = './chk/chk_00000001.0-00000002.0.nc'
       real(SP) :: cx(1), cy(1), glob(TEST_M, TEST_N), tval(1)
       integer  :: ncid, varid, dimid, nlen
       logical  :: exists
@@ -692,9 +692,9 @@ contains
       call comm%barrier()
 
       if (comm%is_io_node()) then
-         inquire (file='./chk_00000000.0-00000001.0.nc', exist=exists)
+         inquire (file='./chk/chk_00000000.0-00000001.0.nc', exist=exists)
          @assertTrue(exists)
-         inquire (file='./chk_00000002.0-00000003.0.nc', exist=exists)
+         inquire (file='./chk/chk_00000002.0-00000003.0.nc', exist=exists)
          @assertTrue(exists)
 
          ! middle chunk: exactly the t=1 frame with the then-current field
@@ -712,11 +712,11 @@ contains
          @assertEqual(5.0_SP, glob(1, 1), tolerance=1e-12_SP)
          @assertEqual(NF90_NOERR, nf90_close(ncid))
 
-         open (unit=99, file='./chk_00000000.0-00000001.0.nc', status='old')
+         open (unit=99, file='./chk/chk_00000000.0-00000001.0.nc', status='old')
          close (99, status='delete')
          open (unit=99, file=F2, status='old')
          close (99, status='delete')
-         open (unit=99, file='./chk_00000002.0-00000003.0.nc', status='old')
+         open (unit=99, file='./chk/chk_00000002.0-00000003.0.nc', status='old')
          close (99, status='delete')
       end if
 

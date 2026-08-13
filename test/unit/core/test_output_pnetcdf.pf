@@ -98,7 +98,7 @@ contains
       call comm%barrier()
 
       if (comm%is_io_node()) then
-         @assertEqual(NF90_NOERR, nf90_open('./snap_pnc.nc', NF90_NOWRITE, ncid))
+         @assertEqual(NF90_NOERR, nf90_open('./snap_pnc/snap_pnc.nc', NF90_NOWRITE, ncid))
 
          @assertEqual(NF90_NOERR, nf90_inq_dimid(ncid, 'time', dimid))
          @assertEqual(NF90_NOERR, nf90_inquire_dimension(ncid, dimid, len=nlen))
@@ -124,7 +124,7 @@ contains
          end do
 
          @assertEqual(NF90_NOERR, nf90_close(ncid))
-         open (unit=99, file='./snap_pnc.nc', status='old')
+         open (unit=99, file='./snap_pnc/snap_pnc.nc', status='old')
          close (99, status='delete')
       end if
 
@@ -146,7 +146,7 @@ contains
       real(SP), allocatable, target :: eta(:,:)
       character(32) :: vars(1)
       character(8)  :: stats(1)
-      character(*), parameter :: F2 = './pchk_00000001.0-00000002.0.nc'
+      character(*), parameter :: F2 = './pchk/pchk_00000001.0-00000002.0.nc'
       real(SP) :: cx(1), cy(1), row(TEST_M)
       integer  :: ncid, varid
       logical  :: exists
@@ -174,7 +174,7 @@ contains
       call comm%barrier()
 
       if (comm%is_io_node()) then
-         inquire (file='./pchk_00000000.0-00000001.0.nc', exist=exists)
+         inquire (file='./pchk/pchk_00000000.0-00000001.0.nc', exist=exists)
          @assertTrue(exists)
 
          @assertEqual(NF90_NOERR, nf90_open(F2, NF90_NOWRITE, ncid))
@@ -186,7 +186,7 @@ contains
          @assertEqual(5.0_SP, row(TEST_M), tolerance=1e-12_SP)
          @assertEqual(NF90_NOERR, nf90_close(ncid))
 
-         open (unit=99, file='./pchk_00000000.0-00000001.0.nc', status='old')
+         open (unit=99, file='./pchk/pchk_00000000.0-00000001.0.nc', status='old')
          close (99, status='delete')
          open (unit=99, file=F2, status='old')
          close (99, status='delete')
