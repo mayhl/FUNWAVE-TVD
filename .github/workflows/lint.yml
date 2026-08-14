@@ -15,12 +15,16 @@ jobs:
       # Fortran formatting (blocking, post canonical reformat). fprettify 0.3.7 has
       # no --check, so gate on a non-empty -d diff. -d is diff-only; exclude legacy
       # old/ and the regression worktrees, matching fortitude.toml. Default indent 3.
+      # -f overrides the extension list --recursive walks, which is the only way to
+      # reach the pFUnit .pf tests; it replaces the defaults, so name every wanted
+      # extension. Note the gate folds stderr into the diff, so an fprettify WARNING
+      # (e.g. a line too long to indent) fails the build as loudly as real drift.
       - name: Check Fortran formatting
         run: |
-          diff=$(uv run fprettify -d --recursive src/ test/ -e old -e worktrees 2>&1) || true
+          diff=$(uv run fprettify -d --recursive src/ test/ -e old -e worktrees -f .f90 -f .F90 -f .pf 2>&1) || true
           if [ -n "$diff" ]; then
             printf '%s\n' "$diff"
-            echo "::error::fprettify formatting drift; run: fprettify --recursive src/ test/ -e old -e worktrees"
+            echo "::error::fprettify formatting drift; run: fprettify --recursive src/ test/ -e old -e worktrees -f .f90 -f .F90 -f .pf"
             exit 1
           fi
 

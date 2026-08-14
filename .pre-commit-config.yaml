@@ -19,11 +19,26 @@ repos:
     rev: v0.3.0
     hooks:
       - id: fortitude-check
-  - repo: https://github.com/kylekimmel/fprettify
-    rev: v0.3.1
+  # Local rather than the upstream hook repo so this runs the SAME binary the
+  # blocking lint.yml gate does (fprettify from the dev group), with the same
+  # flags -- i.e. none: the tree is canonically indent 3, which is the default.
+  # A separately pinned hook repo can drift from pyproject and fight the gate.
+  - repo: local
     hooks:
       - id: fprettify
-        args: ["--indent", "2", "--whitespace", "2"]
+        name: fprettify
+        entry: uv run fprettify
+        language: system
+        # scoped to the gate's own universe: --recursive src/ test/, extensions
+        # = fprettify.FORTRAN_EXTENSIONS plus .pf, which fprettify formats
+        # correctly (pFUnit @decorators survive) but does not discover on its
+        # own -- hence the gate's matching -f flags.  The root old/ benchmark
+        # tree is fixed-form F77 that fprettify cannot even parse, hence
+        # prefix-anchoring rather than a bare extension match
+        files: '^(src|test)/.*\.(f|for|ftn|f90|f95|f03|fpp|pf|F|FOR|FTN|F90|F95|F03|FPP|PF)$'
+        # legacy and vendored trees are reference code, never reformatted;
+        # matches the gate's -e old -e worktrees and fortitude.toml
+        exclude: '^(src/model/(2d|3d)/old/|test/regression/worktrees/)'
   - repo: https://github.com/pre-commit/mirrors-prettier
     rev: v3.1.0
     hooks:
