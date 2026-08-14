@@ -1038,7 +1038,7 @@ contains
                                        n_coords=size(geom%x), grid=this%grid, &
                                        comm=this%env%comm, var_meta=vmeta, &
                                        icount_start=ic0, &
-                                       diag_ncid=merge(froot, mgr%diag_ncid, froot >= 0), &
+                                       diag_ncid=merge(froot, mgr%diag_ncid, is_field), &
                                        chunk_window=cwin, &
                                        hidden=cfg%hidden, &
                                        derived=dspecs, n_derived=cfg%n_derived, &
