@@ -230,3 +230,93 @@ simulations:
       spectral_fidelity: test.validation.oracles.spectral_fidelity
     tolerances:
       spectral_fidelity: { hm0_error_pct: 25.0 }
+
+  # ── wavemaker spectrum self-consistency: target vs field-realized ────────
+  # Synthetic parametric rung (oracle-mode, no lab data): five spectra-type
+  # lanes on one flat rig (h = 10 m, periodic-y, 41-line equal-df ladder ->
+  # T_rec = 200 s; deck headers carry the geometry).  Gauge-measured Hm0,
+  # peak location, band containment, and the exact-T_rec line-completeness
+  # comb tripwire gate each discretizer path: directional grid (TMA+JONSWAP),
+  # single_dir_per_freq (regresses the f0a8375 equal-spreading-mass comb
+  # fix), single_dir + equal_energy: freq (the fcc8c48 per-axis combo — the
+  # reader accepting it is itself coverage; non-uniform bins, so no line
+  # metric), and a WK_DATA2D file table (flat amplitudes: exact component-sum
+  # Hm0 target, no peak gate).  Gates are adjudicated on 2026-08-13 laptop
+  # actuals (anchors on each tolerance line): dead lines 0/41 on every
+  # uniform ladder, band containment 98.9-99.3 %, Welch peak one bin off
+  # deck (2.3 %; the 16.7 % gate is the coarse peak-in-[0.10, 0.14] window,
+  # not a fitted stat).  Hm0 anchors expose a real discretizer spread —
+  # single_dir delivers the deck Hm0 nearly exactly (1.1 %) while the
+  # directional-grid lanes under-deliver 13-18 % (spreading mass parked at
+  # steeply-snapped periodic modes; JONSWAP > TMA via its heavier low band)
+  # — so the Hm0 gates are CHARACTERIZATION bounds per lane, like the
+  # spectral_2d 25 % gate, not one shared physics bound.
+  - name: wm_tma_grid
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/wavemaker_spectrum
+    input_files: [tma_grid.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # anchors: hm0 13.5, fp 2.3, band 99.2, dead 0.0
+      wavemaker_spectrum: { hm0_err_pct: 18.0, fp_err_pct: 16.7, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+
+  - name: wm_jonswap_grid
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/wavemaker_spectrum
+    input_files: [jonswap_grid.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # anchors: hm0 18.5, fp 2.3, band 99.3, dead 0.0
+      wavemaker_spectrum: { hm0_err_pct: 24.0, fp_err_pct: 16.7, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+
+  - name: wm_tma_sd
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/wavemaker_spectrum
+    input_files: [tma_sd.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # anchors: hm0 1.1, fp 2.3, band 99.3, dead 0.0 (pre-f0a8375 comb ~14)
+      wavemaker_spectrum: { hm0_err_pct: 4.0, fp_err_pct: 16.7, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+
+  - name: wm_tma_sd_eqe
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/wavemaker_spectrum
+    input_files: [tma_sd_eqe.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # anchors: hm0 10.5 (0.988 realized at init + delivery), fp 2.3, band 98.9
+      wavemaker_spectrum: { hm0_err_pct: 15.0, fp_err_pct: 16.7, band_frac_pct: 95.0 }
+
+  - name: wm_data2d
+    exe_type: validation-2d
+    np: 4
+    input: test/validation/inputs/wavemaker_spectrum
+    input_files: [data2d.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # anchors: hm0 3.5, band 99.3, dead 0.0 (flat table: no peak gate)
+      wavemaker_spectrum: { hm0_err_pct: 7.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }

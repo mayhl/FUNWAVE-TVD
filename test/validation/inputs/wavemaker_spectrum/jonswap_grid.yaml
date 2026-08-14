@@ -1,0 +1,69 @@
+# Wavemaker spectrum self-consistency — JONSWAP, directional grid discretizer.
+# Same rig as tma_grid (see that deck's header for the shared geometry and
+# T_rec = 200 s ladder rationale); only the density family changes, so the
+# Kitaigorodskii depth factor drops out of the analytic target.
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [500, 80]
+  bathymetry:
+    type: flat
+    depth: 10.0
+simulation:
+  title: wm_jonswap_grid
+  total_time: 340.0
+  screen_interval: 100.0
+wavemaker:
+  seed: 66
+  spectrum:
+    type: jonswap
+    hm0: 1.0
+    gamma: 3.3
+    freq:
+      peak: 0.12
+      min: 0.08
+      max: 0.28
+    directional:
+      peak: 0.0
+      spread: 20.0
+    discretization:
+      freq_bins: 41
+      theta_bins: 24
+      method: grid
+  source:
+    x_center: 145.0
+    y_center: 80.0
+    depth: 10.0
+boundaries:
+  west:
+    sponge:
+      width: 80.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  east:
+    sponge:
+      width: 160.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [265.0, 275.0, 285.0, 295.0, 305.0, 285.0, 285.0]
+      y: [80.0, 80.0, 80.0, 80.0, 80.0, 40.0, 120.0]
+      variables: [eta]
+      interval: 0.1

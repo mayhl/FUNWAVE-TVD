@@ -1,0 +1,86 @@
+# Wavemaker spectrum self-consistency — TMA, directional grid discretizer.
+# Shared rig (all five lanes): flat h = 10 m, dx = 1 m, dy = 2 m, periodic-y
+# tank 160 m wide, west/east sponges, internal Wei-Kirby source at x = 145 m.
+# Band 0.08-0.28 Hz on a 41-bin ENDPOINT-INCLUSIVE equal-df ladder
+# (df = band/(nf-1) = 0.005 Hz) -> recurrence period T_rec = 200 s exactly;
+# the oracle's stats window is the record's LAST T_rec ([140, 340) here), an
+# exact multiple of T_rec so ladder lines land on periodogram bins.  The
+# 160 m width is load-bearing: the first periodic y-mode is
+# k_y = 2pi/160 = 0.039 < k(0.08 Hz) = 0.053, so every ladder line supports
+# an oblique mode — an 80 m tank starves the low band (nonzero-dir
+# components below ~0.11 Hz snap to 90 deg and never reach the gauges;
+# measured 7/41 dead lines + a 13% Hm0 hole on that rig).  dy = 2 m is
+# laptop-budget: the steepest surviving oblique at 0.28 Hz has
+# lambda_y >= 40 m (ppw_y >= 20), while dx = 1 m keeps ppw_x = 20 for the
+# x-propagating high band.  Gauges: 5-point x-line at x = 265..305 m
+# (~1.6-2.1 lambda_p downwave of the source, lambda_p = 74.5 m at
+# fp = 0.12 Hz, kh_p = 0.84; the spectral_2d fidelity case's 2-3 lambda_p
+# precedent) + a lateral pair at x = 285 m for homogeneity.  Slowest in-band
+# group (0.28 Hz, cg = 2.8 m/s) reaches the far gauge at ~56 s, well inside
+# the 140 s discarded spin-up.  Seeded random phases (seed 66) — the
+# variance and exact-T_rec line metrics are phase-realization independent.
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [500, 80]
+  bathymetry:
+    type: flat
+    depth: 10.0
+simulation:
+  title: wm_tma_grid
+  total_time: 340.0
+  screen_interval: 100.0
+wavemaker:
+  seed: 66
+  spectrum:
+    type: tma
+    hm0: 1.0
+    gamma: 3.3
+    freq:
+      peak: 0.12
+      min: 0.08
+      max: 0.28
+    directional:
+      peak: 0.0
+      spread: 20.0
+    discretization:
+      freq_bins: 41
+      theta_bins: 24
+      method: grid
+  source:
+    x_center: 145.0
+    y_center: 80.0
+    depth: 10.0
+boundaries:
+  west:
+    sponge:
+      width: 80.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  east:
+    sponge:
+      width: 160.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+  Cbrk1: 0.65
+  Cbrk2: 0.35
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [265.0, 275.0, 285.0, 295.0, 305.0, 285.0, 285.0]
+      y: [80.0, 80.0, 80.0, 80.0, 80.0, 40.0, 120.0]
+      variables: [eta]
+      interval: 0.1
