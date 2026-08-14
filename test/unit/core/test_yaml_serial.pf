@@ -499,7 +499,8 @@ contains
       @assertEqual('item2', val)
 
       call reader%read('enum_error', words, val=val)
-      @assertExceptionRaised('enum_error is set to "item5", which is not in the allowable list of values. Valid values: item1, item2, & item3.')
+      @assertExceptionRaised('enum_error is set to "item5", which is not in the allowable list of '// &
+                             'values. Valid values: item1, item2, & item3.')
 
       call dummy_fix_lint()
 
@@ -615,7 +616,8 @@ contains
       @assertExceptionRaised("length_obj read method has unknown dimension 'error'.")
 
       call reader%read('length_err', val=val, dim='length')
-      @assertExceptionRaised('length_err.units is set to "error", which is not in the allowable list of values. Valid values: m, cm, & km.')
+      @assertExceptionRaised('length_err.units is set to "error", which is not in the allowable list '// &
+                             'of values. Valid values: m, cm, & km.')
 
       call dummy_fix_lint()
    end subroutine test_read_real_units

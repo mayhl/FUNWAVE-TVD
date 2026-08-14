@@ -3,19 +3,19 @@ module test_field_input
 
    use mpi_f08
    use pFUnit
-   use core_comm_mod,          only: type_comm, new_comm
-   use core_constants_mod,     only: SP
-   use core_env_mod,           only: type_env
-   use core_log_io_mod,        only: new_log_writer
-   use core_grid_mod,          only: type_grid_2d
-   use model_field_input_mod,  only: type_file_spec, parse_file_spec, read_field
+   use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP
+   use core_env_mod, only: type_env
+   use core_log_io_mod, only: new_log_writer
+   use core_grid_mod, only: type_grid_2d
+   use model_field_input_mod, only: type_file_spec, parse_file_spec, read_field
 
    implicit none
 
    integer, parameter :: TEST_M = 8
    integer, parameter :: TEST_N = 4
 
-   real(SP), parameter :: DX_SP  = 1.0_SP
+   real(SP), parameter :: DX_SP = 1.0_SP
    real(SP), parameter :: TOL_SP = 0.0_SP
 
 contains
@@ -27,14 +27,14 @@ contains
    ! the pFUnit-provided communicator (test_checkpoint pattern)
    subroutine open_env_grid(this, env, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_env),       intent(inout) :: env
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_env), intent(inout) :: env
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
       comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
       allocate (env%log)
       env%log = new_log_writer("test_fi", comm%is_io_node())
-      grid%M = TEST_M;  grid%N = TEST_N
-      grid%nx_proc = 1;  grid%ny_proc = 1
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 1; grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
       call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
    end subroutine open_env_grid
@@ -91,7 +91,7 @@ contains
       type(type_grid_2d)   :: grid
       type(type_comm)      :: comm
       type(type_file_spec) :: spec
-      real(SP), allocatable :: arr_a(:,:), arr_b(:,:), row(:)
+      real(SP), allocatable :: arr_a(:, :), arr_b(:, :), row(:)
       integer :: unit, gi, gj
 
       call open_env_grid(this, env, grid, comm)

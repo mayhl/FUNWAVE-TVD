@@ -8,12 +8,12 @@ contains
 
    @test
    subroutine test_get_factor_known()
-      @assertEqual(1.0_SP,    get_factor("sec",  "time"),   tolerance=1e-6_SP)
-      @assertEqual(60.0_SP,   get_factor("min",  "time"),   tolerance=1e-6_SP)
-      @assertEqual(3600.0_SP, get_factor("hour", "time"),   tolerance=1e-6_SP)
-      @assertEqual(1.0_SP,    get_factor("m",    "length"), tolerance=1e-6_SP)
-      @assertEqual(1000.0_SP, get_factor("km",   "length"), tolerance=1e-6_SP)
-      @assertEqual(0.01_SP,   get_factor("cm",   "length"), tolerance=1e-7_SP)
+      @assertEqual(1.0_SP, get_factor("sec", "time"), tolerance=1e-6_SP)
+      @assertEqual(60.0_SP, get_factor("min", "time"), tolerance=1e-6_SP)
+      @assertEqual(3600.0_SP, get_factor("hour", "time"), tolerance=1e-6_SP)
+      @assertEqual(1.0_SP, get_factor("m", "length"), tolerance=1e-6_SP)
+      @assertEqual(1000.0_SP, get_factor("km", "length"), tolerance=1e-6_SP)
+      @assertEqual(0.01_SP, get_factor("cm", "length"), tolerance=1e-7_SP)
    end subroutine test_get_factor_known
 
    @test

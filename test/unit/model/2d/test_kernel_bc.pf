@@ -2,15 +2,15 @@
 module test_kernel_bc
 
    use pFUnit
-   use core_constants_mod,  only: SP
-   use core_grid_mod,       only: type_loop_bounds
+   use core_constants_mod, only: SP
+   use core_grid_mod, only: type_loop_bounds
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR, SIGN_ANTI
 
    implicit none
 
-   integer, parameter :: NG   = 3
-   integer, parameter :: LNX  = 6
-   integer, parameter :: LNY  = 5
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 6
+   integer, parameter :: LNY = 5
    integer, parameter :: MLOC = LNX + 2*NG   ! 12
    integer, parameter :: NLOC = LNY + 2*NG   ! 11
 
@@ -21,15 +21,15 @@ contains
 
    subroutine make_lp(lp)
       type(type_loop_bounds), intent(out) :: lp
-      lp%ib = NG + 1;  lp%ie = NG + LNX
-      lp%jb = NG + 1;  lp%je = NG + LNY
-      lp%mloc = MLOC;  lp%nloc = NLOC
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
    ! Interior filled with a unique value per cell; ghosts poisoned.
    subroutine make_field(lp, f)
       type(type_loop_bounds), intent(in)  :: lp
-      real(SP),               intent(out) :: f(MLOC, NLOC)
+      real(SP), intent(out) :: f(MLOC, NLOC)
       integer :: i, j
       f = -999.0_SP
       do j = lp%jb, lp%je
@@ -165,9 +165,9 @@ contains
                            SIGN_MIRROR, SIGN_MIRROR, f)
 
       ! east x-ghost strip and both y-ghost strips keep the poison value
-      @assertTrue(all(f(lp%ie+1:, lp%jb:lp%je) == -999.0_SP))
+      @assertTrue(all(f(lp%ie + 1:, lp%jb:lp%je) == -999.0_SP))
       @assertTrue(all(f(:, 1:NG) == -999.0_SP))
-      @assertTrue(all(f(:, lp%je+1:) == -999.0_SP))
+      @assertTrue(all(f(:, lp%je + 1:) == -999.0_SP))
 
       call dummy_fix_lint()
    end subroutine test_unflagged_sides_untouched

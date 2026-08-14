@@ -2,20 +2,20 @@
 module test_kernel_fluxes
 
    use pFUnit
-   use core_constants_mod,      only: SP
-   use core_grid_mod,           only: type_loop_bounds
+   use core_constants_mod, only: SP
+   use core_grid_mod, only: type_loop_bounds
    use model_kernel_fluxes_mod, only: type_flux_workspace, &
-                                       delx_fun, dely_fun, &
-                                       construct_x, construct_y, &
-                                       construct_ho_x, construct_ho_y, &
-                                       weno_construct_x, weno_construct_y, &
-                                       hll3
+                                      delx_fun, dely_fun, &
+                                      construct_x, construct_y, &
+                                      construct_ho_x, construct_ho_y, &
+                                      weno_construct_x, weno_construct_y, &
+                                      hll3
 
    implicit none
 
-   integer, parameter :: NG   = 3
-   integer, parameter :: LNX  = 6
-   integer, parameter :: LNY  = 6
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 6
+   integer, parameter :: LNY = 6
    integer, parameter :: MLOC = LNX + 2*NG   ! 12
    integer, parameter :: NLOC = LNY + 2*NG   ! 12
 
@@ -28,9 +28,9 @@ contains
 
    subroutine make_lp(lp)
       type(type_loop_bounds), intent(out) :: lp
-      lp%ib = NG + 1;  lp%ie = NG + LNX
-      lp%jb = NG + 1;  lp%je = NG + LNY
-      lp%mloc = MLOC;  lp%nloc = NLOC
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
    ! ----------------------------------------------------------------
@@ -38,13 +38,13 @@ contains
    ! ----------------------------------------------------------------
    @test
    subroutine test_delx_fun_linear()
-      real(SP) :: uin(MLOC,NLOC), dout(MLOC,NLOC), inv_dx(MLOC,NLOC)
+      real(SP) :: uin(MLOC, NLOC), dout(MLOC, NLOC), inv_dx(MLOC, NLOC)
       integer  :: i, j
 
       inv_dx = 1.0_SP
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
       dout = 0.0_SP
@@ -53,7 +53,7 @@ contains
 
       do j = 1, NLOC
          do i = 1, MLOC
-            @assertEqual(1.0_SP, dout(i,j), tolerance=TOL)
+            @assertEqual(1.0_SP, dout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -65,13 +65,13 @@ contains
    ! ----------------------------------------------------------------
    @test
    subroutine test_dely_fun_linear()
-      real(SP) :: uin(MLOC,NLOC), dout(MLOC,NLOC), inv_dy(MLOC,NLOC)
+      real(SP) :: uin(MLOC, NLOC), dout(MLOC, NLOC), inv_dy(MLOC, NLOC)
       integer  :: i, j
 
       inv_dy = 1.0_SP
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(j, SP)
+            uin(i, j) = real(j, SP)
          end do
       end do
       dout = 0.0_SP
@@ -80,7 +80,7 @@ contains
 
       do j = 1, NLOC
          do i = 1, MLOC
-            @assertEqual(1.0_SP, dout(i,j), tolerance=TOL)
+            @assertEqual(1.0_SP, dout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -93,18 +93,18 @@ contains
    ! ----------------------------------------------------------------
    @test
    subroutine test_construct_x_linear()
-      real(SP) :: uin(MLOC,NLOC), din(MLOC,NLOC), dx(MLOC,NLOC)
-      real(SP) :: outl(MLOC+1,NLOC), outr(MLOC+1,NLOC)
+      real(SP) :: uin(MLOC, NLOC), din(MLOC, NLOC), dx(MLOC, NLOC)
+      real(SP) :: outl(MLOC + 1, NLOC), outr(MLOC + 1, NLOC)
       integer  :: i, j
 
-      dx  = 1.0_SP
+      dx = 1.0_SP
       din = 1.0_SP
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
-      outl = 0.0_SP;  outr = 0.0_SP
+      outl = 0.0_SP; outr = 0.0_SP
 
       call construct_x(dx, uin, din, outl, outr)
 
@@ -113,8 +113,8 @@ contains
       !   OutR(i,j) = uin(i,j)   - 0.5*1*1 = i     - 0.5
       do j = 1, NLOC
          do i = 2, MLOC
-            @assertEqual(real(i,SP) - 0.5_SP, outl(i,j), tolerance=TOL)
-            @assertEqual(real(i,SP) - 0.5_SP, outr(i,j), tolerance=TOL)
+            @assertEqual(real(i, SP) - 0.5_SP, outl(i, j), tolerance=TOL)
+            @assertEqual(real(i, SP) - 0.5_SP, outr(i, j), tolerance=TOL)
          end do
       end do
 
@@ -126,25 +126,25 @@ contains
    ! ----------------------------------------------------------------
    @test
    subroutine test_construct_y_linear()
-      real(SP) :: uin(MLOC,NLOC), din(MLOC,NLOC), dy(MLOC,NLOC)
-      real(SP) :: outl(MLOC,NLOC+1), outr(MLOC,NLOC+1)
+      real(SP) :: uin(MLOC, NLOC), din(MLOC, NLOC), dy(MLOC, NLOC)
+      real(SP) :: outl(MLOC, NLOC + 1), outr(MLOC, NLOC + 1)
       integer  :: i, j
 
-      dy  = 1.0_SP
+      dy = 1.0_SP
       din = 1.0_SP
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(j, SP)
+            uin(i, j) = real(j, SP)
          end do
       end do
-      outl = 0.0_SP;  outr = 0.0_SP
+      outl = 0.0_SP; outr = 0.0_SP
 
       call construct_y(dy, uin, din, outl, outr)
 
       do j = 2, NLOC
          do i = 1, MLOC
-            @assertEqual(real(j,SP) - 0.5_SP, outl(i,j), tolerance=TOL)
-            @assertEqual(real(j,SP) - 0.5_SP, outr(i,j), tolerance=TOL)
+            @assertEqual(real(j, SP) - 0.5_SP, outl(i, j), tolerance=TOL)
+            @assertEqual(real(j, SP) - 0.5_SP, outr(i, j), tolerance=TOL)
          end do
       end do
 
@@ -157,26 +157,26 @@ contains
    @test
    subroutine test_construct_ho_x_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC)
-      real(SP) :: outl(MLOC+1,NLOC), outr(MLOC+1,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC)
+      real(SP) :: outl(MLOC + 1, NLOC), outr(MLOC + 1, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       mask = 1
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
-      outl = 0.0_SP;  outr = 0.0_SP
+      outl = 0.0_SP; outr = 0.0_SP
 
       call construct_ho_x(lp, mask, uin, outl, outr)
 
       ! Linear field: OutL(i,j)=i-0.5, OutR(i,j)=i-0.5
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie + 1
-            @assertEqual(real(i,SP) - 0.5_SP, outl(i,j), tolerance=TOL)
-            @assertEqual(real(i,SP) - 0.5_SP, outr(i,j), tolerance=TOL)
+            @assertEqual(real(i, SP) - 0.5_SP, outl(i, j), tolerance=TOL)
+            @assertEqual(real(i, SP) - 0.5_SP, outr(i, j), tolerance=TOL)
          end do
       end do
 
@@ -189,25 +189,25 @@ contains
    @test
    subroutine test_construct_ho_y_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC)
-      real(SP) :: outl(MLOC,NLOC+1), outr(MLOC,NLOC+1)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC)
+      real(SP) :: outl(MLOC, NLOC + 1), outr(MLOC, NLOC + 1)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       mask = 1
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(j, SP)
+            uin(i, j) = real(j, SP)
          end do
       end do
-      outl = 0.0_SP;  outr = 0.0_SP
+      outl = 0.0_SP; outr = 0.0_SP
 
       call construct_ho_y(lp, mask, uin, outl, outr, lp%jb, lp%je + 1)
 
       do j = lp%jb, lp%je + 1
          do i = lp%ib, lp%ie
-            @assertEqual(real(j,SP) - 0.5_SP, outl(i,j), tolerance=TOL)
-            @assertEqual(real(j,SP) - 0.5_SP, outr(i,j), tolerance=TOL)
+            @assertEqual(real(j, SP) - 0.5_SP, outl(i, j), tolerance=TOL)
+            @assertEqual(real(j, SP) - 0.5_SP, outr(i, j), tolerance=TOL)
          end do
       end do
 
@@ -220,24 +220,24 @@ contains
    @test
    subroutine test_weno_construct_x_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC)
-      real(SP) :: outl(MLOC+1,NLOC), outr(MLOC+1,NLOC)
+      real(SP) :: uin(MLOC, NLOC)
+      real(SP) :: outl(MLOC + 1, NLOC), outr(MLOC + 1, NLOC)
       integer  :: i, j
 
       call make_lp(lp)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
-      outl = 0.0_SP;  outr = 0.0_SP
+      outl = 0.0_SP; outr = 0.0_SP
 
       call weno_construct_x(lp, uin, outl, outr)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie + 1
-            @assertEqual(real(i,SP) - 0.5_SP, outl(i,j), tolerance=TOL)
-            @assertEqual(real(i,SP) - 0.5_SP, outr(i,j), tolerance=TOL)
+            @assertEqual(real(i, SP) - 0.5_SP, outl(i, j), tolerance=TOL)
+            @assertEqual(real(i, SP) - 0.5_SP, outr(i, j), tolerance=TOL)
          end do
       end do
 
@@ -249,21 +249,21 @@ contains
    ! ----------------------------------------------------------------
    @test
    subroutine test_hll_upwind()
-      real(SP) :: sl(3,3), sr(3,3), fl(3,3), fr(3,3), ul(3,3), ur(3,3)
-      real(SP) :: f1(3,3), f2(3,3), f3(3,3)
+      real(SP) :: sl(3, 3), sr(3, 3), fl(3, 3), fr(3, 3), ul(3, 3), ur(3, 3)
+      real(SP) :: f1(3, 3), f2(3, 3), f3(3, 3)
 
-      sl = 1.0_SP;  sr = 2.0_SP
-      fl = 5.0_SP;  fr = 9.0_SP
-      ul = 0.0_SP;  ur = 0.0_SP
+      sl = 1.0_SP; sr = 2.0_SP
+      fl = 5.0_SP; fr = 9.0_SP
+      ul = 0.0_SP; ur = 0.0_SP
       f1 = -1.0_SP; f2 = -1.0_SP; f3 = -1.0_SP
 
       call hll3(sl, sr, fl, fr, ul, ur, f1, &
                 fl, fr, ul, ur, f2, &
                 fl, fr, ul, ur, f3, 1, 3, 1, 3)
 
-      @assertEqual(5.0_SP, f1(1,1), tolerance=TOL)
-      @assertEqual(5.0_SP, f2(2,2), tolerance=TOL)
-      @assertEqual(5.0_SP, f3(3,3), tolerance=TOL)
+      @assertEqual(5.0_SP, f1(1, 1), tolerance=TOL)
+      @assertEqual(5.0_SP, f2(2, 2), tolerance=TOL)
+      @assertEqual(5.0_SP, f3(3, 3), tolerance=TOL)
 
       call dummy_fix_lint()
    end subroutine test_hll_upwind
@@ -273,21 +273,21 @@ contains
    ! ----------------------------------------------------------------
    @test
    subroutine test_hll_downwind()
-      real(SP) :: sl(3,3), sr(3,3), fl(3,3), fr(3,3), ul(3,3), ur(3,3)
-      real(SP) :: f1(3,3), f2(3,3), f3(3,3)
+      real(SP) :: sl(3, 3), sr(3, 3), fl(3, 3), fr(3, 3), ul(3, 3), ur(3, 3)
+      real(SP) :: f1(3, 3), f2(3, 3), f3(3, 3)
 
-      sl = -2.0_SP;  sr = -1.0_SP
-      fl = 5.0_SP;   fr = 9.0_SP
-      ul = 0.0_SP;   ur = 0.0_SP
+      sl = -2.0_SP; sr = -1.0_SP
+      fl = 5.0_SP; fr = 9.0_SP
+      ul = 0.0_SP; ur = 0.0_SP
       f1 = -1.0_SP; f2 = -1.0_SP; f3 = -1.0_SP
 
       call hll3(sl, sr, fl, fr, ul, ur, f1, &
                 fl, fr, ul, ur, f2, &
                 fl, fr, ul, ur, f3, 1, 3, 1, 3)
 
-      @assertEqual(9.0_SP, f1(1,1), tolerance=TOL)
-      @assertEqual(9.0_SP, f2(2,2), tolerance=TOL)
-      @assertEqual(9.0_SP, f3(3,3), tolerance=TOL)
+      @assertEqual(9.0_SP, f1(1, 1), tolerance=TOL)
+      @assertEqual(9.0_SP, f2(2, 2), tolerance=TOL)
+      @assertEqual(9.0_SP, f3(3, 3), tolerance=TOL)
 
       call dummy_fix_lint()
    end subroutine test_hll_downwind
@@ -303,10 +303,10 @@ contains
 
       @assertTrue(allocated(ws%p))
       @assertTrue(allocated(ws%q))
-      @assertEqual(MLOC+1, size(ws%uxl, 1))
-      @assertEqual(NLOC,   size(ws%uxl, 2))
-      @assertEqual(MLOC,   size(ws%uyl, 1))
-      @assertEqual(NLOC+1, size(ws%uyl, 2))
+      @assertEqual(MLOC + 1, size(ws%uxl, 1))
+      @assertEqual(NLOC, size(ws%uxl, 2))
+      @assertEqual(MLOC, size(ws%uyl, 1))
+      @assertEqual(NLOC + 1, size(ws%uyl, 2))
 
       call ws%free()
 

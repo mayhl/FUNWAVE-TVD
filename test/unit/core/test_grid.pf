@@ -3,8 +3,8 @@ module test_grid
 
    use mpi_f08
    use pFUnit
-   use core_comm_mod,      only: type_comm, new_comm
-   use core_grid_mod,      only: type_grid_2d
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_grid_2d
    use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH
 
    implicit none
@@ -20,16 +20,16 @@ contains
 
    subroutine open_grid(this, grid, comm, nx_proc, ny_proc)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
-      integer,              intent(in)    :: nx_proc, ny_proc
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
+      integer, intent(in)    :: nx_proc, ny_proc
       type(MPI_Comm) :: mcomm
 
       mcomm = this%getMpiCommunicator()
       comm = new_comm(io_rank_id=0, comm_id=mcomm)
 
-      grid%M       = TEST_M
-      grid%N       = TEST_N
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = nx_proc
       grid%ny_proc = ny_proc
 
@@ -53,21 +53,21 @@ contains
 
       ! Ghost cell index ranges
       @mpiAssertEqual(grid%ibegin - N_GHOST, grid%ig_begin)
-      @mpiAssertEqual(grid%istop  + N_GHOST, grid%ig_stop)
+      @mpiAssertEqual(grid%istop + N_GHOST, grid%ig_stop)
       @mpiAssertEqual(grid%jbegin - N_GHOST, grid%jg_begin)
-      @mpiAssertEqual(grid%jstop  + N_GHOST, grid%jg_stop)
+      @mpiAssertEqual(grid%jstop + N_GHOST, grid%jg_stop)
 
       ! Rank 0 (iproc=0): left edge, back boundary
       if (grid%iproc == 0) then
-         @mpiAssertEqual(1,  grid%ibegin)
-         @mpiAssertEqual(5,  grid%istop)
+         @mpiAssertEqual(1, grid%ibegin)
+         @mpiAssertEqual(5, grid%istop)
          @assertTrue(grid%is_back_boundary)
          @assertFalse(grid%is_shore_boundary)
       end if
 
       ! Rank 1 (iproc=1): right edge, shore boundary
       if (grid%iproc == 1) then
-         @mpiAssertEqual(6,  grid%ibegin)
+         @mpiAssertEqual(6, grid%ibegin)
          @mpiAssertEqual(10, grid%istop)
          @assertFalse(grid%is_back_boundary)
          @assertTrue(grid%is_shore_boundary)
@@ -129,26 +129,26 @@ contains
       call grid%init_spacing(dx0=5.0_SP, dy0=10.0_SP, x0=0.0_SP, y0=0.0_SP)
 
       ! Spacing and reciprocals
-      @mpiAssertEqual(5.0_SP,  grid%dx(1,1),     tolerance=1e-6_SP)
-      @mpiAssertEqual(10.0_SP, grid%dy(1,1),     tolerance=1e-6_SP)
-      @mpiAssertEqual(0.2_SP,  grid%inv_dx(1,1), tolerance=1e-6_SP)
-      @mpiAssertEqual(0.1_SP,  grid%inv_dy(1,1), tolerance=1e-6_SP)
+      @mpiAssertEqual(5.0_SP, grid%dx(1, 1), tolerance=1e-6_SP)
+      @mpiAssertEqual(10.0_SP, grid%dy(1, 1), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.2_SP, grid%inv_dx(1, 1), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.1_SP, grid%inv_dy(1, 1), tolerance=1e-6_SP)
 
       ! Uniform: all elements identical
-      @mpiAssertEqual(5.0_SP,  grid%dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
-      @mpiAssertEqual(0.2_SP,  grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
+      @mpiAssertEqual(5.0_SP, grid%dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
+      @mpiAssertEqual(0.2_SP, grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
 
       ! Physical coordinates: x(1,1) = x0 + (ibegin - 1) * dx0
-      expected_x1 = real(grid%ibegin - 1, SP) * 5.0_SP
-      expected_y1 = real(grid%jbegin - 1, SP) * 10.0_SP
-      @mpiAssertEqual(expected_x1, grid%x(1,1), tolerance=1e-6_SP)
-      @mpiAssertEqual(expected_y1, grid%y(1,1), tolerance=1e-6_SP)
+      expected_x1 = real(grid%ibegin - 1, SP)*5.0_SP
+      expected_y1 = real(grid%jbegin - 1, SP)*10.0_SP
+      @mpiAssertEqual(expected_x1, grid%x(1, 1), tolerance=1e-6_SP)
+      @mpiAssertEqual(expected_y1, grid%y(1, 1), tolerance=1e-6_SP)
 
       ! Coordinate at last local point
-      expected_xlast = expected_x1 + real(grid%local_nx - 1, SP) * 5.0_SP
+      expected_xlast = expected_x1 + real(grid%local_nx - 1, SP)*5.0_SP
       @mpiAssertEqual(expected_xlast, grid%x(grid%local_nx, 1), tolerance=1e-6_SP)
 
-      @mpiAssertEqual(5.0_SP,  grid%dx0, tolerance=1e-6_SP)
+      @mpiAssertEqual(5.0_SP, grid%dx0, tolerance=1e-6_SP)
       @mpiAssertEqual(10.0_SP, grid%dy0, tolerance=1e-6_SP)
 
       call dummy_fix_lint()
@@ -162,27 +162,27 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_grid_2d) :: grid
       type(type_comm)    :: comm
-      real(SP), allocatable :: local_dx(:,:), local_dy(:,:)
+      real(SP), allocatable :: local_dx(:, :), local_dy(:, :)
       integer :: i, j
 
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
 
       ! Each rank builds a local dx array with varying values: dx(i,j) = ibegin+i-1
-      allocate(local_dx(grid%local_nx, grid%local_ny))
-      allocate(local_dy(grid%local_nx, grid%local_ny))
+      allocate (local_dx(grid%local_nx, grid%local_ny))
+      allocate (local_dy(grid%local_nx, grid%local_ny))
       do j = 1, grid%local_ny
          do i = 1, grid%local_nx
-            local_dx(i,j) = real(grid%ibegin + i - 1, SP)
-            local_dy(i,j) = real(grid%jbegin + j - 1, SP)
+            local_dx(i, j) = real(grid%ibegin + i - 1, SP)
+            local_dy(i, j) = real(grid%jbegin + j - 1, SP)
          end do
       end do
 
       call grid%init_spacing(local_dx, local_dy)
 
       ! inv_dx(i,j) = 1 / local_dx(i,j)
-      @mpiAssertEqual(1.0_SP / local_dx(1,1), grid%inv_dx(1,1), tolerance=1e-6_SP)
-      @mpiAssertEqual(1.0_SP / local_dx(grid%local_nx, grid%local_ny), grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
-      @mpiAssertEqual(1.0_SP / local_dy(1,1), grid%inv_dy(1,1), tolerance=1e-6_SP)
+      @mpiAssertEqual(1.0_SP/local_dx(1, 1), grid%inv_dx(1, 1), tolerance=1e-6_SP)
+      @mpiAssertEqual(1.0_SP/local_dx(grid%local_nx, grid%local_ny), grid%inv_dx(grid%local_nx, grid%local_ny), tolerance=1e-6_SP)
+      @mpiAssertEqual(1.0_SP/local_dy(1, 1), grid%inv_dy(1, 1), tolerance=1e-6_SP)
 
       call dummy_fix_lint()
    end subroutine test_spacing_variable
@@ -223,16 +223,16 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_grid_2d)  :: grid
       type(type_comm)     :: comm
-      real(SP), allocatable :: field(:,:)
+      real(SP), allocatable :: field(:, :)
       integer :: i, j, ng, mloc_g, nloc_g
 
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
       call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
-      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+      allocate (field(mloc_g, nloc_g), source=0.0_SP)
 
       ! Set interior cells to global x-index
       do j = 1, nloc_g
@@ -273,22 +273,22 @@ contains
       type(type_grid_2d)  :: grid
       type(type_comm)     :: comm
       type(MPI_Comm)      :: mcomm
-      real(SP), allocatable :: field(:,:)
+      real(SP), allocatable :: field(:, :)
       integer :: i, j, ng, mloc_g, nloc_g
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
-      grid%M       = TEST_M
-      grid%N       = TEST_N
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = 1
       grid%ny_proc = 2
       call grid%setup(comm, create_partition=.false.)
       call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
-      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+      allocate (field(mloc_g, nloc_g), source=0.0_SP)
 
       ! Set interior cells to global y-index
       do j = 1, grid%local_ny
@@ -325,20 +325,20 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_grid_2d)  :: grid
       type(type_comm)     :: comm
-      real(SP), allocatable :: field(:,:)
+      real(SP), allocatable :: field(:, :)
       integer :: i, j, ng, mloc_g, nloc_g
 
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
       call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
-      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+      allocate (field(mloc_g, nloc_g), source=0.0_SP)
 
       ! Interior base 1; rank 0 loads its high-x ghosts with 10+k
       ! (destined for rank 1's low interior columns)
-      field(ng+1:ng+grid%local_nx, ng+1:ng+grid%local_ny) = 1.0_SP
+      field(ng + 1:ng + grid%local_nx, ng + 1:ng + grid%local_ny) = 1.0_SP
       if (grid%iproc == 0) then
          do i = 1, ng
             do j = ng + 1, ng + grid%local_ny
@@ -378,16 +378,16 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_grid_2d)  :: grid
       type(type_comm)     :: comm
-      real(SP), allocatable :: field(:,:)
+      real(SP), allocatable :: field(:, :)
       integer :: ng, mloc_g, nloc_g
 
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=2)
       call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
-      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+      allocate (field(mloc_g, nloc_g), source=0.0_SP)
 
       if (grid%iproc == 0 .and. grid%jproc == 0) then
          field(ng + grid%local_nx + 1, ng + grid%local_ny + 1) = 7.0_SP
@@ -419,31 +419,31 @@ contains
 
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
 
-      dlon = 0.01_SP;  dlat = 0.01_SP
+      dlon = 0.01_SP; dlat = 0.01_SP
       lon0 = -70.0_SP; lat0 = 20.0_SP
       call grid%init_spacing_spherical(dlon, dlat, lon0, lat0)
 
       @assertTrue(grid%is_spherical)
 
       ! dy is constant
-      expected_dy = R_EARTH * dlat * PI / 180.0_SP
-      @mpiAssertEqual(expected_dy, grid%dy(1,1), tolerance=1.0_SP)
+      expected_dy = R_EARTH*dlat*PI/180.0_SP
+      @mpiAssertEqual(expected_dy, grid%dy(1, 1), tolerance=1.0_SP)
       @mpiAssertEqual(expected_dy, grid%dy(grid%local_nx, grid%local_ny), tolerance=1.0_SP)
 
       ! dx at row j=1 and row j=2 differ (cos(lat) varies)
-      expected_dx_j1 = R_EARTH * cos((lat0 + real(grid%jbegin - 1, SP)*dlat) * PI/180.0_SP) &
-                       * dlon * PI / 180.0_SP
-      expected_dx_j2 = R_EARTH * cos((lat0 + real(grid%jbegin, SP)*dlat) * PI/180.0_SP) &
-                       * dlon * PI / 180.0_SP
-      @mpiAssertEqual(expected_dx_j1, grid%dx(1,1), tolerance=1.0_SP)
-      @mpiAssertEqual(expected_dx_j2, grid%dx(1,2), tolerance=1.0_SP)
-      @assertFalse(abs(grid%dx(1,1) - grid%dx(1,2)) < 1e-6_SP)
+      expected_dx_j1 = R_EARTH*cos((lat0 + real(grid%jbegin - 1, SP)*dlat)*PI/180.0_SP) &
+                       *dlon*PI/180.0_SP
+      expected_dx_j2 = R_EARTH*cos((lat0 + real(grid%jbegin, SP)*dlat)*PI/180.0_SP) &
+                       *dlon*PI/180.0_SP
+      @mpiAssertEqual(expected_dx_j1, grid%dx(1, 1), tolerance=1.0_SP)
+      @mpiAssertEqual(expected_dx_j2, grid%dx(1, 2), tolerance=1.0_SP)
+      @assertFalse(abs(grid%dx(1, 1) - grid%dx(1, 2)) < 1e-6_SP)
 
       ! x(1,1) = 0 (ibegin=1, dx_ref at origin lat); y(1,1) = 0 for rank with jbegin=1
-      expected_x1 = real(grid%ibegin - 1, SP) * R_EARTH * cos(lat0*PI/180.0_SP) * dlon*PI/180.0_SP
-      expected_y1 = real(grid%jbegin - 1, SP) * expected_dy
-      @mpiAssertEqual(expected_x1, grid%x(1,1), tolerance=1.0_SP)
-      @mpiAssertEqual(expected_y1, grid%y(1,1), tolerance=1.0_SP)
+      expected_x1 = real(grid%ibegin - 1, SP)*R_EARTH*cos(lat0*PI/180.0_SP)*dlon*PI/180.0_SP
+      expected_y1 = real(grid%jbegin - 1, SP)*expected_dy
+      @mpiAssertEqual(expected_x1, grid%x(1, 1), tolerance=1.0_SP)
+      @mpiAssertEqual(expected_y1, grid%y(1, 1), tolerance=1.0_SP)
 
       call dummy_fix_lint()
    end subroutine test_spacing_spherical
@@ -466,23 +466,23 @@ contains
       class(MpiTestMethod), intent(inout) :: this
       type(type_grid_2d)    :: grid
       type(type_comm)       :: comm
-      real(SP), allocatable :: field(:,:)
+      real(SP), allocatable :: field(:, :)
       real(SP) :: expected
       integer :: i, j, k, ng, ny, mloc_g, nloc_g
 
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=2)
       call grid%init_spacing(dx0=1.0_SP, dy0=1.0_SP)
 
-      ng     = N_GHOST
-      ny     = grid%local_ny
+      ng = N_GHOST
+      ny = grid%local_ny
       mloc_g = grid%local_nx + 2*ng
       nloc_g = ny + 2*ng
-      allocate(field(mloc_g, nloc_g), source=0.0_SP)
+      allocate (field(mloc_g, nloc_g), source=0.0_SP)
 
       do j = 1, ny
          do i = 1, grid%local_nx
-            field(ng + i, ng + j) = 100.0_SP * real(grid%ibegin + i - 1, SP) &
-                                  +             real(grid%jbegin + j - 1, SP)
+            field(ng + i, ng + j) = 100.0_SP*real(grid%ibegin + i - 1, SP) &
+                                    + real(grid%jbegin + j - 1, SP)
          end do
       end do
 
@@ -492,7 +492,7 @@ contains
       if (grid%iproc == 0 .and. grid%jproc == 0) then
          do k = 1, ng
             do j = 1, ng
-               expected = 100.0_SP * real(grid%istop + k, SP) + real(grid%jstop + j, SP)
+               expected = 100.0_SP*real(grid%istop + k, SP) + real(grid%jstop + j, SP)
                @assertEqual(expected, field(ng + grid%local_nx + k, ny + ng + j), tolerance=1e-5_SP)
             end do
          end do
@@ -503,7 +503,7 @@ contains
       if (grid%iproc == 1 .and. grid%jproc == 1) then
          do k = 1, ng
             do j = 1, ng
-               expected = 100.0_SP * real(grid%ibegin - k, SP) + real(grid%jbegin - j, SP)
+               expected = 100.0_SP*real(grid%ibegin - k, SP) + real(grid%jbegin - j, SP)
                @assertEqual(expected, field(ng - k + 1, ng - j + 1), tolerance=1e-5_SP)
             end do
          end do
@@ -513,7 +513,7 @@ contains
       if (grid%iproc == 1 .and. grid%jproc == 0) then
          do k = 1, ng
             do j = 1, ng
-               expected = 100.0_SP * real(grid%ibegin - k, SP) + real(grid%jstop + j, SP)
+               expected = 100.0_SP*real(grid%ibegin - k, SP) + real(grid%jstop + j, SP)
                @assertEqual(expected, field(ng - k + 1, ny + ng + j), tolerance=1e-5_SP)
             end do
          end do
@@ -523,7 +523,7 @@ contains
       if (grid%iproc == 0 .and. grid%jproc == 1) then
          do k = 1, ng
             do j = 1, ng
-               expected = 100.0_SP * real(grid%istop + k, SP) + real(grid%jbegin - j, SP)
+               expected = 100.0_SP*real(grid%istop + k, SP) + real(grid%jbegin - j, SP)
                @assertEqual(expected, field(ng + grid%local_nx + k, ng - j + 1), tolerance=1e-5_SP)
             end do
          end do
@@ -546,17 +546,17 @@ contains
       ng = N_GHOST
 
       ! Interior bounds in ghost-inclusive indexing
-      @mpiAssertEqual(ng + 1,               grid%lp%ib)
-      @mpiAssertEqual(ng + grid%local_nx,   grid%lp%ie)
-      @mpiAssertEqual(ng + 1,               grid%lp%jb)
-      @mpiAssertEqual(ng + grid%local_ny,   grid%lp%je)
+      @mpiAssertEqual(ng + 1, grid%lp%ib)
+      @mpiAssertEqual(ng + grid%local_nx, grid%lp%ie)
+      @mpiAssertEqual(ng + 1, grid%lp%jb)
+      @mpiAssertEqual(ng + grid%local_ny, grid%lp%je)
       ! Ghost-inclusive array dims
       @mpiAssertEqual(grid%local_nx + 2*ng, grid%lp%mloc)
       @mpiAssertEqual(grid%local_ny + 2*ng, grid%lp%nloc)
       ! 2D sentinel
-      @mpiAssertEqual(0,  grid%lp%kb)
+      @mpiAssertEqual(0, grid%lp%kb)
       @mpiAssertEqual(-1, grid%lp%ke)
-      @mpiAssertEqual(0,  grid%lp%kloc)
+      @mpiAssertEqual(0, grid%lp%kloc)
       ! Default tile sizes
       @mpiAssertEqual(32, grid%lp%ti)
       @mpiAssertEqual(32, grid%lp%tj)

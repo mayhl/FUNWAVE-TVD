@@ -3,12 +3,12 @@ module test_wavemaker
 
    use mpi_f08
    use pFUnit
-   use core_comm_mod,       only: type_comm, new_comm
-   use core_constants_mod,  only: SP
-   use core_env_mod,        only: type_env, new_env
-   use core_log_io_mod,     only: new_log_writer
-   use core_grid_mod,       only: type_grid_2d
-   use model_initial_mod,   only: type_model_initial
+   use core_comm_mod, only: type_comm, new_comm
+   use core_constants_mod, only: SP
+   use core_env_mod, only: type_env, new_env
+   use core_log_io_mod, only: new_log_writer
+   use core_grid_mod, only: type_grid_2d
+   use model_initial_mod, only: type_model_initial
    use model_breaking_mod, only: type_model_breaking
    use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers
 
@@ -19,10 +19,10 @@ module test_wavemaker
    integer, parameter :: TEST_N = 4
 
    ! Module-level SP literals (gfortran 15 kind-suffix quirk, see test_sponge)
-   real(SP), parameter :: DX_SP   = 1.0_SP
-   real(SP), parameter :: DEP_SP  = 10.0_SP
-   real(SP), parameter :: XWM_SP  = 20.0_SP
-   real(SP), parameter :: TOL_SP  = 1.0e-6_SP
+   real(SP), parameter :: DX_SP = 1.0_SP
+   real(SP), parameter :: DEP_SP = 10.0_SP
+   real(SP), parameter :: XWM_SP = 20.0_SP
+   real(SP), parameter :: TOL_SP = 1.0e-6_SP
 
 contains
 
@@ -45,8 +45,8 @@ contains
    ! the 3-direction and pre-compacted 2-direction variants.
    subroutine write_data2d_file(fname, ndir, dirs, amps, phases)
       character(*), intent(in) :: fname
-      integer,      intent(in) :: ndir
-      real(SP),     intent(in) :: dirs(ndir), amps(2, ndir), phases(2, ndir)
+      integer, intent(in) :: ndir
+      real(SP), intent(in) :: dirs(ndir), amps(2, ndir), phases(2, ndir)
       integer :: unit, i
       open (newunit=unit, file=fname, status='replace', action='write')
       write (unit, '(I0,1X,I0)') 2, ndir
@@ -73,13 +73,13 @@ contains
       type(type_comm)    :: comm
       type(type_env)     :: env
       call open_env(this, env, comm)
-      grid%M = TEST_M;  grid%N = TEST_N
-      grid%nx_proc = 1;  grid%ny_proc = 1
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 1; grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
       call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
       wm%wavemaker_type = 'WK_DATA2D'
       wm%WaveCompFile = fname
-      wm%Xc_WK  = XWM_SP
+      wm%Xc_WK = XWM_SP
       wm%DEP_WK = DEP_SP
       call wm%init_compute(grid, .false., env, -0.531_SP)
    end subroutine init_data2d
@@ -157,21 +157,21 @@ contains
       type(type_comm)    :: comm
       type(type_env)     :: env
       call open_env(this, env, comm)
-      grid%M = TEST_M;  grid%N = TEST_N
-      grid%nx_proc = 1;  grid%ny_proc = 1
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 1; grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
       call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
       wm%wavemaker_type = wtype
-      wm%single_dir  = flag
-      wm%Xc_WK       = XWM_SP
-      wm%DEP_WK      = DEP_SP
-      wm%FreqPeak    = 0.1_SP
-      wm%FreqMin     = 0.05_SP
-      wm%FreqMax     = 0.2_SP
-      wm%Hmo         = 0.1_SP
-      wm%Nfreq       = 12
-      wm%ThetaPeak   = 10.0_SP
-      wm%Ntheta      = 5
+      wm%single_dir = flag
+      wm%Xc_WK = XWM_SP
+      wm%DEP_WK = DEP_SP
+      wm%FreqPeak = 0.1_SP
+      wm%FreqMin = 0.05_SP
+      wm%FreqMax = 0.2_SP
+      wm%Hmo = 0.1_SP
+      wm%Nfreq = 12
+      wm%ThetaPeak = 10.0_SP
+      wm%Ntheta = 5
       wm%Sigma_Theta = 25.0_SP
       call wm%init_compute(grid, .false., env, -0.531_SP)
    end subroutine init_single_dir

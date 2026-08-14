@@ -2,9 +2,9 @@
 module test_solver_tridiag
 
    use pFUnit
-   use core_constants_mod,      only: SP, N_GHOST
-   use core_comm_mod,           only: type_comm, new_comm
-   use core_grid_mod,           only: type_loop_bounds, type_grid_2d
+   use core_constants_mod, only: SP, N_GHOST
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_loop_bounds, type_grid_2d
    use core_solver_tridiag_mod, only: trid_thomas_1d, trid_x, trid_y, &
                                       trid_x_periodic, trid_y_periodic, &
                                       trid_y_alltoall, type_trid_workspace
@@ -12,12 +12,12 @@ module test_solver_tridiag
 
    implicit none
 
-   integer, parameter :: NG   = 3
-   integer, parameter :: LNX  = 8
-   integer, parameter :: LNY  = 8
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 8
+   integer, parameter :: LNY = 8
    integer, parameter :: MLOC = LNX + 2*NG
    integer, parameter :: NLOC = LNY + 2*NG
-   real(SP), parameter :: TOL  = 1.0e-4_SP
+   real(SP), parameter :: TOL = 1.0e-4_SP
 
 contains
 
@@ -26,9 +26,9 @@ contains
 
    subroutine make_lp(lp)
       type(type_loop_bounds), intent(out) :: lp
-      lp%ib = NG + 1;  lp%ie = NG + LNX
-      lp%jb = NG + 1;  lp%je = NG + LNY
-      lp%mloc = MLOC;  lp%nloc = NLOC
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
    ! Make a single-rank (serial) grid stub — all neighbor ranks are MPI_PROC_NULL.
@@ -36,17 +36,17 @@ contains
       type(type_grid_2d), intent(out) :: grid
       integer :: dims(2), ierr
       logical :: periods(2)
-      grid%nx_proc = 1;  grid%ny_proc = 1
-      grid%iproc   = 0;  grid%jproc   = 0
-      grid%back_rank  = MPI_PROC_NULL
+      grid%nx_proc = 1; grid%ny_proc = 1
+      grid%iproc = 0; grid%jproc = 0
+      grid%back_rank = MPI_PROC_NULL
       grid%shore_rank = MPI_PROC_NULL
       grid%right_rank = MPI_PROC_NULL
-      grid%left_rank  = MPI_PROC_NULL
-      grid%is_back_boundary  = .true.
+      grid%left_rank = MPI_PROC_NULL
+      grid%is_back_boundary = .true.
       grid%is_shore_boundary = .true.
       grid%is_right_boundary = .true.
-      grid%is_left_boundary  = .true.
-      dims    = [1, 1]
+      grid%is_left_boundary = .true.
+      dims = [1, 1]
       periods = [.false., .false.]
       call MPI_Cart_create(MPI_COMM_SELF, 2, dims, periods, .false., grid%cart_comm, ierr)
    end subroutine make_serial_grid
@@ -75,10 +75,10 @@ contains
       a(1) = 0.0_SP   ! no lower coupling at first row
       c(N) = 0.0_SP   ! no upper coupling at last row
       d(1) = x_exact(1) - 0.5_SP*x_exact(2)
-      do i = 2, N-1
-         d(i) = -0.5_SP*x_exact(i-1) + x_exact(i) - 0.5_SP*x_exact(i+1)
+      do i = 2, N - 1
+         d(i) = -0.5_SP*x_exact(i - 1) + x_exact(i) - 0.5_SP*x_exact(i + 1)
       end do
-      d(N) = -0.5_SP*x_exact(N-1) + x_exact(N)
+      d(N) = -0.5_SP*x_exact(N - 1) + x_exact(N)
 
       call trid_thomas_1d(N, a, c, d, z)
 
@@ -129,24 +129,24 @@ contains
          x_exact(i) = real(i, SP)
       end do
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
 
       do j = lp%jb, lp%je
          ! First row: no lower coupling
-         a(lp%ib, j)   = 0.0_SP
-         c(lp%ib, j)   = -0.5_SP
-         d(lp%ib, j)   = x_exact(1) - 0.5_SP*x_exact(2)
+         a(lp%ib, j) = 0.0_SP
+         c(lp%ib, j) = -0.5_SP
+         d(lp%ib, j) = x_exact(1) - 0.5_SP*x_exact(2)
          ! Interior rows
          do i = lp%ib + 1, lp%ie - 1
             a(i, j) = -0.5_SP
             c(i, j) = -0.5_SP
             d(i, j) = -0.5_SP*x_exact(i - lp%ib) + x_exact(i - lp%ib + 1) &
-                     - 0.5_SP*x_exact(i - lp%ib + 2)
+                      - 0.5_SP*x_exact(i - lp%ib + 2)
          end do
          ! Last row: no upper coupling
          a(lp%ie, j) = -0.5_SP
-         c(lp%ie, j) =  0.0_SP
-         d(lp%ie, j) = -0.5_SP*x_exact(n-1) + x_exact(n)
+         c(lp%ie, j) = 0.0_SP
+         d(lp%ie, j) = -0.5_SP*x_exact(n - 1) + x_exact(n)
       end do
 
       call trid_x(lp, grid, a, c, d, f)
@@ -180,7 +180,7 @@ contains
          x_exact(j) = real(j, SP)
       end do
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
 
       do i = lp%ib, lp%ie
          a(i, lp%jb) = 0.0_SP
@@ -190,11 +190,11 @@ contains
             a(i, j) = -0.5_SP
             c(i, j) = -0.5_SP
             d(i, j) = -0.5_SP*x_exact(j - lp%jb) + x_exact(j - lp%jb + 1) &
-                     - 0.5_SP*x_exact(j - lp%jb + 2)
+                      - 0.5_SP*x_exact(j - lp%jb + 2)
          end do
          a(i, lp%je) = -0.5_SP
-         c(i, lp%je) =  0.0_SP
-         d(i, lp%je) = -0.5_SP*x_exact(n-1) + x_exact(n)
+         c(i, lp%je) = 0.0_SP
+         d(i, lp%je) = -0.5_SP*x_exact(n - 1) + x_exact(n)
       end do
 
       call trid_y(lp, grid, a, c, d, f)
@@ -226,13 +226,13 @@ contains
       call make_serial_grid(grid)
       call tws%alloc(MLOC, NLOC)
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             a(i, j) = -0.25_SP   ! lower (includes periodic corner at ib)
             c(i, j) = -0.25_SP   ! upper (includes periodic corner at ie)
-            d(i, j) =  0.5_SP    ! RHS for constant solution 1.0
+            d(i, j) = 0.5_SP    ! RHS for constant solution 1.0
          end do
       end do
 
@@ -263,13 +263,13 @@ contains
       call make_serial_grid(grid)
       call tws%alloc(MLOC, NLOC)
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             a(i, j) = -0.25_SP
             c(i, j) = -0.25_SP
-            d(i, j) =  0.5_SP
+            d(i, j) = 0.5_SP
          end do
       end do
 
@@ -294,8 +294,8 @@ contains
    ! ================================================================
 
    subroutine make_dist_grid(this, grid, lp)
-      class(MpiTestMethod),   intent(inout) :: this
-      type(type_grid_2d),     intent(inout) :: grid
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_grid_2d), intent(inout) :: grid
       type(type_loop_bounds), intent(out)   :: lp
       type(type_comm) :: comm
       type(MPI_Comm)  :: mcomm
@@ -303,14 +303,14 @@ contains
       mcomm = this%getMpiCommunicator()
       comm = new_comm(io_rank_id=0, comm_id=mcomm)
 
-      grid%M       = 2*LNX
-      grid%N       = 2*LNY
+      grid%M = 2*LNX
+      grid%N = 2*LNY
       grid%nx_proc = 2
       grid%ny_proc = 2
       call grid%setup(comm, create_partition=.false.)
 
-      lp%ib = N_GHOST + 1;  lp%ie = N_GHOST + grid%local_nx
-      lp%jb = N_GHOST + 1;  lp%je = N_GHOST + grid%local_ny
+      lp%ib = N_GHOST + 1; lp%ie = N_GHOST + grid%local_nx
+      lp%jb = N_GHOST + 1; lp%je = N_GHOST + grid%local_ny
       lp%mloc = grid%local_nx + 2*N_GHOST
       lp%nloc = grid%local_ny + 2*N_GHOST
    end subroutine make_dist_grid
@@ -334,18 +334,18 @@ contains
          x_exact(ig) = real(ig, SP)
       end do
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             ig = grid%ibegin + (i - lp%ib)
-            a(i,j) = merge(0.0_SP, -0.5_SP, ig == 1)
-            c(i,j) = merge(0.0_SP, -0.5_SP, ig == ng)
+            a(i, j) = merge(0.0_SP, -0.5_SP, ig == 1)
+            c(i, j) = merge(0.0_SP, -0.5_SP, ig == ng)
             if (ig == 1) then
-               d(i,j) = x_exact(1) - 0.5_SP*x_exact(2)
+               d(i, j) = x_exact(1) - 0.5_SP*x_exact(2)
             else if (ig == ng) then
-               d(i,j) = -0.5_SP*x_exact(ng-1) + x_exact(ng)
+               d(i, j) = -0.5_SP*x_exact(ng - 1) + x_exact(ng)
             else
-               d(i,j) = -0.5_SP*x_exact(ig-1) + x_exact(ig) - 0.5_SP*x_exact(ig+1)
+               d(i, j) = -0.5_SP*x_exact(ig - 1) + x_exact(ig) - 0.5_SP*x_exact(ig + 1)
             end if
          end do
       end do
@@ -355,7 +355,7 @@ contains
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
             ig = grid%ibegin + (i - lp%ib)
-            @mpiAssertEqual(x_exact(ig), f(i,j), TOL)
+            @mpiAssertEqual(x_exact(ig), f(i, j), TOL)
          end do
       end do
    end subroutine test_trid_x_distributed
@@ -378,18 +378,18 @@ contains
          x_exact(jg) = real(jg, SP)
       end do
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
       do j = lp%jb, lp%je
          jg = grid%jbegin + (j - lp%jb)
          do i = lp%ib, lp%ie
-            a(i,j) = merge(0.0_SP, -0.5_SP, jg == 1)
-            c(i,j) = merge(0.0_SP, -0.5_SP, jg == ng)
+            a(i, j) = merge(0.0_SP, -0.5_SP, jg == 1)
+            c(i, j) = merge(0.0_SP, -0.5_SP, jg == ng)
             if (jg == 1) then
-               d(i,j) = x_exact(1) - 0.5_SP*x_exact(2)
+               d(i, j) = x_exact(1) - 0.5_SP*x_exact(2)
             else if (jg == ng) then
-               d(i,j) = -0.5_SP*x_exact(ng-1) + x_exact(ng)
+               d(i, j) = -0.5_SP*x_exact(ng - 1) + x_exact(ng)
             else
-               d(i,j) = -0.5_SP*x_exact(jg-1) + x_exact(jg) - 0.5_SP*x_exact(jg+1)
+               d(i, j) = -0.5_SP*x_exact(jg - 1) + x_exact(jg) - 0.5_SP*x_exact(jg + 1)
             end if
          end do
       end do
@@ -399,7 +399,7 @@ contains
       do j = lp%jb, lp%je
          jg = grid%jbegin + (j - lp%jb)
          do i = lp%ib, lp%ie
-            @mpiAssertEqual(x_exact(jg), f(i,j), TOL)
+            @mpiAssertEqual(x_exact(jg), f(i, j), TOL)
          end do
       end do
    end subroutine test_trid_y_distributed
@@ -472,12 +472,12 @@ contains
       call make_dist_grid(this, grid, lp)
       call tws%alloc(lp%mloc, lp%nloc)
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            a(i,j) = -0.25_SP
-            c(i,j) = -0.25_SP
-            d(i,j) =  0.5_SP
+            a(i, j) = -0.25_SP
+            c(i, j) = -0.25_SP
+            d(i, j) = 0.5_SP
          end do
       end do
 
@@ -485,7 +485,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @mpiAssertEqual(1.0_SP, f(i,j), TOL)
+            @mpiAssertEqual(1.0_SP, f(i, j), TOL)
          end do
       end do
 
@@ -507,12 +507,12 @@ contains
       call make_dist_grid(this, grid, lp)
       call tws%alloc(lp%mloc, lp%nloc)
 
-      a = 0.0_SP;  c = 0.0_SP;  d = 0.0_SP
+      a = 0.0_SP; c = 0.0_SP; d = 0.0_SP
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            a(i,j) = -0.25_SP
-            c(i,j) = -0.25_SP
-            d(i,j) =  0.5_SP
+            a(i, j) = -0.25_SP
+            c(i, j) = -0.25_SP
+            d(i, j) = 0.5_SP
          end do
       end do
 
@@ -520,7 +520,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @mpiAssertEqual(1.0_SP, f(i,j), TOL)
+            @mpiAssertEqual(1.0_SP, f(i, j), TOL)
          end do
       end do
 

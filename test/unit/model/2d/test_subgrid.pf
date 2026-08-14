@@ -2,18 +2,18 @@
 module test_subgrid
 
    use pFUnit
-   use core_constants_mod,    only: SP, LARGE
-   use core_grid_mod,         only: type_loop_bounds
-   use model_subgrid_mod,     only: type_model_subgrid
+   use core_constants_mod, only: SP, LARGE
+   use core_grid_mod, only: type_loop_bounds
+   use model_subgrid_mod, only: type_model_subgrid
    use model_kernel_etauv_mod, only: cal_rk_update
 
    implicit none
 
-   integer, parameter :: NG    = 3
-   integer, parameter :: LNX   = 4
-   integer, parameter :: LNY   = 4
-   integer, parameter :: MLOC  = LNX + 2*NG   ! 10
-   integer, parameter :: NLOC  = LNY + 2*NG   ! 10
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 4
+   integer, parameter :: LNY = 4
+   integer, parameter :: MLOC = LNX + 2*NG   ! 10
+   integer, parameter :: NLOC = LNY + 2*NG   ! 10
    integer, parameter :: RATIO = 2
 
    real(SP), parameter :: TOL = 1.0e-12_SP

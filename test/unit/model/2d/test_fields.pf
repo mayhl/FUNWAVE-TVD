@@ -3,11 +3,11 @@ module test_fields
 
    use mpi_f08
    use pFUnit
-   use core_comm_mod,         only: type_comm, new_comm
-   use core_grid_mod,         only: type_grid_2d
-   use model_fields_2d_mod,   only: type_fields_2d
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_grid_2d
+   use model_fields_2d_mod, only: type_fields_2d
    use core_field_registry_mod, only: type_field_registry
-   use core_constants_mod,    only: SP, N_GHOST
+   use core_constants_mod, only: SP, N_GHOST
 
    implicit none
 
@@ -21,14 +21,14 @@ contains
 
    subroutine open_grid(this, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
       type(MPI_Comm) :: mcomm
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
-      grid%M       = TEST_M
-      grid%N       = TEST_N
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = 2
       grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
@@ -50,16 +50,16 @@ contains
       call open_grid(this, grid, comm)
       call f%alloc(grid)
 
-      ng         = N_GHOST
+      ng = N_GHOST
       expected_m = grid%local_nx + 2*ng
       expected_n = grid%local_ny + 2*ng
 
-      @mpiAssertEqual(expected_m, size(f%eta,   1))
-      @mpiAssertEqual(expected_n, size(f%eta,   2))
-      @mpiAssertEqual(expected_m, size(f%p,     1))
+      @mpiAssertEqual(expected_m, size(f%eta, 1))
+      @mpiAssertEqual(expected_n, size(f%eta, 2))
+      @mpiAssertEqual(expected_m, size(f%p, 1))
       @mpiAssertEqual(expected_m, size(f%depth, 1))
-      @mpiAssertEqual(expected_m, size(f%mask,  1))
-      @mpiAssertEqual(expected_m, size(f%eta0,  1))
+      @mpiAssertEqual(expected_m, size(f%mask, 1))
+      @mpiAssertEqual(expected_m, size(f%eta0, 1))
       @mpiAssertEqual(expected_m, size(f%h_max, 1))
 
       call dummy_fix_lint()
@@ -78,10 +78,10 @@ contains
       call open_grid(this, grid, comm)
       call f%alloc(grid)
 
-      @mpiAssertEqual(0.0_SP, f%eta  (1,1), tolerance=1e-10_SP)
-      @mpiAssertEqual(0.0_SP, f%p    (1,1), tolerance=1e-10_SP)
-      @mpiAssertEqual(0.0_SP, f%depth(1,1), tolerance=1e-10_SP)
-      @mpiAssertEqual(0,      f%mask (1,1))
+      @mpiAssertEqual(0.0_SP, f%eta(1, 1), tolerance=1e-10_SP)
+      @mpiAssertEqual(0.0_SP, f%p(1, 1), tolerance=1e-10_SP)
+      @mpiAssertEqual(0.0_SP, f%depth(1, 1), tolerance=1e-10_SP)
+      @mpiAssertEqual(0, f%mask(1, 1))
 
       call dummy_fix_lint()
    end subroutine test_alloc_zero
@@ -141,7 +141,7 @@ contains
       type(type_comm)              :: comm
       type(type_fields_2d), target :: f
       type(type_field_registry)    :: reg
-      real(SP), pointer :: ptr(:,:)
+      real(SP), pointer :: ptr(:, :)
 
       call open_grid(this, grid, comm)
       call f%alloc(grid)
@@ -156,8 +156,8 @@ contains
 
       f%eta = 3.5_SP
       ptr => reg%get('eta')
-      @mpiAssertEqual(3.5_SP, ptr(N_GHOST+1, N_GHOST+1), 1.0e-12_SP)
-      @mpiAssertEqual(size(f%eta,1), size(ptr,1))
+      @mpiAssertEqual(3.5_SP, ptr(N_GHOST + 1, N_GHOST + 1), 1.0e-12_SP)
+      @mpiAssertEqual(size(f%eta, 1), size(ptr, 1))
 
       call f%alloc_breaking(grid)
       call f%register(reg)

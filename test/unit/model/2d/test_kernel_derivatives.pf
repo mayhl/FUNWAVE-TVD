@@ -2,8 +2,8 @@
 module test_kernel_derivatives
 
    use pFUnit
-   use core_constants_mod,           only: SP
-   use core_grid_mod,                only: type_loop_bounds
+   use core_constants_mod, only: SP
+   use core_grid_mod, only: type_loop_bounds
    use model_kernel_derivatives_mod, only: deriv_x, deriv_y, &
                                            deriv_xx, deriv_yy, deriv_xy, &
                                            deriv_x_high, deriv_y_high, &
@@ -13,9 +13,9 @@ module test_kernel_derivatives
    implicit none
 
    ! Grid: 6 interior cells, 3 ghost cells each side → mloc=12, ib=4, ie=9
-   integer, parameter :: NG   = 3
-   integer, parameter :: LNX  = 6
-   integer, parameter :: LNY  = 6
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 6
+   integer, parameter :: LNY = 6
    integer, parameter :: MLOC = LNX + 2*NG   ! 12
    integer, parameter :: NLOC = LNY + 2*NG   ! 12
 
@@ -28,16 +28,16 @@ contains
 
    subroutine make_lp(lp)
       type(type_loop_bounds), intent(out) :: lp
-      lp%ib = NG + 1;  lp%ie = NG + LNX
-      lp%jb = NG + 1;  lp%je = NG + LNY
-      lp%mloc = MLOC;  lp%nloc = NLOC
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
    ! Initialise arrays to uniform spacing and fully wet mask.
    subroutine init_arrays(inv_dx, inv_dy, mask)
       real(SP), intent(out) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
-      integer,  intent(out) :: mask(MLOC, NLOC)
-      inv_dx = 1.0_SP;  inv_dy = 1.0_SP;  mask = 1
+      integer, intent(out) :: mask(MLOC, NLOC)
+      inv_dx = 1.0_SP; inv_dy = 1.0_SP; mask = 1
    end subroutine init_arrays
 
    ! ----------------------------------------------------------------
@@ -46,15 +46,15 @@ contains
    @test
    subroutine test_deriv_x_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
       uout = 0.0_SP
@@ -63,7 +63,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(1.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(1.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -76,15 +76,15 @@ contains
    @test
    subroutine test_deriv_y_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(j, SP)
+            uin(i, j) = real(j, SP)
          end do
       end do
       uout = 0.0_SP
@@ -93,7 +93,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(1.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(1.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -106,15 +106,15 @@ contains
    @test
    subroutine test_deriv_xx_quadratic()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)**2
+            uin(i, j) = real(i, SP)**2
          end do
       end do
       uout = 0.0_SP
@@ -123,7 +123,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(2.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(2.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -136,15 +136,15 @@ contains
    @test
    subroutine test_deriv_yy_quadratic()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(j, SP)**2
+            uin(i, j) = real(j, SP)**2
          end do
       end do
       uout = 0.0_SP
@@ -153,7 +153,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(2.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(2.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -166,15 +166,15 @@ contains
    @test
    subroutine test_deriv_xy_bilinear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP) * real(j, SP)
+            uin(i, j) = real(i, SP)*real(j, SP)
          end do
       end do
       uout = 0.0_SP
@@ -183,7 +183,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(1.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(1.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -196,15 +196,15 @@ contains
    @test
    subroutine test_mask_zeros_output()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
       mask(lp%ib, lp%jb) = 0
@@ -213,7 +213,7 @@ contains
       call deriv_x(lp, inv_dx, mask, uin, uout)
 
       @assertEqual(0.0_SP, uout(lp%ib, lp%jb), tolerance=TOL)
-      @assertEqual(1.0_SP, uout(lp%ib+1, lp%jb), tolerance=TOL)
+      @assertEqual(1.0_SP, uout(lp%ib + 1, lp%jb), tolerance=TOL)
 
       call dummy_fix_lint()
    end subroutine test_mask_zeros_output
@@ -224,15 +224,15 @@ contains
    @test
    subroutine test_deriv_x_high_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(i, SP)
+            uin(i, j) = real(i, SP)
          end do
       end do
       uout = 0.0_SP
@@ -241,7 +241,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(1.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(1.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 
@@ -256,15 +256,15 @@ contains
    @test
    subroutine test_deriv_yy_high_quadratic()
       type(type_loop_bounds) :: lp
-      real(SP) :: uin(MLOC,NLOC), uout(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC), i, j
+      real(SP) :: uin(MLOC, NLOC), uout(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC), i, j
 
       call make_lp(lp)
       call init_arrays(inv_dx, inv_dy, mask)
       do j = 1, NLOC
          do i = 1, MLOC
-            uin(i,j) = real(j, SP)**2
+            uin(i, j) = real(j, SP)**2
          end do
       end do
       uout = 0.0_SP
@@ -273,7 +273,7 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(2.0_SP, uout(i,j), tolerance=TOL)
+            @assertEqual(2.0_SP, uout(i, j), tolerance=TOL)
          end do
       end do
 

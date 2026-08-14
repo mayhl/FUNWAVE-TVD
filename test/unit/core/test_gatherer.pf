@@ -2,10 +2,10 @@
 module test_gatherer
    use mpi_f08
    use pFUnit
-   use core_constants_mod,        only: SP
-   use core_comm_mod,             only: type_comm, new_comm
-   use core_grid_mod,             only: type_grid_2d
-   use core_output_gatherer_mod,  only: type_output_gatherer
+   use core_constants_mod, only: SP
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_grid_2d
+   use core_output_gatherer_mod, only: type_output_gatherer
    implicit none
 
 contains
@@ -21,12 +21,12 @@ contains
    ! 6x4 global grid split 2x1 in x: rank 0 owns i=1..3, rank 1 owns i=4..6.
    subroutine open_grid(this, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
 
       call open_comm(this, comm)
-      grid%M       = 6
-      grid%N       = 4
+      grid%M = 6
+      grid%N = 4
       grid%nx_proc = 2
       grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
@@ -70,12 +70,12 @@ contains
       call open_comm(this, comm)
 
       if (comm%is_io_node()) then
-         allocate(local_vals(3));  local_vals = [1.0_SP, 2.0_SP, 3.0_SP]
-         allocate(global_out(5))
+         allocate (local_vals(3)); local_vals = [1.0_SP, 2.0_SP, 3.0_SP]
+         allocate (global_out(5))
          call g%init_points(5, 3, comm)
       else
-         allocate(local_vals(2));  local_vals = [4.0_SP, 5.0_SP]
-         allocate(global_out(1))   ! dummy on non-IO rank
+         allocate (local_vals(2)); local_vals = [4.0_SP, 5.0_SP]
+         allocate (global_out(1))   ! dummy on non-IO rank
          call g%init_points(5, 2, comm)
       end if
 
@@ -123,7 +123,7 @@ contains
       type(type_comm) :: comm
       type(type_grid_2d) :: grid
       type(type_output_gatherer) :: g
-      real(SP), allocatable :: local_vals(:,:), glob(:,:)
+      real(SP), allocatable :: local_vals(:, :), glob(:, :)
       integer :: i, j, ig, jg
 
       call open_grid(this, grid, comm)
@@ -133,7 +133,7 @@ contains
       @assertEqual(4, g%N)
       @assertEqual(grid%local_nx*grid%local_ny, g%n_local)
 
-      allocate(local_vals(grid%local_nx, grid%local_ny))
+      allocate (local_vals(grid%local_nx, grid%local_ny))
       do j = 1, grid%local_ny
          do i = 1, grid%local_nx
             ig = grid%ibegin + i - 1
@@ -143,16 +143,16 @@ contains
       end do
 
       if (comm%is_io_node()) then
-         allocate(glob(g%M, g%N), source=0.0_SP)
+         allocate (glob(g%M, g%N), source=0.0_SP)
       else
-         allocate(glob(1, 1))
+         allocate (glob(1, 1))
       end if
       call g%gather_field(local_vals, glob, comm)
 
       if (comm%is_io_node()) then
          do jg = 1, g%N
             do ig = 1, g%M
-               @assertEqual(real(ig,SP) + 100.0_SP*real(jg,SP), glob(ig,jg), tolerance=1e-6_SP)
+               @assertEqual(real(ig, SP) + 100.0_SP*real(jg, SP), glob(ig, jg), tolerance=1e-6_SP)
             end do
          end do
       end if

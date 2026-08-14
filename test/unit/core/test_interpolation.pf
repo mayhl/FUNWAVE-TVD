@@ -3,16 +3,16 @@ module test_interpolation
 
    use mpi_f08
    use pFUnit
-   use core_comm_mod,          only: type_comm, new_comm
-   use core_grid_mod,          only: type_grid_2d
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_grid_2d
    use core_interpolation_mod, only: type_interpolator
-   use core_constants_mod,     only: SP, N_GHOST, PI, R_EARTH
+   use core_constants_mod, only: SP, N_GHOST, PI, R_EARTH
 
    implicit none
 
    ! M=10 splits evenly across 2 ranks (5 cols each); N=4
-   integer,  parameter :: TEST_M  = 10
-   integer,  parameter :: TEST_N  = 4
+   integer, parameter :: TEST_M = 10
+   integer, parameter :: TEST_N = 4
    real(SP), parameter :: TEST_DX = 5.0_SP
    real(SP), parameter :: TEST_DY = 10.0_SP
 
@@ -33,15 +33,15 @@ contains
 
    subroutine open_grid(this, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
       type(MPI_Comm) :: mcomm
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
 
-      grid%M       = TEST_M
-      grid%N       = TEST_N
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = 2
       grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
@@ -89,8 +89,8 @@ contains
 
       call open_grid(this, grid, comm)
 
-      xq = [7.5_SP,   32.5_SP, 999.0_SP]
-      yq = [15.0_SP, 15.0_SP,  999.0_SP]
+      xq = [7.5_SP, 32.5_SP, 999.0_SP]
+      yq = [15.0_SP, 15.0_SP, 999.0_SP]
       call interp%init(xq, yq, grid)
 
       expected_src = 2 + N_GHOST
@@ -99,7 +99,7 @@ contains
       @mpiAssertEqual(expected_src, interp%src_i(1))
       @mpiAssertEqual(expected_src, interp%src_j(1))
       @mpiAssertEqual(0.5_SP, interp%alpha(1), tolerance=1e-6_SP)
-      @mpiAssertEqual(0.5_SP, interp%beta(1),  tolerance=1e-6_SP)
+      @mpiAssertEqual(0.5_SP, interp%beta(1), tolerance=1e-6_SP)
 
       ! point_id: rank 0 → global point 1, rank 1 → global point 2
       @mpiAssertEqual(grid%iproc + 1, interp%point_id(1))
@@ -118,7 +118,7 @@ contains
       type(type_grid_2d)      :: grid
       type(type_comm)         :: comm
       type(type_interpolator) :: interp
-      real(SP), allocatable   :: field(:,:), out(:)
+      real(SP), allocatable   :: field(:, :), out(:)
       real(SP) :: xq(2), yq(2)
       integer  :: i, j, ng
 
@@ -129,13 +129,13 @@ contains
       call interp%init(xq, yq, grid)
 
       ng = N_GHOST
-      allocate(field(grid%local_nx + 2*ng, grid%local_ny + 2*ng))
-      allocate(out(interp%n_points))
+      allocate (field(grid%local_nx + 2*ng, grid%local_ny + 2*ng))
+      allocate (out(interp%n_points))
 
       field = 0.0_SP
       do j = 1, grid%local_ny
          do i = 1, grid%local_nx
-            field(i+ng, j+ng) = real(i + j, SP)
+            field(i + ng, j + ng) = real(i + j, SP)
          end do
       end do
 
@@ -158,7 +158,7 @@ contains
       type(type_grid_2d)      :: grid
       type(type_comm)         :: comm
       type(type_interpolator) :: interp
-      real(SP), allocatable   :: field(:,:), out(:)
+      real(SP), allocatable   :: field(:, :), out(:)
       real(SP) :: xq(2), yq(2)
       integer  :: i, j, ng
 
@@ -169,13 +169,13 @@ contains
       call interp%init(xq, yq, grid)
 
       ng = N_GHOST
-      allocate(field(grid%local_nx + 2*ng, grid%local_ny + 2*ng))
-      allocate(out(interp%n_points))
+      allocate (field(grid%local_nx + 2*ng, grid%local_ny + 2*ng))
+      allocate (out(interp%n_points))
 
       field = 0.0_SP
       do j = 1, grid%local_ny
          do i = 1, grid%local_nx
-            field(i+ng, j+ng) = real(i*10 + j, SP)
+            field(i + ng, j + ng) = real(i*10 + j, SP)
          end do
       end do
 
@@ -227,18 +227,18 @@ contains
       type(type_comm)         :: comm
       type(type_interpolator) :: interp
       type(MPI_Comm) :: mcomm
-      real(SP), allocatable :: dx(:,:), dy(:,:)
+      real(SP), allocatable :: dx(:, :), dy(:, :)
       real(SP) :: xq(1), yq(1)
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
 
       grid%M = 10; grid%N = 4
       grid%nx_proc = 2; grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
 
-      allocate(dx(grid%local_nx, grid%local_ny))
-      allocate(dy(grid%local_nx, grid%local_ny))
+      allocate (dx(grid%local_nx, grid%local_ny))
+      allocate (dy(grid%local_nx, grid%local_ny))
       if (grid%iproc == 0) then
          dx = 1.0_SP
       else
@@ -254,9 +254,9 @@ contains
       if (grid%iproc == 0) then
          @assertEqual(0, interp%n_points)
       else
-         @assertEqual(1,      interp%n_points)
+         @assertEqual(1, interp%n_points)
          @assertEqual(0.25_SP, interp%alpha(1), tolerance=1e-6_SP)
-         @assertEqual(0.5_SP,  interp%beta(1),  tolerance=1e-6_SP)
+         @assertEqual(0.5_SP, interp%beta(1), tolerance=1e-6_SP)
       end if
 
       call dummy_fix_lint()
@@ -280,24 +280,24 @@ contains
       real(SP), parameter :: DLON = 1.0_SP, DLAT = 1.0_SP, LON0 = 0.0_SP, LAT0 = 60.0_SP
 
       mcomm = this%getMpiCommunicator()
-      comm  = new_comm(io_rank_id=0, comm_id=mcomm)
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
       grid%M = 10; grid%N = 6
       grid%nx_proc = 2; grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
       call grid%init_spacing_spherical(DLON, DLAT, LON0, LAT0)
 
-      dx_ref = R_EARTH * cos(LAT0 * PI / 180.0_SP) * DLON * PI / 180.0_SP
-      dy_val = R_EARTH * DLAT * PI / 180.0_SP
+      dx_ref = R_EARTH*cos(LAT0*PI/180.0_SP)*DLON*PI/180.0_SP
+      dy_val = R_EARTH*DLAT*PI/180.0_SP
 
       ! Midpoint in x-direction (li=2) and midpoint within row lj=3
-      xq(1) = 1.5_SP * dx_ref
-      yq(1) = 2.5_SP * dy_val
+      xq(1) = 1.5_SP*dx_ref
+      yq(1) = 2.5_SP*dy_val
 
       call interp%init(xq, yq, grid)
 
       if (grid%iproc == 0) then
-         alpha_expected = 0.5_SP * cos(LAT0 * PI / 180.0_SP) &
-                        / cos((LAT0 + 2.0_SP*DLAT) * PI / 180.0_SP)
+         alpha_expected = 0.5_SP*cos(LAT0*PI/180.0_SP) &
+                          /cos((LAT0 + 2.0_SP*DLAT)*PI/180.0_SP)
          @assertEqual(1, interp%n_points)
          @assertEqual(alpha_expected, interp%alpha(1), tolerance=1e-5_SP)
          @assertEqual(0.5_SP, interp%beta(1), tolerance=1e-5_SP)

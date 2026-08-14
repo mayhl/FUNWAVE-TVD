@@ -22,14 +22,14 @@ contains
    subroutine test_get_returns_alias()
       type(type_field_registry) :: reg
       real(SP), target  :: fld(2, 2)
-      real(SP), pointer :: ptr(:,:)
+      real(SP), pointer :: ptr(:, :)
 
       fld = 0.0_SP
       call reg%register("u", fld)
       ptr => reg%get("u")
-      ptr(1,1) = 99.0_SP
+      ptr(1, 1) = 99.0_SP
 
-      @assertEqual(99.0_SP, fld(1,1), tolerance=1e-6_SP)
+      @assertEqual(99.0_SP, fld(1, 1), tolerance=1e-6_SP)
    end subroutine test_get_returns_alias
 
    ! Re-registering the same name must update the pointer without
@@ -38,7 +38,7 @@ contains
    subroutine test_reregister_updates_pointer()
       type(type_field_registry) :: reg
       real(SP), target  :: fld1(2, 2), fld2(2, 2)
-      real(SP), pointer :: ptr(:,:)
+      real(SP), pointer :: ptr(:, :)
 
       fld1 = 1.0_SP
       fld2 = 2.0_SP
@@ -47,18 +47,18 @@ contains
       call reg%register("v", fld2)
       ptr => reg%get("v")
 
-      @assertEqual(1,      reg%n)
-      @assertEqual(2.0_SP, ptr(1,1), tolerance=1e-6_SP)
+      @assertEqual(1, reg%n)
+      @assertEqual(2.0_SP, ptr(1, 1), tolerance=1e-6_SP)
    end subroutine test_reregister_updates_pointer
 
    @test
    subroutine test_multiple_fields_coexist()
       type(type_field_registry) :: reg
-      real(SP), target :: eta(2,2), u(2,2), v(2,2)
+      real(SP), target :: eta(2, 2), u(2, 2), v(2, 2)
 
       call reg%register("eta", eta)
-      call reg%register("u",   u)
-      call reg%register("v",   v)
+      call reg%register("u", u)
+      call reg%register("v", v)
 
       @assertEqual(3, reg%n)
       @assertTrue(reg%has("eta"))

@@ -41,8 +41,8 @@ contains
       type(type_scratch_pool) :: pool
 
       call pool%reserve(2)       ! depth=2, peak=2
-         call pool%reserve(3)    ! depth=5, peak=5
-         call pool%unreserve(3)  ! depth=2
+      call pool%reserve(3)    ! depth=5, peak=5
+      call pool%unreserve(3)  ! depth=2
       call pool%unreserve(2)     ! depth=0
 
       @assertEqual(5, pool%peak)
@@ -66,8 +66,8 @@ contains
       @assertTrue(allocated(pool%in_use))
       @assertEqual(DIM1, size(pool%slots, 1))
       @assertEqual(DIM2, size(pool%slots, 2))
-      @assertEqual(4,    size(pool%slots, 3))
-      @assertEqual(4,    size(pool%in_use))
+      @assertEqual(4, size(pool%slots, 3))
+      @assertEqual(4, size(pool%in_use))
 
       call pool%free()
       call dummy_fix_lint()

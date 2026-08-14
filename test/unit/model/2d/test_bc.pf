@@ -77,33 +77,33 @@ contains
 
       associate (lp => grid%lp)
 
-      ! halo continuity across an interior x-seam: ghost columns carry
-      ! the neighbour's global-keyed values
-      if (.not. grid%is_back_boundary) then
-         j = lp%jb
-         gj = grid%jbegin
-         do k = 1, NG
-            @assertEqual(real(100*(grid%ibegin - k) + gj, SP), fields%eta(lp%ib - k, j), TOL_SP)
-         end do
-      end if
+         ! halo continuity across an interior x-seam: ghost columns carry
+         ! the neighbour's global-keyed values
+         if (.not. grid%is_back_boundary) then
+            j = lp%jb
+            gj = grid%jbegin
+            do k = 1, NG
+               @assertEqual(real(100*(grid%ibegin - k) + gj, SP), fields%eta(lp%ib - k, j), TOL_SP)
+            end do
+         end if
 
-      ! physical west wall: eta mirror, u antisymmetric
-      if (grid%is_back_boundary) then
-         j = lp%jb
-         do k = 1, NG
-            @assertEqual(fields%eta(2*NG + 1 - k, j), fields%eta(k, j), TOL_SP)
-            @assertEqual(-fields%u(2*NG + 1 - k, j), fields%u(k, j), TOL_SP)
-            @assertEqual(fields%v(2*NG + 1 - k, j), fields%v(k, j), TOL_SP)
-         end do
-      end if
+         ! physical west wall: eta mirror, u antisymmetric
+         if (grid%is_back_boundary) then
+            j = lp%jb
+            do k = 1, NG
+               @assertEqual(fields%eta(2*NG + 1 - k, j), fields%eta(k, j), TOL_SP)
+               @assertEqual(-fields%u(2*NG + 1 - k, j), fields%u(k, j), TOL_SP)
+               @assertEqual(fields%v(2*NG + 1 - k, j), fields%v(k, j), TOL_SP)
+            end do
+         end if
 
-      ! physical south wall: v antisymmetric, eta mirror
-      if (grid%is_right_boundary) then
-         do k = 1, NG
-            @assertEqual(fields%eta(lp%ib, 2*NG + 1 - k), fields%eta(lp%ib, k), TOL_SP)
-            @assertEqual(-fields%v(lp%ib, 2*NG + 1 - k), fields%v(lp%ib, k), TOL_SP)
-         end do
-      end if
+         ! physical south wall: v antisymmetric, eta mirror
+         if (grid%is_right_boundary) then
+            do k = 1, NG
+               @assertEqual(fields%eta(lp%ib, 2*NG + 1 - k), fields%eta(lp%ib, k), TOL_SP)
+               @assertEqual(-fields%v(lp%ib, 2*NG + 1 - k), fields%v(lp%ib, k), TOL_SP)
+            end do
+         end if
 
       end associate
 
@@ -132,14 +132,14 @@ contains
       call bc%exchange_state(grid, fields)
 
       associate (lp => grid%lp)
-      ! south ghosts on the globally-lowest row wrap to the top rows
-      if (grid%jbegin == 1) then
-         gi = grid%ibegin
-         do k = 1, NG
-            gj_wrap = TEST_N - k + 1
-            @assertEqual(real(100*gi + gj_wrap, SP), fields%eta(lp%ib, lp%jb - k), TOL_SP)
-         end do
-      end if
+         ! south ghosts on the globally-lowest row wrap to the top rows
+         if (grid%jbegin == 1) then
+            gi = grid%ibegin
+            do k = 1, NG
+               gj_wrap = TEST_N - k + 1
+               @assertEqual(real(100*gi + gj_wrap, SP), fields%eta(lp%ib, lp%jb - k), TOL_SP)
+            end do
+         end if
       end associate
 
       call dummy_fix_lint()

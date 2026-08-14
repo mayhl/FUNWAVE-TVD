@@ -1,16 +1,16 @@
 @test
 subroutine test_dump_types()
-  use probe_mod
-  implicit none
-  real(8) :: val_r8 = 1.0d0
-  real(4) :: val_r4 = 1.0
-  integer(4) :: val_i4 = 1
-  real(8) :: arr_r8(2) = [1.0d0, 2.0d0]
-  
-  ! This should run without crashing
-  call reset_state()
-  call dump_state(val_r8, "val_r8")
-  call dump_state(val_r4, "val_r4")
-  call dump_state(val_i4, "val_i4")
-  call dump_state(arr_r8, "arr_r8")
+   use probe_mod
+   implicit none
+   real(8) :: val_r8 = 1.0d0
+   real(4) :: val_r4 = 1.0
+   integer(4) :: val_i4 = 1
+   real(8) :: arr_r8(2) = [1.0d0, 2.0d0]
+
+   ! This should run without crashing
+   call reset_state()
+   call dump_state(val_r8, "val_r8")
+   call dump_state(val_r4, "val_r4")
+   call dump_state(val_i4, "val_i4")
+   call dump_state(arr_r8, "arr_r8")
 end subroutine test_dump_types

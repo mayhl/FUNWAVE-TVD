@@ -4,8 +4,8 @@ module test_model_setup
    use mpi_f08
    use pFUnit
    use core_constants_mod, only: SP, N_GHOST
-   use core_env_mod,       only: type_env, new_env
-   use model_main_mod,     only: type_model_main
+   use core_env_mod, only: type_env, new_env
+   use model_main_mod, only: type_model_main
 
    implicit none
 
@@ -15,9 +15,9 @@ module test_model_setup
 
    ! Module-level SP literals (gfortran 15 kind-suffix quirk, see test_sponge)
    real(SP), parameter :: DEPTH_SP = 10.0_SP
-   real(SP), parameter :: AMP_SP   = 0.5_SP
-   real(SP), parameter :: TOL_SP   = 1.0e-6_SP
-   real(SP), parameter :: TOL2PCT  = 0.02_SP
+   real(SP), parameter :: AMP_SP = 0.5_SP
+   real(SP), parameter :: TOL_SP = 1.0e-6_SP
+   real(SP), parameter :: TOL2PCT = 0.02_SP
 
 contains
 
@@ -43,32 +43,32 @@ contains
 
       associate (f => model%fields, lp => model%grid%lp)
 
-      ! grid
-      @assertEqual(TEST_M, model%grid%M)
-      @assertEqual(4, model%grid%nx_proc)
-      @assertEqual(TEST_M/4, model%grid%local_nx)
+         ! grid
+         @assertEqual(TEST_M, model%grid%M)
+         @assertEqual(4, model%grid%nx_proc)
+         @assertEqual(TEST_M/4, model%grid%local_nx)
 
-      ! depth
-      @assertEqual(DEPTH_SP, minval(f%depth), TOL_SP)
-      @assertEqual(DEPTH_SP, maxval(f%depth), TOL_SP)
+         ! depth
+         @assertEqual(DEPTH_SP, minval(f%depth), TOL_SP)
+         @assertEqual(DEPTH_SP, maxval(f%depth), TOL_SP)
 
-      ! solitary IC: local eta bounded by crest amplitude, v still zero
-      eta_max = maxval(f%eta(lp%ib:lp%ie, lp%jb:lp%je))
-      @assertTrue(eta_max <= AMP_SP * (1.0_SP + TOL2PCT))
-      @assertEqual(0.0_SP, maxval(abs(f%v)), TOL_SP)
+         ! solitary IC: local eta bounded by crest amplitude, v still zero
+         eta_max = maxval(f%eta(lp%ib:lp%ie, lp%jb:lp%je))
+         @assertTrue(eta_max <= AMP_SP*(1.0_SP + TOL2PCT))
+         @assertEqual(0.0_SP, maxval(abs(f%v)), TOL_SP)
 
-      ! all wet, mask9 all one (all-wet solitary on deep water)
-      @assertEqual(1, minval(f%mask))
-      @assertEqual(1, minval(f%mask9(lp%ib:lp%ie, lp%jb:lp%je)))
+         ! all wet, mask9 all one (all-wet solitary on deep water)
+         @assertEqual(1, minval(f%mask))
+         @assertEqual(1, minval(f%mask9(lp%ib:lp%ie, lp%jb:lp%je)))
 
-      ! H = Gamma3*eta + depth (no clipping when wet), p = H*u
-      @assertEqual(f%eta(lp%ib, lp%jb) + f%depth(lp%ib, lp%jb), &
-                   f%h(lp%ib, lp%jb), TOL_SP)
-      @assertEqual(f%h(lp%ib+1, lp%jb) * f%u(lp%ib+1, lp%jb), &
-                   f%p(lp%ib+1, lp%jb), TOL_SP)
+         ! H = Gamma3*eta + depth (no clipping when wet), p = H*u
+         @assertEqual(f%eta(lp%ib, lp%jb) + f%depth(lp%ib, lp%jb), &
+                      f%h(lp%ib, lp%jb), TOL_SP)
+         @assertEqual(f%h(lp%ib + 1, lp%jb)*f%u(lp%ib + 1, lp%jb), &
+                      f%p(lp%ib + 1, lp%jb), TOL_SP)
 
-      ! registry serves the live eta array
-      @assertTrue(model%registry%has('eta'))
+         ! registry serves the live eta array
+         @assertTrue(model%registry%has('eta'))
 
       end associate
 
@@ -92,52 +92,52 @@ contains
 
       associate (out => model%output)
 
-      ! geometries: station verbatim, transect expanded (entry 3 is the
-      ! inline one appended by channel wg3, asserted below)
-      @assertEqual('station', out%geometries(1)%geom_type)
-      @assertEqual(10.5_SP, out%geometries(1)%x(1), TOL_SP)
-      @assertEqual(2.0_SP, out%geometries(1)%y(2), TOL_SP)
-      @assertEqual('transect', out%geometries(2)%geom_type)
-      @assertEqual(5, size(out%geometries(2)%x))
-      @assertEqual(9.75_SP, out%geometries(2)%x(2), TOL_SP)
-      @assertEqual(1.5_SP, out%geometries(2)%y(4), TOL_SP)
+         ! geometries: station verbatim, transect expanded (entry 3 is the
+         ! inline one appended by channel wg3, asserted below)
+         @assertEqual('station', out%geometries(1)%geom_type)
+         @assertEqual(10.5_SP, out%geometries(1)%x(1), TOL_SP)
+         @assertEqual(2.0_SP, out%geometries(1)%y(2), TOL_SP)
+         @assertEqual('transect', out%geometries(2)%geom_type)
+         @assertEqual(5, size(out%geometries(2)%x))
+         @assertEqual(9.75_SP, out%geometries(2)%x(2), TOL_SP)
+         @assertEqual(1.5_SP, out%geometries(2)%y(4), TOL_SP)
 
-      ! channels: geometry refs resolved by name
-      @assertEqual(4, out%n_channels)
-      @assertEqual(1, out%channels(1)%geom_idx)
-      @assertEqual(1, out%channels(2)%geom_idx)
-      @assertEqual(2, out%channels(3)%geom_idx)
+         ! channels: geometry refs resolved by name
+         @assertEqual(4, out%n_channels)
+         @assertEqual(1, out%channels(1)%geom_idx)
+         @assertEqual(1, out%channels(2)%geom_idx)
+         @assertEqual(2, out%channels(3)%geom_idx)
 
-      ! inline geometry: appended to the list under the channel's name
-      @assertEqual(3, size(out%geometries))
-      @assertEqual(3, out%channels(4)%geom_idx)
-      @assertEqual('wg3', out%geometries(3)%name)
-      @assertEqual('station', out%geometries(3)%geom_type)
-      @assertEqual(25.0_SP, out%geometries(3)%x(1), TOL_SP)
+         ! inline geometry: appended to the list under the channel's name
+         @assertEqual(3, size(out%geometries))
+         @assertEqual(3, out%channels(4)%geom_idx)
+         @assertEqual('wg3', out%geometries(3)%name)
+         @assertEqual('station', out%geometries(3)%geom_type)
+         @assertEqual(25.0_SP, out%geometries(3)%x(1), TOL_SP)
 
-      ! snapshot channel: no statistics key
-      @assertTrue(out%channels(1)%snapshot)
-      @assertEqual(0, out%channels(1)%n_stats)
-      @assertEqual(2, size(out%channels(1)%variables))
-      @assertEqual('u', trim(out%channels(1)%variables(2)))
+         ! snapshot channel: no statistics key
+         @assertTrue(out%channels(1)%snapshot)
+         @assertEqual(0, out%channels(1)%n_stats)
+         @assertEqual(2, size(out%channels(1)%variables))
+         @assertEqual('u', trim(out%channels(1)%variables(2)))
 
-      ! windowed channel: statistics presence flips snapshot off
-      @assertFalse(out%channels(2)%snapshot)
-      @assertEqual(2, out%channels(2)%n_stats)
-      @assertEqual('mean', trim(out%channels(2)%statistics(2)))
+         ! windowed channel: statistics presence flips snapshot off
+         @assertFalse(out%channels(2)%snapshot)
+         @assertEqual(2, out%channels(2)%n_stats)
+         @assertEqual('mean', trim(out%channels(2)%statistics(2)))
 
-      ! t_start: explicit on profile, defaulted elsewhere
-      @assertFalse(out%channels(1)%has_t_start)
-      @assertTrue(out%channels(3)%has_t_start)
-      @assertEqual(0.25_SP, out%channels(3)%t_start, TOL_SP)
+         ! t_start: explicit on profile, defaulted elsewhere
+         @assertFalse(out%channels(1)%has_t_start)
+         @assertTrue(out%channels(3)%has_t_start)
+         @assertEqual(0.25_SP, out%channels(3)%t_start, TOL_SP)
 
-      ! format: explicit on wg3, inherit sentinel elsewhere
-      @assertEqual(0, len_trim(out%channels(1)%format))
-      @assertEqual('netcdf', trim(out%channels(4)%format))
+         ! format: explicit on wg3, inherit sentinel elsewhere
+         @assertEqual(0, len_trim(out%channels(1)%format))
+         @assertEqual('netcdf', trim(out%channels(4)%format))
 
-      ! layout defaults (registry): chunked at the 50 GB cap
-      @assertEqual('chunked', out%layout)
-      @assertEqual(50.0_SP, out%max_file_size, TOL_SP)
+         ! layout defaults (registry): chunked at the 50 GB cap
+         @assertEqual('chunked', out%layout)
+         @assertEqual(50.0_SP, out%max_file_size, TOL_SP)
 
       end associate
 

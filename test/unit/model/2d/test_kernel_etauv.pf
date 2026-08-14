@@ -2,40 +2,40 @@
 module test_kernel_etauv
 
    use pFUnit
-   use core_constants_mod,      only: SP, GRAV
-   use core_grid_mod,           only: type_loop_bounds, type_grid_2d
+   use core_constants_mod, only: SP, GRAV
+   use core_grid_mod, only: type_loop_bounds, type_grid_2d
    use core_solver_tridiag_mod, only: trid_x, trid_y, trid_y_periodic, &
                                       type_trid_workspace
-   use model_kernel_etauv_mod,  only: type_etauv_workspace, update_h, &
-                                      cal_etauv_assemble_x, cal_etauv_assemble_y, &
-                                      cal_uv_no_dispersion, cal_etauv_update
+   use model_kernel_etauv_mod, only: type_etauv_workspace, update_h, &
+                                     cal_etauv_assemble_x, cal_etauv_assemble_y, &
+                                     cal_uv_no_dispersion, cal_etauv_update
    use mpi_f08
 
    implicit none
 
-   integer, parameter :: NG   = 3
-   integer, parameter :: LNX  = 6
-   integer, parameter :: LNY  = 6
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 6
+   integer, parameter :: LNY = 6
    integer, parameter :: MLOC = LNX + 2*NG   ! 12
    integer, parameter :: NLOC = LNY + 2*NG   ! 12
    real(SP), parameter :: TOL = 1.0e-4_SP
 
    ! Default physics values matching FUNWAVE standard configuration
-   real(SP), parameter :: FCAP      = 3.0_SP     ! Froude number cap (numerics default)
+   real(SP), parameter :: FCAP = 3.0_SP     ! Froude number cap (numerics default)
    real(SP), parameter :: MIN_DEPTH = 0.01_SP    ! minimum depth floor
-   real(SP), parameter :: B1        = 0.28196_SP  ! b1 = BetaRef², BetaRef = -0.531
-   real(SP), parameter :: B2        = -0.531_SP   ! b2 = BetaRef
+   real(SP), parameter :: B1 = 0.28196_SP  ! b1 = BetaRef², BetaRef = -0.531
+   real(SP), parameter :: B2 = -0.531_SP   ! b2 = BetaRef
 
    ! Gamma coefficients
-   real(SP), parameter :: GAMMA1_ON  = 1.0_SP   ! standard Boussinesq dispersion coefficient
+   real(SP), parameter :: GAMMA1_ON = 1.0_SP   ! standard Boussinesq dispersion coefficient
    real(SP), parameter :: GAMMA1_OFF = 0.0_SP   ! no dispersive correction (NSWE)
    real(SP), parameter :: GAMMA2_OFF = 0.0_SP   ! LHS Gamma2 inactive (disp_time_left=.false.)
 
    ! Boolean flags for cal_etauv mode selection
-   logical, parameter :: DISP_ON      = .true.
-   logical, parameter :: DISP_OFF     = .false.
+   logical, parameter :: DISP_ON = .true.
+   logical, parameter :: DISP_OFF = .false.
    logical, parameter :: PERIODIC_OFF = .false.
-   logical, parameter :: DTL_OFF      = .false.   ! disp_time_left — semi-implicit Gamma2 deferred
+   logical, parameter :: DTL_OFF = .false.   ! disp_time_left — semi-implicit Gamma2 deferred
 
 contains
 
@@ -44,26 +44,26 @@ contains
 
    subroutine make_lp(lp)
       type(type_loop_bounds), intent(out) :: lp
-      lp%ib = NG + 1;  lp%ie = NG + LNX
-      lp%jb = NG + 1;  lp%je = NG + LNY
-      lp%mloc = MLOC;  lp%nloc = NLOC
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
    subroutine make_serial_grid(grid)
       type(type_grid_2d), intent(out) :: grid
       integer :: dims(2), ierr
       logical :: periods(2)
-      grid%nx_proc = 1;  grid%ny_proc = 1
-      grid%iproc   = 0;  grid%jproc   = 0
-      grid%back_rank  = MPI_PROC_NULL
+      grid%nx_proc = 1; grid%ny_proc = 1
+      grid%iproc = 0; grid%jproc = 0
+      grid%back_rank = MPI_PROC_NULL
       grid%shore_rank = MPI_PROC_NULL
       grid%right_rank = MPI_PROC_NULL
-      grid%left_rank  = MPI_PROC_NULL
-      grid%is_back_boundary  = .true.
+      grid%left_rank = MPI_PROC_NULL
+      grid%is_back_boundary = .true.
       grid%is_shore_boundary = .true.
       grid%is_right_boundary = .true.
-      grid%is_left_boundary  = .true.
-      dims    = [1, 1]
+      grid%is_left_boundary = .true.
+      dims = [1, 1]
       periods = [.false., .false.]
       call MPI_Cart_create(MPI_COMM_SELF, 2, dims, periods, .false., grid%cart_comm, ierr)
    end subroutine make_serial_grid
@@ -79,19 +79,19 @@ contains
                           ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
                           ws, u, v, hu, hv)
       type(type_loop_bounds), intent(in) :: lp
-      type(type_grid_2d),     intent(in) :: grid
-      logical,  intent(in)  :: dispersion, periodic, disp_time_left
+      type(type_grid_2d), intent(in) :: grid
+      logical, intent(in)  :: dispersion, periodic, disp_time_left
       real(SP), intent(in)  :: froude_cap, min_depth, gamma1, gamma2, b1, b2
-      real(SP), intent(in)  :: inv_dx(:,:), inv_dy(:,:)
-      integer,  intent(in)  :: mask(:,:)
-      real(SP), intent(in)  :: mask9(:,:)
-      real(SP), intent(in)  :: depth(:,:), h(:,:), eta(:,:)
-      real(SP), intent(inout) :: ubar(:,:), vbar(:,:)
-      real(SP), intent(in)  :: vxy(:,:), dvxy(:,:), uxy(:,:), duxy(:,:)
-      real(SP), intent(in)  :: ux(:,:), dux(:,:)
+      real(SP), intent(in)  :: inv_dx(:, :), inv_dy(:, :)
+      integer, intent(in)  :: mask(:, :)
+      real(SP), intent(in)  :: mask9(:, :)
+      real(SP), intent(in)  :: depth(:, :), h(:, :), eta(:, :)
+      real(SP), intent(inout) :: ubar(:, :), vbar(:, :)
+      real(SP), intent(in)  :: vxy(:, :), dvxy(:, :), uxy(:, :), duxy(:, :)
+      real(SP), intent(in)  :: ux(:, :), dux(:, :)
       type(type_etauv_workspace), intent(inout) :: ws
-      real(SP), intent(inout) :: u(:,:), v(:,:)
-      real(SP), intent(out)   :: hu(:,:), hv(:,:)
+      real(SP), intent(inout) :: u(:, :), v(:, :)
+      real(SP), intent(out)   :: hu(:, :), hv(:, :)
 
       type(type_trid_workspace) :: tws
 
@@ -153,18 +153,18 @@ contains
    @test
    subroutine test_update_h_nonlinear()
       type(type_loop_bounds) :: lp
-      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: eta(MLOC, NLOC), depth(MLOC, NLOC), h(MLOC, NLOC)
       integer  :: i, j
 
       call make_lp(lp)
-      eta   = 0.5_SP
+      eta = 0.5_SP
       depth = 10.0_SP
 
       call update_h(lp, 1.0_SP, eta, depth, h)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(10.5_SP, h(i,j), TOL)
+            @assertEqual(10.5_SP, h(i, j), TOL)
          end do
       end do
    end subroutine test_update_h_nonlinear
@@ -175,18 +175,18 @@ contains
    @test
    subroutine test_update_h_linear()
       type(type_loop_bounds) :: lp
-      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC), h(MLOC,NLOC)
+      real(SP) :: eta(MLOC, NLOC), depth(MLOC, NLOC), h(MLOC, NLOC)
       integer  :: i, j
 
       call make_lp(lp)
-      eta   = 5.0_SP
+      eta = 5.0_SP
       depth = 3.0_SP
 
       call update_h(lp, 0.0_SP, eta, depth, h)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(3.0_SP, h(i,j), TOL)
+            @assertEqual(3.0_SP, h(i, j), TOL)
          end do
       end do
    end subroutine test_update_h_linear
@@ -199,15 +199,15 @@ contains
       type(type_loop_bounds)     :: lp
       type(type_grid_2d)         :: grid
       type(type_etauv_workspace) :: ws
-      real(SP) :: depth(MLOC,NLOC), h(MLOC,NLOC), eta(MLOC,NLOC)
-      real(SP) :: ubar(MLOC,NLOC), vbar(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: vxy(MLOC,NLOC), dvxy(MLOC,NLOC)
-      real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
-      real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC)
-      real(SP) :: mask9(MLOC,NLOC)
+      real(SP) :: depth(MLOC, NLOC), h(MLOC, NLOC), eta(MLOC, NLOC)
+      real(SP) :: ubar(MLOC, NLOC), vbar(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: vxy(MLOC, NLOC), dvxy(MLOC, NLOC)
+      real(SP) :: uxy(MLOC, NLOC), duxy(MLOC, NLOC)
+      real(SP) :: ux(MLOC, NLOC), dux(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), hu(MLOC, NLOC), hv(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+      real(SP) :: mask9(MLOC, NLOC)
       integer  :: i, j
 
       real(SP), parameter :: D0 = 10.0_SP, UB = 2.0_SP, VB = 1.0_SP
@@ -216,27 +216,27 @@ contains
       call make_serial_grid(grid)
       call ws%alloc(MLOC, NLOC)
 
-      depth = D0;  h = D0;  eta = 0.0_SP
-      ubar = UB;   vbar = VB
-      inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1.0_SP
-      vxy = 0.0_SP;  dvxy = 0.0_SP
-      uxy = 0.0_SP;  duxy = 0.0_SP
-      ux  = 0.0_SP;  dux  = 0.0_SP
-      u = 0.0_SP;  v = 0.0_SP
+      depth = D0; h = D0; eta = 0.0_SP
+      ubar = UB; vbar = VB
+      inv_dx = 1.0_SP/50.0_SP; inv_dy = 1.0_SP/50.0_SP
+      mask = 1; mask9 = 1.0_SP
+      vxy = 0.0_SP; dvxy = 0.0_SP
+      uxy = 0.0_SP; duxy = 0.0_SP
+      ux = 0.0_SP; dux = 0.0_SP
+      u = 0.0_SP; v = 0.0_SP
 
       call drive_etauv(lp, grid, DISP_OFF, PERIODIC_OFF, DTL_OFF, &
-                     FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
-                     inv_dx, inv_dy, mask, mask9, depth, h, eta, &
-                     ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
-                     ws, u, v, hu, hv)
+                       FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
+                       inv_dx, inv_dy, mask, mask9, depth, h, eta, &
+                       ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
+                       ws, u, v, hu, hv)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(UB/D0, u(i,j),  TOL)
-            @assertEqual(VB/D0, v(i,j),  TOL)
-            @assertEqual(UB,    hu(i,j), TOL)
-            @assertEqual(VB,    hv(i,j), TOL)
+            @assertEqual(UB/D0, u(i, j), TOL)
+            @assertEqual(VB/D0, v(i, j), TOL)
+            @assertEqual(UB, hu(i, j), TOL)
+            @assertEqual(VB, hv(i, j), TOL)
          end do
       end do
 
@@ -252,15 +252,15 @@ contains
       type(type_loop_bounds)     :: lp
       type(type_grid_2d)         :: grid
       type(type_etauv_workspace) :: ws
-      real(SP) :: depth(MLOC,NLOC), h(MLOC,NLOC), eta(MLOC,NLOC)
-      real(SP) :: ubar(MLOC,NLOC), vbar(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: vxy(MLOC,NLOC), dvxy(MLOC,NLOC)
-      real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
-      real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC)
-      real(SP) :: mask9(MLOC,NLOC)
+      real(SP) :: depth(MLOC, NLOC), h(MLOC, NLOC), eta(MLOC, NLOC)
+      real(SP) :: ubar(MLOC, NLOC), vbar(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: vxy(MLOC, NLOC), dvxy(MLOC, NLOC)
+      real(SP) :: uxy(MLOC, NLOC), duxy(MLOC, NLOC)
+      real(SP) :: ux(MLOC, NLOC), dux(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), hu(MLOC, NLOC), hv(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+      real(SP) :: mask9(MLOC, NLOC)
       integer  :: im, jm
 
       real(SP), parameter :: D0 = 5.0_SP, UB = 1.0_SP, VB = 1.0_SP
@@ -269,32 +269,32 @@ contains
       call make_serial_grid(grid)
       call ws%alloc(MLOC, NLOC)
 
-      im = lp%ib + 2;  jm = lp%jb + 2
+      im = lp%ib + 2; jm = lp%jb + 2
 
-      depth = D0;  h = D0;  eta = 0.0_SP
-      ubar = UB;   vbar = VB
-      inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1.0_SP
+      depth = D0; h = D0; eta = 0.0_SP
+      ubar = UB; vbar = VB
+      inv_dx = 1.0_SP/50.0_SP; inv_dy = 1.0_SP/50.0_SP
+      mask = 1; mask9 = 1.0_SP
       mask(im, jm) = 0
-      vxy = 0.0_SP;  dvxy = 0.0_SP
-      uxy = 0.0_SP;  duxy = 0.0_SP
-      ux  = 0.0_SP;  dux  = 0.0_SP
-      u = 0.0_SP;  v = 0.0_SP
+      vxy = 0.0_SP; dvxy = 0.0_SP
+      uxy = 0.0_SP; duxy = 0.0_SP
+      ux = 0.0_SP; dux = 0.0_SP
+      u = 0.0_SP; v = 0.0_SP
 
       call drive_etauv(lp, grid, DISP_OFF, PERIODIC_OFF, DTL_OFF, &
-                     FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
-                     inv_dx, inv_dy, mask, mask9, depth, h, eta, &
-                     ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
-                     ws, u, v, hu, hv)
+                       FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
+                       inv_dx, inv_dy, mask, mask9, depth, h, eta, &
+                       ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
+                       ws, u, v, hu, hv)
 
       ! dry cell zeroed
-      @assertEqual(0.0_SP,  u(im, jm), TOL)
-      @assertEqual(0.0_SP,  v(im, jm), TOL)
+      @assertEqual(0.0_SP, u(im, jm), TOL)
+      @assertEqual(0.0_SP, v(im, jm), TOL)
       @assertEqual(0.0_SP, hu(im, jm), TOL)
       @assertEqual(0.0_SP, hv(im, jm), TOL)
 
       ! wet cell adjacent to dry: U = Ubar/H
-      @assertEqual(UB/D0, u(im+1, jm), TOL)
+      @assertEqual(UB/D0, u(im + 1, jm), TOL)
 
       call ws%free()
       call MPI_Comm_free(grid%cart_comm)
@@ -310,15 +310,15 @@ contains
       type(type_loop_bounds)     :: lp
       type(type_grid_2d)         :: grid
       type(type_etauv_workspace) :: ws
-      real(SP) :: depth(MLOC,NLOC), h(MLOC,NLOC), eta(MLOC,NLOC)
-      real(SP) :: ubar(MLOC,NLOC), vbar(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: vxy(MLOC,NLOC), dvxy(MLOC,NLOC)
-      real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
-      real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC)
-      real(SP) :: mask9(MLOC,NLOC)
+      real(SP) :: depth(MLOC, NLOC), h(MLOC, NLOC), eta(MLOC, NLOC)
+      real(SP) :: ubar(MLOC, NLOC), vbar(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: vxy(MLOC, NLOC), dvxy(MLOC, NLOC)
+      real(SP) :: uxy(MLOC, NLOC), duxy(MLOC, NLOC)
+      real(SP) :: ux(MLOC, NLOC), dux(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), hu(MLOC, NLOC), hv(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+      real(SP) :: mask9(MLOC, NLOC)
       real(SP) :: cap_speed, u45, utotal
       integer  :: i, j
 
@@ -328,54 +328,54 @@ contains
       call make_serial_grid(grid)
       call ws%alloc(MLOC, NLOC)
 
-      depth = H0;  h = H0;  eta = 0.0_SP
-      inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1.0_SP
-      vxy = 0.0_SP;  dvxy = 0.0_SP
-      uxy = 0.0_SP;  duxy = 0.0_SP
-      ux  = 0.0_SP;  dux  = 0.0_SP
+      depth = H0; h = H0; eta = 0.0_SP
+      inv_dx = 1.0_SP/50.0_SP; inv_dy = 1.0_SP/50.0_SP
+      mask = 1; mask9 = 1.0_SP
+      vxy = 0.0_SP; dvxy = 0.0_SP
+      uxy = 0.0_SP; duxy = 0.0_SP
+      ux = 0.0_SP; dux = 0.0_SP
 
-      cap_speed = FCAP * sqrt(GRAV * H0)
+      cap_speed = FCAP*sqrt(GRAV*H0)
 
       ! --- phase 1: U-only (utheta = 0) ---
-      ubar = 1000.0_SP;  vbar = 0.0_SP
-      u = 0.0_SP;  v = 0.0_SP
+      ubar = 1000.0_SP; vbar = 0.0_SP
+      u = 0.0_SP; v = 0.0_SP
 
       call drive_etauv(lp, grid, DISP_OFF, PERIODIC_OFF, DTL_OFF, &
-                     FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
-                     inv_dx, inv_dy, mask, mask9, depth, h, eta, &
-                     ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
-                     ws, u, v, hu, hv)
+                       FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
+                       inv_dx, inv_dy, mask, mask9, depth, h, eta, &
+                       ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
+                       ws, u, v, hu, hv)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(cap_speed,       u(i,j),  TOL)
-            @assertEqual(0.0_SP,          v(i,j),  TOL)
-            @assertEqual(cap_speed * H0, hu(i,j),  TOL)
-            @assertEqual(0.0_SP,         hv(i,j),  TOL)
+            @assertEqual(cap_speed, u(i, j), TOL)
+            @assertEqual(0.0_SP, v(i, j), TOL)
+            @assertEqual(cap_speed*H0, hu(i, j), TOL)
+            @assertEqual(0.0_SP, hv(i, j), TOL)
          end do
       end do
 
       ! --- phase 2: mixed U+V at 45° (utheta = pi/4) ---
-      ubar = 1000.0_SP;  vbar = 1000.0_SP
-      u = 0.0_SP;  v = 0.0_SP
+      ubar = 1000.0_SP; vbar = 1000.0_SP
+      u = 0.0_SP; v = 0.0_SP
 
       call drive_etauv(lp, grid, DISP_OFF, PERIODIC_OFF, DTL_OFF, &
-                     FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
-                     inv_dx, inv_dy, mask, mask9, depth, h, eta, &
-                     ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
-                     ws, u, v, hu, hv)
+                       FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
+                       inv_dx, inv_dy, mask, mask9, depth, h, eta, &
+                       ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
+                       ws, u, v, hu, hv)
 
-      u45 = cap_speed / sqrt(2.0_SP)
+      u45 = cap_speed/sqrt(2.0_SP)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(u45,        u(i,j),  TOL)
-            @assertEqual(u45,        v(i,j),  TOL)
-            @assertEqual(u45 * H0,  hu(i,j),  TOL)
-            @assertEqual(u45 * H0,  hv(i,j),  TOL)
-            utotal = sqrt(u(i,j)**2 + v(i,j)**2)
-            @assertEqual(cap_speed, utotal,   TOL)
+            @assertEqual(u45, u(i, j), TOL)
+            @assertEqual(u45, v(i, j), TOL)
+            @assertEqual(u45*H0, hu(i, j), TOL)
+            @assertEqual(u45*H0, hv(i, j), TOL)
+            utotal = sqrt(u(i, j)**2 + v(i, j)**2)
+            @assertEqual(cap_speed, utotal, TOL)
          end do
       end do
 
@@ -392,15 +392,15 @@ contains
       type(type_loop_bounds)     :: lp
       type(type_grid_2d)         :: grid
       type(type_etauv_workspace) :: ws
-      real(SP) :: depth(MLOC,NLOC), h(MLOC,NLOC), eta(MLOC,NLOC)
-      real(SP) :: ubar(MLOC,NLOC), vbar(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: vxy(MLOC,NLOC), dvxy(MLOC,NLOC)
-      real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
-      real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC)
-      real(SP) :: mask9(MLOC,NLOC)
+      real(SP) :: depth(MLOC, NLOC), h(MLOC, NLOC), eta(MLOC, NLOC)
+      real(SP) :: ubar(MLOC, NLOC), vbar(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: vxy(MLOC, NLOC), dvxy(MLOC, NLOC)
+      real(SP) :: uxy(MLOC, NLOC), duxy(MLOC, NLOC)
+      real(SP) :: ux(MLOC, NLOC), dux(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), hu(MLOC, NLOC), hv(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+      real(SP) :: mask9(MLOC, NLOC)
       integer  :: i, j
 
       real(SP), parameter :: D0 = 8.0_SP, UB = 4.0_SP, VB = 2.0_SP
@@ -409,25 +409,25 @@ contains
       call make_serial_grid(grid)
       call ws%alloc(MLOC, NLOC)
 
-      depth = D0;  h = D0;  eta = 0.0_SP
-      ubar = UB;   vbar = VB
-      inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1.0_SP
-      vxy = 0.0_SP;  dvxy = 0.0_SP
-      uxy = 0.0_SP;  duxy = 0.0_SP
-      ux  = 0.0_SP;  dux  = 0.0_SP
-      u = 0.0_SP;  v = 0.0_SP
+      depth = D0; h = D0; eta = 0.0_SP
+      ubar = UB; vbar = VB
+      inv_dx = 1.0_SP/50.0_SP; inv_dy = 1.0_SP/50.0_SP
+      mask = 1; mask9 = 1.0_SP
+      vxy = 0.0_SP; dvxy = 0.0_SP
+      uxy = 0.0_SP; duxy = 0.0_SP
+      ux = 0.0_SP; dux = 0.0_SP
+      u = 0.0_SP; v = 0.0_SP
 
       call drive_etauv(lp, grid, DISP_ON, PERIODIC_OFF, DTL_OFF, &
-                     FCAP, MIN_DEPTH, GAMMA1_OFF, GAMMA2_OFF, B1, B2, &
-                     inv_dx, inv_dy, mask, mask9, depth, h, eta, &
-                     ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
-                     ws, u, v, hu, hv)
+                       FCAP, MIN_DEPTH, GAMMA1_OFF, GAMMA2_OFF, B1, B2, &
+                       inv_dx, inv_dy, mask, mask9, depth, h, eta, &
+                       ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
+                       ws, u, v, hu, hv)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(UB/D0, u(i,j), TOL)
-            @assertEqual(VB/D0, v(i,j), TOL)
+            @assertEqual(UB/D0, u(i, j), TOL)
+            @assertEqual(VB/D0, v(i, j), TOL)
          end do
       end do
 
@@ -444,42 +444,42 @@ contains
       type(type_loop_bounds)     :: lp
       type(type_grid_2d)         :: grid
       type(type_etauv_workspace) :: ws
-      real(SP) :: depth(MLOC,NLOC), h(MLOC,NLOC), eta(MLOC,NLOC)
-      real(SP) :: ubar(MLOC,NLOC), vbar(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: vxy(MLOC,NLOC), dvxy(MLOC,NLOC)
-      real(SP) :: uxy(MLOC,NLOC), duxy(MLOC,NLOC)
-      real(SP) :: ux(MLOC,NLOC),  dux(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), hu(MLOC,NLOC), hv(MLOC,NLOC)
-      integer  :: mask(MLOC,NLOC)
-      real(SP) :: mask9(MLOC,NLOC)
+      real(SP) :: depth(MLOC, NLOC), h(MLOC, NLOC), eta(MLOC, NLOC)
+      real(SP) :: ubar(MLOC, NLOC), vbar(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: vxy(MLOC, NLOC), dvxy(MLOC, NLOC)
+      real(SP) :: uxy(MLOC, NLOC), duxy(MLOC, NLOC)
+      real(SP) :: ux(MLOC, NLOC), dux(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), hu(MLOC, NLOC), hv(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+      real(SP) :: mask9(MLOC, NLOC)
       integer  :: i, j
 
       call make_lp(lp)
       call make_serial_grid(grid)
       call ws%alloc(MLOC, NLOC)
 
-      depth = 5.0_SP;  h = 5.0_SP;  eta = 0.0_SP
-      ubar = 0.0_SP;   vbar = 0.0_SP
-      inv_dx = 1.0_SP/50.0_SP;  inv_dy = 1.0_SP/50.0_SP
-      mask = 1;  mask9 = 1.0_SP
-      vxy = 0.0_SP;  dvxy = 0.0_SP
-      uxy = 0.0_SP;  duxy = 0.0_SP
-      ux  = 0.0_SP;  dux  = 0.0_SP
-      u = 0.0_SP;  v = 0.0_SP
+      depth = 5.0_SP; h = 5.0_SP; eta = 0.0_SP
+      ubar = 0.0_SP; vbar = 0.0_SP
+      inv_dx = 1.0_SP/50.0_SP; inv_dy = 1.0_SP/50.0_SP
+      mask = 1; mask9 = 1.0_SP
+      vxy = 0.0_SP; dvxy = 0.0_SP
+      uxy = 0.0_SP; duxy = 0.0_SP
+      ux = 0.0_SP; dux = 0.0_SP
+      u = 0.0_SP; v = 0.0_SP
 
       call drive_etauv(lp, grid, DISP_ON, PERIODIC_OFF, DTL_OFF, &
-                     FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
-                     inv_dx, inv_dy, mask, mask9, depth, h, eta, &
-                     ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
-                     ws, u, v, hu, hv)
+                       FCAP, MIN_DEPTH, GAMMA1_ON, GAMMA2_OFF, B1, B2, &
+                       inv_dx, inv_dy, mask, mask9, depth, h, eta, &
+                       ubar, vbar, vxy, dvxy, uxy, duxy, ux, dux, &
+                       ws, u, v, hu, hv)
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(0.0_SP,  u(i,j), TOL)
-            @assertEqual(0.0_SP,  v(i,j), TOL)
-            @assertEqual(0.0_SP, hu(i,j), TOL)
-            @assertEqual(0.0_SP, hv(i,j), TOL)
+            @assertEqual(0.0_SP, u(i, j), TOL)
+            @assertEqual(0.0_SP, v(i, j), TOL)
+            @assertEqual(0.0_SP, hu(i, j), TOL)
+            @assertEqual(0.0_SP, hv(i, j), TOL)
          end do
       end do
 

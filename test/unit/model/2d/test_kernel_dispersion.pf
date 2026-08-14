@@ -2,17 +2,17 @@
 module test_kernel_dispersion
 
    use pFUnit
-   use core_constants_mod,         only: SP
-   use core_grid_mod,               only: type_loop_bounds
+   use core_constants_mod, only: SP
+   use core_grid_mod, only: type_loop_bounds
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
                                           cal_dispersion_derivs, &
                                           cal_dispersion_assemble
 
    implicit none
 
-   integer, parameter :: NG   = 3
-   integer, parameter :: LNX  = 6
-   integer, parameter :: LNY  = 6
+   integer, parameter :: NG = 3
+   integer, parameter :: LNX = 6
+   integer, parameter :: LNY = 6
    integer, parameter :: MLOC = LNX + 2*NG   ! 12
    integer, parameter :: NLOC = LNY + 2*NG   ! 12
 
@@ -25,9 +25,9 @@ contains
 
    subroutine make_lp(lp)
       type(type_loop_bounds), intent(out) :: lp
-      lp%ib = NG + 1;  lp%ie = NG + LNX
-      lp%jb = NG + 1;  lp%je = NG + LNY
-      lp%mloc = MLOC;  lp%nloc = NLOC
+      lp%ib = NG + 1; lp%ie = NG + LNX
+      lp%jb = NG + 1; lp%je = NG + LNY
+      lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
    ! derivs + assemble back to back (no ghost exchange in unit context;
@@ -38,18 +38,18 @@ contains
                              u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_disp_workspace), intent(inout) :: ws
-      real(SP), intent(in)    :: eta(:,:), depth(:,:)
-      real(SP), intent(in)    :: u(:,:), v(:,:), u0(:,:), v0(:,:)
-      real(SP), intent(in)    :: p(:,:), q(:,:)
-      real(SP), intent(in)    :: mask9(:,:)
-      real(SP), intent(in)    :: inv_dx(:,:), inv_dy(:,:)
+      real(SP), intent(in)    :: eta(:, :), depth(:, :)
+      real(SP), intent(in)    :: u(:, :), v(:, :), u0(:, :), v0(:, :)
+      real(SP), intent(in)    :: p(:, :), q(:, :)
+      real(SP), intent(in)    :: mask9(:, :)
+      real(SP), intent(in)    :: inv_dx(:, :), inv_dy(:, :)
       real(SP), intent(in)    :: dt, mdf, beta1, beta2, gamma2
-      logical,  intent(in)    :: shb, wb, eb, sb, nb
-      real(SP), intent(out)   :: etat(:,:)
-      real(SP), intent(inout) :: ut(:,:), vt(:,:), etax(:,:), etay(:,:)
-      real(SP), intent(out)   :: u4(:,:), v4(:,:), u1p(:,:), v1p(:,:)
-      real(SP), intent(inout) :: u1pp(:,:), v1pp(:,:)
-      real(SP), intent(inout) :: u2(:,:), v2(:,:), u3(:,:), v3(:,:)
+      logical, intent(in)    :: shb, wb, eb, sb, nb
+      real(SP), intent(out)   :: etat(:, :)
+      real(SP), intent(inout) :: ut(:, :), vt(:, :), etax(:, :), etay(:, :)
+      real(SP), intent(out)   :: u4(:, :), v4(:, :), u1p(:, :), v1p(:, :)
+      real(SP), intent(inout) :: u1pp(:, :), v1pp(:, :)
+      real(SP), intent(inout) :: u2(:, :), v2(:, :), u3(:, :), v3(:, :)
 
       call cal_dispersion_derivs(lp, ws, eta, depth, u, v, u0, v0, p, q, &
                                  mask9, inv_dx, inv_dy, dt, mdf, gamma2, &
@@ -92,35 +92,35 @@ contains
    subroutine test_cal_dispersion_etat()
       type(type_loop_bounds)   :: lp
       type(type_disp_workspace) :: ws
-      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
-      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      real(SP) :: mask9(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
-      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
-      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
-      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
-      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: eta(MLOC, NLOC), depth(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), u0(MLOC, NLOC), v0(MLOC, NLOC)
+      real(SP) :: p(MLOC + 1, NLOC), q(MLOC, NLOC + 1)
+      real(SP) :: mask9(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: etat(MLOC, NLOC), ut(MLOC, NLOC), vt(MLOC, NLOC)
+      real(SP) :: etax(MLOC, NLOC), etay(MLOC, NLOC)
+      real(SP) :: u4(MLOC, NLOC), v4(MLOC, NLOC), u1p(MLOC, NLOC), v1p(MLOC, NLOC)
+      real(SP) :: u1pp(MLOC, NLOC), v1pp(MLOC, NLOC)
+      real(SP) :: u2(MLOC, NLOC), v2(MLOC, NLOC), u3(MLOC, NLOC), v3(MLOC, NLOC)
       integer  :: i, j
       real(SP), parameter :: DX_VAL = 2.0_SP
 
       call make_lp(lp)
       call ws%alloc(MLOC, NLOC)
 
-      eta = 0.0_SP;  depth = 1.0_SP
-      u = 0.0_SP;    v = 0.0_SP;  u0 = 0.0_SP;  v0 = 0.0_SP
-      mask9 = 1.0_SP;  inv_dx = 1.0_SP/DX_VAL;  inv_dy = 1.0_SP/DX_VAL
+      eta = 0.0_SP; depth = 1.0_SP
+      u = 0.0_SP; v = 0.0_SP; u0 = 0.0_SP; v0 = 0.0_SP
+      mask9 = 1.0_SP; inv_dx = 1.0_SP/DX_VAL; inv_dy = 1.0_SP/DX_VAL
       ! P(i,j) = (i-1)*DX_VAL  => P(i+1,j)-P(i,j) = DX_VAL  => dP/dx*inv_dx = 1
       do j = 1, NLOC
-         do i = 1, MLOC+1
-            p(i,j) = real(i-1, SP) * DX_VAL
+         do i = 1, MLOC + 1
+            p(i, j) = real(i - 1, SP)*DX_VAL
          end do
       end do
       q = 0.0_SP
-      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
-      u1pp = 0.0_SP;  v1pp = 0.0_SP
-      u2 = 0.0_SP;    v2 = 0.0_SP;   u3 = 0.0_SP;  v3 = 0.0_SP
+      ut = 0.0_SP; vt = 0.0_SP; etax = 0.0_SP; etay = 0.0_SP
+      u1pp = 0.0_SP; v1pp = 0.0_SP
+      u2 = 0.0_SP; v2 = 0.0_SP; u3 = 0.0_SP; v3 = 0.0_SP
 
       call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
                           inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
@@ -131,7 +131,7 @@ contains
 
       do j = 1, NLOC - 1
          do i = 1, MLOC - 1
-            @assertEqual(-1.0_SP, etat(i,j), tolerance=TOL)
+            @assertEqual(-1.0_SP, etat(i, j), tolerance=TOL)
          end do
       end do
 
@@ -147,28 +147,28 @@ contains
    subroutine test_cal_dispersion_uniform_zero()
       type(type_loop_bounds)    :: lp
       type(type_disp_workspace) :: ws
-      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
-      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      real(SP) :: mask9(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
-      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
-      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
-      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
-      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: eta(MLOC, NLOC), depth(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), u0(MLOC, NLOC), v0(MLOC, NLOC)
+      real(SP) :: p(MLOC + 1, NLOC), q(MLOC, NLOC + 1)
+      real(SP) :: mask9(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: etat(MLOC, NLOC), ut(MLOC, NLOC), vt(MLOC, NLOC)
+      real(SP) :: etax(MLOC, NLOC), etay(MLOC, NLOC)
+      real(SP) :: u4(MLOC, NLOC), v4(MLOC, NLOC), u1p(MLOC, NLOC), v1p(MLOC, NLOC)
+      real(SP) :: u1pp(MLOC, NLOC), v1pp(MLOC, NLOC)
+      real(SP) :: u2(MLOC, NLOC), v2(MLOC, NLOC), u3(MLOC, NLOC), v3(MLOC, NLOC)
       integer  :: i, j
 
       call make_lp(lp)
       call ws%alloc(MLOC, NLOC)
 
-      eta = 0.0_SP;  depth = 1.0_SP
-      u = 1.0_SP;  v = 0.5_SP;  u0 = 1.0_SP;  v0 = 0.5_SP
-      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1.0_SP
-      inv_dx = 1.0_SP;  inv_dy = 1.0_SP
-      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
-      u1pp = 0.0_SP;  v1pp = 0.0_SP
-      u2 = 0.0_SP;  v2 = 0.0_SP;  u3 = 0.0_SP;  v3 = 0.0_SP
+      eta = 0.0_SP; depth = 1.0_SP
+      u = 1.0_SP; v = 0.5_SP; u0 = 1.0_SP; v0 = 0.5_SP
+      p = 0.0_SP; q = 0.0_SP; mask9 = 1.0_SP
+      inv_dx = 1.0_SP; inv_dy = 1.0_SP
+      ut = 0.0_SP; vt = 0.0_SP; etax = 0.0_SP; etay = 0.0_SP
+      u1pp = 0.0_SP; v1pp = 0.0_SP
+      u2 = 0.0_SP; v2 = 0.0_SP; u3 = 0.0_SP; v3 = 0.0_SP
 
       call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
                           inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
@@ -179,10 +179,10 @@ contains
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(0.0_SP, u4(i,j),  tolerance=TOL)
-            @assertEqual(0.0_SP, v4(i,j),  tolerance=TOL)
-            @assertEqual(0.0_SP, u1p(i,j), tolerance=TOL)
-            @assertEqual(0.0_SP, v1p(i,j), tolerance=TOL)
+            @assertEqual(0.0_SP, u4(i, j), tolerance=TOL)
+            @assertEqual(0.0_SP, v4(i, j), tolerance=TOL)
+            @assertEqual(0.0_SP, u1p(i, j), tolerance=TOL)
+            @assertEqual(0.0_SP, v1p(i, j), tolerance=TOL)
          end do
       end do
 
@@ -198,30 +198,30 @@ contains
    subroutine test_cal_dispersion_gamma2_skip()
       type(type_loop_bounds)    :: lp
       type(type_disp_workspace) :: ws
-      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
-      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      real(SP) :: mask9(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
-      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
-      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
-      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
-      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: eta(MLOC, NLOC), depth(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), u0(MLOC, NLOC), v0(MLOC, NLOC)
+      real(SP) :: p(MLOC + 1, NLOC), q(MLOC, NLOC + 1)
+      real(SP) :: mask9(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: etat(MLOC, NLOC), ut(MLOC, NLOC), vt(MLOC, NLOC)
+      real(SP) :: etax(MLOC, NLOC), etay(MLOC, NLOC)
+      real(SP) :: u4(MLOC, NLOC), v4(MLOC, NLOC), u1p(MLOC, NLOC), v1p(MLOC, NLOC)
+      real(SP) :: u1pp(MLOC, NLOC), v1pp(MLOC, NLOC)
+      real(SP) :: u2(MLOC, NLOC), v2(MLOC, NLOC), u3(MLOC, NLOC), v3(MLOC, NLOC)
       real(SP), parameter :: SENTINEL = 99.0_SP
 
       call make_lp(lp)
       call ws%alloc(MLOC, NLOC)
 
-      eta = 0.0_SP;  depth = 1.0_SP
-      u = 0.0_SP;  v = 0.0_SP;  u0 = 0.0_SP;  v0 = 0.0_SP
-      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1.0_SP
-      inv_dx = 1.0_SP;  inv_dy = 1.0_SP
-      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
+      eta = 0.0_SP; depth = 1.0_SP
+      u = 0.0_SP; v = 0.0_SP; u0 = 0.0_SP; v0 = 0.0_SP
+      p = 0.0_SP; q = 0.0_SP; mask9 = 1.0_SP
+      inv_dx = 1.0_SP; inv_dy = 1.0_SP
+      ut = 0.0_SP; vt = 0.0_SP; etax = 0.0_SP; etay = 0.0_SP
       ! pre-set gamma2 arrays to sentinel
-      u1pp = SENTINEL;  v1pp = SENTINEL
-      u2   = SENTINEL;  v2   = SENTINEL
-      u3   = SENTINEL;  v3   = SENTINEL
+      u1pp = SENTINEL; v1pp = SENTINEL
+      u2 = SENTINEL; v2 = SENTINEL
+      u3 = SENTINEL; v3 = SENTINEL
 
       call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
                           inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
@@ -232,8 +232,8 @@ contains
 
       @assertEqual(SENTINEL, u1pp(lp%ib, lp%jb), tolerance=TOL)
       @assertEqual(SENTINEL, v1pp(lp%ie, lp%je), tolerance=TOL)
-      @assertEqual(SENTINEL, u2(lp%ib, lp%jb),   tolerance=TOL)
-      @assertEqual(SENTINEL, v3(lp%ie, lp%je),   tolerance=TOL)
+      @assertEqual(SENTINEL, u2(lp%ib, lp%jb), tolerance=TOL)
+      @assertEqual(SENTINEL, v3(lp%ie, lp%je), tolerance=TOL)
 
       call ws%free()
       call dummy_fix_lint()
@@ -251,16 +251,16 @@ contains
    subroutine test_cal_dispersion_u4_parabolic()
       type(type_loop_bounds)    :: lp
       type(type_disp_workspace) :: ws
-      real(SP) :: eta(MLOC,NLOC), depth(MLOC,NLOC)
-      real(SP) :: u(MLOC,NLOC), v(MLOC,NLOC), u0(MLOC,NLOC), v0(MLOC,NLOC)
-      real(SP) :: p(MLOC+1,NLOC), q(MLOC,NLOC+1)
-      real(SP) :: mask9(MLOC,NLOC)
-      real(SP) :: inv_dx(MLOC,NLOC), inv_dy(MLOC,NLOC)
-      real(SP) :: etat(MLOC,NLOC), ut(MLOC,NLOC), vt(MLOC,NLOC)
-      real(SP) :: etax(MLOC,NLOC), etay(MLOC,NLOC)
-      real(SP) :: u4(MLOC,NLOC), v4(MLOC,NLOC), u1p(MLOC,NLOC), v1p(MLOC,NLOC)
-      real(SP) :: u1pp(MLOC,NLOC), v1pp(MLOC,NLOC)
-      real(SP) :: u2(MLOC,NLOC), v2(MLOC,NLOC), u3(MLOC,NLOC), v3(MLOC,NLOC)
+      real(SP) :: eta(MLOC, NLOC), depth(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), u0(MLOC, NLOC), v0(MLOC, NLOC)
+      real(SP) :: p(MLOC + 1, NLOC), q(MLOC, NLOC + 1)
+      real(SP) :: mask9(MLOC, NLOC)
+      real(SP) :: inv_dx(MLOC, NLOC), inv_dy(MLOC, NLOC)
+      real(SP) :: etat(MLOC, NLOC), ut(MLOC, NLOC), vt(MLOC, NLOC)
+      real(SP) :: etax(MLOC, NLOC), etay(MLOC, NLOC)
+      real(SP) :: u4(MLOC, NLOC), v4(MLOC, NLOC), u1p(MLOC, NLOC), v1p(MLOC, NLOC)
+      real(SP) :: u1pp(MLOC, NLOC), v1pp(MLOC, NLOC)
+      real(SP) :: u2(MLOC, NLOC), v2(MLOC, NLOC), u3(MLOC, NLOC), v3(MLOC, NLOC)
       integer  :: i, j
       real(SP), parameter :: BETA1 = 0.0_SP   ! simplifies coeff_a=1/3, coeff_b=-1/2
       real(SP), parameter :: EXPECTED_U4 = -1.0_SP/3.0_SP
@@ -268,19 +268,19 @@ contains
       call make_lp(lp)
       call ws%alloc(MLOC, NLOC)
 
-      depth = 1.0_SP;  eta = 0.0_SP
+      depth = 1.0_SP; eta = 0.0_SP
       ! u(i,j) = i^2 so uxx = 2 everywhere (with inv_dx=1)
       do j = 1, NLOC
          do i = 1, MLOC
-            u(i,j) = real(i, SP) * real(i, SP)
+            u(i, j) = real(i, SP)*real(i, SP)
          end do
       end do
-      v = 0.0_SP;  u0 = u;  v0 = 0.0_SP
-      p = 0.0_SP;  q = 0.0_SP;  mask9 = 1.0_SP
-      inv_dx = 1.0_SP;  inv_dy = 1.0_SP
-      ut = 0.0_SP;  vt = 0.0_SP;  etax = 0.0_SP;  etay = 0.0_SP
-      u1pp = 0.0_SP;  v1pp = 0.0_SP
-      u2 = 0.0_SP;  v2 = 0.0_SP;  u3 = 0.0_SP;  v3 = 0.0_SP
+      v = 0.0_SP; u0 = u; v0 = 0.0_SP
+      p = 0.0_SP; q = 0.0_SP; mask9 = 1.0_SP
+      inv_dx = 1.0_SP; inv_dy = 1.0_SP
+      ut = 0.0_SP; vt = 0.0_SP; etax = 0.0_SP; etay = 0.0_SP
+      u1pp = 0.0_SP; v1pp = 0.0_SP
+      u2 = 0.0_SP; v2 = 0.0_SP; u3 = 0.0_SP; v3 = 0.0_SP
 
       call cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
                           inv_dx, inv_dy, 1.0_SP, 1.0e-4_SP, &
@@ -292,8 +292,8 @@ contains
       ! inner cells away from boundaries where uxx is exactly 2
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie
-            @assertEqual(EXPECTED_U4, u4(i,j),  tolerance=TOL)
-            @assertEqual(0.0_SP,      v4(i,j),  tolerance=TOL)
+            @assertEqual(EXPECTED_U4, u4(i, j), tolerance=TOL)
+            @assertEqual(0.0_SP, v4(i, j), tolerance=TOL)
          end do
       end do
 

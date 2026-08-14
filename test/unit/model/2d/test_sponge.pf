@@ -3,27 +3,27 @@ module test_sponge
 
    use mpi_f08
    use pFUnit
-   use core_comm_mod,       only: type_comm, new_comm
-   use core_grid_mod,       only: type_grid_2d
-   use core_constants_mod,  only: SP, N_GHOST
-   use model_sponge_mod,    only: type_model_sponge, FACE_W
+   use core_comm_mod, only: type_comm, new_comm
+   use core_grid_mod, only: type_grid_2d
+   use core_constants_mod, only: SP, N_GHOST
+   use model_sponge_mod, only: type_model_sponge, FACE_W
    use model_fields_2d_mod, only: type_fields_2d
 
    implicit none
 
-   integer,  parameter :: TEST_M  = 20
-   integer,  parameter :: TEST_N  = 16
+   integer, parameter :: TEST_M = 20
+   integer, parameter :: TEST_N = 16
    real(SP), parameter :: TEST_DX = 5.0_SP
 
    ! Module-level constants — gfortran 15 mishandles _SP kind suffixes after
    ! #line directives inside subroutine bodies.  Define all SP literals here.
    real(SP), parameter :: R_SP = 0.85_SP
    real(SP), parameter :: A_SP = 5.0_SP
-   real(SP), parameter :: ZERO_SP  = 0.0_SP
-   real(SP), parameter :: ONE_SP   = 1.0_SP
-   real(SP), parameter :: TWO_SP   = 2.0_SP
+   real(SP), parameter :: ZERO_SP = 0.0_SP
+   real(SP), parameter :: ONE_SP = 1.0_SP
+   real(SP), parameter :: TWO_SP = 2.0_SP
    real(SP), parameter :: THREE_SP = 3.0_SP
-   real(SP), parameter :: FOUR_SP  = 4.0_SP
+   real(SP), parameter :: FOUR_SP = 4.0_SP
    real(SP), parameter :: ONEHALF_SP = 1.5_SP
    real(SP), parameter :: TOL_SP = 1.0e-6_SP
 
@@ -34,14 +34,14 @@ contains
 
    subroutine open_grid(this, grid, comm)
       class(MpiTestMethod), intent(inout) :: this
-      type(type_grid_2d),   intent(inout) :: grid
-      type(type_comm),      intent(inout) :: comm
+      type(type_grid_2d), intent(inout) :: grid
+      type(type_comm), intent(inout) :: comm
       type(MPI_Comm) :: mcomm
 
-      mcomm      = this%getMpiCommunicator()
-      comm       = new_comm(io_rank_id=0, comm_id=mcomm)
-      grid%M     = TEST_M
-      grid%N     = TEST_N
+      mcomm = this%getMpiCommunicator()
+      comm = new_comm(io_rank_id=0, comm_id=mcomm)
+      grid%M = TEST_M
+      grid%N = TEST_N
       grid%nx_proc = 2
       grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
@@ -78,13 +78,13 @@ contains
       integer :: ng, expected_m, expected_n
 
       call open_grid(this, grid, comm)
-      sponge%is_activated  = .true.
+      sponge%is_activated = .true.
       sponge%direct_on(FACE_W) = .true.
-      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%width(FACE_W) = real(TEST_M/4, SP)*TEST_DX
 
       call sponge%init_compute(grid)
 
-      ng         = N_GHOST
+      ng = N_GHOST
       expected_m = grid%local_nx + 2*ng
       expected_n = grid%local_ny + 2*ng
 
@@ -109,9 +109,9 @@ contains
       logical :: all_ge_one
 
       call open_grid(this, grid, comm)
-      sponge%is_activated     = .true.
-      sponge%direct_on(FACE_W)    = .true.
-      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%is_activated = .true.
+      sponge%direct_on(FACE_W) = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP)*TEST_DX
       sponge%r_direct(FACE_W) = R_SP
       sponge%a_direct(FACE_W) = A_SP
 
@@ -144,9 +144,9 @@ contains
       rank = this%getProcessRank()
       call open_grid(this, grid, comm)
 
-      sponge%is_activated     = .true.
-      sponge%direct_on(FACE_W)    = .true.
-      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%is_activated = .true.
+      sponge%direct_on(FACE_W) = .true.
+      sponge%width(FACE_W) = real(TEST_M/4, SP)*TEST_DX
       sponge%r_direct(FACE_W) = R_SP
       sponge%a_direct(FACE_W) = A_SP
 
@@ -175,21 +175,21 @@ contains
       rank = this%getProcessRank()
       call open_grid(this, grid, comm)
 
-      sponge%is_activated     = .true.
-      sponge%direct_on(FACE_W)    = .true.
-      sponge%width(FACE_W) = TEST_DX * TWO_SP   ! only 2 cells wide
+      sponge%is_activated = .true.
+      sponge%direct_on(FACE_W) = .true.
+      sponge%width(FACE_W) = TEST_DX*TWO_SP   ! only 2 cells wide
       sponge%r_direct(FACE_W) = R_SP
       sponge%a_direct(FACE_W) = A_SP
 
       call sponge%init_compute(grid)
 
-      ng     = N_GHOST
+      ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
 
       if (rank == 1) then
          @mpiAssertEqual(ONE_SP, sponge%coeff(ng + 1, ng + 1), tolerance=TOL_SP)
-         @mpiAssertEqual(ONE_SP, sponge%coeff(mloc_g,  nloc_g), tolerance=TOL_SP)
+         @mpiAssertEqual(ONE_SP, sponge%coeff(mloc_g, nloc_g), tolerance=TOL_SP)
       end if
 
       call sponge%free()
@@ -214,36 +214,36 @@ contains
 
       ng = N_GHOST
 
-      sponge%is_activated  = .true.
+      sponge%is_activated = .true.
       sponge%direct_on(FACE_W) = .true.
-      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%width(FACE_W) = real(TEST_M/4, SP)*TEST_DX
       sponge%r_direct(FACE_W) = R_SP
       sponge%a_direct(FACE_W) = A_SP
 
       call sponge%init_compute(grid)
 
-      f%eta(ng+1, ng+1)  = TWO_SP
-      f%p  (ng+1, ng+1)  = THREE_SP
-      f%q  (ng+1, ng+1)  = FOUR_SP
-      f%mask(ng+1, ng+1) = 1
+      f%eta(ng + 1, ng + 1) = TWO_SP
+      f%p(ng + 1, ng + 1) = THREE_SP
+      f%q(ng + 1, ng + 1) = FOUR_SP
+      f%mask(ng + 1, ng + 1) = 1
 
-      eta_before = f%eta(ng+1, ng+1)
-      p_before   = f%p  (ng+1, ng+1)
-      q_before   = f%q  (ng+1, ng+1)
+      eta_before = f%eta(ng + 1, ng + 1)
+      p_before = f%p(ng + 1, ng + 1)
+      q_before = f%q(ng + 1, ng + 1)
 
       call sponge%apply(f, grid)
 
       ! Verify values were damped (divided by coeff >= 1)
-      @assertTrue(f%eta(ng+1, ng+1) <= eta_before)
-      @assertTrue(f%p  (ng+1, ng+1) <= p_before)
-      @assertTrue(f%q  (ng+1, ng+1) <= q_before)
+      @assertTrue(f%eta(ng + 1, ng + 1) <= eta_before)
+      @assertTrue(f%p(ng + 1, ng + 1) <= p_before)
+      @assertTrue(f%q(ng + 1, ng + 1) <= q_before)
 
       ! Dry cell: apply should NOT touch eta
-      f%eta(ng+2, ng+1)  = ONEHALF_SP
-      f%mask(ng+2, ng+1) = 0
+      f%eta(ng + 2, ng + 1) = ONEHALF_SP
+      f%mask(ng + 2, ng + 1) = 0
       call sponge%apply(f, grid)
       ! eta unchanged for dry cell (skipped by mask check)
-      @mpiAssertEqual(ONEHALF_SP, f%eta(ng+2, ng+1), tolerance=TOL_SP)
+      @mpiAssertEqual(ONEHALF_SP, f%eta(ng + 2, ng + 1), tolerance=TOL_SP)
 
       call sponge%free()
       call f%free()
@@ -263,10 +263,10 @@ contains
       logical :: all_nonneg
 
       call open_grid(this, grid, comm)
-      sponge%is_activated    = .true.
+      sponge%is_activated = .true.
       sponge%friction_on(FACE_W) = .true.
-      sponge%cd_fric(FACE_W)        = A_SP
-      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%cd_fric(FACE_W) = A_SP
+      sponge%width(FACE_W) = real(TEST_M/4, SP)*TEST_DX
 
       call sponge%init_compute(grid)
 
@@ -295,11 +295,11 @@ contains
       type(type_model_sponge) :: sponge
 
       call open_grid(this, grid, comm)
-      sponge%is_activated     = .true.
-      sponge%direct_on(FACE_W)    = .true.
-      sponge%friction_on(FACE_W)  = .true.
+      sponge%is_activated = .true.
+      sponge%direct_on(FACE_W) = .true.
+      sponge%friction_on(FACE_W) = .true.
       sponge%diffusion_on(FACE_W) = .true.
-      sponge%width(FACE_W) = real(TEST_M/4, SP) * TEST_DX
+      sponge%width(FACE_W) = real(TEST_M/4, SP)*TEST_DX
 
       call sponge%init_compute(grid)
       call sponge%free()

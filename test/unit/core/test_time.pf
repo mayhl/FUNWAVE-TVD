@@ -1,8 +1,8 @@
 module test_time
    use pFUnit
    use core_constants_mod, only: SP
-   use core_comm_mod,           only: type_comm, new_comm
-   use core_yaml_file_mod,      only: type_yaml_reader
+   use core_comm_mod, only: type_comm, new_comm
+   use core_yaml_file_mod, only: type_yaml_reader
    use core_simulation_time_mod, only: type_simulation_control
    implicit none
 
@@ -63,12 +63,11 @@ contains
       call reader%init(yaml_path, comm)
       call sim%init_from_yaml(reader)
 
-      @assertEqual(0.0_SP,   sim%t_start,      tolerance=1e-6_SP)
-      @assertEqual(100.0_SP, sim%t_end,        tolerance=1e-5_SP)
-      @assertEqual(0.0_SP,   sim%current_time, tolerance=1e-6_SP)
-      @assertEqual(0,        sim%step)
+      @assertEqual(0.0_SP, sim%t_start, tolerance=1e-6_SP)
+      @assertEqual(100.0_SP, sim%t_end, tolerance=1e-5_SP)
+      @assertEqual(0.0_SP, sim%current_time, tolerance=1e-6_SP)
+      @assertEqual(0, sim%step)
    end subroutine test_init_from_yaml
 
 end module test_time
-
 
