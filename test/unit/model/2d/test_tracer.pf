@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_tracer
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_grid_2d
    use model_tracer_mod, only: type_model_tracer, tracer_locate, tracer_move, tri_area
@@ -36,7 +36,7 @@ contains
       grid%lp%jb = NG + 1; grid%lp%je = NG + LNY
       grid%lp%mloc = MLOC; grid%lp%nloc = NLOC
       grid%nx_proc = 1; grid%ny_proc = 1
-      grid%is_shore_boundary = .true.    ! east  — the far vertex has no owner
+      grid%is_shore_boundary = .true.    ! east  -- the far vertex has no owner
       grid%is_left_boundary = .true.     ! north
 
       tr%is_activated = .true.
@@ -69,7 +69,7 @@ contains
       end do
    end subroutine make_tracer
 
-   ! The signed area is negative when the vertices run clockwise — that sign
+   ! The signed area is negative when the vertices run clockwise -- that sign
    ! is what makes the three-non-negative-areas test an inside test.
    @test
    subroutine test_tri_area_sign()
@@ -174,7 +174,7 @@ contains
 
    ! The wet-cell revert sums all three triangle vertices (tracer.f90 NOTE 1).
    ! With vertices 1 and 2 dry but vertex 3 WET the sum clears 1, so the move
-   ! is kept — exercising that vertex 3 IS read (the fixed legacy typo, which
+   ! is kept -- exercising that vertex 3 IS read (the fixed legacy typo, which
    ! double-counted vertex 2 and dropped vertex 3).
    @test
    subroutine test_dry_revert_reads_vertex3()
@@ -195,7 +195,7 @@ contains
       mask = 1
       mask(5, 4) = 0     ! vertex 1 dry
       mask(6, 4) = 0     ! vertex 2 dry
-      mask(5, 5) = 1     ! vertex 3 WET — now read, so the move is kept
+      mask(5, 5) = 1     ! vertex 3 WET -- now read, so the move is kept
 
       call tr%update(grid, 1.0_SP, 1.0_SP, u, v, mask)
 

@@ -63,7 +63,7 @@ contains
    end subroutine test_dt_still_water
 
    ! ----------------------------------------------------------------
-   ! One rank carries a fast current — its limit reaches every rank
+   ! One rank carries a fast current -- its limit reaches every rank
    ! through the allreduce.
    ! ----------------------------------------------------------------
    @test(npes=[4])

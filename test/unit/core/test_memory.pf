@@ -1,5 +1,5 @@
 module test_memory
-   use pFUnit
+   use FUnit
    use iso_c_binding
    use core_memory_mod, only: core_alloc_aligned, core_dealloc_aligned
    implicit none

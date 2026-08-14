@@ -29,7 +29,7 @@ contains
    subroutine dummy_fix_lint()
    end subroutine dummy_fix_lint
 
-   ! Minimal env (log only) — new_env would re-init MPI and clash with
+   ! Minimal env (log only) -- new_env would re-init MPI and clash with
    ! the pFUnit-provided communicator (test_checkpoint pattern)
    subroutine open_env(this, env, comm)
       class(MpiTestMethod), intent(inout) :: this
@@ -120,7 +120,7 @@ contains
    ! dropped direction FIRST, the tuple filter keeps each phase column
    ! paired with its own direction, so the 3-direction file must
    ! reproduce the pre-compacted ground truth bitwise (legacy never
-   ! compacted Phase2D — survivors picked up the dropped phases).
+   ! compacted Phase2D -- survivors picked up the dropped phases).
    ! ----------------------------------------------------------------
    @test(npes=[1])
    subroutine test_data2d_phase_mispair_characterization(this)

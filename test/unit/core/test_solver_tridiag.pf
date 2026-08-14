@@ -31,7 +31,7 @@ contains
       lp%mloc = MLOC; lp%nloc = NLOC
    end subroutine make_lp
 
-   ! Make a single-rank (serial) grid stub — all neighbor ranks are MPI_PROC_NULL.
+   ! Make a single-rank (serial) grid stub -- all neighbor ranks are MPI_PROC_NULL.
    subroutine make_serial_grid(grid)
       type(type_grid_2d), intent(out) :: grid
       integer :: dims(2), ierr
@@ -88,7 +88,7 @@ contains
    end subroutine test_thomas_1d_poisson
 
    ! ----------------------------------------------------------------
-   ! trid_thomas_1d: purely diagonal system (a=0, c=0) — solution equals RHS.
+   ! trid_thomas_1d: purely diagonal system (a=0, c=0) -- solution equals RHS.
    ! ----------------------------------------------------------------
    @test
    subroutine test_thomas_1d_diagonal()
@@ -286,7 +286,7 @@ contains
    end subroutine test_trid_y_periodic_serial
 
    ! ================================================================
-   ! Distributed tests — real 2x2 Cartesian decomposition on 4 ranks.
+   ! Distributed tests -- real 2x2 Cartesian decomposition on 4 ranks.
    ! These exercise the pipelined Irecv/Isend sweeps and the periodic
    ! cross-rank exchanges that the serial-stub tests above cannot
    ! (all their neighbors are MPI_PROC_NULL).
@@ -407,7 +407,7 @@ contains
    ! ----------------------------------------------------------------
    ! trid_y_alltoall vs trid_y on 2x2 ranks: the transpose path must
    ! reproduce the pipelined sweep BITWISE (same per-line recurrence,
-   ! rank seams just split rows) — tolerance zero on purpose.  The
+   ! rank seams just split rows) -- tolerance zero on purpose.  The
    ! two-RHS lanes are checked by feeding d twice: f2 must equal f1
    ! exactly (identical float sequences).
    ! ----------------------------------------------------------------

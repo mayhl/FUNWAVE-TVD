@@ -134,7 +134,7 @@ contains
    ! field snapshot, binary: raw real(SP) stream of the (M, N) global
    ! interior array in Fortran order.  Written via collective MPI-IO
    ! (each rank puts its tile at its subarray offset), read back with
-   ! a plain stream read — the bytes must match the gathered layout.
+   ! a plain stream read -- the bytes must match the gathered layout.
    ! ----------------------------------------------------------------
    @test(npes=[2])
    subroutine test_field_snapshot_binary(this)
@@ -323,7 +323,7 @@ contains
 
    ! ----------------------------------------------------------------
    ! station snapshot: values land in point order (point 1 lives on
-   ! rank 1, point 2 on rank 0 — exercises the point_id re-sort),
+   ! rank 1, point 2 on rank 0 -- exercises the point_id re-sort),
    ! one "t v1 v2" row appended per flush
    ! ----------------------------------------------------------------
    @test(npes=[2])
@@ -504,7 +504,7 @@ contains
    end subroutine test_field_derived_hsig
 
    ! ----------------------------------------------------------------
-   ! netcdf point channels: two groups share one diagnostics.nc — the
+   ! netcdf point channels: two groups share one diagnostics.nc -- the
    ! snapshot group records every flush with cell_methods "time: point";
    ! the windowed group drops its degenerate first flush and carries
    ! time_bnds spanning each closed window

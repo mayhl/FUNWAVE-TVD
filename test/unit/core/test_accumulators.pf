@@ -1,5 +1,5 @@
 module test_accumulators
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_accumulators_mod, only: type_accumulator
    implicit none
@@ -7,7 +7,7 @@ module test_accumulators
 contains
 
    ! ----------------------------------------------------------------
-   ! mean: time-weighted — (1.0*0.1 + 2.0*0.2) / 0.3 = 5/3
+   ! mean: time-weighted -- (1.0*0.1 + 2.0*0.2) / 0.3 = 5/3
    ! ----------------------------------------------------------------
    @test
    subroutine test_mean_adaptive_dt()
@@ -48,7 +48,7 @@ contains
    ! ----------------------------------------------------------------
    ! rms with non-uniform dt:
    !   x=0 @ dt=0.1, x=2 @ dt=0.9  (total_dt=1.0)
-   !   E[x²] = (0*0.1 + 4*0.9) = 3.6  →  rms = sqrt(3.6)
+   !   E[x^2] = (0*0.1 + 4*0.9) = 3.6  ->  rms = sqrt(3.6)
    ! ----------------------------------------------------------------
    @test
    subroutine test_rms_adaptive_dt()
@@ -104,8 +104,8 @@ contains
    end subroutine test_total_dt_always_tracked
 
    ! ----------------------------------------------------------------
-   ! rms: sqrt(E[x²]) with uniform dt
-   !   x = 3, 4 → rms = sqrt((9+16)/2) = sqrt(12.5)
+   ! rms: sqrt(E[x^2]) with uniform dt
+   !   x = 3, 4 -> rms = sqrt((9+16)/2) = sqrt(12.5)
    ! ----------------------------------------------------------------
    @test
    subroutine test_rms()
@@ -148,7 +148,7 @@ contains
    end subroutine test_max_min
 
    ! ----------------------------------------------------------------
-   ! std: about the window mean, dt-weighted, on a large offset —
+   ! std: about the window mean, dt-weighted, on a large offset --
    ! samples 100 +/- 0.5 with equal dt: mean 100, std 0.5.  The raw
    ! E[f^2]-E[f]^2 identity loses ~half the SP digits at offset 100;
    ! the shifted moments keep the answer tight

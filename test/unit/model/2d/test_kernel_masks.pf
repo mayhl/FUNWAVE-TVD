@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_masks
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
    use model_kernel_masks_mod, only: update_mask, update_mask9

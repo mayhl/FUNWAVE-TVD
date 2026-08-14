@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_derivatives
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
    use model_kernel_derivatives_mod, only: deriv_x, deriv_y, &
@@ -12,7 +12,7 @@ module test_kernel_derivatives
 
    implicit none
 
-   ! Grid: 6 interior cells, 3 ghost cells each side → mloc=12, ib=4, ie=9
+   ! Grid: 6 interior cells, 3 ghost cells each side -> mloc=12, ib=4, ie=9
    integer, parameter :: NG = 3
    integer, parameter :: LNX = 6
    integer, parameter :: LNY = 6
@@ -41,7 +41,7 @@ contains
    end subroutine init_arrays
 
    ! ----------------------------------------------------------------
-   ! deriv_x: u(i,j)=i → (u(i+1)-u(i-1))*0.5*inv_dx = 1.0
+   ! deriv_x: u(i,j)=i -> (u(i+1)-u(i-1))*0.5*inv_dx = 1.0
    ! ----------------------------------------------------------------
    @test
    subroutine test_deriv_x_linear()
@@ -71,7 +71,7 @@ contains
    end subroutine test_deriv_x_linear
 
    ! ----------------------------------------------------------------
-   ! deriv_y: u(i,j)=j → 1.0
+   ! deriv_y: u(i,j)=j -> 1.0
    ! ----------------------------------------------------------------
    @test
    subroutine test_deriv_y_linear()
@@ -101,7 +101,7 @@ contains
    end subroutine test_deriv_y_linear
 
    ! ----------------------------------------------------------------
-   ! deriv_xx: u(i,j)=i² → (i+1)²-2i²+(i-1)² = 2 → uout = 2.0
+   ! deriv_xx: u(i,j)=i^2 -> (i+1)^2-2i^2+(i-1)^2 = 2 -> uout = 2.0
    ! ----------------------------------------------------------------
    @test
    subroutine test_deriv_xx_quadratic()
@@ -131,7 +131,7 @@ contains
    end subroutine test_deriv_xx_quadratic
 
    ! ----------------------------------------------------------------
-   ! deriv_yy: u(i,j)=j² → 2.0
+   ! deriv_yy: u(i,j)=j^2 -> 2.0
    ! ----------------------------------------------------------------
    @test
    subroutine test_deriv_yy_quadratic()
@@ -161,7 +161,7 @@ contains
    end subroutine test_deriv_yy_quadratic
 
    ! ----------------------------------------------------------------
-   ! deriv_xy: u(i,j)=i*j → 1.0
+   ! deriv_xy: u(i,j)=i*j -> 1.0
    ! ----------------------------------------------------------------
    @test
    subroutine test_deriv_xy_bilinear()
@@ -219,7 +219,7 @@ contains
    end subroutine test_mask_zeros_output
 
    ! ----------------------------------------------------------------
-   ! deriv_x_high: u=i → 8-stencil sums to 8 → *inv_dx/8 = 1.0
+   ! deriv_x_high: u=i -> 8-stencil sums to 8 -> *inv_dx/8 = 1.0
    ! ----------------------------------------------------------------
    @test
    subroutine test_deriv_x_high_linear()
@@ -249,7 +249,7 @@ contains
    end subroutine test_deriv_x_high_linear
 
    ! ----------------------------------------------------------------
-   ! deriv_yy_high: u=j² → stencil sum = 24 → *inv_dy²/12 = 2.0
+   ! deriv_yy_high: u=j^2 -> stencil sum = 24 -> *inv_dy^2/12 = 2.0
    ! Also implicitly tests the bug-fix (old spherical branch had
    ! Uin(I+2,J+2) instead of Uin(I,J+2)).
    ! ----------------------------------------------------------------

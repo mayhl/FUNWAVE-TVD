@@ -15,7 +15,7 @@ module test_sponge
    integer, parameter :: TEST_N = 16
    real(SP), parameter :: TEST_DX = 5.0_SP
 
-   ! Module-level constants — gfortran 15 mishandles _SP kind suffixes after
+   ! Module-level constants -- gfortran 15 mishandles _SP kind suffixes after
    ! #line directives inside subroutine bodies.  Define all SP literals here.
    real(SP), parameter :: R_SP = 0.85_SP
    real(SP), parameter :: A_SP = 5.0_SP
@@ -162,7 +162,7 @@ contains
    end subroutine test_direct_west_sponge_rank0
 
    ! ----------------------------------------------------------------
-   ! direct sponge: east-half proc is outside narrow west sponge → coeff 1
+   ! direct sponge: east-half proc is outside narrow west sponge -> coeff 1
    ! ----------------------------------------------------------------
    @test(npes=[2])
    subroutine test_direct_interior_coeff_one(this)

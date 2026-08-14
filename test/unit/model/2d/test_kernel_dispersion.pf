@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_dispersion
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
@@ -31,7 +31,7 @@ contains
    end subroutine make_lp
 
    ! derivs + assemble back to back (no ghost exchange in unit context;
-   ! workspace ghosts stay zeroed) — the old single-call shape
+   ! workspace ghosts stay zeroed) -- the old single-call shape
    subroutine cal_dispersion(lp, ws, eta, depth, u, v, u0, v0, p, q, mask9, &
                              inv_dx, inv_dy, dt, mdf, beta1, beta2, gamma2, &
                              shb, wb, eb, sb, nb, etat, ut, vt, etax, etay, &

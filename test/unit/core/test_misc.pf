@@ -1,5 +1,5 @@
 module test_misc
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_misc_mod, only: str2int, str2real, count_char
    implicit none
@@ -23,7 +23,7 @@ contains
    end subroutine test_str2int_negative
 
    ! The verify() guard was added because ifx silently parses "10.5" as 10
-   ! without setting iostat — this pins that fix.
+   ! without setting iostat -- this pins that fix.
    @test
    subroutine test_str2int_rejects_float()
       integer :: val, stat

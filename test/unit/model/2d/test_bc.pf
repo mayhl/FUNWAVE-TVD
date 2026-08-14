@@ -112,7 +112,7 @@ contains
 
    ! ----------------------------------------------------------------
    ! periodic_y: y-ghosts wrap the global numbering instead of
-   ! mirroring — check on a y-boundary rank.
+   ! mirroring -- check on a y-boundary rank.
    ! ----------------------------------------------------------------
    @test(npes=[4])
    subroutine test_exchange_state_periodic_y(this)
@@ -167,7 +167,7 @@ contains
 
       if (grid%is_back_boundary) then
          @assertFalse(bc%fill_west)
-         ! west ghosts keep the poison value — nothing wrote them
+         ! west ghosts keep the poison value -- nothing wrote them
          @assertEqual(-999.0_SP, fields%eta(1, grid%lp%jb), TOL_SP)
       end if
 

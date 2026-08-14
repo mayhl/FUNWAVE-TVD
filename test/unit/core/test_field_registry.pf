@@ -1,5 +1,5 @@
 module test_field_registry
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_field_registry_mod, only: type_field_registry
    implicit none
@@ -16,7 +16,7 @@ contains
       @assertTrue(reg%has("eta"))
    end subroutine test_has_before_and_after_register
 
-   ! get() must return a pointer that aliases the original — modifications
+   ! get() must return a pointer that aliases the original -- modifications
    ! through the registry pointer must be visible in the source array.
    @test
    subroutine test_get_returns_alias()

@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_fluxes
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
    use model_kernel_fluxes_mod, only: type_flux_workspace, &
@@ -34,7 +34,7 @@ contains
    end subroutine make_lp
 
    ! ----------------------------------------------------------------
-   ! delx_fun: u(i,j)=i, inv_dx=1 → slope = 1 everywhere
+   ! delx_fun: u(i,j)=i, inv_dx=1 -> slope = 1 everywhere
    ! ----------------------------------------------------------------
    @test
    subroutine test_delx_fun_linear()
@@ -61,7 +61,7 @@ contains
    end subroutine test_delx_fun_linear
 
    ! ----------------------------------------------------------------
-   ! dely_fun: u(i,j)=j, inv_dy=1 → slope = 1 everywhere
+   ! dely_fun: u(i,j)=j, inv_dy=1 -> slope = 1 everywhere
    ! ----------------------------------------------------------------
    @test
    subroutine test_dely_fun_linear()
@@ -245,7 +245,7 @@ contains
    end subroutine test_weno_construct_x_linear
 
    ! ----------------------------------------------------------------
-   ! hll3: SL >= 0 → each FOUT = its FL
+   ! hll3: SL >= 0 -> each FOUT = its FL
    ! ----------------------------------------------------------------
    @test
    subroutine test_hll_upwind()
@@ -269,7 +269,7 @@ contains
    end subroutine test_hll_upwind
 
    ! ----------------------------------------------------------------
-   ! hll3: SR <= 0 → each FOUT = its FR
+   ! hll3: SR <= 0 -> each FOUT = its FR
    ! ----------------------------------------------------------------
    @test
    subroutine test_hll_downwind()

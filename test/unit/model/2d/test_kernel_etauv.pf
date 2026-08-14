@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_etauv
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP, GRAV
    use core_grid_mod, only: type_loop_bounds, type_grid_2d
    use core_solver_tridiag_mod, only: trid_x, trid_y, trid_y_periodic, &
@@ -23,7 +23,7 @@ module test_kernel_etauv
    ! Default physics values matching FUNWAVE standard configuration
    real(SP), parameter :: FCAP = 3.0_SP     ! Froude number cap (numerics default)
    real(SP), parameter :: MIN_DEPTH = 0.01_SP    ! minimum depth floor
-   real(SP), parameter :: B1 = 0.28196_SP  ! b1 = BetaRef², BetaRef = -0.531
+   real(SP), parameter :: B1 = 0.28196_SP  ! b1 = BetaRef^2, BetaRef = -0.531
    real(SP), parameter :: B2 = -0.531_SP   ! b2 = BetaRef
 
    ! Gamma coefficients
@@ -35,7 +35,7 @@ module test_kernel_etauv
    logical, parameter :: DISP_ON = .true.
    logical, parameter :: DISP_OFF = .false.
    logical, parameter :: PERIODIC_OFF = .false.
-   logical, parameter :: DTL_OFF = .false.   ! disp_time_left — semi-implicit Gamma2 deferred
+   logical, parameter :: DTL_OFF = .false.   ! disp_time_left -- semi-implicit Gamma2 deferred
 
 contains
 
@@ -69,7 +69,7 @@ contains
    end subroutine make_serial_grid
 
    ! ----------------------------------------------------------------
-   ! drive_etauv — the coordinator calling sequence: assemble kernels
+   ! drive_etauv -- the coordinator calling sequence: assemble kernels
    ! around the core_solver_tridiag solves, then the update kernel.
    ! Mirrors what type_model_2d_main%compute_timestep will do (Step 6).
    ! ----------------------------------------------------------------
@@ -148,7 +148,7 @@ contains
    end subroutine test_workspace_alloc_free
 
    ! ----------------------------------------------------------------
-   ! update_h: nonlinear — H = 1*eta + depth.
+   ! update_h: nonlinear -- H = 1*eta + depth.
    ! ----------------------------------------------------------------
    @test
    subroutine test_update_h_nonlinear()
@@ -170,7 +170,7 @@ contains
    end subroutine test_update_h_nonlinear
 
    ! ----------------------------------------------------------------
-   ! update_h: linear (gamma3=0) — H = depth only.
+   ! update_h: linear (gamma3=0) -- H = depth only.
    ! ----------------------------------------------------------------
    @test
    subroutine test_update_h_linear()
@@ -303,7 +303,7 @@ contains
    ! ----------------------------------------------------------------
    ! Froude cap: velocity magnitude exceeding froude_cap*sqrt(g*h)
    ! is reduced to exactly that limit, direction preserved.
-   ! Two phases: U-only (utheta=0) and mixed U+V at 45° (utheta=pi/4).
+   ! Two phases: U-only (utheta=0) and mixed U+V at 45 deg (utheta=pi/4).
    ! ----------------------------------------------------------------
    @test
    subroutine test_froude_cap()
@@ -356,7 +356,7 @@ contains
          end do
       end do
 
-      ! --- phase 2: mixed U+V at 45° (utheta = pi/4) ---
+      ! --- phase 2: mixed U+V at 45 deg (utheta = pi/4) ---
       ubar = 1000.0_SP; vbar = 1000.0_SP
       u = 0.0_SP; v = 0.0_SP
 
@@ -384,7 +384,7 @@ contains
    end subroutine test_froude_cap
 
    ! ----------------------------------------------------------------
-   ! Gamma1=0, dispersion=.true.: tridiagonal is diagonal — gives
+   ! Gamma1=0, dispersion=.true.: tridiagonal is diagonal -- gives
    ! U = Ubar/H, V = Vbar/H, same as no-dispersion path.
    ! ----------------------------------------------------------------
    @test
@@ -437,7 +437,7 @@ contains
 
    ! ----------------------------------------------------------------
    ! Dispersion path, zero forcing: Ubar=0, all dispersion inputs=0
-   ! → U=V=HU=HV=0 everywhere.
+   ! -> U=V=HU=HV=0 everywhere.
    ! ----------------------------------------------------------------
    @test
    subroutine test_dispersion_zero_forcing()

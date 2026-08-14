@@ -9,7 +9,7 @@ module test_grid
 
    implicit none
 
-   ! Test grid dimensions — chosen so M=10 splits evenly across 2 ranks in x
+   ! Test grid dimensions -- chosen so M=10 splits evenly across 2 ranks in x
    integer, parameter :: TEST_M = 10
    integer, parameter :: TEST_N = 8
 
@@ -45,7 +45,7 @@ contains
       type(type_grid_2d) :: grid
       type(type_comm)    :: comm
 
-      ! 2 ranks in x, 1 in y  →  each rank gets 5 columns, all 8 rows
+      ! 2 ranks in x, 1 in y  ->  each rank gets 5 columns, all 8 rows
       call open_grid(this, grid, comm, nx_proc=2, ny_proc=1)
 
       @mpiAssertEqual(5, grid%local_nx)
@@ -73,7 +73,7 @@ contains
          @assertTrue(grid%is_shore_boundary)
       end if
 
-      ! Both ranks: single proc in y — left and right boundaries
+      ! Both ranks: single proc in y -- left and right boundaries
       @assertTrue(grid%is_left_boundary)
       @assertTrue(grid%is_right_boundary)
       @mpiAssertEqual(1, grid%jbegin)
@@ -100,7 +100,7 @@ contains
       grid%nx_proc = 2; grid%ny_proc = 1
       call grid%setup(comm, create_partition=.false.)
 
-      ! n_min=4, n_left=1 → rank 0 gets 5, rank 1 gets 4
+      ! n_min=4, n_left=1 -> rank 0 gets 5, rank 1 gets 4
       if (grid%iproc == 0) then
          @mpiAssertEqual(5, grid%local_nx)
          @mpiAssertEqual(1, grid%ibegin)
@@ -317,7 +317,7 @@ contains
    end subroutine test_halo_exchange_y
 
    ! ----------------------------------------------------------------
-   ! halo_accumulate: 2 ranks in x — ghost contributions add into the
+   ! halo_accumulate: 2 ranks in x -- ghost contributions add into the
    ! neighbour's interior edge columns and the sent ghosts are zeroed.
    ! ----------------------------------------------------------------
    @test(npes=[2])
@@ -367,7 +367,7 @@ contains
    end subroutine test_halo_accumulate_x
 
    ! ----------------------------------------------------------------
-   ! halo_accumulate: 2x2 ranks — a CORNER ghost contribution reaches
+   ! halo_accumulate: 2x2 ranks -- a CORNER ghost contribution reaches
    ! the diagonal owner via the two-hop y-then-x route.
    !   Rank (iproc=0, jproc=0) global patch x=1..5, y=1..4 writes 7 into
    !   its high-x/high-y corner ghost = global (6, 5), owned by rank
@@ -398,7 +398,7 @@ contains
       if (grid%iproc == 1 .and. grid%jproc == 1) then
          @assertEqual(7.0_SP, field(ng + 1, ng + 1), tolerance=1e-6_SP)
       else
-         ! nothing anywhere else — incl. the sender's zeroed corner
+         ! nothing anywhere else -- incl. the sender's zeroed corner
          @assertEqual(0.0_SP, maxval(abs(field)), tolerance=1e-6_SP)
       end if
 
@@ -488,7 +488,7 @@ contains
 
       call grid%halo_exchange(field)
 
-      ! Rank (iproc=0, jproc=0): high-x / high-y corner ← rank (1,1) data
+      ! Rank (iproc=0, jproc=0): high-x / high-y corner <- rank (1,1) data
       if (grid%iproc == 0 .and. grid%jproc == 0) then
          do k = 1, ng
             do j = 1, ng
@@ -498,8 +498,8 @@ contains
          end do
       end if
 
-      ! Rank (iproc=1, jproc=1): low-x / low-y corner ← rank (0,0) data
-      ! j=1 innermost ghost → global y = jbegin-1; field index = ng-j+1 = ng
+      ! Rank (iproc=1, jproc=1): low-x / low-y corner <- rank (0,0) data
+      ! j=1 innermost ghost -> global y = jbegin-1; field index = ng-j+1 = ng
       if (grid%iproc == 1 .and. grid%jproc == 1) then
          do k = 1, ng
             do j = 1, ng
@@ -509,7 +509,7 @@ contains
          end do
       end if
 
-      ! Rank (iproc=1, jproc=0): low-x / high-y corner ← rank (0,1) data
+      ! Rank (iproc=1, jproc=0): low-x / high-y corner <- rank (0,1) data
       if (grid%iproc == 1 .and. grid%jproc == 0) then
          do k = 1, ng
             do j = 1, ng
@@ -519,7 +519,7 @@ contains
          end do
       end if
 
-      ! Rank (iproc=0, jproc=1): high-x / low-y corner ← rank (1,0) data
+      ! Rank (iproc=0, jproc=1): high-x / low-y corner <- rank (1,0) data
       if (grid%iproc == 0 .and. grid%jproc == 1) then
          do k = 1, ng
             do j = 1, ng

@@ -76,7 +76,7 @@ contains
    end subroutine test_setup_solitary_flat
 
    ! ----------------------------------------------------------------
-   ! output.geometries:/channels: reader — named point sets resolve,
+   ! output.geometries:/channels: reader -- named point sets resolve,
    ! transects expand to n_points, statistics presence derives the
    ! channel kind, t_start defaults are tracked
    ! ----------------------------------------------------------------

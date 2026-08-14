@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_breaker
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
    use model_kernel_breaker_mod, only: wave_breaking, &

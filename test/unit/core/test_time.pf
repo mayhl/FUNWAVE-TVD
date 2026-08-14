@@ -1,5 +1,5 @@
 module test_time
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP
    use core_comm_mod, only: type_comm, new_comm
    use core_yaml_file_mod, only: type_yaml_reader

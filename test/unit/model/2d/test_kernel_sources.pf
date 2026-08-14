@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_kernel_sources
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP, GRAV
    use core_grid_mod, only: type_loop_bounds
    use model_kernel_sources_mod, only: cal_sources
@@ -58,7 +58,7 @@ contains
    end subroutine zero_inputs
 
    ! ----------------------------------------------------------------
-   ! Bathy slope: depth_x(i,j) = i*ds → src_x = g*eta*ds*inv_dx.
+   ! Bathy slope: depth_x(i,j) = i*ds -> src_x = g*eta*ds*inv_dx.
    ! All other terms off.  src_y = 0 (flat depth_y).
    ! ----------------------------------------------------------------
    @test
@@ -112,7 +112,7 @@ contains
    end subroutine test_bathy_slope
 
    ! ----------------------------------------------------------------
-   ! Friction: flat bathy, cd const, u=2, v=0 → src_x = -cd*u*|u|.
+   ! Friction: flat bathy, cd const, u=2, v=0 -> src_x = -cd*u*|u|.
    ! ----------------------------------------------------------------
    @test
    subroutine test_friction_drag()
@@ -211,8 +211,8 @@ contains
    end subroutine test_wavemaker_mass
 
    ! ----------------------------------------------------------------
-   ! Eddy viscosity term: linear hu (d²HU/dx² = 0) with nu_vis const
-   ! contributes exactly zero — the term is a Laplacian-type operator.
+   ! Eddy viscosity term: linear hu (d^2HU/dx^2 = 0) with nu_vis const
+   ! contributes exactly zero -- the term is a Laplacian-type operator.
    ! ----------------------------------------------------------------
    @test
    subroutine test_eddy_viscosity_linear_hu()
@@ -265,9 +265,9 @@ contains
    end subroutine test_eddy_viscosity_linear_hu
 
    ! ----------------------------------------------------------------
-   ! Coriolis: constant f and constant face fluxes →
+   ! Coriolis: constant f and constant face fluxes ->
    !   src_x = f*Q0 (face average of a constant), src_y = -f*P0.
-   ! All other terms off; same inputs with coriolis_on=.false. → 0.
+   ! All other terms off; same inputs with coriolis_on=.false. -> 0.
    ! ----------------------------------------------------------------
    @test
    subroutine test_coriolis_constant_flux()
@@ -329,9 +329,9 @@ contains
    end subroutine test_coriolis_constant_flux
 
    ! ----------------------------------------------------------------
-   ! Breakwater friction: constant cd_bw, u, depth →
+   ! Breakwater friction: constant cd_bw, u, depth ->
    !   src_x = -cd_bw*u*|u|*d (still-water depth, not H).
-   ! All other terms off; same inputs with breakwater_on=.false. → 0.
+   ! All other terms off; same inputs with breakwater_on=.false. -> 0.
    ! ----------------------------------------------------------------
    @test
    subroutine test_breakwater_drag()

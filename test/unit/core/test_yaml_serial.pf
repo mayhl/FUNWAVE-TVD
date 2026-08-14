@@ -4,7 +4,7 @@
 ! allow(E001)
 module test_yaml_serial
 
-   use pFUnit
+   use FUnit
 
    use core_comm_mod, only: type_comm, new_comm
    use core_constants_mod, only: SP, MESSAGE_SIZE, type_string

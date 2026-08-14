@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_subgrid
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP, LARGE
    use core_grid_mod, only: type_loop_bounds
    use model_subgrid_mod, only: type_model_subgrid
@@ -56,7 +56,7 @@ contains
 
       i = NG + 1; j = NG + 1
       @assertEqual(0.5_SP, sg%porosity(i, j), TOL)
-      ! (1 + 1)/4 — the two dry pixels contribute nothing but still count
+      ! (1 + 1)/4 -- the two dry pixels contribute nothing but still count
       @assertEqual(0.5_SP, sg%dep_avg(i, j), TOL)
 
       ! lift the surface above the blocks: every pixel wets
@@ -111,7 +111,7 @@ contains
 
       i = NG + 2; j = NG + 2
       ! untouched by the sweep, but the trailing clamp still lifts a
-      ! below-SMALL porosity — 0.25 is above it, so the sentinel stands
+      ! below-SMALL porosity -- 0.25 is above it, so the sentinel stands
       @assertEqual(0.25_SP, sg%porosity(i, j), TOL)
       @assertEqual(-7.0_SP, sg%dep_avg(i, j), TOL)
       @assertEqual(1.0_SP, sg%porosity(NG + 1, NG + 1), TOL)
@@ -179,7 +179,7 @@ contains
                          .false., .false., .false., &
                          zeros, zeros, zeros, zeros, zeros, &
                          eta0, ubar0, vbar0, eta, ubar, vbar)
-      ! (-2 + 1)/0.5 + 3 — the rain is NOT scaled by the porosity
+      ! (-2 + 1)/0.5 + 3 -- the rain is NOT scaled by the porosity
       expect = -2.0_SP + 3.0_SP
       @assertEqual(expect, eta(i, j), TOL)
 

@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_path
 
-   use pFUnit
+   use FUnit
    use core_path_mod
    implicit none
 

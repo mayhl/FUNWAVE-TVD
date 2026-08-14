@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_vessel
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP, PI, ZERO
    use core_grid_mod, only: type_grid_2d
    use model_vessel_mod, only: type_model_vessel, vessel_pressure_source, &

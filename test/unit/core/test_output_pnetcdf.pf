@@ -57,7 +57,7 @@ contains
    ! ----------------------------------------------------------------
    ! field snapshot, pnetcdf: two collective flushes; the subarray
    ! offsets must assemble the split linear field exactly (read back
-   ! through plain nf90 — CDF-5 is netcdf-c readable)
+   ! through plain nf90 -- CDF-5 is netcdf-c readable)
    ! ----------------------------------------------------------------
    @test(npes=[2])
    subroutine test_field_snapshot_pnetcdf(this)
@@ -133,7 +133,7 @@ contains
    end subroutine test_field_snapshot_pnetcdf
 
    ! ----------------------------------------------------------------
-   ! chunked pnetcdf: the roll-over is collective — every rank closes
+   ! chunked pnetcdf: the roll-over is collective -- every rank closes
    ! and reopens; each 1 s chunk holds exactly one assembled frame
    ! ----------------------------------------------------------------
    @test(npes=[2])

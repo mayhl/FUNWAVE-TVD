@@ -16,12 +16,12 @@ module test_interpolation
    real(SP), parameter :: TEST_DX = 5.0_SP
    real(SP), parameter :: TEST_DY = 10.0_SP
 
-   ! Rank 0: x in [0, 25)   — x(1)=0, x(5)=20; owns cell 5 via right ghost
-   ! Rank 1: x in [25, 45]  — x(1)=25, x(5)=45 (shore boundary, inclusive)
-   ! Both:   y in [0, 30]   — y(1)=0, y(4)=30   (ny_proc=1, both boundaries)
+   ! Rank 0: x in [0, 25)   -- x(1)=0, x(5)=20; owns cell 5 via right ghost
+   ! Rank 1: x in [25, 45]  -- x(1)=25, x(5)=45 (shore boundary, inclusive)
+   ! Both:   y in [0, 30]   -- y(1)=0, y(4)=30   (ny_proc=1, both boundaries)
    !
    ! src_i/src_j are ghost-inclusive: interior index li + N_GHOST.
-   ! Query point at local cell (2,2) → src_i = 2 + N_GHOST, src_j = 2 + N_GHOST.
+   ! Query point at local cell (2,2) -> src_i = 2 + N_GHOST, src_j = 2 + N_GHOST.
    !
    ! Ghost-inclusive field: allocate (local_nx + 2*N_GHOST, local_ny + 2*N_GHOST).
    ! Interior values start at index N_GHOST+1.
@@ -49,7 +49,7 @@ contains
    end subroutine open_grid
 
    ! ----------------------------------------------------------------
-   ! Query point outside entire domain → n_points = 0 on all ranks
+   ! Query point outside entire domain -> n_points = 0 on all ranks
    ! ----------------------------------------------------------------
    @test(npes=[2])
    subroutine test_init_no_points(this)
@@ -73,8 +73,8 @@ contains
    ! ----------------------------------------------------------------
    ! One point per rank; verify local count, ghost-inclusive cell indices,
    ! and weights.
-   !   Rank 0: (7.5, 15.0) → interior cell (2,2), src = (2+NG, 2+NG)
-   !   Rank 1: (32.5, 15.0) → interior cell (2,2), src = (2+NG, 2+NG)
+   !   Rank 0: (7.5, 15.0) -> interior cell (2,2), src = (2+NG, 2+NG)
+   !   Rank 1: (32.5, 15.0) -> interior cell (2,2), src = (2+NG, 2+NG)
    !   alpha = (7.5 - x(2,1)) / dx0 = (7.5-5)/5 = 0.5
    !   beta  = (15.0 - y(1,2)) / dy0 = (15-10)/10 = 0.5
    ! ----------------------------------------------------------------
@@ -101,7 +101,7 @@ contains
       @mpiAssertEqual(0.5_SP, interp%alpha(1), tolerance=1e-6_SP)
       @mpiAssertEqual(0.5_SP, interp%beta(1), tolerance=1e-6_SP)
 
-      ! point_id: rank 0 → global point 1, rank 1 → global point 2
+      ! point_id: rank 0 -> global point 1, rank 1 -> global point 2
       @mpiAssertEqual(grid%iproc + 1, interp%point_id(1))
 
       call dummy_fix_lint()
@@ -147,10 +147,10 @@ contains
    end subroutine test_gather_values
 
    ! ----------------------------------------------------------------
-   ! Point exactly at a grid node: alpha=0, beta=0 → out = field at node.
-   ! Node at local (2,2): field(i,j)=i*10+j → field(2,2)=22.
-   !   Rank 0: xq=5.0  → x(2,1)=5,  alpha=0
-   !   Rank 1: xq=30.0 → x(2,1)=30, alpha=0
+   ! Point exactly at a grid node: alpha=0, beta=0 -> out = field at node.
+   ! Node at local (2,2): field(i,j)=i*10+j -> field(2,2)=22.
+   !   Rank 0: xq=5.0  -> x(2,1)=5,  alpha=0
+   !   Rank 1: xq=30.0 -> x(2,1)=30, alpha=0
    ! ----------------------------------------------------------------
    @test(npes=[2])
    subroutine test_gather_at_node(this)
@@ -264,9 +264,9 @@ contains
 
    ! ----------------------------------------------------------------
    ! Spherical grid: alpha uses dx at the query row (lj), not row 1.
-   !   lat0=60°, dlon=1°, dlat=1°; query at row lj=3 (lat 62°).
-   !   dx(i,3) = R_EARTH*cos(62°*PI/180)*PI/180 ≠ dx(i,1).
-   !   alpha_expected = 0.5*cos(60°)/cos(62°) ≠ 0.5.
+   !   lat0=60 deg, dlon=1 deg, dlat=1 deg; query at row lj=3 (lat 62 deg).
+   !   dx(i,3) = R_EARTH*cos(62 deg*PI/180)*PI/180 /= dx(i,1).
+   !   alpha_expected = 0.5*cos(60 deg)/cos(62 deg) /= 0.5.
    !   Only rank 0 (ibegin=1) owns xq=1.5*dx_ref; rank 1 (ibegin=6) does not.
    ! ----------------------------------------------------------------
    @test(npes=[2])

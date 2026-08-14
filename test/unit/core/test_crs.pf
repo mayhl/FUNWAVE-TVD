@@ -1,5 +1,5 @@
 module test_crs
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP, PI, R_EARTH
    use core_crs_mod, only: type_crs, CRS_LOCAL, CRS_PROJECTED, CRS_GEOGRAPHIC
    implicit none
@@ -49,7 +49,7 @@ contains
    end subroutine test_projected_translate
 
    ! ----------------------------------------------------------------
-   ! CRS_PROJECTED with rotation: roundtrip to_local → to_external = identity
+   ! CRS_PROJECTED with rotation: roundtrip to_local -> to_external = identity
    ! ----------------------------------------------------------------
    @test
    subroutine test_projected_rotation_roundtrip()
@@ -77,13 +77,13 @@ contains
       real(SP) :: x_loc(1), y_loc(1), x_ext(1), y_ext(1)
       real(SP) :: expected_x, expected_y, lat0
 
-      lat0 = 30.0_SP   ! 30° N
+      lat0 = 30.0_SP   ! 30 deg N
       crs%mode = CRS_GEOGRAPHIC
       crs%origin_x = 0.0_SP
       crs%origin_y = lat0
       crs%theta = 0.0_SP
 
-      ! 1 degree east at 30°N
+      ! 1 degree east at 30 deg N
       x_ext(1) = 1.0_SP; y_ext(1) = lat0
       call crs%to_local(x_ext, y_ext, x_loc, y_loc)
 
@@ -94,7 +94,7 @@ contains
    end subroutine test_geographic_x_scale
 
    ! ----------------------------------------------------------------
-   ! CRS_GEOGRAPHIC: roundtrip lon/lat → local → lon/lat
+   ! CRS_GEOGRAPHIC: roundtrip lon/lat -> local -> lon/lat
    ! ----------------------------------------------------------------
    @test
    subroutine test_geographic_roundtrip()

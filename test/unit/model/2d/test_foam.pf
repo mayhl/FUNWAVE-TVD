@@ -1,7 +1,7 @@
 ! allow(E001)
 module test_foam
 
-   use pFUnit
+   use FUnit
    use core_constants_mod, only: SP, LARGE
    use core_grid_mod, only: type_loop_bounds
    use model_foam_mod, only: type_model_foam, foam_flux, foam_advance
