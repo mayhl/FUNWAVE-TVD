@@ -182,11 +182,9 @@ contains
          call bathy_yaml%read_enum("file_type", FILE_TYPES, val=this%bathy_ftype, default="ascii")
          call bathy_yaml%read_input_path("file", val=this%bathy_file)
          call bathy_yaml%read("correction", val=this%bathy_correction, default="NO")
-         ! NOTE: 1. the vendored legacy still READ_FLOATs these two with the
-         !          flat-txt parser, so under the YAML bridge it always lands
-         !          on the defaults — pin defaults in any parity config
-         !       2. defaults must ride the read call — yaml val is intent(out),
-         !          a silent miss wipes the type initializer
+         ! NOTE: the vendored legacy still READ_FLOATs these two with the
+         !       flat-txt parser, so under the YAML bridge it always lands
+         !       on the defaults — pin defaults in any parity config
          call bathy_yaml%read("smooth_below_depth", val=this%smooth_below_depth, &
                               default="-999999.0")
          call bathy_yaml%read("slope_cap", val=this%slope_cap, default="1.0")

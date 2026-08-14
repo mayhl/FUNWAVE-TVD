@@ -348,7 +348,7 @@ contains
       ! each mechanism: a face mapping = on + per-key coefficient override;
       ! a face boolean = on (inherited/default coefficients) or off (opt
       ! out of the shared template); absent = the shared state.  Seeds come
-      ! from the shared defaults (tmp guards the intent(out) wipe)
+      ! from the shared defaults
       call mech_gate(sp_yaml, "direct", defs%direct, on, sub_yaml, has_blk)
       if (on) then
          sponge%direct_on(f) = .true.
@@ -577,8 +577,6 @@ contains
       end if
       forced = .true.
 
-      ! yaml read val is intent(out) — a silent-miss WIPES the passed
-      ! component, so read into temps and assign only when present
       call frc_yaml%read_input_path("file", silent=no_file, val=file)
       call frc_yaml%read("eta", silent=no_eta, val=eta)
       call frc_yaml%read("u", silent=no_u, val=u)

@@ -294,11 +294,9 @@ contains
                                     "' -- valid: single per_stream chunked")
       call sub_env%yaml%read_positive("max_file_size", val=this%max_file_size, &
                                       default=DEF_OUTPUT_MAX_FILE_SIZE)
-      ! NOTE: no `default=` here on purpose -- yaml%read only assigns `silent`
-      ! when `default` is ABSENT, so asking for both hands back an unwritten
-      ! flag.  Absent key -> blowup_threshold is WIPED (val intent(out)); safety
-      ! comes from has_blow_val gating resolve_blowup(), which overwrites it with
-      ! the legacy-derived 100*max|Depth| -- NOT from value preservation
+      ! no `default=` on purpose -- the fallback is not a constant: when the
+      ! key is absent, resolve_blowup() computes the legacy-derived
+      ! 100*max|Depth|, gated by has_blow_val
       call sub_env%yaml%read("blowup_threshold", silent=no_key, val=this%blowup_threshold)
       this%has_blow_val = .not. no_key
       call sub_env%yaml%read("depth_out", val=this%depth_out, default=DEF_OUTPUT_DEPTH_OUT)
