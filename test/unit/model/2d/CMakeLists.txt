@@ -1,71 +1,71 @@
 qadd_pfunit_ctest(test_fields 2)
-target_link_libraries(test_fields libfunwave_model)
+qlink_pfunit_ctest(test_fields libfunwave_model)
 
 qadd_pfunit_ctest(test_checkpoint 2)
-target_link_libraries(test_checkpoint libfunwave_model)
+qlink_pfunit_ctest(test_checkpoint libfunwave_model)
 
 qadd_pfunit_ctest(test_scratch_pool)
-target_link_libraries(test_scratch_pool libfunwave_model)
+qlink_pfunit_ctest(test_scratch_pool libfunwave_model)
 
 qadd_pfunit_ctest(test_sponge 2)
-target_link_libraries(test_sponge libfunwave_model)
+qlink_pfunit_ctest(test_sponge libfunwave_model)
 
 file(COPY test_setup.yaml DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 file(COPY test_coexist.yaml DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
 qadd_pfunit_ctest(test_model_setup 4)
-target_link_libraries(test_model_setup libfunwave_model)
+qlink_pfunit_ctest(test_model_setup libfunwave_model)
 
 qadd_pfunit_ctest(test_wavemaker 4)
-target_link_libraries(test_wavemaker libfunwave_model)
+qlink_pfunit_ctest(test_wavemaker libfunwave_model)
 
 qadd_pfunit_ctest(test_initial 4)
-target_link_libraries(test_initial libfunwave_model)
+qlink_pfunit_ctest(test_initial libfunwave_model)
 
 qadd_pfunit_ctest(test_field_input 1)
-target_link_libraries(test_field_input libfunwave_model)
+qlink_pfunit_ctest(test_field_input libfunwave_model)
 
 qadd_pfunit_ctest(test_geometry 4)
-target_link_libraries(test_geometry libfunwave_model)
+qlink_pfunit_ctest(test_geometry libfunwave_model)
 
 qadd_pfunit_ctest(test_numerics 4)
-target_link_libraries(test_numerics libfunwave_model)
+qlink_pfunit_ctest(test_numerics libfunwave_model)
 
 qadd_pfunit_ctest(test_bc 4)
-target_link_libraries(test_bc libfunwave_model)
+qlink_pfunit_ctest(test_bc libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_bc)
-target_link_libraries(test_kernel_bc libfunwave_model)
+qlink_pfunit_ctest(test_kernel_bc libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_derivatives)
-target_link_libraries(test_kernel_derivatives libfunwave_model)
+qlink_pfunit_ctest(test_kernel_derivatives libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_fluxes)
-target_link_libraries(test_kernel_fluxes libfunwave_model)
+qlink_pfunit_ctest(test_kernel_fluxes libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_masks)
-target_link_libraries(test_kernel_masks libfunwave_model)
+qlink_pfunit_ctest(test_kernel_masks libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_dispersion)
-target_link_libraries(test_kernel_dispersion libfunwave_model)
+qlink_pfunit_ctest(test_kernel_dispersion libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_breaker)
-target_link_libraries(test_kernel_breaker libfunwave_model)
+qlink_pfunit_ctest(test_kernel_breaker libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_etauv 1)
-target_link_libraries(test_kernel_etauv libfunwave_model)
+qlink_pfunit_ctest(test_kernel_etauv libfunwave_model)
 
 qadd_pfunit_ctest(test_kernel_sources)
-target_link_libraries(test_kernel_sources libfunwave_model)
+qlink_pfunit_ctest(test_kernel_sources libfunwave_model)
 
 qadd_pfunit_ctest(test_subgrid)
-target_link_libraries(test_subgrid libfunwave_model)
+qlink_pfunit_ctest(test_subgrid libfunwave_model)
 
 qadd_pfunit_ctest(test_foam)
-target_link_libraries(test_foam libfunwave_model)
+qlink_pfunit_ctest(test_foam libfunwave_model)
 
 qadd_pfunit_ctest(test_tracer)
-target_link_libraries(test_tracer libfunwave_model)
+qlink_pfunit_ctest(test_tracer libfunwave_model)
 
 qadd_pfunit_ctest(test_vessel)
-target_link_libraries(test_vessel libfunwave_model)
+qlink_pfunit_ctest(test_vessel libfunwave_model)

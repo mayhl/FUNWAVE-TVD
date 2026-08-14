@@ -3,8 +3,8 @@
 # ==============================================================================
 
 # Macro: my_fetch_package Purpose: Wraps FetchContent to clone, register, and
-# link external dependencies like 'fortran-yaml-c' into the project
-# build system.
+# link external dependencies like 'fortran-yaml-c' into the project build
+# system.
 macro("my_fetch_package" package url rev)
 
   string(TOLOWER "${package}" _pkg_lc)
@@ -67,6 +67,14 @@ endmacro()
 # Macro: qadd_pfunit_ctest Purpose: Simplifies pFUnit test registration by
 # linking against the core library and configuring the required Fortran module
 # search paths.
+#
+# A suite given a rank count needs the PARALLEL pFUnit umbrella: `pfunit.mod` at
+# compile time for the MpiTestMethod suites, and libpfunit's own `funit_main` --
+# the one that wraps MPI_Init -- at run time for the rest.  Upstream forces
+# SKIP_MPI on MinGW (pFUnit `CMakeLists.txt`), so a Windows install ships only
+# libfunit/funit.mod and every such suite would die on a missing module, taking
+# the whole build down with it.  Those registrations are therefore skipped when
+# the located install is serial-only, and reported by qreport_pfunit_skips.
 macro("qadd_pfunit_ctest" name)
 
   set(_extra_args ${ARGN})
@@ -75,6 +83,7 @@ macro("qadd_pfunit_ctest" name)
   set(_other_sources ${CMAKE_SOURCE_DIR}/test/throw_with_pfunit.F90)
   set(_extra_use throw_with_pfunit_mod)
   set(_extra_init initialize_throw)
+  set(_max_pes "")
 
   if(${_extra_count} GREATER 0)
     list(GET _extra_args 0 _first_arg)
@@ -92,32 +101,68 @@ macro("qadd_pfunit_ctest" name)
     set(_extra_args MAX_PES ${_max_pes})
   endif()
 
-  add_pfunit_ctest(
-    ${name}
-    TEST_SOURCES
-    ${name}.pf
-    OTHER_SOURCES
-    ${_other_sources}
-    LINK_LIBRARIES
-    ${main_lib}_core
-    EXTRA_USE
-    ${_extra_use}
-    EXTRA_INITIALIZE
-    ${_extra_init}
-    ${_extra_args})
+  if(_max_pes AND NOT PFUNIT_MPI_FOUND)
 
-  target_include_directories(
-    ${name}
-    PRIVATE "$<TARGET_PROPERTY:${main_lib}_core,INTERFACE_INCLUDE_DIRECTORIES>"
-            "${CMAKE_BINARY_DIR}/src" "${CMAKE_BINARY_DIR}/src/core/engine")
+    set_property(GLOBAL APPEND PROPERTY funwave_skipped_mpi_suites ${name})
 
-  set_tests_properties(${name} PROPERTIES LABELS "unit")
-  set_target_properties(
-    ${name} PROPERTIES Fortran_MODULE_DIRECTORY
-                       ${CMAKE_CURRENT_BINARY_DIR}/mod/${name})
-  # Intel needs linker_language Fortran else error "undefined reference to
-  # `main'"
-  set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE Fortran)
+  else()
+
+    add_pfunit_ctest(
+      ${name}
+      TEST_SOURCES
+      ${name}.pf
+      OTHER_SOURCES
+      ${_other_sources}
+      LINK_LIBRARIES
+      ${main_lib}_core
+      EXTRA_USE
+      ${_extra_use}
+      EXTRA_INITIALIZE
+      ${_extra_init}
+      ${_extra_args})
+
+    target_include_directories(
+      ${name}
+      PRIVATE
+        "$<TARGET_PROPERTY:${main_lib}_core,INTERFACE_INCLUDE_DIRECTORIES>"
+        "${CMAKE_BINARY_DIR}/src" "${CMAKE_BINARY_DIR}/src/core/engine")
+
+    set_tests_properties(${name} PROPERTIES LABELS "unit")
+    set_target_properties(
+      ${name} PROPERTIES Fortran_MODULE_DIRECTORY
+                         ${CMAKE_CURRENT_BINARY_DIR}/mod/${name})
+    # Intel needs linker_language Fortran else error "undefined reference to
+    # `main'"
+    set_property(TARGET ${name} PROPERTY LINKER_LANGUAGE Fortran)
+
+  endif()
 
   unset(_extra_args)
+  unset(_max_pes)
+endmacro()
+
+# Macro: qlink_pfunit_ctest Purpose: Adds extra libraries to a suite, tolerating
+# the suite having been skipped -- a bare target_link_libraries on a name
+# qadd_pfunit_ctest declined to register is a hard configure error.
+macro("qlink_pfunit_ctest" name)
+  if(TARGET ${name})
+    target_link_libraries(${name} ${ARGN})
+  endif()
+endmacro()
+
+# Macro: qreport_pfunit_skips Purpose: Names the suites qadd_pfunit_ctest
+# dropped, so a truncated unit gate announces itself at configure time instead
+# of passing quietly with a third of the coverage missing.
+macro("qreport_pfunit_skips")
+  get_property(_skipped GLOBAL PROPERTY funwave_skipped_mpi_suites)
+  list(LENGTH _skipped _skipped_count)
+  if(${_skipped_count} GREATER 0)
+    string(REPLACE ";" " " _skipped_names "${_skipped}")
+    message(
+      STATUS "pFUnit install is serial-only (no parallel umbrella) -- skipping "
+             "${_skipped_count} MPI unit suites: ${_skipped_names}")
+  endif()
+  unset(_skipped)
+  unset(_skipped_count)
+  unset(_skipped_names)
 endmacro()
