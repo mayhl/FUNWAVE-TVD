@@ -408,7 +408,7 @@ contains
       integer :: k, kk
       logical :: no_blk, no_key
 
-      entries = sub_env%yaml%cast_dictionary_list("geometries", no_blk)
+      call sub_env%yaml%cast_dictionary_list("geometries", no_blk, entries)
       if (no_blk) then
          allocate (this%geometries(0))
          return
@@ -570,7 +570,7 @@ contains
       integer :: k, kk, iv, g
       logical :: no_blk, no_key, no_stats
 
-      entries = sub_env%yaml%cast_dictionary_list("channels", no_blk)
+      call sub_env%yaml%cast_dictionary_list("channels", no_blk, entries)
       if (no_blk) then
          allocate (this%channels(0))
          return

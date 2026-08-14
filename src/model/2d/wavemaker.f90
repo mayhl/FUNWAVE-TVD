@@ -553,7 +553,7 @@ contains
       logical :: no_wm
 
       this%wavemaker_type = "nothing"
-      entries = env%yaml%cast_dictionary_list("wavemaker", no_wm)
+      call env%yaml%cast_dictionary_list("wavemaker", no_wm, entries)
       this%is_activated = .not. no_wm
       if (no_wm) return
 
@@ -583,7 +583,7 @@ contains
       logical :: no_wm
       integer :: k, kk, n_internal
 
-      entries = env%yaml%cast_dictionary_list("wavemaker", no_wm)
+      call env%yaml%cast_dictionary_list("wavemaker", no_wm, entries)
       if (no_wm) then
          allocate (wms(0))
          return

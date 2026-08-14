@@ -261,11 +261,20 @@ contains
    !> Cast key to a list of dictionary readers: a mapping yields one child,
    !> a sequence of mappings one child per item — list-shaped sections
    !> (e.g. wavemaker:) accept both spellings transparently.
-   function cast_dictionary_list(this, key, is_empty) result(children)
+   !
+   ! A subroutine, not a function returning the array: for an ALLOCATABLE
+   ! array result of a finalizable type, gfortran emits the deallocation of
+   ! the assignment temporary BEFORE its finalizer (verified in
+   ! -fdump-tree-original, gfortran 15.2 and 16.1 alike), so
+   ! "entries = reader%cast_dictionary_list(...)" ran YamlFile_final over
+   ! freed memory -- a heap-use-after-free AddressSanitizer flags on macOS
+   ! and the Windows heap turns into a SIGSEGV.  Returning through an
+   ! intent(out) dummy builds no temporary and so has nothing to mis-order.
+   subroutine cast_dictionary_list(this, key, is_empty, children)
       class(type_yaml_reader), intent(in) :: this
       character(*), intent(in) :: key
       logical, intent(out) :: is_empty
-      type(type_yaml_reader), allocatable :: children(:)
+      type(type_yaml_reader), allocatable, intent(out) :: children(:)
 
       class(type_node), pointer :: node
       class(type_list), pointer :: list_node
@@ -304,7 +313,7 @@ contains
          call this%log%exit_on_error('Key "'//trim(key)// &
                                      '" must be a mapping or a sequence of mappings.')
       end select
-   end function cast_dictionary_list
+   end subroutine cast_dictionary_list
 
    !----------------------------------------------------------------------
    ! Typed read implementations, expanded from the retired yaml_body.inc
