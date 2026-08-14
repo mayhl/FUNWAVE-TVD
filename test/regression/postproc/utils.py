@@ -333,7 +333,8 @@ def get_output_variables(
         suffixes = [int(m.group(1)) for f in output_dir.iterdir() if (m := _STATION_RE.match(f.name))]
         if not suffixes:
             return []
-        return [VariableInfo("sta", min(suffixes), max(suffixes))]
+        # stations carry no 99999 sentinel -- that convention is field-file only
+        return [VariableInfo("sta", min(suffixes), max(suffixes), unstable=False)]
 
     _KIND_MAP: dict[str, frozenset[str]] = {
         "field": FIELD_PREFIXES,
