@@ -26,6 +26,8 @@ install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/modules/"
 # * Debug: runtime checks + FPE traps + warnings
 # * Coverage: GNU-only lcov diagnostic (empty elsewhere -> guarded)
 # * Benchmark: this-machine peak + symbols for timing/profiling
+#
+# plus funwave_asan_flags: the USE_ASAN add-on, empty where unsupported
 set(fc_config
     "${CMAKE_CURRENT_SOURCE_DIR}/compilers/${CMAKE_Fortran_COMPILER_ID}.cmake")
 if(NOT EXISTS "${fc_config}")
@@ -40,8 +42,31 @@ if(CMAKE_BUILD_TYPE STREQUAL "Coverage" AND funwave_flags_coverage STREQUAL "")
   )
 endif()
 
-# Propagated to PARENT_SCOPE so the flags apply to every target defined in
-# the root CMakeLists.txt
+# AddressSanitizer stacks on top of whichever build type is selected -- an
+# on-demand diagnostic, never a refs or timing build.  It is what catches the
+# class the suite cannot see: gfortran frees the temporary of an
+# allocatable-array function result before running the type's FINAL, and the
+# stale read lands in slack the allocator leaves intact (43/43 green with a live
+# one).  Fortran only: the C compiler is often a different vendor from the
+# Fortran one, and two sanitizer runtimes cannot share a link.
+if(USE_ASAN)
+  if(funwave_asan_flags STREQUAL "")
+    message(FATAL_ERROR "ASan build not configured for "
+                        "${CMAKE_Fortran_COMPILER_ID}")
+  endif()
+  # The compiler file may name a runtime library to link instead of repeating
+  # the compile flag on the link line
+  if(NOT DEFINED funwave_asan_link_flags)
+    set(funwave_asan_link_flags "${funwave_asan_flags}")
+  endif()
+  string(APPEND funwave_base_flags " ${funwave_asan_flags}")
+  set(CMAKE_EXE_LINKER_FLAGS
+      "${CMAKE_EXE_LINKER_FLAGS} ${funwave_asan_link_flags}"
+      PARENT_SCOPE)
+endif()
+
+# Propagated to PARENT_SCOPE so the flags apply to every target defined in the
+# root CMakeLists.txt
 set(CMAKE_Fortran_FLAGS
     "${CMAKE_Fortran_FLAGS} ${funwave_base_flags}"
     PARENT_SCOPE)

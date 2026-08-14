@@ -19,3 +19,5 @@ set(funwave_flags_debug "-O0 -g -check all -fpe0")
 # would go here if that path is ever stood up
 set(funwave_flags_coverage "")
 set(funwave_flags_benchmark "-O3 -xHost -g")
+# ASan add-on (USE_ASAN): ifx takes -fsanitize=address, untested here
+set(funwave_asan_flags "-fsanitize=address -fno-omit-frame-pointer -g")

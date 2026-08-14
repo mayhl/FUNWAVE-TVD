@@ -23,3 +23,19 @@ set(funwave_flags_coverage "-O0 -g --coverage")
 # Benchmark: this-machine peak + symbols for timing/profiler attribution --
 # never for refs (native arch breaks cross-machine bitwise)
 set(funwave_flags_benchmark "-O3 -march=native -g")
+# ASan add-on (USE_ASAN): -g here too so a Release+ASan run still names lines
+set(funwave_asan_flags "-fsanitize=address -fno-omit-frame-pointer -g")
+# The runtime goes on the link by absolute path instead of -fsanitize=address:
+# the vendored FortranCInterface probe links gfortran objects with the C driver,
+# and clang's sanitizer runtime does not export GCC's symbols
+if(USE_ASAN)
+  execute_process(
+    COMMAND ${CMAKE_Fortran_COMPILER}
+            -print-file-name=libasan${CMAKE_SHARED_LIBRARY_SUFFIX}
+    OUTPUT_VARIABLE _asan_runtime
+    OUTPUT_STRIP_TRAILING_WHITESPACE)
+  if(EXISTS "${_asan_runtime}")
+    set(funwave_asan_link_flags "${_asan_runtime}")
+  endif()
+  unset(_asan_runtime)
+endif()

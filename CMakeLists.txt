@@ -44,6 +44,7 @@ option(USE_NETCDF "Enable NetCDF output when netcdf-fortran is found" ON)
 option(USE_PNETCDF "Enable parallel PnetCDF field output when PnetCDF is found"
        ON)
 option(USE_OPENMP "Enable OpenMP threading (hybrid MPI x OpenMP)" OFF)
+option(USE_ASAN "Build with AddressSanitizer (on-demand memory diagnostic)" OFF)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)

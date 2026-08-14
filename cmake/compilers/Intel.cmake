@@ -7,3 +7,5 @@ set(funwave_flags_relwithdebinfo "-O2 -g")
 set(funwave_flags_debug "-O0 -g -check all -fpe0")
 set(funwave_flags_coverage "")
 set(funwave_flags_benchmark "-O3 -xHost -g")
+# ASan add-on (USE_ASAN): ifort takes -fsanitize=address, untested here
+set(funwave_asan_flags "-fsanitize=address -fno-omit-frame-pointer -g")
