@@ -298,10 +298,15 @@ simulations:
 
   - name: standing_wave_3d_10m
     exe_type: central-3d
-    # decomp pinned np=2 (PX=2|Mglob=100): wheat scan showed the 3D HYPRE Poisson
-    # solve does not strong-scale (np=1 52.9s, np=2 47.3s best, np=16 slower than
-    # serial) — HYPRE is not yet implemented efficiently. np=2 is the measured
-    # optimum; revisit if/when the 3D solver is tuned. PY=1 forced by Nglob=3.
+    # decomp pinned np=2 (PX=2|Mglob=100, PY=1 forced by Nglob=3). The pin is
+    # about this case's size, not the solver: 100x3x24 = 7,200 cells leaves ~1,800
+    # per rank at PX=2, and past that the run is halo and per-stage solver setup.
+    # The solver itself does strong-scale on a realistic problem —
+    # bench_decks/poisson_scale_3d (192x96x16, wheat/ifx, 2026-08-13) hits 4.1x at
+    # np=16 and a 4.3x optimum at np=32, turning back up by np=64 — but parallel
+    # efficiency still falls off hard (84% np=2, 46% np=8, 14% np=32) because
+    # GMRES and the SMG preconditioner are rebuilt every RK stage. 2fb47bf
+    # persisted only the grid/matrix/vector objects and left that curve unmoved.
     decomp: [2, 1]
     # the vendor ref reads ./input.txt only (no yaml, no argv): the legacy 10m
     # deck stays in the input dir under that name and stages with the run
