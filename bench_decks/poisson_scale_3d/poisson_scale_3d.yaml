@@ -1,0 +1,96 @@
+# 3D strong-scaling deck — closed-basin standing wave over a flat bed.
+#
+# Purpose: exercise the non-hydrostatic HYPRE Poisson solve (GMRES + SMG
+# preconditioner, src/model/3d/old/kernel.F:hypre_pres_solver) under a rank
+# ladder, so per-step wall time can be turned into a parallel-efficiency curve.
+#
+# Sizing rationale
+#   1. Mglob=192 is divisible by every PX in the ladder {1,2,4,8} and Nglob=96
+#      by every PY in {1,2,4,8}.  INDEX_LOCAL (src/model/3d/old/init.F) computes
+#      Mloc = Mglob/PX + 2*Nghost by INTEGER DIVISION with no remainder handling
+#      and no divisibility check, so a non-divisible grid silently drops a
+#      column and each rank count would benchmark a different problem.
+#   2. 192*96*16 = 294,912 cells keeps 9,216 cells/rank at np=32, well clear of
+#      the halo-dominated regime, while np=1 stays a few minutes.
+#   3. dt is pinned (dt_ini = dt_max, both below the CFL limit dx/sqrt(g*h) *
+#      cfl ~= 1.0e-2 s) so estimate_dt never adapts: identical dt, identical
+#      step count, and identical matrix coefficients at every rank count.
+#      sim_steps therefore fixes the work exactly; total_time is a dead stop.
+#   4. Field output is switched off inside the timed loop (plot_intv far beyond
+#      the run) so the "Simulation takes ... seconds" timer around
+#      SINGLE_GRID_LOOP measures stepping, not I/O.
+#
+# Physics: uniform depth h = 10 m, domain 38.4 m x 19.2 m, initial free surface
+# eta0 = 0.1*cos(4*pi*x/Lx) — the fourth closed-basin mode, wavelength 19.2 m,
+# so kh = 3.27.  Strongly non-hydrostatic (the regression standing wave runs at
+# kh = pi), which is the point: it keeps the Poisson solve load-bearing.
+# Velocities and dynamic pressure start at rest, so the wave is at its crest
+# phase and the run stays linear (a/h = 0.01).
+#
+# Generate data/ and the per-rank decomposition variants with make_case.py.
+
+geometry:
+  grid_size: [192, 96, 16]
+  cell_size: [0.2, 0.2]
+  ivgrd: 1
+  decomposition:
+    nx_proc: 1
+    ny_proc: 1
+  bathymetry:
+    type: CELL_CENTER
+    analytic: false
+    file: data/depth.txt
+  bottom:
+    roughness_type: 1
+    cd: 0.0025
+    zob: 1.5e-05
+    min_depth: 0.002
+simulation:
+  # total_time is deliberately unreachable — sim_steps ends the run
+  total_time: 100000.0
+  # 60 steps puts the np=1 arm near 200 s at ~3.5 s/step on wheat/ifx; the
+  # driver rewrites this line, so the deck stays the single source of truth
+  sim_steps: 60
+  plot_start: 0.0
+  plot_intv: 100000.0
+  screen_intv: 0.6
+  cfl: 0.5
+  time_stepping:
+    dt_ini: 0.008
+    dt_min: 1e-05
+    dt_max: 0.008
+physics:
+  barotropic: true
+  non_hydro: true
+  high_order: SECOND
+  time_order: SECOND
+  convection: HLPA
+  tramp: 0.0
+turbulence:
+  ivturb: 10
+  ihturb: 10
+  visc: 1e-06
+  schmidt: 1.0
+  cvs: 0.001
+  chs: 0.001
+  viscous_number: 0.1666667
+solver:
+  solver_type: 2
+  max_iter: 1000
+  tolerance: 1e-08
+boundary_conditions:
+  bc_x0: 1
+  bc_xn: 1
+  bc_y0: 1
+  bc_yn: 1
+  bc_z0: 1
+  bc_zn: 1
+hot_start:
+  eta_file: data/eta0.txt
+  u_file: data/u0.txt
+  v_file: data/v0.txt
+  w_file: data/w0.txt
+  p_file: data/p0.txt
+output:
+  result_folder: output/
+  variables: [ETA]
