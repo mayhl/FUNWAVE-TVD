@@ -282,7 +282,10 @@
              0,1,-1,1,0,-1,0,0,-1,-1,0,-1,0,-1,-1/
 
      ! grid/stencil/matrix/vector objects are stage-invariant: built once and
-     ! reused across calls; only the coefficients and rhs change per RK stage
+     ! reused across calls; only the coefficients and rhs change per RK stage.
+     ! Initialize allocates each object's data array, so it belongs in here too
+     ! -- calling it per stage leaks ~5.8 MB/rank/stage; later stages reload
+     ! through SetBoxValues + Assemble alone
      if(.not.built) then
      ! set up a three dimensional grid
      call HYPRE_StructGridCreate(MPI_COMM_WORLD,ndim,grid,ierr)
@@ -333,10 +336,13 @@
 
      ! create matrix object
      call HYPRE_StructMatrixCreate(MPI_COMM_WORLD,grid,stencil,matrix,ierr)
+     call HYPRE_StructMatrixInitialize(matrix,ierr)
 
      ! set up struct vectors for b and x
      call HYPRE_StructVectorCreate(MPI_COMM_WORLD,grid,vec_b,ierr)
      call HYPRE_StructVectorCreate(MPI_COMM_WORLD,grid,vec_x,ierr)
+     call HYPRE_StructVectorInitialize(vec_b,ierr)
+     call HYPRE_StructVectorInitialize(vec_x,ierr)
 
      allocate(indx(Mloc,Nloc,Kloc))
 
@@ -356,8 +362,6 @@
 
      built = .true.
      endif
-
-     call HYPRE_StructMatrixInitialize(matrix,ierr)
 
      ! set the matrix coefficient
      do i = 1,nentries
@@ -380,9 +384,6 @@
                                   stencil_indices,values,ierr)
      call HYPRE_StructMatrixAssemble(matrix,ierr)
      !call HYPRE_StructMatrixPrint(matrix,zero,ierr)
-
-     call HYPRE_StructVectorInitialize(vec_b,ierr)
-     call HYPRE_StructVectorInitialize(vec_x,ierr)
 
      ! set the vector coefficients
      call HYPRE_StructVectorSetBoxValues(vec_b,ilower,iupper,Rhs,ierr)
