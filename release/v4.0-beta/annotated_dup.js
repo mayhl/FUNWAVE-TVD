@@ -33,6 +33,7 @@ var annotated_dup =
       [ "type_log_writer", "structcore__log__io__mod_1_1type__log__writer.html", null ]
     ] ],
     [ "core_output_channel_mod", null, [
+      [ "type_channel_derived", "structcore__output__channel__mod_1_1type__channel__derived.html", null ],
       [ "type_output_channel", "structcore__output__channel__mod_1_1type__output__channel.html", null ],
       [ "type_var_meta", "structcore__output__channel__mod_1_1type__var__meta.html", null ]
     ] ],
@@ -69,9 +70,6 @@ var annotated_dup =
     [ "core_yaml_file_mod", null, [
       [ "type_yaml_reader", "structcore__yaml__file__mod_1_1type__yaml__reader.html", "structcore__yaml__file__mod_1_1type__yaml__reader" ]
     ] ],
-    [ "input_read", null, [
-      [ "read_four_type_values", "interfaceinput__read_1_1read__four__type__values.html", null ]
-    ] ],
     [ "model_3d_baroclinic_mod", null, [
       [ "type_model_3d_baroclinic", "structmodel__3d__baroclinic__mod_1_1type__model__3d__baroclinic.html", null ]
     ] ],
@@ -81,6 +79,9 @@ var annotated_dup =
     [ "model_3d_config_mod", null, [
       [ "type_model_3d_config", "structmodel__3d__config__mod_1_1type__model__3d__config.html", null ]
     ] ],
+    [ "model_3d_friction_mod", null, [
+      [ "type_model_3d_friction", "structmodel__3d__friction__mod_1_1type__model__3d__friction.html", null ]
+    ] ],
     [ "model_3d_geometry_mod", null, [
       [ "type_model_3d_geometry", "structmodel__3d__geometry__mod_1_1type__model__3d__geometry.html", null ]
     ] ],
@@ -89,6 +90,9 @@ var annotated_dup =
     ] ],
     [ "model_3d_mod", null, [
       [ "type_model_3d", "structmodel__3d__mod_1_1type__model__3d.html", null ]
+    ] ],
+    [ "model_3d_numerics_mod", null, [
+      [ "type_model_3d_numerics", "structmodel__3d__numerics__mod_1_1type__model__3d__numerics.html", null ]
     ] ],
     [ "model_3d_output_mod", null, [
       [ "type_model_3d_output", "structmodel__3d__output__mod_1_1type__model__3d__output.html", null ]

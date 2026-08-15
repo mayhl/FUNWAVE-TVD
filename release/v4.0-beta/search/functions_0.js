@@ -4,5 +4,6 @@ var searchData=
   ['alloc_1',['alloc',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#a5956fec8d9fbfdb95de46ae247751e26',1,'model_fields_2d_mod::type_fields_2d']]],
   ['alloc_5fbreaking_2',['alloc_breaking',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#a908ec8add451f443322df1ce2519755b',1,'model_fields_2d_mod::type_fields_2d']]],
   ['allocate_5fstat_3',['allocate_stat',['../structcore__accumulators__mod_1_1type__accumulator.html#ad6e89d75d1d6e9a44a9fb01ce334ea79',1,'core_accumulators_mod::type_accumulator::allocate_stat()'],['../namespacecore__accumulators__mod.html#a38d5ac39ad9485d19e520784a87b40fb',1,'core_accumulators_mod::allocate_stat()']]],
-  ['apply_4',['apply',['../structmodel__sponge__mod_1_1type__model__sponge.html#a494b68dbb81a39195f4c200be00114e6',1,'model_sponge_mod::type_model_sponge']]]
+  ['apply_4',['apply',['../structmodel__sponge__mod_1_1type__model__sponge.html#a494b68dbb81a39195f4c200be00114e6',1,'model_sponge_mod::type_model_sponge']]],
+  ['apply_5fpml_5',['apply_pml',['../structmodel__sponge__mod_1_1type__model__sponge.html#a27809b5e749b734e0e4216783003fa71',1,'model_sponge_mod::type_model_sponge']]]
 ];

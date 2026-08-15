@@ -8,5 +8,6 @@ var searchData=
   ['depth_5fx_5',['depth_x',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#a81de6d6089527314e126f07aed7d8152',1,'model_fields_2d_mod::type_fields_2d']]],
   ['depth_5fy_6',['depth_y',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#ae9b3544513ce2213eee9c9928be0cd51',1,'model_fields_2d_mod::type_fields_2d']]],
   ['dim1_7',['dim1',['../structcore__accumulators__mod_1_1type__accumulator.html#ae6232b2084164cafa63d48dacad0432a',1,'core_accumulators_mod::type_accumulator']]],
-  ['dim2_8',['dim2',['../structcore__accumulators__mod_1_1type__accumulator.html#a4b621277e421e6df2b942ff3c734dfc2',1,'core_accumulators_mod::type_accumulator']]]
+  ['dim2_8',['dim2',['../structcore__accumulators__mod_1_1type__accumulator.html#a4b621277e421e6df2b942ff3c734dfc2',1,'core_accumulators_mod::type_accumulator']]],
+  ['disp_5fw_9',['disp_w',['../structmodel__fields__2d__mod_1_1type__fields__2d.html#ae7d8119e01bfa2257e53eb778eef65c3',1,'model_fields_2d_mod::type_fields_2d']]]
 ];

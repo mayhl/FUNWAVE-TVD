@@ -130,6 +130,15 @@ procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>transfer
 <tr class="memitem:a348d3812efe934b99ca92d5a01f1d00b" id="r_a348d3812efe934b99ca92d5a01f1d00b"><td class="memItemLeft" align="right" valign="top"><a id="a348d3812efe934b99ca92d5a01f1d00b" name="a348d3812efe934b99ca92d5a01f1d00b"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>clone</b> (this, node)</td></tr>
 <tr class="separator:a348d3812efe934b99ca92d5a01f1d00b"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a41133e068b0ce65a794199fb1db158b3" id="r_a41133e068b0ce65a794199fb1db158b3"><td class="memItemLeft" align="right" valign="top"><a id="a41133e068b0ce65a794199fb1db158b3" name="a41133e068b0ce65a794199fb1db158b3"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>mark_reserved</b> (this, key)</td></tr>
+<tr class="separator:a41133e068b0ce65a794199fb1db158b3"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa394222a4892732571ef28c183f86b4e" id="r_aa394222a4892732571ef28c183f86b4e"><td class="memItemLeft" align="right" valign="top"><a id="aa394222a4892732571ef28c183f86b4e" name="aa394222a4892732571ef28c183f86b4e"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>mark_read</b> (this, key)</td></tr>
+<tr class="separator:aa394222a4892732571ef28c183f86b4e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a48e80831b61163f5f3614609c110b0b6" id="r_a48e80831b61163f5f3614609c110b0b6"><td class="memItemLeft" align="right" valign="top"><a id="a48e80831b61163f5f3614609c110b0b6" name="a48e80831b61163f5f3614609c110b0b6"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>report_unread</b> (this)</td></tr>
+<tr class="separator:a48e80831b61163f5f3614609c110b0b6"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2e55d27355a8611ab6c0f675ed3aa586" id="r_a2e55d27355a8611ab6c0f675ed3aa586"><td class="memItemLeft" align="right" valign="top"><a id="a2e55d27355a8611ab6c0f675ed3aa586" name="a2e55d27355a8611ab6c0f675ed3aa586"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>parse_error_message</b> (this, key, io_err, default, silent)</td></tr>
 <tr class="separator:a2e55d27355a8611ab6c0f675ed3aa586"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -148,10 +157,10 @@ procedure&#160;</td><td class="memItemRight" valign="bottom"><b>sanitize_path</b
 <tr class="memitem:a417254abfe7babaa38d26b092c6cecf8" id="r_a417254abfe7babaa38d26b092c6cecf8"><td class="memItemLeft" align="right" valign="top"><a id="a417254abfe7babaa38d26b092c6cecf8" name="a417254abfe7babaa38d26b092c6cecf8"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>cast_dictionary</b> (this, key, is_empty)</td></tr>
 <tr class="separator:a417254abfe7babaa38d26b092c6cecf8"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:ac2ce1017a84d248cf7a0d5cbfe34b410" id="r_ac2ce1017a84d248cf7a0d5cbfe34b410"><td class="memItemLeft" align="right" valign="top"><a id="ac2ce1017a84d248cf7a0d5cbfe34b410" name="ac2ce1017a84d248cf7a0d5cbfe34b410"></a>
-procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>cast_dictionary_list</b> (this, key, is_empty)</td></tr>
-<tr class="memdesc:ac2ce1017a84d248cf7a0d5cbfe34b410"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cast key to a list of dictionary readers: a mapping yields one child, a sequence of mappings one child per item — list-shaped sections (e.g. wavemaker:) accept both spellings transparently. <br /></td></tr>
-<tr class="separator:ac2ce1017a84d248cf7a0d5cbfe34b410"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a845a7a63edcab450428ecbe961db8fed" id="r_a845a7a63edcab450428ecbe961db8fed"><td class="memItemLeft" align="right" valign="top"><a id="a845a7a63edcab450428ecbe961db8fed" name="a845a7a63edcab450428ecbe961db8fed"></a>
+procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>cast_dictionary_list</b> (this, key, is_empty, children)</td></tr>
+<tr class="memdesc:a845a7a63edcab450428ecbe961db8fed"><td class="mdescLeft">&#160;</td><td class="mdescRight">Cast key to a list of dictionary readers: a mapping yields one child, a sequence of mappings one child per item — list-shaped sections (e.g. wavemaker:) accept both spellings transparently. <br /></td></tr>
+<tr class="separator:a845a7a63edcab450428ecbe961db8fed"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a0211483a06863d62696d2ba4ae53ed79" id="r_a0211483a06863d62696d2ba4ae53ed79"><td class="memItemLeft" align="right" valign="top"><a id="a0211483a06863d62696d2ba4ae53ed79" name="a0211483a06863d62696d2ba4ae53ed79"></a>
 procedure, public&#160;</td><td class="memItemRight" valign="bottom"><b>is_dictionary</b> (this, key, is_empty)</td></tr>
 <tr class="separator:a0211483a06863d62696d2ba4ae53ed79"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -284,6 +293,9 @@ Public Attributes</h2></td></tr>
 <tr class="memitem:a8d205a034bc22236ce4baed0875a01b9" id="r_a8d205a034bc22236ce4baed0875a01b9"><td class="memItemLeft" align="right" valign="top"><a id="a8d205a034bc22236ce4baed0875a01b9" name="a8d205a034bc22236ce4baed0875a01b9"></a>
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_io_node</b> = .False.</td></tr>
 <tr class="separator:a8d205a034bc22236ce4baed0875a01b9"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab5e155e439a25da1a4c796717934215f" id="r_ab5e155e439a25da1a4c796717934215f"><td class="memItemLeft" align="right" valign="top"><a id="ab5e155e439a25da1a4c796717934215f" name="ab5e155e439a25da1a4c796717934215f"></a>
+logical&#160;</td><td class="memItemRight" valign="bottom"><b>unread_strict</b> = .false.</td></tr>
+<tr class="separator:ab5e155e439a25da1a4c796717934215f"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a10b4ef847a53aeb29c841f1397858181" id="r_a10b4ef847a53aeb29c841f1397858181"><td class="memItemLeft" align="right" valign="top"><a id="a10b4ef847a53aeb29c841f1397858181" name="a10b4ef847a53aeb29c841f1397858181"></a>
 character(message_size)&#160;</td><td class="memItemRight" valign="bottom"><b>path</b> = &quot;&quot;</td></tr>
 <tr class="separator:a10b4ef847a53aeb29c841f1397858181"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -296,6 +308,9 @@ type(<a class="el" href="structcore__comm__mod_1_1type__comm.html">type_comm</a>
 <tr class="memitem:aaf36838ffef4087196f700b9af2bbd7f" id="r_aaf36838ffef4087196f700b9af2bbd7f"><td class="memItemLeft" align="right" valign="top"><a id="aaf36838ffef4087196f700b9af2bbd7f" name="aaf36838ffef4087196f700b9af2bbd7f"></a>
 class(type_dictionary), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>root</b> =&gt; null()</td></tr>
 <tr class="separator:aaf36838ffef4087196f700b9af2bbd7f"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a469720124708f41ec3110024957b248a" id="r_a469720124708f41ec3110024957b248a"><td class="memItemLeft" align="right" valign="top"><a id="a469720124708f41ec3110024957b248a" name="a469720124708f41ec3110024957b248a"></a>
+type(type_visited_set), pointer&#160;</td><td class="memItemRight" valign="bottom"><b>visited</b> =&gt; null()</td></tr>
+<tr class="separator:a469720124708f41ec3110024957b248a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a8c6410837b190318a44abce467fe844e" id="r_a8c6410837b190318a44abce467fe844e"><td class="memItemLeft" align="right" valign="top"><a id="a8c6410837b190318a44abce467fe844e" name="a8c6410837b190318a44abce467fe844e"></a>
 type(yamlfile)&#160;</td><td class="memItemRight" valign="bottom"><b>file</b></td></tr>
 <tr class="separator:a8c6410837b190318a44abce467fe844e"><td class="memSeparator" colspan="2">&#160;</td></tr>

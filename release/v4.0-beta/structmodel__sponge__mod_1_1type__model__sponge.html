@@ -142,6 +142,21 @@ procedure&#160;</td><td class="memItemRight" valign="bottom"><b>any_diffusion</b
 <tr class="memitem:a494b68dbb81a39195f4c200be00114e6" id="r_a494b68dbb81a39195f4c200be00114e6"><td class="memItemLeft" align="right" valign="top">procedure&#160;</td><td class="memItemRight" valign="bottom"><a class="el" href="structmodel__sponge__mod_1_1type__model__sponge.html#a494b68dbb81a39195f4c200be00114e6">apply</a> (this, fields, grid)</td></tr>
 <tr class="memdesc:a494b68dbb81a39195f4c200be00114e6"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply Larsen-Dancy (1983) per-stage damping to the state (legacy SPONGE_DAMPING, old/sponge.F).  <br /></td></tr>
 <tr class="separator:a494b68dbb81a39195f4c200be00114e6"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae759fca83a09321bb1c426bd9f935d9d" id="r_ae759fca83a09321bb1c426bd9f935d9d"><td class="memItemLeft" align="right" valign="top"><a id="ae759fca83a09321bb1c426bd9f935d9d" name="ae759fca83a09321bb1c426bd9f935d9d"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>any_pml</b> (this)</td></tr>
+<tr class="separator:ae759fca83a09321bb1c426bd9f935d9d"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:af49dc676aba1a0058c762a7c68221ade" id="r_af49dc676aba1a0058c762a7c68221ade"><td class="memItemLeft" align="right" valign="top"><a id="af49dc676aba1a0058c762a7c68221ade" name="af49dc676aba1a0058c762a7c68221ade"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init_pml</b> (this, grid, depth, env)</td></tr>
+<tr class="memdesc:af49dc676aba1a0058c762a7c68221ade"><td class="mdescLeft">&#160;</td><td class="mdescRight">Build the y-PML damping field. Single-direction (sigma_y only, N/S faces) so no corner tensor terms exist; overlap with a W/E direct sponge is plain additive damping. Quadratic profile grows from the interior edge toward the boundary with sigma_max = 3 c / (2 W) * ln(1/R), c = sqrt(g h_local) (the standard polynomial-PML reflection estimate at normal incidence). A smoothstep depth gate tapers sigma to zero below h_gate so the shoreward strip end hands off to the beach &ndash; no aux dynamics on wet/dry cells. Needs depth, so it runs after bathymetry setup (separate from init_compute, whose call site predates depth). <br /></td></tr>
+<tr class="separator:af49dc676aba1a0058c762a7c68221ade"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a27809b5e749b734e0e4216783003fa71" id="r_a27809b5e749b734e0e4216783003fa71"><td class="memItemLeft" align="right" valign="top"><a id="a27809b5e749b734e0e4216783003fa71" name="a27809b5e749b734e0e4216783003fa71"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>apply_pml</b> (this, fields, grid, dt)</td></tr>
+<tr class="memdesc:a27809b5e749b734e0e4216783003fa71"><td class="mdescLeft">&#160;</td><td class="mdescRight">Apply the unsplit y-PML as a per-step split correction (final RK stage only &ndash; the caller gates on istage). Derivation: with the stretched derivative dy -&gt; (iw/(iw+sigma)) dy the linearized system becomes eta_t = -(P_x + Q_y) + psi, psi_t = sigma (Q_y - psi) Q_t = ... - sigma Q i.e. one strip-local auxiliary psi carrying the removed share of the y-divergence, and Rayleigh damping on the y-momentum alone (u and the x-divergence are untouched &ndash; that is what distinguishes PML from a direct sponge and buys the oblique/broadband absorption). psi integrates exactly (exponential); q/v/hv share the decay factor so the derived fields stay consistent with the conserved flux. <br /></td></tr>
+<tr class="separator:a27809b5e749b734e0e4216783003fa71"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae9cb64a56e672fe9638abbe95c5bfa9a" id="r_ae9cb64a56e672fe9638abbe95c5bfa9a"><td class="memItemLeft" align="right" valign="top"><a id="ae9cb64a56e672fe9638abbe95c5bfa9a" name="ae9cb64a56e672fe9638abbe95c5bfa9a"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>pml_blank_mask9</b> (this, mask9)</td></tr>
+<tr class="memdesc:ae9cb64a56e672fe9638abbe95c5bfa9a"><td class="mdescLeft">&#160;</td><td class="mdescRight">Force the PML strip to NSWE by blanking mask9 (identity tridiagonal rows + dispersion assembly gates &ndash; the existing SWE-fallback path). The sigma_y stretch is a PML of the shallow-water system only; with the Boussinesq auxiliaries live in-strip the mismatch terms pump (measured: blow-up at t~12 s vs clean under scheme: nswe). The static SWE interface at the strip edge partially reflects the dispersive tail; sigma = 0 there, and long waves &ndash; the harbor concern &ndash; cross it cleanly. Call after every mask9 rebuild, BEFORE update_disp_weight. <br /></td></tr>
+<tr class="separator:ae9cb64a56e672fe9638abbe95c5bfa9a"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a051b213a2f2372d13ccbfea9deb1d494" id="r_a051b213a2f2372d13ccbfea9deb1d494"><td class="memItemLeft" align="right" valign="top"><a id="a051b213a2f2372d13ccbfea9deb1d494" name="a051b213a2f2372d13ccbfea9deb1d494"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>free</b> (this)</td></tr>
 <tr class="separator:a051b213a2f2372d13ccbfea9deb1d494"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -176,6 +191,18 @@ real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>cd_
 <tr class="memitem:af7f08339d485499f48ea76e600d40b65" id="r_af7f08339d485499f48ea76e600d40b65"><td class="memItemLeft" align="right" valign="top"><a id="af7f08339d485499f48ea76e600d40b65" name="af7f08339d485499f48ea76e600d40b65"></a>
 real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>nu_diff</b> = 0.1_SP</td></tr>
 <tr class="separator:af7f08339d485499f48ea76e600d40b65"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a37765f720d8dae15336d0aabcf732227" id="r_a37765f720d8dae15336d0aabcf732227"><td class="memItemLeft" align="right" valign="top"><a id="a37765f720d8dae15336d0aabcf732227" name="a37765f720d8dae15336d0aabcf732227"></a>
+logical, dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>pml_on</b> = .false.</td></tr>
+<tr class="separator:a37765f720d8dae15336d0aabcf732227"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:aa63a8381903aa7bd8713aa60360eb564" id="r_aa63a8381903aa7bd8713aa60360eb564"><td class="memItemLeft" align="right" valign="top"><a id="aa63a8381903aa7bd8713aa60360eb564" name="aa63a8381903aa7bd8713aa60360eb564"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>pml_r</b> = 0.001_SP</td></tr>
+<tr class="separator:aa63a8381903aa7bd8713aa60360eb564"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a037457a6a6b651422c3a7c6ddcf76dfa" id="r_a037457a6a6b651422c3a7c6ddcf76dfa"><td class="memItemLeft" align="right" valign="top"><a id="a037457a6a6b651422c3a7c6ddcf76dfa" name="a037457a6a6b651422c3a7c6ddcf76dfa"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>pml_hgate</b> = 2.0_SP</td></tr>
+<tr class="separator:a037457a6a6b651422c3a7c6ddcf76dfa"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0df78c144adc8286e263454aa3297716" id="r_a0df78c144adc8286e263454aa3297716"><td class="memItemLeft" align="right" valign="top"><a id="a0df78c144adc8286e263454aa3297716" name="a0df78c144adc8286e263454aa3297716"></a>
+real(sp), dimension(4)&#160;</td><td class="memItemRight" valign="bottom"><b>pml_width</b> = 0.0_SP</td></tr>
+<tr class="separator:a0df78c144adc8286e263454aa3297716"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a7b8b0c55f52884f834e99cfec560f823" id="r_a7b8b0c55f52884f834e99cfec560f823"><td class="memItemLeft" align="right" valign="top"><a id="a7b8b0c55f52884f834e99cfec560f823" name="a7b8b0c55f52884f834e99cfec560f823"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>coeff</b></td></tr>
 <tr class="separator:a7b8b0c55f52884f834e99cfec560f823"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -185,6 +212,12 @@ real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign
 <tr class="memitem:a36c1ed79e0900403203e6b44d65ed654" id="r_a36c1ed79e0900403203e6b44d65ed654"><td class="memItemLeft" align="right" valign="top"><a id="a36c1ed79e0900403203e6b44d65ed654" name="a36c1ed79e0900403203e6b44d65ed654"></a>
 real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>nu_sponge</b></td></tr>
 <tr class="separator:a36c1ed79e0900403203e6b44d65ed654"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a0ad45262cfe6d63e49377d705ec23d91" id="r_a0ad45262cfe6d63e49377d705ec23d91"><td class="memItemLeft" align="right" valign="top"><a id="a0ad45262cfe6d63e49377d705ec23d91" name="a0ad45262cfe6d63e49377d705ec23d91"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>sigma_pml</b></td></tr>
+<tr class="separator:a0ad45262cfe6d63e49377d705ec23d91"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a85a10da35c8c1e7f8a72367ba5dbd19e" id="r_a85a10da35c8c1e7f8a72367ba5dbd19e"><td class="memItemLeft" align="right" valign="top"><a id="a85a10da35c8c1e7f8a72367ba5dbd19e" name="a85a10da35c8c1e7f8a72367ba5dbd19e"></a>
+real(sp), dimension(:, :), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>psi_pml</b></td></tr>
+<tr class="separator:a85a10da35c8c1e7f8a72367ba5dbd19e"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="inherit_header pub_attribs_structmodel__base__mod_1_1type__model__base"><td colspan="2" onclick="javascript:toggleInherit('pub_attribs_structmodel__base__mod_1_1type__model__base')"><img src="closed.png" alt="-"/>&#160;Public Attributes inherited from <a class="el" href="structmodel__base__mod_1_1type__model__base.html">model_base_mod::type_model_base</a></td></tr>
 <tr class="memitem:a201e9827a8f300136e2f6a1a777a4bd4 inherit pub_attribs_structmodel__base__mod_1_1type__model__base" id="r_a201e9827a8f300136e2f6a1a777a4bd4"><td class="memItemLeft" align="right" valign="top">
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>is_activated</b> = .false.</td></tr>

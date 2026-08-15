@@ -115,9 +115,9 @@ Collaboration diagram for core_output_channel_mod::type_output_channel:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a61f1198ef61204c833211217c6dd9e30" id="r_a61f1198ef61204c833211217c6dd9e30"><td class="memItemLeft" align="right" valign="top"><a id="a61f1198ef61204c833211217c6dd9e30" name="a61f1198ef61204c833211217c6dd9e30"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, id, geom_type, variables, n_vars, statistics, n_stats, snapshot, t_start, interval, result_folder, format, coords_x, coords_y, n_coords, grid, comm, file_prefixes, icount_start, var_meta, diag_ncid, chunk_window)</td></tr>
-<tr class="separator:a61f1198ef61204c833211217c6dd9e30"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab35f0df464126e029921a44cc4e1be88" id="r_ab35f0df464126e029921a44cc4e1be88"><td class="memItemLeft" align="right" valign="top"><a id="ab35f0df464126e029921a44cc4e1be88" name="ab35f0df464126e029921a44cc4e1be88"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, id, geom_type, variables, n_vars, statistics, n_stats, snapshot, t_start, interval, result_folder, format, coords_x, coords_y, n_coords, grid, comm, file_prefixes, icount_start, var_meta, diag_ncid, chunk_window, hidden, derived, n_derived, single_prec)</td></tr>
+<tr class="separator:ab35f0df464126e029921a44cc4e1be88"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a030bc48fea78c0a8a5e62f591ecc61b5" id="r_a030bc48fea78c0a8a5e62f591ecc61b5"><td class="memItemLeft" align="right" valign="top"><a id="a030bc48fea78c0a8a5e62f591ecc61b5" name="a030bc48fea78c0a8a5e62f591ecc61b5"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>step</b> (this, t, dt, registry, comm, force)</td></tr>
 <tr class="separator:a030bc48fea78c0a8a5e62f591ecc61b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -154,6 +154,18 @@ integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_vars</b> = 0</td
 <tr class="memitem:a8622e78f14241820e0b05329f60f0c5a" id="r_a8622e78f14241820e0b05329f60f0c5a"><td class="memItemLeft" align="right" valign="top"><a id="a8622e78f14241820e0b05329f60f0c5a" name="a8622e78f14241820e0b05329f60f0c5a"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_stats</b> = 0</td></tr>
 <tr class="separator:a8622e78f14241820e0b05329f60f0c5a"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ae65c2ac594a92988addd0724fd1f42ed" id="r_ae65c2ac594a92988addd0724fd1f42ed"><td class="memItemLeft" align="right" valign="top"><a id="ae65c2ac594a92988addd0724fd1f42ed" name="ae65c2ac594a92988addd0724fd1f42ed"></a>
+logical, dimension(vars_max)&#160;</td><td class="memItemRight" valign="bottom"><b>hidden</b> = .false.</td></tr>
+<tr class="separator:ae65c2ac594a92988addd0724fd1f42ed"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2da1b0c0a994c5f16a28785fd2498651" id="r_a2da1b0c0a994c5f16a28785fd2498651"><td class="memItemLeft" align="right" valign="top"><a id="a2da1b0c0a994c5f16a28785fd2498651" name="a2da1b0c0a994c5f16a28785fd2498651"></a>
+logical&#160;</td><td class="memItemRight" valign="bottom"><b>single_prec</b> = .false.</td></tr>
+<tr class="separator:a2da1b0c0a994c5f16a28785fd2498651"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2d70cca3f0d53469b48c7371f78f7773" id="r_a2d70cca3f0d53469b48c7371f78f7773"><td class="memItemLeft" align="right" valign="top"><a id="a2d70cca3f0d53469b48c7371f78f7773" name="a2d70cca3f0d53469b48c7371f78f7773"></a>
+integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_derived</b> = 0</td></tr>
+<tr class="separator:a2d70cca3f0d53469b48c7371f78f7773"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:a2d32af6ce34245771688936e41ef1fac" id="r_a2d32af6ce34245771688936e41ef1fac"><td class="memItemLeft" align="right" valign="top"><a id="a2d32af6ce34245771688936e41ef1fac" name="a2d32af6ce34245771688936e41ef1fac"></a>
+type(<a class="el" href="structcore__output__channel__mod_1_1type__channel__derived.html">type_channel_derived</a>), dimension(derived_max)&#160;</td><td class="memItemRight" valign="bottom"><b>derived</b></td></tr>
+<tr class="separator:a2d32af6ce34245771688936e41ef1fac"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:afb2f8e5c3ded652f2a5921aa65bb1deb" id="r_afb2f8e5c3ded652f2a5921aa65bb1deb"><td class="memItemLeft" align="right" valign="top"><a id="afb2f8e5c3ded652f2a5921aa65bb1deb" name="afb2f8e5c3ded652f2a5921aa65bb1deb"></a>
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>snapshot</b> = .true.</td></tr>
 <tr class="separator:afb2f8e5c3ded652f2a5921aa65bb1deb"><td class="memSeparator" colspan="2">&#160;</td></tr>

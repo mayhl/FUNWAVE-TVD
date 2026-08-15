@@ -9,7 +9,6 @@ var hierarchy =
     [ "core_log_io_mod::new_log_writer", "interfacecore__log__io__mod_1_1new__log__writer.html", null ],
     [ "netcdf::nf90_put_var", "interfacenetcdf_1_1nf90__put__var.html", null ],
     [ "pnetcdf::nf90mpi_put_var_all", "interfacepnetcdf_1_1nf90mpi__put__var__all.html", null ],
-    [ "input_read::read_four_type_values", "interfaceinput__read_1_1read__four__type__values.html", null ],
     [ "probe_mod::reset_state", "interfaceprobe__mod_1_1reset__state.html", null ],
     [ "model_wavemaker_mod::spectrum_density_i", "interfacemodel__wavemaker__mod_1_1spectrum__density__i.html", null ],
     [ "core_accumulators_mod::type_accumulator", "structcore__accumulators__mod_1_1type__accumulator.html", null ],
@@ -18,6 +17,7 @@ var hierarchy =
       [ "core_range_parse_mod::type_real_range", "structcore__range__parse__mod_1_1type__real__range.html", null ]
     ] ],
     [ "model_output_mod::type_channel_config", "structmodel__output__mod_1_1type__channel__config.html", null ],
+    [ "core_output_channel_mod::type_channel_derived", "structcore__output__channel__mod_1_1type__channel__derived.html", null ],
     [ "core_comm_mod::type_comm", "structcore__comm__mod_1_1type__comm.html", null ],
     [ "core_crs_mod::type_crs", "structcore__crs__mod_1_1type__crs.html", null ],
     [ "model_kernel_dispersion_mod::type_disp_workspace", "structmodel__kernel__dispersion__mod_1_1type__disp__workspace.html", null ],
@@ -40,9 +40,11 @@ var hierarchy =
     [ "model_base_mod::type_model_base", "structmodel__base__mod_1_1type__model__base.html", [
       [ "model_3d_baroclinic_mod::type_model_3d_baroclinic", "structmodel__3d__baroclinic__mod_1_1type__model__3d__baroclinic.html", null ],
       [ "model_3d_bc_mod::type_model_3d_bc", "structmodel__3d__bc__mod_1_1type__model__3d__bc.html", null ],
+      [ "model_3d_friction_mod::type_model_3d_friction", "structmodel__3d__friction__mod_1_1type__model__3d__friction.html", null ],
       [ "model_3d_geometry_mod::type_model_3d_geometry", "structmodel__3d__geometry__mod_1_1type__model__3d__geometry.html", null ],
       [ "model_3d_hotstart_mod::type_model_3d_hotstart", "structmodel__3d__hotstart__mod_1_1type__model__3d__hotstart.html", null ],
       [ "model_3d_mod::type_model_3d", "structmodel__3d__mod_1_1type__model__3d.html", null ],
+      [ "model_3d_numerics_mod::type_model_3d_numerics", "structmodel__3d__numerics__mod_1_1type__model__3d__numerics.html", null ],
       [ "model_3d_output_mod::type_model_3d_output", "structmodel__3d__output__mod_1_1type__model__3d__output.html", null ],
       [ "model_3d_physics_mod::type_model_3d_physics", "structmodel__3d__physics__mod_1_1type__model__3d__physics.html", null ],
       [ "model_3d_simulation_mod::type_model_3d_simulation", "structmodel__3d__simulation__mod_1_1type__model__3d__simulation.html", null ],

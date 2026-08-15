@@ -5,5 +5,7 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="core_time_utils_mod\l::callback_interface",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$interfacecore__time__utils__mod_1_1callback__interface.html",tooltip=" "];
+  Node0 [id="Node000000",label="core_stepper_engine\l_mod::type_stepper_model",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__stepper__engine__mod_1_1type__stepper__model.html",tooltip=" "];
+  Node0 -> Node1 [id="edge4_Node000000_Node000001",dir="back",color="steelblue1",style="solid",tooltip=" "];
+  Node1 [id="Node000001",label="model_stepper_2d_mod\l::type_model_stepper_2d",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structmodel__stepper__2d__mod_1_1type__model__stepper__2d.html",tooltip=" "];
 }

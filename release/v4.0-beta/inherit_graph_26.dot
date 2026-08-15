@@ -5,5 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="core_time_utils_mod\l::type_timing_control",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__time__utils__mod_1_1type__timing__control.html",tooltip=" "];
+  Node0 [id="Node000000",label="core_time_utils_mod\l::callback_interface",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$interfacecore__time__utils__mod_1_1callback__interface.html",tooltip=" "];
 }

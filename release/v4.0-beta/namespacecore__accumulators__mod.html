@@ -154,7 +154,15 @@ Time-weighted formulas</h3>
    f_{\mathrm{rms}} = \sqrt{\frac{1}{T} \sum_n \bigl(f^{(n)}\bigr)^2 \Delta t_n}
  \]
 </p>
-<p><b>Min / Max</b> — point-wise extrema over all accumulated steps, unweighted. </p>
+<p><b>Min / Max</b> — point-wise extrema over all accumulated steps, unweighted.</p>
+<p><b>Std</b> — time-weighted standard deviation about the window mean,  </p><p class="formulaDsp">
+\[
+   f_{\mathrm{std}} = \sqrt{\frac{1}{T} \sum_n \bigl(f^{(n)}\bigr)^2 \Delta t_n
+                      - \bar{f}^2}
+ \]
+</p>
+<p> computed with SHIFTED moments (the first accumulated sample is subtracted from every term) so the \(E[f^2]-E[f]^2\) cancellation stays benign in single precision even when \(|\bar f| \gg
+ f_{\mathrm{std}}\). The shift changes neither the variance nor the reconstructed mean/RMS; shifted accumulation engages only when "std" is requested, so channels without it keep the historical bit pattern. </p>
 </div><h2 class="groupheader">Function/Subroutine Documentation</h2>
 <a id="ab125f92747fd7ae7b4c240c300e05351" name="ab125f92747fd7ae7b4c240c300e05351"></a>
 <h2 class="memtitle"><span class="permalink"><a href="#ab125f92747fd7ae7b4c240c300e05351">&#9670;&#160;</a></span>accumulate()</h2>

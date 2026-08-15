@@ -5,5 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="core_solver_tridiag\l_mod::type_trid_workspace",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__solver__tridiag__mod_1_1type__trid__workspace.html",tooltip=" "];
+  Node0 [id="Node000000",label="core_simulation_time\l_mod::type_simulation\l_control",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structcore__simulation__time__mod_1_1type__simulation__control.html",tooltip=" "];
 }
