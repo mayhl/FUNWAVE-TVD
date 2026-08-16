@@ -9,7 +9,7 @@ digraph "model_output_mod::type_model_output"
   Node2 -> Node1 [id="edge1_Node000001_Node000002",dir="back",color="steelblue1",style="solid",tooltip=" "];
   Node2 [id="Node000002",label="model_base_mod::type\l_model_base",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__base__mod_1_1type__model__base.html",tooltip=" "];
   Node3 -> Node1 [id="edge2_Node000001_Node000003",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" geometries",fontcolor="grey" ];
-  Node3 [id="Node000003",label="model_output_mod::type\l_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__output__geometry.html",tooltip=" "];
+  Node3 [id="Node000003",label="model_output_config\l_mod::type_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__output__geometry.html",tooltip=" "];
   Node4 -> Node1 [id="edge3_Node000001_Node000004",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" channels",fontcolor="grey" ];
-  Node4 [id="Node000004",label="model_output_mod::type\l_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__channel__config.html",tooltip=" "];
+  Node4 [id="Node000004",label="model_output_config\l_mod::type_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__channel__config.html",tooltip=" "];
 }

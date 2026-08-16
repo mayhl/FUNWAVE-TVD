@@ -5,5 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="netcdf::nf90_put_var",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$interfacenetcdf_1_1nf90__put__var.html",tooltip=" "];
+  Node0 [id="Node000000",label="model_scratch_mod::\ltype_scratch_pool",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structmodel__scratch__mod_1_1type__scratch__pool.html",tooltip="Generic pre-allocated slot pool for intra-timestep temporary 2-D arrays."];
 }

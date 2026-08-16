@@ -69,9 +69,9 @@ digraph "model_main_mod::type_model_main"
   Node23 [id="Node000023",label="model_output_mod::type\l_model_output",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__model__output.html",tooltip=" "];
   Node10 -> Node23 [id="edge40_Node000023_Node000010",dir="back",color="steelblue1",style="solid",tooltip=" "];
   Node24 -> Node23 [id="edge41_Node000023_Node000024",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" geometries",fontcolor="grey" ];
-  Node24 [id="Node000024",label="model_output_mod::type\l_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__output__geometry.html",tooltip=" "];
+  Node24 [id="Node000024",label="model_output_config\l_mod::type_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__output__geometry.html",tooltip=" "];
   Node25 -> Node23 [id="edge42_Node000023_Node000025",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" channels",fontcolor="grey" ];
-  Node25 [id="Node000025",label="model_output_mod::type\l_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__channel__config.html",tooltip=" "];
+  Node25 [id="Node000025",label="model_output_config\l_mod::type_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__channel__config.html",tooltip=" "];
   Node26 -> Node1 [id="edge43_Node000001_Node000026",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" physics",fontcolor="grey" ];
   Node26 [id="Node000026",label="model_physics_mod::\ltype_model_physics",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__physics__mod_1_1type__model__physics.html",tooltip=" "];
   Node10 -> Node26 [id="edge44_Node000026_Node000010",dir="back",color="steelblue1",style="solid",tooltip=" "];

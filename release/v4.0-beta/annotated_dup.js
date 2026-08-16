@@ -73,8 +73,8 @@ var annotated_dup =
     [ "model_3d_baroclinic_mod", null, [
       [ "type_model_3d_baroclinic", "structmodel__3d__baroclinic__mod_1_1type__model__3d__baroclinic.html", null ]
     ] ],
-    [ "model_3d_bc_mod", null, [
-      [ "type_model_3d_bc", "structmodel__3d__bc__mod_1_1type__model__3d__bc.html", null ]
+    [ "model_3d_boundaries_mod", null, [
+      [ "type_model_3d_boundaries", "structmodel__3d__boundaries__mod_1_1type__model__3d__boundaries.html", null ]
     ] ],
     [ "model_3d_config_mod", null, [
       [ "type_model_3d_config", "structmodel__3d__config__mod_1_1type__model__3d__config.html", null ]
@@ -85,8 +85,8 @@ var annotated_dup =
     [ "model_3d_geometry_mod", null, [
       [ "type_model_3d_geometry", "structmodel__3d__geometry__mod_1_1type__model__3d__geometry.html", null ]
     ] ],
-    [ "model_3d_hotstart_mod", null, [
-      [ "type_model_3d_hotstart", "structmodel__3d__hotstart__mod_1_1type__model__3d__hotstart.html", null ]
+    [ "model_3d_initial_mod", null, [
+      [ "type_model_3d_initial", "structmodel__3d__initial__mod_1_1type__model__3d__initial.html", null ]
     ] ],
     [ "model_3d_mod", null, [
       [ "type_model_3d", "structmodel__3d__mod_1_1type__model__3d.html", null ]
@@ -97,17 +97,8 @@ var annotated_dup =
     [ "model_3d_output_mod", null, [
       [ "type_model_3d_output", "structmodel__3d__output__mod_1_1type__model__3d__output.html", null ]
     ] ],
-    [ "model_3d_physics_mod", null, [
-      [ "type_model_3d_physics", "structmodel__3d__physics__mod_1_1type__model__3d__physics.html", null ]
-    ] ],
     [ "model_3d_simulation_mod", null, [
       [ "type_model_3d_simulation", "structmodel__3d__simulation__mod_1_1type__model__3d__simulation.html", null ]
-    ] ],
-    [ "model_3d_solver_mod", null, [
-      [ "type_model_3d_solver", "structmodel__3d__solver__mod_1_1type__model__3d__solver.html", null ]
-    ] ],
-    [ "model_3d_sponge_mod", null, [
-      [ "type_model_3d_sponge", "structmodel__3d__sponge__mod_1_1type__model__3d__sponge.html", null ]
     ] ],
     [ "model_3d_turbulence_mod", null, [
       [ "type_model_3d_turbulence", "structmodel__3d__turbulence__mod_1_1type__model__3d__turbulence.html", null ]
@@ -175,10 +166,14 @@ var annotated_dup =
     [ "model_obstacle_mod", null, [
       [ "type_model_obstacle", "structmodel__obstacle__mod_1_1type__model__obstacle.html", null ]
     ] ],
+    [ "model_output_config_mod", null, [
+      [ "split_vars_iface", "interfacemodel__output__config__mod_1_1split__vars__iface.html", null ],
+      [ "type_channel_config", "structmodel__output__config__mod_1_1type__channel__config.html", null ],
+      [ "type_output_geometry", "structmodel__output__config__mod_1_1type__output__geometry.html", null ],
+      [ "validate_channel_iface", "interfacemodel__output__config__mod_1_1validate__channel__iface.html", null ]
+    ] ],
     [ "model_output_mod", null, [
-      [ "type_channel_config", "structmodel__output__mod_1_1type__channel__config.html", null ],
-      [ "type_model_output", "structmodel__output__mod_1_1type__model__output.html", null ],
-      [ "type_output_geometry", "structmodel__output__mod_1_1type__output__geometry.html", null ]
+      [ "type_model_output", "structmodel__output__mod_1_1type__model__output.html", null ]
     ] ],
     [ "model_physics_mod", null, [
       [ "type_model_physics", "structmodel__physics__mod_1_1type__model__physics.html", null ]
