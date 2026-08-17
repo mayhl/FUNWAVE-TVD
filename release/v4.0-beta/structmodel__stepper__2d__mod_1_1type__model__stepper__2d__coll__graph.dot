@@ -56,9 +56,9 @@ digraph "model_stepper_2d_mod::type_model_stepper_2d"
   Node21 [id="Node000021",label="model_output_mod::type\l_model_output",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__model__output.html",tooltip=" "];
   Node15 -> Node21 [id="edge29_Node000021_Node000015",dir="back",color="steelblue1",style="solid",tooltip=" "];
   Node22 -> Node21 [id="edge30_Node000021_Node000022",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" geometries",fontcolor="grey" ];
-  Node22 [id="Node000022",label="model_output_config\l_mod::type_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__output__geometry.html",tooltip=" "];
+  Node22 [id="Node000022",label="model_output_mod::type\l_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__output__geometry.html",tooltip=" "];
   Node23 -> Node21 [id="edge31_Node000021_Node000023",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" channels",fontcolor="grey" ];
-  Node23 [id="Node000023",label="model_output_config\l_mod::type_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__channel__config.html",tooltip=" "];
+  Node23 [id="Node000023",label="model_output_mod::type\l_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__mod_1_1type__channel__config.html",tooltip=" "];
   Node24 -> Node1 [id="edge32_Node000001_Node000024",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" wavemakers\nwm_bc\nwm_src",fontcolor="grey" ];
   Node24 [id="Node000024",label="model_wavemaker_mod\l::type_model_wavemaker",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__wavemaker__mod_1_1type__model__wavemaker.html",tooltip=" "];
   Node15 -> Node24 [id="edge33_Node000024_Node000015",dir="back",color="steelblue1",style="solid",tooltip=" "];

@@ -115,9 +115,9 @@ Collaboration diagram for core_output_channel_mod::type_output_channel:</div>
 <table class="memberdecls">
 <tr class="heading"><td colspan="2"><h2 class="groupheader"><a id="pub-methods" name="pub-methods"></a>
 Public Member Functions</h2></td></tr>
-<tr class="memitem:a04b35809058a0abe7bc9bf9a9c3cd92e" id="r_a04b35809058a0abe7bc9bf9a9c3cd92e"><td class="memItemLeft" align="right" valign="top"><a id="a04b35809058a0abe7bc9bf9a9c3cd92e" name="a04b35809058a0abe7bc9bf9a9c3cd92e"></a>
-procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, id, geom_type, variables, n_vars, statistics, n_stats, snapshot, t_start, interval, result_folder, format, coords_x, coords_y, n_coords, grid, comm, file_prefixes, icount_start, var_meta, diag_ncid, chunk_window, hidden, derived, n_derived, single_prec, ascii_fmt, var_ranks, z_coord)</td></tr>
-<tr class="separator:a04b35809058a0abe7bc9bf9a9c3cd92e"><td class="memSeparator" colspan="2">&#160;</td></tr>
+<tr class="memitem:ab35f0df464126e029921a44cc4e1be88" id="r_ab35f0df464126e029921a44cc4e1be88"><td class="memItemLeft" align="right" valign="top"><a id="ab35f0df464126e029921a44cc4e1be88" name="ab35f0df464126e029921a44cc4e1be88"></a>
+procedure&#160;</td><td class="memItemRight" valign="bottom"><b>init</b> (this, id, geom_type, variables, n_vars, statistics, n_stats, snapshot, t_start, interval, result_folder, format, coords_x, coords_y, n_coords, grid, comm, file_prefixes, icount_start, var_meta, diag_ncid, chunk_window, hidden, derived, n_derived, single_prec)</td></tr>
+<tr class="separator:ab35f0df464126e029921a44cc4e1be88"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a030bc48fea78c0a8a5e62f591ecc61b5" id="r_a030bc48fea78c0a8a5e62f591ecc61b5"><td class="memItemLeft" align="right" valign="top"><a id="a030bc48fea78c0a8a5e62f591ecc61b5" name="a030bc48fea78c0a8a5e62f591ecc61b5"></a>
 procedure&#160;</td><td class="memItemRight" valign="bottom"><b>step</b> (this, t, dt, registry, comm, force)</td></tr>
 <tr class="separator:a030bc48fea78c0a8a5e62f591ecc61b5"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -160,15 +160,6 @@ logical, dimension(vars_max)&#160;</td><td class="memItemRight" valign="bottom">
 <tr class="memitem:a2da1b0c0a994c5f16a28785fd2498651" id="r_a2da1b0c0a994c5f16a28785fd2498651"><td class="memItemLeft" align="right" valign="top"><a id="a2da1b0c0a994c5f16a28785fd2498651" name="a2da1b0c0a994c5f16a28785fd2498651"></a>
 logical&#160;</td><td class="memItemRight" valign="bottom"><b>single_prec</b> = .false.</td></tr>
 <tr class="separator:a2da1b0c0a994c5f16a28785fd2498651"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a6df5689f66c9f821fe3b0f63f8c87a77" id="r_a6df5689f66c9f821fe3b0f63f8c87a77"><td class="memItemLeft" align="right" valign="top"><a id="a6df5689f66c9f821fe3b0f63f8c87a77" name="a6df5689f66c9f821fe3b0f63f8c87a77"></a>
-character(8)&#160;</td><td class="memItemRight" valign="bottom"><b>ascii_fmt</b> = 'E16.6'</td></tr>
-<tr class="separator:a6df5689f66c9f821fe3b0f63f8c87a77"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a4b9bc42af0cb5a2d7620fa19167379a3" id="r_a4b9bc42af0cb5a2d7620fa19167379a3"><td class="memItemLeft" align="right" valign="top"><a id="a4b9bc42af0cb5a2d7620fa19167379a3" name="a4b9bc42af0cb5a2d7620fa19167379a3"></a>
-integer, dimension(vars_max)&#160;</td><td class="memItemRight" valign="bottom"><b>var_ranks</b> = 2</td></tr>
-<tr class="separator:a4b9bc42af0cb5a2d7620fa19167379a3"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:a9a1fb023d14981a058aa46f07a6acfb8" id="r_a9a1fb023d14981a058aa46f07a6acfb8"><td class="memItemLeft" align="right" valign="top"><a id="a9a1fb023d14981a058aa46f07a6acfb8" name="a9a1fb023d14981a058aa46f07a6acfb8"></a>
-real(sp), dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>z_coord</b></td></tr>
-<tr class="separator:a9a1fb023d14981a058aa46f07a6acfb8"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:a2d70cca3f0d53469b48c7371f78f7773" id="r_a2d70cca3f0d53469b48c7371f78f7773"><td class="memItemLeft" align="right" valign="top"><a id="a2d70cca3f0d53469b48c7371f78f7773" name="a2d70cca3f0d53469b48c7371f78f7773"></a>
 integer&#160;</td><td class="memItemRight" valign="bottom"><b>n_derived</b> = 0</td></tr>
 <tr class="separator:a2d70cca3f0d53469b48c7371f78f7773"><td class="memSeparator" colspan="2">&#160;</td></tr>
@@ -238,9 +229,6 @@ real(sp)&#160;</td><td class="memItemRight" valign="bottom"><b>dy0</b> = 0.0_SP<
 <tr class="memitem:a01f2be8a7c7516d58fc9f8503018d41f" id="r_a01f2be8a7c7516d58fc9f8503018d41f"><td class="memItemLeft" align="right" valign="top"><a id="a01f2be8a7c7516d58fc9f8503018d41f" name="a01f2be8a7c7516d58fc9f8503018d41f"></a>
 character(varname_len+statname_len+1), dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>nc_names</b></td></tr>
 <tr class="separator:a01f2be8a7c7516d58fc9f8503018d41f"><td class="memSeparator" colspan="2">&#160;</td></tr>
-<tr class="memitem:aeb5bbfc3531133c748ddd6fc3e0aa46c" id="r_aeb5bbfc3531133c748ddd6fc3e0aa46c"><td class="memItemLeft" align="right" valign="top"><a id="aeb5bbfc3531133c748ddd6fc3e0aa46c" name="aeb5bbfc3531133c748ddd6fc3e0aa46c"></a>
-integer, dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>nc_ranks</b></td></tr>
-<tr class="separator:aeb5bbfc3531133c748ddd6fc3e0aa46c"><td class="memSeparator" colspan="2">&#160;</td></tr>
 <tr class="memitem:aa8949586ac4f57f4685e752daa9c92d9" id="r_aa8949586ac4f57f4685e752daa9c92d9"><td class="memItemLeft" align="right" valign="top"><a id="aa8949586ac4f57f4685e752daa9c92d9" name="aa8949586ac4f57f4685e752daa9c92d9"></a>
 type(<a class="el" href="structcore__output__channel__mod_1_1type__var__meta.html">type_var_meta</a>), dimension(:), allocatable&#160;</td><td class="memItemRight" valign="bottom"><b>nc_meta</b></td></tr>
 <tr class="separator:aa8949586ac4f57f4685e752daa9c92d9"><td class="memSeparator" colspan="2">&#160;</td></tr>

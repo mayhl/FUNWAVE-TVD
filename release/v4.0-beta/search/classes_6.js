@@ -1,4 +1,4 @@
 var searchData=
 [
-  ['reset_5fstate_0',['reset_state',['../interfaceprobe__mod_1_1reset__state.html',1,'probe_mod']]]
+  ['spectrum_5fdensity_5fi_0',['spectrum_density_i',['../interfacemodel__wavemaker__mod_1_1spectrum__density__i.html',1,'model_wavemaker_mod']]]
 ];
