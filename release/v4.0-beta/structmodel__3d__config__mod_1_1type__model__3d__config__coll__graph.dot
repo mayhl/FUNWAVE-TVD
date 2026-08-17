@@ -58,9 +58,4 @@ digraph "model_3d_config_mod::type_model_3d_config"
   Node20 [id="Node000020",label="model_output_config\l_mod::type_output_geometry",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__output__geometry.html",tooltip=" "];
   Node21 -> Node19 [id="edge32_Node000019_Node000021",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" channels",fontcolor="grey" ];
   Node21 [id="Node000021",label="model_output_config\l_mod::type_channel_config",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__output__config__mod_1_1type__channel__config.html",tooltip=" "];
-  Node22 -> Node1 [id="edge33_Node000001_Node000022",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" coupling",fontcolor="grey" ];
-  Node22 [id="Node000022",label="model_coupling_mod\l::type_model_coupling",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",URL="$structmodel__coupling__mod_1_1type__model__coupling.html",tooltip=" "];
-  Node10 -> Node22 [id="edge34_Node000022_Node000010",dir="back",color="steelblue1",style="solid",tooltip=" "];
-  Node23 -> Node22 [id="edge35_Node000022_Node000023",dir="back",color="darkorchid3",style="dashed",tooltip=" ",label=" coupling_file",fontcolor="grey" ];
-  Node23 [id="Node000023",label="type_path",height=0.2,width=0.4,color="grey75", fillcolor="white", style="filled",tooltip=" "];
 }

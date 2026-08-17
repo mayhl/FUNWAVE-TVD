@@ -73,11 +73,17 @@ var annotated_dup =
     [ "model_3d_baroclinic_mod", null, [
       [ "type_model_3d_baroclinic", "structmodel__3d__baroclinic__mod_1_1type__model__3d__baroclinic.html", null ]
     ] ],
+    [ "model_3d_bc_mod", null, [
+      [ "halo_exchange", "interfacemodel__3d__bc__mod_1_1halo__exchange.html", null ]
+    ] ],
     [ "model_3d_boundaries_mod", null, [
       [ "type_model_3d_boundaries", "structmodel__3d__boundaries__mod_1_1type__model__3d__boundaries.html", null ]
     ] ],
     [ "model_3d_config_mod", null, [
       [ "type_model_3d_config", "structmodel__3d__config__mod_1_1type__model__3d__config.html", null ]
+    ] ],
+    [ "model_3d_fields_mod", null, [
+      [ "type_fields_3d", "structmodel__3d__fields__mod_1_1type__fields__3d.html", null ]
     ] ],
     [ "model_3d_friction_mod", null, [
       [ "type_model_3d_friction", "structmodel__3d__friction__mod_1_1type__model__3d__friction.html", null ]

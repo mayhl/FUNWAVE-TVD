@@ -5,5 +5,5 @@ digraph "Graphical Class Hierarchy"
   edge [fontname=Helvetica,fontsize=10,labelfontname=Helvetica,labelfontsize=10];
   node [fontname=Helvetica,fontsize=10,shape=box,height=0.2,width=0.4];
   rankdir="LR";
-  Node0 [id="Node000000",label="model_main_mod::type\l_model_main",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structmodel__main__mod_1_1type__model__main.html",tooltip=" "];
+  Node0 [id="Node000000",label="model_kernel_etauv\l_mod::type_etauv_workspace",height=0.2,width=0.4,color="grey40", fillcolor="white", style="filled",URL="$structmodel__kernel__etauv__mod_1_1type__etauv__workspace.html",tooltip=" "];
 }

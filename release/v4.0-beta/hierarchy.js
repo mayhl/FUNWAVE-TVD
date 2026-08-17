@@ -2,6 +2,7 @@ var hierarchy =
 [
     [ "core_time_utils_mod::callback_interface", "interfacecore__time__utils__mod_1_1callback__interface.html", null ],
     [ "probe_mod::dump_state", "interfaceprobe__mod_1_1dump__state.html", null ],
+    [ "model_3d_bc_mod::halo_exchange", "interfacemodel__3d__bc__mod_1_1halo__exchange.html", null ],
     [ "core_stepper_engine_mod::i_pre_step", "interfacecore__stepper__engine__mod_1_1i__pre__step.html", null ],
     [ "model_base_mod::model_read_input", "interfacemodel__base__mod_1_1model__read__input.html", null ],
     [ "core_comm_mod::new_comm", "interfacecore__comm__mod_1_1new__comm.html", null ],
@@ -29,6 +30,7 @@ var hierarchy =
     [ "model_kernel_etauv_mod::type_etauv_workspace", "structmodel__kernel__etauv__mod_1_1type__etauv__workspace.html", null ],
     [ "core_field_registry_mod::type_field_registry", "structcore__field__registry__mod_1_1type__field__registry.html", null ],
     [ "model_fields_2d_mod::type_fields_2d", "structmodel__fields__2d__mod_1_1type__fields__2d.html", null ],
+    [ "model_3d_fields_mod::type_fields_3d", "structmodel__3d__fields__mod_1_1type__fields__3d.html", null ],
     [ "model_field_input_mod::type_file_spec", "structmodel__field__input__mod_1_1type__file__spec.html", null ],
     [ "model_kernel_fluxes_mod::type_flux_workspace", "structmodel__kernel__fluxes__mod_1_1type__flux__workspace.html", null ],
     [ "core_grid_mod::type_grid_2d", "structcore__grid__mod_1_1type__grid__2d.html", null ],
