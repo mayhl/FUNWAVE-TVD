@@ -144,9 +144,12 @@ if [ -n "${SKIP_HYPRE:-}" ]; then
 	exit 0
 fi
 
+# HYPRE_BUILD_DIR/HYPRE_INSTALL_DIR let a second toolchain — a different MPI,
+# say — land in its own prefix instead of overwriting the one the boards already
+# build against, which would break every 3D run until it was rebuilt back
 HYPRE_SRC="${PROJ_ROOT}/extern/hypre/src"
-HYPRE_BUILD="${PROJ_ROOT}/extern/hypre/build"
-HYPRE_INSTALL="${PROJ_ROOT}/extern/hypre/installed"
+HYPRE_BUILD="${HYPRE_BUILD_DIR:-${PROJ_ROOT}/extern/hypre/build}"
+HYPRE_INSTALL="${HYPRE_INSTALL_DIR:-${PROJ_ROOT}/extern/hypre/installed}"
 
 echo "HYPRE source:  ${HYPRE_SRC}"
 echo "HYPRE install: ${HYPRE_INSTALL}"
