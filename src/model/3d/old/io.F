@@ -3,13 +3,16 @@
 SUBROUTINE READ_INPUT
      USE GLOBAL
      use model_3d_config_mod, only: type_model_3d_config
+     use core_path_mod, only: type_path
 # if defined (PARALLEL)
      use core_grid_mod, only: compute_optimal_grid_size
 # endif
      IMPLICIT NONE
 
      type(type_model_3d_config) :: config
-     character(len=80) :: MKFOLDER, TMP_NAME, FILE_NAME_number
+     type(type_path) :: outdir
+     logical :: dir_ok
+     character(len=80) :: TMP_NAME, FILE_NAME_number
      real(SP) :: Segma_loc, Celerity_loc, Wave_Length_loc, Wave_Number_loc
      real(SP) :: Fk_loc, Fkdif_loc, Theta_Calc_loc, Wnumy_loc
      real(SP) :: tmp_loc, tmp1_loc
@@ -358,8 +361,12 @@ SUBROUTINE READ_INPUT
 # if defined (PARALLEL)
      if (myid .eq. 0) then
 # endif
-        MKFOLDER = 'mkdir -p '//TRIM(RESULT_FOLDER)
-        CALL SYSTEM(TRIM(MKFOLDER))
+        ! core mkdir rather than CALL SYSTEM('mkdir -p'): shelling out has
+        ! no equivalent on the Windows/MS-MPI build, and it is how 2D does
+        ! it (main.f90, build_field_channel).  Single level, as there --
+        ! a nested result_folder needs its parent to exist
+        outdir = type_path(TRIM(RESULT_FOLDER))
+        if (.not. outdir%is_dir()) dir_ok = outdir%mkdir()
 # if defined (PARALLEL)
      end if
 # endif
