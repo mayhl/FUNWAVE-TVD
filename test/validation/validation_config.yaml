@@ -525,3 +525,50 @@ simulations:
         setup_nrmse_pct: 50.0
         height_nrmse_pct: 50.0
 
+  # ── Wavemaker fidelity: the h470 incident gauge as its own gated case ───
+  # anchors: nrmse 8.6 over the 60-700 s window
+  - name: lab_mase_wavemaker
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/mase_kirby
+    input_files: [mase_kirby_run2.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, gauges, wavemaker, 1d, local]
+    postprocess:
+      gauges: test.validation.oracles.gauges
+    tolerances:
+      gauges:
+        file: gauges.txt
+        gauges: [h470]
+        align: none
+        channel: gauges
+        window_s: [60.0, 700.0]
+        gauge_nrmse_pct: 12.0
+
+  # ── Mase & Kirby 1992 run 2: random-wave gauge ladder, statistics gates ─
+  # anchors: sigma_rmse 6.7, skew 24.0, asym 12.0; Shi 2012 = 5.4/6.6/12.1
+  - name: lab_mase_kirby
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/mase_kirby
+    input_files: [mase_kirby_run2.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, gauges, 1d, local]
+    postprocess:
+      gauges: test.validation.oracles.gauges
+    tolerances:
+      gauges:
+        file: gauges.txt
+        gauges: [h470, h350, h300, h250, h200, h175, h150, h125, h100, h075, h050, h025]
+        align: none
+        channel: gauges
+        window_s: [60.0, 700.0]
+        mode: heights
+        stat_exclude: [h470]
+        height_error_pct: 25.0
+        sigma_error_pct: 20.0
+        sigma_rmse_pct: 8.5
+        skew_rmse_pct: 30.0
+        asym_rmse_pct: 15.0

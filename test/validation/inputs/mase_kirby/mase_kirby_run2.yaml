@@ -1,0 +1,57 @@
+# Mase & Kirby (1992) run 2 — random waves on the 1:20 slope, h0 = 0.47 m
+# (Shi et al. 2012 Sec. 4.2).  Components come from the h470 record's FFT,
+# so model and data share t = 0 (align: none).  Truth: gauges.txt.
+# dx = 0.02, half the published deck: 0.04 dissipates the 1.2-2.3 Hz band.
+
+grid:
+  cell_size: [0.02, 0.1]
+  n_cells: [1000, 3]
+  bathymetry:
+    type: slope
+    depth: 0.47
+    slope: 0.05
+    x0: 10.0
+simulation:
+  title: lab_mase_kirby_run2
+  total_time: 716.8
+  screen_interval: 50.0
+wavemaker:
+  spectrum:
+    type: components
+    n: 1505
+    period_peak: 1.0
+    file: wave_components.txt
+  source:
+    x_center: 10.0
+    y_center: 0.15
+    depth: 0.47
+    delta: 0.4
+    time_ramp: 1.0
+boundaries:
+  west:
+    sponge:
+      width: 2.0
+      direct:
+        r: 0.90
+        a: 5.0
+numerics:
+  cfl: 0.5
+  froude_cap: 10.0
+  min_depth: 0.001
+breaking:
+  model: shock_capturing
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: gauges
+      geometry: stations
+      variables: [eta]
+      interval: 0.05
+  geometries:
+    - name: stations
+      type: station
+      # legacy gauges_004.txt station cells (i-1)*dx, h470 first (incident
+      # check), then the 11 comparison gauges h350..h025
+      x: [9.96, 12.48, 13.48, 14.48, 15.48, 15.96, 16.48, 16.96, 17.48, 17.96, 18.48, 18.96]
+      y: [0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15, 0.15]
