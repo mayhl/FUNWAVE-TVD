@@ -57,6 +57,9 @@ fun.env
 site/
 docs/_build/
 
+# user_supplied lab data: manifest ships, measurements do not
+test/validation/inputs/beji_battjes/fig4_energy.txt
+
 # FUNWAVE runtime output (accidentally runs from repo root)
 dump.bin
 output/
