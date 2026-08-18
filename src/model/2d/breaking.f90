@@ -17,6 +17,7 @@
 !    visbrk:        <real>   breaking viscosity,                 default 0.0
 !    nu_bkg:        <real>   background viscosity floor,         default 0.0
 !    swe_eta_dep:   <real>   bore-regime eta/h threshold,        default 0.8
+!    swe_gate:      <bool>   SWE gate under eddy_viscosity,      default NO
 !    swe_eta_ramp:  <real>   SWE-gate smoothstep taper width,    default 0.1
 !    swe_wetdry_ramp: <real> wet/dry dispersion taper (x min_depth), default 0
 !
@@ -48,7 +49,8 @@ module model_breaking_mod
                                         DEF_BREAKING_VISBRK, &
                                         DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP, &
                                         DEF_BREAKING_SWE_WETDRY_RAMP, &
-                                        DEF_BREAKING_T_BRK, DEF_BREAKING_AGE_PER_STAGE
+                                        DEF_BREAKING_T_BRK, DEF_BREAKING_AGE_PER_STAGE, &
+                                        DEF_BREAKING_SWE_GATE, DEF_BREAKING_NU_CAP
 
    implicit none
 
@@ -100,6 +102,13 @@ module model_breaking_mod
       ! Mode-independent -- the viscous path has no SWE gate, so swash-edge
       ! mask flips otherwise radiate through the dispersive terms
       real(SP) :: swe_wetdry_ramp = 0.0_SP
+      ! apply the SWE gate under eddy_viscosity as a dispersion amplitude
+      ! cap at steep bores; false = legacy (dispersion never gated -- the
+      ! open-water surf blow-up mechanism)
+      logical  :: swe_gate = .false.
+      ! clamp nu_break at this fraction of the explicit-diffusion stability
+      ! bound (the Laplacian rides the advective-CFL dt); 0 = off (legacy)
+      real(SP) :: nu_cap = 0.0_SP
 
    contains
       procedure :: read_input => breaking_read_input
@@ -145,8 +154,16 @@ contains
          call sub_env%yaml%read("t_brk", silent=no_key, val=this%t_brk, default=DEF_BREAKING_T_BRK)
          call sub_env%yaml%read("age_per_stage", silent=no_key, val=this%age_per_stage, &
                                 default=DEF_BREAKING_AGE_PER_STAGE)
+         call sub_env%yaml%read("nu_cap", silent=no_key, val=this%nu_cap, &
+                                default=DEF_BREAKING_NU_CAP)
       end if
-      if (trim(this%model) /= "eddy_viscosity") then
+      ! the gate is structural under the other models — the knob only means
+      ! something where legacy forces mask9 to 1
+      if (trim(this%model) == "eddy_viscosity") then
+         call sub_env%yaml%read("swe_gate", silent=no_key, val=this%swe_gate, &
+                                default=DEF_BREAKING_SWE_GATE)
+      end if
+      if (trim(this%model) /= "eddy_viscosity" .or. this%swe_gate) then
          call sub_env%yaml%read("swe_eta_ramp", silent=no_key, val=this%swe_eta_ramp, &
                                 default=DEF_BREAKING_SWE_ETA_RAMP)
       end if

@@ -179,6 +179,10 @@ module model_stepper_2d_mod
       ! lets sync_from_flux skip them.  Never set while the vessel hull
       ! blanks mask9 per stage.
       logical :: m9_settled = .false.
+      ! mask9 forced all-one = legacy viscous behavior; breaking%swe_gate
+      ! re-arms the eta/h gate under eddy_viscosity (dispersion amplitude
+      ! cap), which also disables the settled fast path above
+      logical :: m9_forced = .false.
 
       ! Combined eddy viscosity, allocated only when more than one of
       ! nu_break / vessel deep-draft / nu_sponge is active (legacy nu_vis
@@ -431,6 +435,8 @@ contains
       this%run_breaker = this%physics%viscosity_breaking &
                          .or. (this%breaking%show_breaking &
                                .and. .not. this%breaking%wavemaker_vis)
+
+      this%m9_forced = this%physics%viscosity_breaking .and. .not. this%breaking%swe_gate
 
       ! legacy allocates + zeroes ROLLER_FLUX/UNDERTOW unconditionally,
       ! so OUT_ROLLER/OUT_UNDERTOW without a running breaker still
@@ -705,7 +711,8 @@ contains
                                this%breaking%age_per_stage .or. istage == 3, &
                                num%MinDepthFrc, this%breaking%cbrk1, &
                                this%breaking%cbrk2, this%breaking%wavemaker_cbrk, &
-                               this%breaking%nu_bkg, VIS_SCHEME_DEFAULT, &
+                               this%breaking%nu_bkg, this%breaking%nu_cap, &
+                               VIS_SCHEME_DEFAULT, &
                                this%breaking%swe_eta_dep, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
                                this%undertow_u, this%undertow_v)
@@ -828,11 +835,11 @@ contains
          ! via m9_settled; the vessel hull re-blank keeps the per-stage
          ! rebuild, and the guard leaves t = 0 (pure product, ledger 8c)
          ! to the first pass
-         if (.not. (phy%viscosity_breaking .and. this%m9_settled &
+         if (.not. (this%m9_forced .and. this%m9_settled &
                     .and. .not. ves_mask_on(this))) then
             call update_mask9(lp, f%eta, f%depth, f%mask, f%mask9, &
                               num%MinDepthFrc, this%breaking%swe_eta_dep, &
-                              phy%viscosity_breaking)
+                              this%m9_forced)
 
             ! 18c quirk-drop, honouring the kernel_masks caller contract:
             ! update_mask9 is interior-only, and nothing since init refreshed
@@ -855,7 +862,7 @@ contains
             ! real dispersion-gate weight off the settled mask9 (halos valid)
             call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
                                    this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
-                                   phy%viscosity_breaking, f%swe_w, &
+                                   this%m9_forced, f%swe_w, &
                                    num%MinDepth, this%breaking%swe_wetdry_ramp)
             ! latch only once the vessel is NOT blanking mask9 — else a
             ! mid-run deactivation (is_activated -> F) would leave m9_settled
@@ -896,7 +903,7 @@ contains
          ! misses; the ring exchange then matches the sync_from_flux tail
          call update_mask9(this%grid%lp, f%eta, f%depth, f%mask, f%mask9, &
                            this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
-                           phy%viscosity_breaking)
+                           this%m9_forced)
          block
             real(SP), allocatable :: rmask(:, :)
             allocate (rmask, source=real(f%mask9, SP))
@@ -906,7 +913,7 @@ contains
          call this%sponge%pml_blank_mask9(f%mask9)
          call update_swe_weight(f%eta, f%depth, f%mask9, &
                                 this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
-                                this%breaking%swe_eta_ramp, phy%viscosity_breaking, &
+                                this%breaking%swe_eta_ramp, this%m9_forced, &
                                 f%swe_w, this%numerics%MinDepth, &
                                 this%breaking%swe_wetdry_ramp)
 

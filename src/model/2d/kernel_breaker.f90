@@ -48,7 +48,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                             dx, dy, dt, t_brk, advance_age, min_depth_frc, &
-                            cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, &
+                            cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap, &
                             vis_scheme, swe_eta_dep, in_wm_zone, &
                             nu_break, age, roller_flux, undertow_u, undertow_v)
       type(type_loop_bounds), intent(in) :: lp
@@ -58,7 +58,7 @@ contains
       real(SP), intent(in)  :: dx(:, :), dy(:, :)
       real(SP), intent(in)  :: dt, t_brk, min_depth_frc
       logical, intent(in)  :: advance_age
-      real(SP), intent(in)  :: cbrk1, cbrk2, wavemaker_cbrk, nu_bkg
+      real(SP), intent(in)  :: cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap
       integer, intent(in)  :: vis_scheme
       real(SP), intent(in)  :: swe_eta_dep
       logical, intent(in)  :: in_wm_zone(:, :)
@@ -203,6 +203,22 @@ contains
 
          end do
       end do
+
+      ! explicit-diffusion stability clamp: the Laplacian rides the
+      ! advective-CFL dt (estimate_dt has no viscous term, matching
+      ! legacy), so an uncapped nu at an energetic breakpoint can sit
+      ! several-fold over the stable bound — the open-water viscous
+      ! blow-up mechanism.  Applies to the wavemaker zone too.
+      if (nu_cap > 0.0_SP) then
+         !$omp parallel do default(shared) schedule(static) private(i, cap1)
+         do j = lp%jb - 1, lp%je + 1
+            do i = lp%ib - 1, lp%ie + 1
+               cap1 = nu_cap/(2.0_SP*dt*(1.0_SP/(dx(i, j)*dx(i, j)) &
+                                         + 1.0_SP/(dy(i, j)*dy(i, j))))
+               nu_break(i, j) = min(nu_break(i, j), cap1)
+            end do
+         end do
+      end if
 
    end subroutine wave_breaking
 

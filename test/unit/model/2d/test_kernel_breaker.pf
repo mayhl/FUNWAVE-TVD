@@ -79,8 +79,8 @@ contains
       etat = 0.1_SP
 
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
-                         dx, dy, 0.1_SP, 10.0_SP, 1.0e-4_SP, &
-                         0.35_SP, 0.65_SP, 0.5_SP, NU_BKG, &
+                         dx, dy, 0.1_SP, 10.0_SP, .true., 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, 0.5_SP, NU_BKG, 0.0_SP, &
                          VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
@@ -118,8 +118,8 @@ contains
       age = 0.0_SP
 
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
-                         dx, dy, DT, 10.0_SP, 1.0e-4_SP, &
-                         0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, &
+                         dx, dy, DT, 10.0_SP, .true., 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, 0.0_SP, &
                          VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
@@ -164,8 +164,8 @@ contains
       expected_nu = cap1*thr2   ! nu_bkg=0
 
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
-                         dx, dy, 0.05_SP, 10.0_SP, 1.0e-4_SP, &
-                         0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, &
+                         dx, dy, 0.05_SP, 10.0_SP, .true., 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, 0.0_SP, &
                          VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
@@ -212,8 +212,8 @@ contains
       expected_nu = cap1*thr2*(1.0_SP + b)
 
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
-                         dx, dy, 0.05_SP, 10.0_SP, 1.0e-4_SP, &
-                         0.50_SP, 0.65_SP, 0.5_SP, 0.0_SP, &
+                         dx, dy, 0.05_SP, 10.0_SP, .true., 1.0e-4_SP, &
+                         0.50_SP, 0.65_SP, 0.5_SP, 0.0_SP, 0.0_SP, &
                          VIS_SCHEME_KENNEDY, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
@@ -254,8 +254,8 @@ contains
       expected_nu = cap1*WM_CBRK*c_shallow
 
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
-                         dx, dy, 0.05_SP, 10.0_SP, 1.0e-4_SP, &
-                         0.35_SP, 0.65_SP, WM_CBRK, 0.0_SP, &
+                         dx, dy, 0.05_SP, 10.0_SP, .true., 1.0e-4_SP, &
+                         0.35_SP, 0.65_SP, WM_CBRK, 0.0_SP, 0.0_SP, &
                          VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 

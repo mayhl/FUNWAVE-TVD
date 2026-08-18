@@ -78,24 +78,25 @@ contains
    ! local wave is too nonlinear (abs(eta)/depth > swe_eta_dep) to
    ! use the Boussinesq correction.
    !
-   ! viscosity_breaking: when .true., MASK9 is forced to 1 everywhere
-   !   (Boussinesq dispersion disabled in favour of viscosity breaking).
+   ! mask9_forced: when .true., MASK9 is forced to 1 everywhere
+   !   (Boussinesq dispersion never gated — legacy viscosity breaking;
+   !   breaking%swe_gate re-arms the gate there).
    ! ----------------------------------------------------------------
    subroutine update_mask9(lp, eta, depth, mask, mask9, &
-                           min_depth_frc, swe_eta_dep, viscosity_breaking)
+                           min_depth_frc, swe_eta_dep, mask9_forced)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: eta(:, :), depth(:, :)
       integer, intent(in)  :: mask(:, :)
       integer, intent(out) :: mask9(:, :)
       real(SP), intent(in)  :: min_depth_frc, swe_eta_dep
-      logical, intent(in)  :: viscosity_breaking
+      logical, intent(in)  :: mask9_forced
 
       integer :: i, j
 
       !$omp parallel do default(shared) schedule(static) private(i)
       do j = lp%jb - 1, lp%je + 1
          do i = lp%ib - 1, lp%ie + 1
-            if (viscosity_breaking) then
+            if (mask9_forced) then
                mask9(i, j) = 1
             else
                mask9(i, j) = mask(i, j)*mask(i - 1, j)*mask(i + 1, j) &
@@ -112,8 +113,8 @@ contains
    ! ----------------------------------------------------------------
    ! Real dispersion-gate weight consumed by the kernels in place of
    ! MASK9: swe_w = mask9 * smoothstep taper over eta/depth in
-   ! [swe_eta_dep - swe_eta_ramp, swe_eta_dep].  Ramp 0 (or viscosity
-   ! breaking) reduces to real(mask9) — bitwise the old behaviour.
+   ! [swe_eta_dep - swe_eta_ramp, swe_eta_dep].  Ramp 0 (or mask9
+   ! forced all-one) reduces to real(mask9) — bitwise the old behaviour.
    ! Pointwise over the FULL local array: mask9/eta carry valid halos
    ! here (caller runs it after the mask9 ring exchange), so no new
    ! exchange is needed.  Rationale: the hard switch converts last-bit
@@ -122,12 +123,12 @@ contains
    ! ----------------------------------------------------------------
    subroutine update_swe_weight(eta, depth, mask9, min_depth_frc, &
                                 swe_eta_dep, swe_eta_ramp, &
-                                viscosity_breaking, swe_w, &
+                                mask9_forced, swe_w, &
                                 min_depth, swe_wetdry_ramp)
       real(SP), intent(in)  :: eta(:, :), depth(:, :)
       integer, intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: min_depth_frc, swe_eta_dep, swe_eta_ramp
-      logical, intent(in)  :: viscosity_breaking
+      logical, intent(in)  :: mask9_forced
       real(SP), intent(out) :: swe_w(:, :)
       real(SP), intent(in)  :: min_depth, swe_wetdry_ramp
 
@@ -140,7 +141,7 @@ contains
       ! dispersive weight AT the swash-edge flip cells so raw mask flips
       ! stop seeding the dispersion-ringing artifact (viscous path has
       ! no SWE gate to do it for free)
-      gate_on = swe_eta_ramp > 0.0_SP .and. .not. viscosity_breaking
+      gate_on = swe_eta_ramp > 0.0_SP .and. .not. mask9_forced
       wd_on = swe_wetdry_ramp > 0.0_SP
 
       if (.not. (gate_on .or. wd_on)) then
