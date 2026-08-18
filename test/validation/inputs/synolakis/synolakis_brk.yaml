@@ -1,0 +1,35 @@
+# Synolakis (1987) solitary runup — breaking, H/h = 0.30.  Truth:
+# profile_brk_*.txt at t* = 15..30.  TRAP: the t* = 0 crest sits a WKN-B
+# half-length offshore of the toe, not the classical sqrt(3H/4h) length.
+
+grid:
+  cell_size: [0.05, 0.05]
+  n_cells: [1500, 3]
+  bathymetry:
+    type: slope
+    depth: 1.0
+    slope: 0.0503778
+    x0: 40.15
+simulation:
+  title: lab_synolakis_brk
+  total_time: 10.5
+  screen_interval: 5.0
+initial:
+  solitary:
+    amplitude: 0.30
+    depth: 1.0
+    x_center: 34.784
+numerics:
+  cfl: 0.5
+  froude_cap: 5.0
+  min_depth: 0.001
+breaking:
+  model: shock_capturing
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 0.05

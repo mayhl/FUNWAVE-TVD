@@ -315,3 +315,56 @@ simulations:
       # anchors: hm0 3.5, band 99.3, dead 0.0 (flat table: no peak gate)
       wavemaker_spectrum: { hm0_err_pct: 7.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
 
+  # ═══ Lab cases — model vs measured laboratory truth ═════════════════════
+  # Ref-less; each inputs/<case>/ dir holds decks + measured data, staged
+  # into the run dir where the oracle reads them.  Gates = anchor + headroom.
+
+  # ── Synolakis runup: measured eta(x) snapshots, NTHMP labBM-04 ──────────
+  # anchors: nb worst 10.6 (t*=70), NTHMP acceptance 10/20 nb/breaking
+  - name: lab_synolakis_nb
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/synolakis
+    input_files: [synolakis_nb.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, profiles, 1d, local]
+    postprocess:
+      synolakis: test.validation.oracles.synolakis
+    tolerances:
+      synolakis:
+        profiles: [profile_nb_t30.txt, profile_nb_t40.txt, profile_nb_t50.txt, profile_nb_t60.txt, profile_nb_t70.txt]
+        profile_nrmse_pct: 15.0
+
+  # anchors: brk worst 8.2 at the WKN-B release
+  - name: lab_synolakis_brk
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/synolakis
+    input_files: [synolakis_brk.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, profiles, 1d, local]
+    postprocess:
+      synolakis: test.validation.oracles.synolakis
+    tolerances:
+      synolakis:
+        profiles: [profile_brk_t15.txt, profile_brk_t20.txt, profile_brk_t25.txt, profile_brk_t30.txt]
+        profile_nrmse_pct: 10.0
+
+  # wetdry_disp_ramp acceptance probe; anchors: worst 10.9
+  - name: lab_synolakis_brk_visc
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/synolakis
+    input_files: [synolakis_brk_visc.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, profiles, 1d, local, diagnostic]
+    postprocess:
+      synolakis: test.validation.oracles.synolakis
+    tolerances:
+      synolakis:
+        profiles: [profile_brk_t15.txt, profile_brk_t20.txt, profile_brk_t25.txt, profile_brk_t30.txt]
+        profile_nrmse_pct: 15.0
+

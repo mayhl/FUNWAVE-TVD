@@ -1,0 +1,34 @@
+# Synolakis (1987) solitary runup — nonbreaking, H/h = 0.0185 on the
+# cot(beta) = 19.85 beach.  Truth: profile_nb_*.txt at t* = 30..70.
+# Geometry is the legacy benchmark deck scaled to h = 1 m.
+
+grid:
+  cell_size: [0.05, 0.05]
+  n_cells: [1500, 3]
+  bathymetry:
+    type: slope
+    depth: 1.0
+    slope: 0.0503778
+    x0: 40.15
+simulation:
+  title: lab_synolakis_nb
+  total_time: 23.0
+  screen_interval: 5.0
+initial:
+  solitary:
+    amplitude: 0.0185
+    depth: 1.0
+    x_center: 21.9
+numerics:
+  cfl: 0.5
+  min_depth: 0.001
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    # eta frames every 0.05 s (dt* = 0.157) bracket the published instants;
+    # the oracle interpolates linearly in time between frames
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 0.05
