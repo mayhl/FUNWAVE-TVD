@@ -1,0 +1,13 @@
+# Ting & Kirby (1994) spilling/plunging cnoidal breakers on a 1:35 slope
+# source: CACR-94-20 Table 1 (setup = h - d from the table depths)
+# case: plunging
+# columns: x d h setup
+# units: m m m m
+# toe_x: -0.7
+     7.295    0.169    0.166    -0.003
+     7.795    0.156    0.154    -0.002
+     8.345    0.142    0.143     0.001
+     8.795    0.128    0.132     0.004
+     9.295    0.113    0.119     0.006
+     9.795    0.096    0.104     0.008
+    10.395    0.079    0.090     0.011

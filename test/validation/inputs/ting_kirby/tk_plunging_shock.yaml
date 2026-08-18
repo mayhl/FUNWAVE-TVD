@@ -1,0 +1,56 @@
+# Ting & Kirby (1994) plunging — T = 5.0 s cnoidal, H = 0.128 m over the
+# h0 = 0.40 m flat, 1:35 slope.  Truth: setup + digitized heights here.
+# The sinusoid stand-in at kh ~ 0.25 is the roughest in the rung;
+# amplitude 0.050 = 0.78 x H/2, x_center 16 clears the sponge.
+
+grid:
+  cell_size: [0.025, 0.2]
+  n_cells: [1600, 3]
+  bathymetry:
+    type: slope
+    depth: 0.4
+    slope: 0.02857142857
+    x0: 20.0
+simulation:
+  title: lab_tk_plunging_shock
+  total_time: 400.0
+  screen_interval: 20.0
+wavemaker:
+  spectrum:
+    type: regular
+    amplitude: 0.050
+    period: 5.0
+    direction: 0.0
+  source:
+    x_center: 16.0
+    y_center: 0.3
+    depth: 0.4
+    delta: 0.5
+    time_ramp: 5.0
+boundaries:
+  west:
+    sponge:
+      width: 12.0
+      direct:
+        r: 0.85
+        a: 5.0
+numerics:
+  cfl: 0.5
+  froude_cap: 10.0
+  min_depth: 0.001
+breaking:
+  model: shock_capturing
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: line
+      geometry: gauges
+      variables: [eta]
+      interval: 0.05
+  geometries:
+    - name: gauges
+      type: transect
+      start: [19.435, 0.3]
+      end: [30.435, 0.3]
+      n_points: 221
