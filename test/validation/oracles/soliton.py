@@ -10,7 +10,7 @@ analytic celerity
 
 indefinitely; numerical dissipation or a broken dispersive term shows as
 amplitude decay, shape distortion, or a celerity bias.  The oracle tracks the
-crest through the ETA field frames (frame times from time_dt.out):
+crest through the ETA field frames (frame times from the channel t.out):
 
   celerity_error_pct   — |c_fit - c| / c from a linear fit of the unwrapped
                          sub-cell crest trajectory, first transit excluded
@@ -47,6 +47,7 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import frame_times
 
 _console = Console()
 
@@ -61,11 +62,6 @@ def _deck_params(run_dir: Path) -> tuple[float, float, float]:
     sol = cfg.get("initial", {}).get("solitary", {})
     return float(sol["amplitude"]), float(sol["depth"]), float(sol.get("angle", 0.0))
 
-
-def _frame_times(run_dir: Path, n: int) -> np.ndarray:
-    """Frame times from time_dt.out (one 't dt' row per fired field frame)."""
-    rows = np.atleast_2d(np.loadtxt(run_dir / "time_dt.out"))
-    return rows[:n, 0]
 
 
 def _crest(row: np.ndarray, dx: float) -> tuple[float, float]:
@@ -119,7 +115,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     # speed c / cos(theta); angle = 0 reduces to the straight flume
     c_ana = math.sqrt(G * (h + a)) / math.cos(math.radians(angle))
     t_transit = span / c_ana
-    times = _frame_times(dev_dir, len(eta_files))
+    times = frame_times(eta_files)
 
     # crest trajectory from one interior row (pseudo-1D case: rows identical)
     mid = meta.ny // 2

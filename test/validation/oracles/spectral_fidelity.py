@@ -114,7 +114,7 @@ def _read_case(run_dir: Path) -> tuple[float, float, float, float, float, float,
 
 def _find_station_files(output_dir: Path) -> list[Path]:
     """Point-channel eta files (<name>_eta.dat: t, eta(1..n) per row)."""
-    return sorted(output_dir.glob("*_eta.dat"))
+    return sorted(output_dir.glob("*/eta.dat")) or sorted(output_dir.glob("*_eta.dat"))
 
 
 # ---------------------------------------------------------------------------

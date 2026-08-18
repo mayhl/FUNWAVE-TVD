@@ -58,6 +58,7 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import frame_times
 
 _console = Console()
 
@@ -77,11 +78,6 @@ def _deck_params(run_dir: Path) -> tuple[float, float, float, float, float]:
             float(bathy["slope"]), float(bathy["x0"]),
             float(wm["source"]["x_center"]))
 
-
-def _frame_times(run_dir: Path, n: int) -> np.ndarray:
-    """Frame times from time_dt.out (one 't dt' row per fired field frame)."""
-    rows = np.atleast_2d(np.loadtxt(run_dir / "time_dt.out"))
-    return rows[:n, 0]
 
 
 def _linear_amplification(x: np.ndarray, dep: np.ndarray, omega: float,
@@ -158,8 +154,8 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
 
     amp = _linear_amplification(x, dep, omega, h0, x_match)
 
-    # clamp to the time_dt.out row count (the forced final frame can outnumber it)
-    times = _frame_times(dev_dir, min(len(eta_files), len(mask_files)))
+    n_frames = min(len(eta_files), len(mask_files))
+    times = frame_times(eta_files[:n_frames])
     n = len(times)
     # steady window: exactly 5 periods of frames (integer periods for the lock-in)
     dt_f = float(np.median(np.diff(times)))
