@@ -1,0 +1,54 @@
+# Hansen & Svendsen test 061071 — spilling, eddy_viscosity arm; same
+# flume/wavemaker as hs_spilling_shock.
+
+grid:
+  cell_size: [0.025, 0.2]
+  n_cells: [2000, 3]
+  bathymetry:
+    type: slope
+    depth: 0.36
+    slope: 0.0292
+    x0: 30.0
+simulation:
+  title: lab_hs_spilling_visc
+  total_time: 100.0
+  screen_interval: 10.0
+wavemaker:
+  spectrum:
+    type: regular
+    amplitude: 0.0317
+    period: 1.67
+    direction: 0.0
+  source:
+    x_center: 20.0
+    y_center: 0.3
+    depth: 0.36
+    delta: 0.5
+    time_ramp: 1.0
+boundaries:
+  west:
+    sponge:
+      width: 12.0
+      direct:
+        r: 0.85
+        a: 5.0
+numerics:
+  cfl: 0.5
+  froude_cap: 10.0
+  min_depth: 0.001
+breaking:
+  model: eddy_viscosity
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: line
+      geometry: gauges
+      variables: [eta]
+      interval: 0.05
+  geometries:
+    - name: gauges
+      type: transect
+      start: [30.175, 0.3]
+      end: [41.975, 0.3]
+      n_points: 119

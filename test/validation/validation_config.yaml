@@ -368,3 +368,81 @@ simulations:
         profiles: [profile_brk_t15.txt, profile_brk_t20.txt, profile_brk_t25.txt, profile_brk_t30.txt]
         profile_nrmse_pct: 15.0
 
+  # ── Hansen & Svendsen 1979: H(x) + setup(x), the breaking-closure rung ──
+  # anchors: H 6.0-8.6; setup 18.7/31.1 spilling, 14.4/18.1 plunging
+  - name: lab_hs_spilling_shock
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/hansen_svendsen
+    input_files: [hs_spilling_shock.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, surf, 1d, local]
+    postprocess:
+      surf: test.validation.oracles.surf
+    tolerances:
+      surf:
+        heights: ht_setup_061071.txt
+        setup: ht_setup_061071.txt
+        channel: line
+        window_s: [30.0, 100.0]
+        height_nrmse_pct: 15.0
+        setup_nrmse_pct: 30.0
+
+  - name: lab_hs_spilling_visc
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/hansen_svendsen
+    input_files: [hs_spilling_visc.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, surf, 1d, local]
+    postprocess:
+      surf: test.validation.oracles.surf
+    tolerances:
+      surf:
+        heights: ht_setup_061071.txt
+        setup: ht_setup_061071.txt
+        channel: line
+        window_s: [30.0, 100.0]
+        height_nrmse_pct: 20.0
+        setup_nrmse_pct: 40.0
+
+  - name: lab_hs_plunging_shock
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/hansen_svendsen
+    input_files: [hs_plunging_shock.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, surf, 1d, local]
+    postprocess:
+      surf: test.validation.oracles.surf
+    tolerances:
+      surf:
+        heights: ht_setup_031041.txt
+        setup: ht_setup_031041.txt
+        channel: line
+        window_s: [30.0, 100.0]
+        height_nrmse_pct: 15.0
+        setup_nrmse_pct: 25.0
+
+  - name: lab_hs_plunging_visc
+    exe_type: validation-2d
+    np: 2
+    input: test/validation/inputs/hansen_svendsen
+    input_files: [hs_plunging_visc.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, surf, 1d, local]
+    postprocess:
+      surf: test.validation.oracles.surf
+    tolerances:
+      surf:
+        heights: ht_setup_031041.txt
+        setup: ht_setup_031041.txt
+        channel: line
+        window_s: [30.0, 100.0]
+        height_nrmse_pct: 20.0
+        setup_nrmse_pct: 25.0
+
