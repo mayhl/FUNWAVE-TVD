@@ -1,0 +1,47 @@
+# Dispersion-isotropy validation — oblique standing wave in a closed SQUARE basin.
+# The mode (m_x, m_y) is eta = A cos(m_x pi x/L) cos(m_y pi y/L), so
+# |k| = (pi/L) sqrt(m_x^2 + m_y^2) and theta = atan2(m_y, m_x).  The four cases
+# share m_x^2 + m_y^2 = 25 (Pythagorean 3-4-5), so |k| (hence kh) is IDENTICAL at
+# theta = 0/36.9/53.1/90 deg — an isotropic scheme returns the same period at every
+# angle.  Each case is also checked against Nwogu individually; (5,0) vs (0,5) is
+# the exact x<->y symmetry probe.  L = Mglob*DX = 20 m, h = 2 m -> kh ~ 1.57.
+# FUNWAVE-TVD input — converted from legacy input.txt
+# Source: test/validation/inputs/isotropy_2d/iso_43.txt
+#
+# No unrecognised keys.
+
+grid:
+  cell_size: [0.2, 0.2]
+  n_cells: [100, 100]
+  bathymetry:
+    type: flat
+    depth: 2.0
+simulation:
+  title: isotropy_2d_43
+  total_time: 40.0
+  screen_interval: 10.0
+initial:
+  sine_mode:
+    amplitude: 0.01
+    mode_x: 4
+    mode_y: 3
+numerics:
+  cfl: 0.5
+  froude_cap: 3.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+output:
+  format: ascii
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 40.0
+    - name: sta
+      type: station
+      x: [0.2]
+      y: [0.2]
+      variables: [eta, u, v]
+      interval: 0.04
+  depth_out: true

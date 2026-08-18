@@ -5,8 +5,9 @@ Both validators excite an INI_SINE standing wave in a closed flat basin, read th
 single near-corner station time series, and measure its oscillation period.  The
 only per-validator differences are the basin shape (1D strip vs square) and the
 mode numbers (mode_x, mode_y), so the deck template, the ~12-period run-length
-rule, the run/convert/extract mechanics, and the Nwogu/Airy dispersion curves all
-live here.
+rule, the run/extract mechanics, and the Nwogu/Airy dispersion curves all
+live here.  Decks are authored directly in the YAML schema (input.txt is
+retired for 2D).
 """
 
 from __future__ import annotations
@@ -27,7 +28,6 @@ from test.validation.oracles.dispersion import (
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 BINARY = REPO_ROOT / "workspaces" / "dev" / "validation-2d" / "funwave"
-CONVERT = REPO_ROOT / "scripts" / "convert_input.py"
 
 
 # ---------------------------------------------------------------------------
@@ -51,48 +51,39 @@ def _cg_airy(kh):
 # ---------------------------------------------------------------------------
 
 _DECK = """\
-! Auto-generated seiche validation case; do not edit by hand.
-TITLE = {title}
-
-PX = 1
-PY = 1
-
-DEPTH_TYPE = FLAT
-DEPTH_FLAT = {h:.6f}
-
-Mglob = {mglob}
-Nglob = {nglob}
-DX = {dx:.6f}
-DY = {dy:.6f}
-
-TOTAL_TIME = {total_time:.4f}
-PLOT_INTV = {total_time:.4f}
-SCREEN_INTV = {total_time:.4f}
-
-WAVEMAKER = INI_SINE
-AMP = 0.01
-mode_x = {mode_x}
-mode_y = {mode_y}
-
-PERIODIC = F
-
-DIFFUSION_SPONGE = F
-FRICTION_SPONGE = F
-DIRECT_SPONGE = F
-
-Cd = 0.0
-VISCOSITY_BREAKING = F
-
-CFL = 0.5
-FroudeCap = 3.0
-MinDepth = 0.01
-
-NumberStations = 1
-STATIONS_FILE = stations.txt
-PLOT_INTV_STATION = {dt_sta:.6f}
-
-DEPTH_OUT = T
-ETA = T
+# Auto-generated seiche validation case; do not edit by hand.
+grid:
+  cell_size: [{dx:.6f}, {dy:.6f}]
+  n_cells: [{mglob}, {nglob}]
+  n_procs: [1, 1]
+  bathymetry:
+    type: flat
+    depth: {h:.6f}
+simulation:
+  title: {title}
+  total_time: {total_time:.4f}
+  screen_interval: {total_time:.4f}
+initial:
+  sine_mode:
+    amplitude: 0.01
+    mode_x: {mode_x}
+    mode_y: {mode_y}
+numerics:
+  cfl: 0.5
+  froude_cap: 3.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+output:
+  format: ascii
+  channels:
+    - name: sta
+      type: station
+      x: [{sta_x:.6f}]
+      y: [{sta_y:.6f}]
+      variables: [eta]
+      interval: {dt_sta:.6f}
+  depth_out: true
 """
 
 
@@ -118,16 +109,18 @@ def run_seiche(
     station: str = "2 2",
     verbose: bool = False,
 ) -> float | None:
-    """Write the deck, convert, run (1 rank), read station 1; return its period (s).
+    """Write the YAML deck, run (1 rank), read station 1; return its period (s).
 
-    Returns None on convert/run failure or an unmeasurable series.
+    Returns None on a run failure or an unmeasurable series.
     """
     if run_dir.exists():
         shutil.rmtree(run_dir)
     out_dir = run_dir / "output"
     out_dir.mkdir(parents=True)
 
-    (run_dir / "input.txt").write_text(
+    # legacy station strings are 1-based grid indices "i j"
+    i_sta, j_sta = (int(v) for v in station.split())
+    (run_dir / "input.yaml").write_text(
         _DECK.format(
             title=title,
             h=h,
@@ -139,20 +132,10 @@ def run_seiche(
             mode_y=mode_y,
             total_time=total_time,
             dt_sta=dt_sta,
+            sta_x=(i_sta - 1) * dx,
+            sta_y=(j_sta - 1) * dy,
         )
     )
-    (run_dir / "stations.txt").write_text(station + "\n")
-
-    conv = subprocess.run(
-        ["uv", "run", "python", str(CONVERT), "input.txt", "input.yaml"],
-        cwd=run_dir,
-        capture_output=True,
-        text=True,
-    )
-    if conv.returncode != 0:
-        if verbose:
-            print(f"  [{title}] convert failed:\n{conv.stderr}", file=sys.stderr)
-        return None
 
     run = subprocess.run(
         ["mpirun", "-np", "1", str(BINARY), "input.yaml"],
@@ -160,7 +143,7 @@ def run_seiche(
         capture_output=True,
         text=True,
     )
-    sta = out_dir / "sta_eta.dat"
+    sta = out_dir / "sta" / "eta.dat"
     if run.returncode != 0 or not sta.exists():
         if verbose:
             print(f"  [{title}] run failed (rc={run.returncode}):\n{run.stdout[-400:]}\n{run.stderr[-400:]}", file=sys.stderr)

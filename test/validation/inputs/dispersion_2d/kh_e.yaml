@@ -1,0 +1,46 @@
+# Linear-dispersion validation — fundamental seiche in a closed flat basin.
+# One half wavelength across L = Mglob*DX = 20 m, so k = pi/L; kh is set by the
+# depth alone (kh = k*DEPTH_FLAT), swept a..f = 0.31/0.94/1.88/2.83/4.00/12.57.
+# e/f probe the short-wave edge of the Boussinesq range (f = 4*pi, the 2D upper
+# bound past which the highly dispersive 3D model takes over); the gate checks the
+# period against the model's OWN Nwogu relation, so it stays a correctness test
+# even where Nwogu departs from Airy.  Small amplitude keeps it linear; no
+# friction/breaking/sponge so only dispersion sets the oscillation period.
+# FUNWAVE-TVD input — converted from legacy input.txt
+# Source: test/validation/inputs/dispersion_2d/kh_e.txt
+#
+# No unrecognised keys.
+
+grid:
+  cell_size: [0.2, 0.2]
+  n_cells: [100, 3]
+  bathymetry:
+    type: flat
+    depth: 25.5
+simulation:
+  title: dispersion_2d_khe
+  total_time: 50.0
+  screen_interval: 10.0
+initial:
+  sine_mode:
+    amplitude: 0.01
+numerics:
+  cfl: 0.5
+  froude_cap: 3.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+output:
+  format: ascii
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 50.0
+    - name: sta
+      type: station
+      x: [0.8]
+      y: [0.2]
+      variables: [eta, u, v]
+      interval: 0.05
+  depth_out: true

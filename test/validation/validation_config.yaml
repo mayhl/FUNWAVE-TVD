@@ -22,9 +22,7 @@ simulations:
     exe_type: validation-2d
     np: 4
     input: test/validation/inputs/dispersion_2d
-    input_files: [kh_a.txt, kh_b.txt, kh_c.txt, kh_d.txt, kh_e.txt, kh_f.txt]
-    preprocess:
-      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    input_files: [kh_a.yaml, kh_b.yaml, kh_c.yaml, kh_d.yaml, kh_e.yaml, kh_f.yaml]
     binary: funwave
     output_dir: output
     tags: [validation, 2d, dispersion]
@@ -43,9 +41,7 @@ simulations:
     exe_type: validation-2d
     np: 4
     input: test/validation/inputs/conservation_2d
-    input_files: [cons_diag.txt, cons_axis.txt]
-    preprocess:
-      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    input_files: [cons_diag.yaml, cons_axis.yaml]
     binary: funwave
     output_dir: output
     tags: [validation, 2d, conservation]
@@ -64,9 +60,7 @@ simulations:
     exe_type: validation-2d
     np: 4
     input: test/validation/inputs/conservation_2d
-    input_files: [cons_lowkh.txt]
-    preprocess:
-      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    input_files: [cons_lowkh.yaml]
     binary: funwave
     output_dir: output
     tags: [validation, 2d, conservation]
@@ -199,9 +193,7 @@ simulations:
     exe_type: validation-2d
     np: 4
     input: test/validation/inputs/isotropy_2d
-    input_files: [iso_50.txt, iso_43.txt, iso_34.txt, iso_05.txt]
-    preprocess:
-      [uv, run, "{repo_root}/scripts/convert_input.py", "{input_file}", "{curr_input}"]
+    input_files: [iso_50.yaml, iso_43.yaml, iso_34.yaml, iso_05.yaml]
     binary: funwave
     output_dir: output
     tags: [validation, 2d, dispersion, isotropy]
