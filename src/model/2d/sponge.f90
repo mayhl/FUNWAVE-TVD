@@ -352,7 +352,7 @@ contains
    !> static SWE interface at the strip edge partially reflects the
    !> dispersive tail; sigma = 0 there, and long waves -- the harbor
    !> concern -- cross it cleanly.  Call after every mask9 rebuild,
-   !> BEFORE update_swe_weight.
+   !> BEFORE update_disp_weight.
    subroutine sponge_pml_blank_mask9(this, mask9)
       class(type_model_sponge), intent(in) :: this
       integer, intent(inout) :: mask9(:, :)

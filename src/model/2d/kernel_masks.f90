@@ -5,7 +5,7 @@ module model_kernel_masks_mod
    implicit none
    private
 
-   public :: update_mask, update_mask9, update_swe_weight
+   public :: update_mask, update_mask9, update_disp_weight
 
 contains
 
@@ -112,7 +112,7 @@ contains
 
    ! ----------------------------------------------------------------
    ! Real dispersion-gate weight consumed by the kernels in place of
-   ! MASK9: swe_w = mask9 * smoothstep taper over eta/depth in
+   ! MASK9: disp_w = mask9 * smoothstep taper over eta/depth in
    ! [swe_eta_dep - swe_eta_ramp, swe_eta_dep].  Ramp 0 (or mask9
    ! forced all-one) reduces to real(mask9) — bitwise the old behaviour.
    ! Pointwise over the FULL local array: mask9/eta carry valid halos
@@ -121,16 +121,16 @@ contains
    ! eta differences into O(1) residual flips at threshold cells — the
    ! blow-up injector of the 2026-07 damping mission.
    ! ----------------------------------------------------------------
-   subroutine update_swe_weight(eta, depth, mask9, min_depth_frc, &
+   subroutine update_disp_weight(eta, depth, mask9, min_depth_frc, &
                                 swe_eta_dep, swe_eta_ramp, &
-                                mask9_forced, swe_w, &
-                                min_depth, swe_wetdry_ramp)
+                                mask9_forced, disp_w, &
+                                min_depth, wetdry_disp_ramp)
       real(SP), intent(in)  :: eta(:, :), depth(:, :)
       integer, intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: min_depth_frc, swe_eta_dep, swe_eta_ramp
       logical, intent(in)  :: mask9_forced
-      real(SP), intent(out) :: swe_w(:, :)
-      real(SP), intent(in)  :: min_depth, swe_wetdry_ramp
+      real(SP), intent(out) :: disp_w(:, :)
+      real(SP), intent(in)  :: min_depth, wetdry_disp_ramp
 
       real(SP) :: t, s
       integer :: i, j
@@ -142,31 +142,31 @@ contains
       ! stop seeding the dispersion-ringing artifact (viscous path has
       ! no SWE gate to do it for free)
       gate_on = swe_eta_ramp > 0.0_SP .and. .not. mask9_forced
-      wd_on = swe_wetdry_ramp > 0.0_SP
+      wd_on = wetdry_disp_ramp > 0.0_SP
 
       if (.not. (gate_on .or. wd_on)) then
-         swe_w = real(mask9, SP)
+         disp_w = real(mask9, SP)
          return
       end if
 
       !$omp parallel do default(shared) schedule(static) private(i, t, s)
       do j = 1, size(mask9, 2)
          do i = 1, size(mask9, 1)
-            swe_w(i, j) = real(mask9(i, j), SP)
+            disp_w(i, j) = real(mask9(i, j), SP)
             if (gate_on) then
                t = (swe_eta_dep - abs(eta(i, j)) &
                     /max(depth(i, j), min_depth_frc))/swe_eta_ramp
                t = min(1.0_SP, max(0.0_SP, t))
-               swe_w(i, j) = swe_w(i, j)*t*t*(3.0_SP - 2.0_SP*t)
+               disp_w(i, j) = disp_w(i, j)*t*t*(3.0_SP - 2.0_SP*t)
             end if
             if (wd_on) then
                s = (eta(i, j) + depth(i, j) - min_depth) &
-                   /(swe_wetdry_ramp*min_depth)
+                   /(wetdry_disp_ramp*min_depth)
                s = min(1.0_SP, max(0.0_SP, s))
-               swe_w(i, j) = swe_w(i, j)*s*s*(3.0_SP - 2.0_SP*s)
+               disp_w(i, j) = disp_w(i, j)*s*s*(3.0_SP - 2.0_SP*s)
             end if
          end do
       end do
-   end subroutine update_swe_weight
+   end subroutine update_disp_weight
 
 end module model_kernel_masks_mod

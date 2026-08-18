@@ -69,7 +69,7 @@ module model_stepper_2d_mod
                                      cal_etauv_assemble_x, cal_etauv_assemble_y, &
                                      cal_uv_no_dispersion, cal_etauv_update, &
                                      RK_ALPHA, RK_BETA
-   use model_kernel_masks_mod, only: update_mask, update_mask9, update_swe_weight
+   use model_kernel_masks_mod, only: update_mask, update_mask9, update_disp_weight
    use model_kernel_breaker_mod, only: wave_breaking, viscosity_wmaker, &
                                        VIS_SCHEME_DEFAULT
 
@@ -173,7 +173,7 @@ module model_stepper_2d_mod
       ! show in modern (deliberate 19c deviation from the ykchoi trap)
       logical :: run_breaker = .false.
 
-      ! Viscosity mode pins mask9/swe_w at their all-one settled state
+      ! Viscosity mode pins mask9/disp_w at their all-one settled state
       ! (update_mask9 is state-independent there); once the first in-loop
       ! rebuild + ring ride has run, every repeat is a no-op — this flag
       ! lets sync_from_flux skip them.  Never set while the vessel hull
@@ -582,7 +582,7 @@ contains
          call fluxes(lp, num%high_order, num%construction, &
                      f%eta, f%u, f%v, f%hu, f%hv, this%u4, this%v4, &
                      this%depth_fx, this%depth_fy, this%dx, this%dy, &
-                     this%inv_dx, this%inv_dy, f%mask, f%swe_w, &
+                     this%inv_dx, this%inv_dy, f%mask, f%disp_w, &
                      phy%Gamma1, phy%Gamma3, phy%dispersion, this%fws)
 
          call flux_wall_bc(lp, this%bc%fill_west, this%bc%fill_east, &
@@ -631,7 +631,7 @@ contains
          call cal_sources(lp, phy%Gamma1, phy%Gamma2, phy%dispersion, &
                           phy%coriolis_on, this%obstacle%breakwater, &
                           ves_drag_on(this), meteo_wind_on(this), &
-                          f%mask, f%swe_w, this%inv_dx, this%inv_dy, &
+                          f%mask, f%disp_w, this%inv_dx, this%inv_dy, &
                           f%depth, this%depth_fx, this%depth_fy, &
                           f%eta, f%h, f%u, f%v, &
                           this%fws%p, this%fws%q, f%hu, f%hv, &
@@ -671,7 +671,7 @@ contains
          ! MASK9 = MASK9tmp*MaskVessel, before the ghost exchange)
          if (ves_mask_on(this)) then
             f%mask9 = f%mask9*this%vessel%mask_vessel
-            f%swe_w = f%swe_w*real(this%vessel%mask_vessel, SP)
+            f%disp_w = f%disp_w*real(this%vessel%mask_vessel, SP)
          end if
 
          ! tidal strip relaxation (legacy TIDE_BC between UPDATE_MASK
@@ -780,7 +780,7 @@ contains
          if (phy%dispersion) then
             call cal_etauv_assemble_x(lp, phy%Gamma1, num%MinDepthFrc, &
                                       this%b1, this%b2, this%inv_dx, &
-                                      f%mask, f%swe_w, f%depth, f%h, f%p, &
+                                      f%mask, f%disp_w, f%depth, f%h, f%p, &
                                       this%dws%vxy, this%dws%dvxy, &
                                       this%west_dirichlet, f%u, this%ews)
             ct0 = MPI_Wtime()
@@ -798,7 +798,7 @@ contains
             call cal_etauv_assemble_y(lp, phy%disp_time_left, phy%Gamma1, &
                                       phy%Gamma2, num%MinDepthFrc, &
                                       this%b1, this%b2, this%inv_dy, &
-                                      f%mask, f%swe_w, f%depth, f%h, f%eta, &
+                                      f%mask, f%disp_w, f%depth, f%h, f%eta, &
                                       f%q, this%dws%uxy, this%dws%duxy, &
                                       this%dws%ux, this%dws%dux, this%ews)
             ct0 = MPI_Wtime()
@@ -830,7 +830,7 @@ contains
                           this%depth_fx, this%depth_fy, truncate_depth=.true.)
 
          ! viscosity mode makes the rebuild below state-independent (all-1
-         ! over its range), so after the first pass mask9/swe_w sit at a
+         ! over its range), so after the first pass mask9/disp_w sit at a
          ! fixed point and the rebuild + ride + weight refresh are skipped
          ! via m9_settled; the vessel hull re-blank keeps the per-stage
          ! rebuild, and the guard leaves t = 0 (pure product, ledger 8c)
@@ -860,10 +860,10 @@ contains
             call this%sponge%pml_blank_mask9(f%mask9)
 
             ! real dispersion-gate weight off the settled mask9 (halos valid)
-            call update_swe_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
+            call update_disp_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
                                    this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
-                                   this%m9_forced, f%swe_w, &
-                                   num%MinDepth, this%breaking%swe_wetdry_ramp)
+                                   this%m9_forced, f%disp_w, &
+                                   num%MinDepth, this%breaking%wetdry_disp_ramp)
             ! latch only once the vessel is NOT blanking mask9 — else a
             ! mid-run deactivation (is_activated -> F) would leave m9_settled
             ! true and freeze mask9 with the stale hull zeros; the guard's
@@ -911,11 +911,11 @@ contains
             f%mask9 = nint(rmask)
          end block
          call this%sponge%pml_blank_mask9(f%mask9)
-         call update_swe_weight(f%eta, f%depth, f%mask9, &
+         call update_disp_weight(f%eta, f%depth, f%mask9, &
                                 this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
                                 this%breaking%swe_eta_ramp, this%m9_forced, &
-                                f%swe_w, this%numerics%MinDepth, &
-                                this%breaking%swe_wetdry_ramp)
+                                f%disp_w, this%numerics%MinDepth, &
+                                this%breaking%wetdry_disp_ramp)
 
          ! carried fws face restore (18c): the first stage's etat reads the
          ! interface flux one row past the interior, which the interior-only
@@ -1206,7 +1206,7 @@ contains
                  phy => this%physics, num => this%numerics)
          call cal_dispersion_derivs(lp, this%dws, f%eta, f%depth, f%u, f%v, &
                                     this%u0, this%v0, this%fws%p, this%fws%q, &
-                                    f%swe_w, this%inv_dx, this%inv_dy, dt, &
+                                    f%disp_w, this%inv_dx, this%inv_dy, dt, &
                                     num%MinDepthFrc, phy%Gamma2, &
                                     this%breaking%show_breaking, &
                                     g%is_back_boundary .and. .not. this%west_dirichlet, &
@@ -1222,7 +1222,7 @@ contains
          call this%bc%exchange_dispersion(g, phy%Gamma2, this%dws, &
                                           this%etax, this%etay)
          call cal_dispersion_assemble(lp, this%dws, f%eta, f%depth, f%u, f%v, &
-                                      f%swe_w, this%inv_dx, this%inv_dy, &
+                                      f%disp_w, this%inv_dx, this%inv_dy, &
                                       this%beta1, this%beta2, phy%Gamma2, &
                                       this%etat, this%etax, this%etay, &
                                       this%u4, this%v4, this%u1p, this%v1p, &

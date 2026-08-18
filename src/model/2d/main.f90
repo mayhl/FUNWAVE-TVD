@@ -386,8 +386,8 @@ contains
          end if
          ! t = 0 dispersion weight mirrors mask9 verbatim — no taper at
          ! init, matching the no-SWE-zeroing convention above (ledger 8c);
-         ! the first in-loop update_swe_weight applies the ramp
-         f%swe_w = real(f%mask9, SP)
+         ! the first in-loop update_disp_weight applies the ramp
+         f%disp_w = real(f%mask9, SP)
       end associate
 
       call this%fields%register(this%registry)

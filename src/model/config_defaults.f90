@@ -59,9 +59,9 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_SWE_ETA_DEP = "0.8"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_RAMP = "0.1"
    character(*), parameter :: DEF_BREAKING_SWE_GATE = "NO"
-   character(*), parameter :: DEF_BREAKING_SWE_WETDRY_RAMP = "0.0"
    character(*), parameter :: DEF_BREAKING_T_BRK = "20.0"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"
+   character(*), parameter :: DEF_BREAKING_WETDRY_DISP_RAMP = "0.0"
    ! ── dispersion ──
    character(*), parameter :: DEF_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_DISPERSION_SCHEME = "fully_nonlinear"
