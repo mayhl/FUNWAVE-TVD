@@ -27,7 +27,6 @@ numerics:
 breaking:
   model: shock_capturing
 output:
-  interval: 50.0
   channels:
     - name: sta
       type: station
@@ -36,4 +35,3 @@ output:
       variables: [eta]
       interval: 0.05
   depth_out: true
-  variables: [ETA]

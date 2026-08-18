@@ -73,10 +73,13 @@ breaking:
   Cbrk1: 0.65
   Cbrk2: 0.35
 output:
-  interval: 900.0
   # 5 gauges ~2-3 lambda_p downwave of the source, spanning ~half a peak
   # wavelength (nee stations.txt i = 175..203, j = 3 at dx = dy = 2 m)
   channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 900.0
     - name: sta
       type: station
       x: [348.0, 362.0, 376.0, 390.0, 404.0]
@@ -84,4 +87,3 @@ output:
       variables: [eta]
       interval: 0.1
   depth_out: true
-  variables: [ETA]
