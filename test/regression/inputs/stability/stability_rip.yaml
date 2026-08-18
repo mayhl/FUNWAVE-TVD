@@ -9,7 +9,7 @@
 # postproc asserts dt never collapses and the final eta stays finite/bounded.
 #
 # Fixed dt 0.04; under this forcing the CFL halves it to 0.02 (gfortran) or
-# 0.01 (wheat/ifx, t~53) where the healthy run settles — the blow-up cascades
+# 0.01 (ifx reference run, t~53) where the healthy run settles — the blow-up cascades
 # past 5e-3 instead.  screen_interval 1.0 so the per-step dt is sampled densely
 # in the log for the dt-floor check.
 

@@ -73,7 +73,7 @@ def regression(
         fixed_dt=fixed_dt,
         ranks=jobs,
     )
-    # a failing board must exit red -- rc=0-on-FAIL let 310380 read green
+    # a failing board must exit red -- rc=0-on-FAIL let a failing board read green
     if any_failed:
         raise typer.Exit(code=1)
 

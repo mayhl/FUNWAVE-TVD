@@ -40,7 +40,7 @@ class LocalProvider(BaseProvider):
         # every launcher binding to the same low cores.  Each var is a no-op
         # under the other launchers.  NOTE the OpenMPI 4 -> 5 rename: v5's
         # PRRTE ignores the OMPI_MCA_hwloc_* form, so both spellings are set
-        # (missing PRTE_* left packed wheat runs core-stacked ~5x slow).
+        # (missing PRTE_* left packed cluster runs core-stacked ~5x slow).
         env.setdefault("OMPI_MCA_hwloc_base_binding_policy", "none")  # OpenMPI 4
         env.setdefault("PRTE_MCA_hwloc_default_binding_policy", "none")  # OpenMPI 5
         # :OVERSUBSCRIBE — PRRTE also ignores the v4 oversubscribe var and

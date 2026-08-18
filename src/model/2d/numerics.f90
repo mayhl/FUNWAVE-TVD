@@ -114,7 +114,7 @@ contains
       this%MinDepthFrc = this%MinDepth
 
       ! tridiag: system-tuned solver knobs (bitwise-neutral); absent
-      ! keys keep the wheat-measured defaults compiled into the solver
+      ! keys keep the reference-measured defaults compiled into the solver
       tri_yaml = sub_env%yaml%cast_dictionary("tridiag", no_tri)
       if (.not. no_tri) then
          call tri_yaml%read("chunk", silent=no_key, val=tri_chunk, &

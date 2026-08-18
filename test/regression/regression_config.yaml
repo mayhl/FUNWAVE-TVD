@@ -1,9 +1,9 @@
 # Auto rank-sizing: each test's MPI np is derived from its grid, not hand-set.
 #   np = clamp(round(sqrt(Mglob*Nglob) / K), 1, rank_budget)
 # Only the horizontal plane decomposes, so Kglob (vertical layers) is excluded:
-# a wheat scan showed the 3D HYPRE solve does not strong-scale (np=1 fastest), so
+# a reference-cluster scan showed the 3D HYPRE solve does not strong-scale (np=1 fastest), so
 # M*N sizes the 3D case to np=1 while leaving 2D unchanged.
-# K is the efficiency dial (measured on wheat, 92-core, shm transport):
+# K is the efficiency dial (measured on a 92-core reference node, shm transport):
 #   K=13 -> ~60% per-run efficiency (debug: max node usage, fastest turnaround)
 #   K=25 -> ~85% per-run efficiency (production: revisit near release)
 # ref and dev auto-size identically, so the comparison stays bitwise.
@@ -250,7 +250,7 @@ simulations:
     postprocess:
       stability: test.regression.postproc.stability_check
     # min_dt 0.006 sits between the healthy operating floor (dt settles at 0.01
-    # on wheat/ifx under this forcing, 10/10 ensemble draws) and the blow-up
+    # on ifx reference runs under this forcing, 10/10 ensemble draws) and the blow-up
     # cascade (2.5e-3 by t~105, 10/10 hard-switch draws) — decomp-robust either
     # side.  0.011 would false-fail the healthy arm on ifx.
     tolerances:
@@ -302,7 +302,7 @@ simulations:
     # about this case's size, not the solver: 100x3x24 = 7,200 cells leaves ~1,800
     # per rank at PX=2, and past that the run is halo and per-stage solver setup.
     # The solver itself does strong-scale on a realistic problem —
-    # bench_decks/poisson_scale_3d (192x96x16, wheat/ifx, 2026-08-13) hits 4.1x at
+    # bench_decks/poisson_scale_3d (192x96x16, ifx reference run, 2026-08-13) hits 4.1x at
     # np=16 and a 4.3x optimum at np=32, turning back up by np=64 — but parallel
     # efficiency still falls off hard (84% np=2, 46% np=8, 14% np=32) because
     # GMRES and the SMG preconditioner are rebuilt every RK stage. 2fb47bf

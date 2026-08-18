@@ -371,7 +371,7 @@ sections:
         legacy: ~
         default: 48
         units: ~
-        doc: "Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (wheat sweep flat over 16-64)."
+        doc: "Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (reference sweep flat over 16-64)."
       tridiag.transpose_min_py:
         legacy: ~
         default: 40

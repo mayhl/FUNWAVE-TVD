@@ -10,7 +10,7 @@
 # lock-in decomposition (as of rung 3 — A7c fixed, width now peak-based):
 #   1. ~~source-box truncation (ledger A7c)~~ FIXED at rung 3: Width_WK comes
 #      from the PEAK period, so the low-frequency Gaussians are no longer
-#      clipped (Hm0 error dropped 29.3 % -> 19.8 % on the wheat board);
+#      clipped (Hm0 error dropped 29.3 % -> 19.8 % on the reference board);
 #   2. kh-dependent Wei-Kirby delivery: REGULAR waves in this flume radiate
 #      ~0.80 of nominal at kh 0.5-0.9 (measured 30 m from the source; the CG
 #      runup case saw 0.986 at kh 0.2) — inherited, not spectral-specific;

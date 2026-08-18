@@ -1,6 +1,6 @@
 # Intel ifx
 #
-# -axAVX2 stays on the optimized build types (NOT base): the wheat/barfoot refs
+# -axAVX2 stays on the optimized build types (NOT base): the reference builds
 # were built with its dispatch paths, so RelWithDebInfo keeps it for bitwise
 # stability; Debug/Coverage drop it with the rest of the optimizer.
 #

@@ -20,7 +20,7 @@ _GRID_RE = {k: re.compile(rf"^\s*{k}\s*=\s*(\d+)", re.IGNORECASE | re.MULTILINE)
 _PX_RE = re.compile(r"(?im)^(\s*PX\s*=\s*)\d+")
 _PY_RE = re.compile(r"(?im)^(\s*PY\s*=\s*)\d+")
 # Default rank-sizing dial: np = round(sqrt(cells) / K). K=13 ~ 60% eff (debug,
-# max node usage); K=25 ~ 85% eff (production). Measured on wheat (92-core, shm).
+# max node usage); K=25 ~ 85% eff (production). Measured on a 92-core shm reference node.
 _DEFAULT_NP_K = 13.0
 # Halo (Nghost=3) needs a few interior cells; floor each subdomain axis here.
 _MIN_SUBDOMAIN = 4
@@ -156,7 +156,7 @@ class RegressionRunner(BaseRunner):
         # Regression execs funwave directly (no ctest) -> build the exe only,
         # no unit-test scaffolding (ENABLE_UNIT_TESTING stays OFF).
         # Compiler selection is CMake auto-config from the environment (batch
-        # scripts export FC: mpifort on wheat, ftn on Cray PE).  On macOS
+        # scripts export FC: mpifort on the reference cluster, ftn on Cray PE).  On macOS
         # FindMPI misdetects under bare gfortran, so default FC to the OpenMPI
         # wrapper there -- an explicit FC always wins.
         env = os.environ.copy()
@@ -469,7 +469,7 @@ class RegressionRunner(BaseRunner):
         Returns (eff_np, target_np, (px, py)). target_np is the pre-budget wish;
         eff_np = px*py is what launches (feasible factorization capped to budget).
         Only the horizontal plane decomposes (nx*ny), so Kglob (vertical layers) is
-        NOT in the count: a 2026-07-18 wheat scan of the 3D standing wave showed its
+        NOT in the count: a 2026-07-18 reference-cluster scan of the 3D standing wave showed its
         HYPRE Poisson solve does not strong-scale (np=1 fastest, np=16 slower than
         serial), so counting K would over-provision. M*N → the 3D case sizes to np=1,
         matching the data; every 2D case is unchanged (K=1). 3D stays uncalibrated

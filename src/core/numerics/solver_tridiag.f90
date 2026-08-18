@@ -40,9 +40,9 @@ module core_solver_tridiag_mod
    end type type_trid_workspace
 
    ! Chunk width of the pipelined sweeps and the transpose threshold —
-   ! deck-tunable (numerics: tridiag:), defaults measured on wheat:
-   ! chunk from the 312446 sweep (flat 16-64, 96 worse), threshold
-   ! from the 313297 A/B (transpose wins at PY=80 and PY=40 on 8
+   ! deck-tunable (numerics: tridiag:), defaults measured on the reference cluster:
+   ! chunk from the sweep (flat 16-64, 96 worse), threshold
+   ! from the transpose A/B (transpose wins at PY=80 and PY=40 on 8
    ! nodes, neutral at PY=40 on 4, loses at PY<=10).  Both are
    ! bitwise-neutral and system-flavored — retune per fabric via the
    ! benchmark harness.
@@ -436,7 +436,7 @@ contains
          ! NOT OMP-threaded: the j recurrence bars the sweep loop, and
          ! the i-slab variant (each thread sweeping its own column
          ! range) cost ~5% serial under ifx — code-shape regression,
-         ! wheat A/B 310901 vs 310916; columns stay a GPU-pass target
+         ! reference A/B pair; columns stay a GPU-pass target
          do j = lp%jb + 1, lp%je
             do i = lp%ib, lp%ie
                if (a(i, j) /= 0.0_SP) then
@@ -702,7 +702,7 @@ contains
    ! even share of the x-columns), one serial Thomas per line, second
    ! all-to-all scatters the solutions back.  Trades the alpha*PY
    ! latency ladder of the pipelined chain for pure bandwidth — the
-   ! 8n trid_y datum (ctband 312020).  Per-line float sequence matches
+   ! 8n trid_y datum.  Per-line float sequence matches
    ! the pipelined recurrence exactly (rank seams just split rows), so
    ! the path is bitwise vs trid_y/trid_y2.  The pack loops ARE the
    ! transpose: send side packs y-fastest per destination, unpack
