@@ -249,6 +249,8 @@ class RunMetadata:
     output_res: int = 1  # OUTPUT_RES stride (ASCII only; binary is always full res)
     variables: list[str] = field(default_factory=list)  # canonical names from input
     nz: int = 0  # Kglob for 3D runs; 0 for 2D runs
+    # per-prefix parent dir cache for field_path (flat vs channel subfolder)
+    _prefix_dirs: dict = field(default_factory=dict)
 
     @property
     def is_3d(self) -> bool:
@@ -258,9 +260,21 @@ class RunMetadata:
         """Return the path for a time-series output file.
 
         3D uses 4-digit suffixes (_%04d); 2D uses 5-digit (_%05d).
+        Channels own subfolders since the flags-list retirement — resolve
+        the prefix's parent once (flat first, then one channel level) and
+        cache it.
         """
         digits = 4 if self.is_3d else 5
-        return self.output_dir / f"{prefix}_{idx:0{digits}d}"
+        name = f"{prefix}_{idx:0{digits}d}"
+        parent = self._prefix_dirs.get(prefix)
+        if parent is None:
+            parent = self.output_dir
+            if not (parent / name).exists():
+                hit = next(self.output_dir.glob(f"*/{name}"), None)
+                if hit is not None:
+                    parent = hit.parent
+            self._prefix_dirs[prefix] = parent
+        return parent / name
 
     def output_files(self, variable: str) -> list[Path]:
         """Sorted list of output files for a variable.
