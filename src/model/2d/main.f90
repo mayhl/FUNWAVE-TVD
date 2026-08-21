@@ -785,6 +785,9 @@ contains
                        this%simulation%screen_interval)
       call engine%run(stepper, monitor, this%env%log)
 
+      ! repeat the nu_cap engagement warning where it survives a long log
+      call stepper%report_cap()
+
       ! checkpoint the final state (this slice: end-of-run only)
       if (this%output%write_checkpoint) &
          call write_checkpoint_set(this, engine%clock%current_time)

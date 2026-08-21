@@ -155,6 +155,9 @@ module model_stepper_2d_mod
       ! step-start hu/hv + a solve buffer, only under stage_split (the
       ! pre-blend IMEX correction re-injects the undiffused step-start state)
       real(SP), allocatable :: hu0(:, :), hv0(:, :), vzb(:, :)
+      ! nu_cap engagement bookkeeping (rank-local; reduced in the summary)
+      integer  :: cap_stages = 0, cap_steps = 0, n_steps = 0, cap_peak = 0
+      logical  :: cap_warned = .false.
       real(SP), allocatable :: etat(:, :), ut(:, :), vt(:, :)
       real(SP), allocatable :: etax(:, :), etay(:, :)
       real(SP), allocatable :: u4(:, :), v4(:, :)
@@ -208,6 +211,7 @@ module model_stepper_2d_mod
       procedure :: stage => stepper_stage
       procedure :: post_step => stepper_post_step
       procedure :: sync_from_flux => stepper_sync_from_flux
+      procedure :: report_cap => stepper_report_cap
       procedure :: restart_sync => stepper_restart_sync
    end type type_model_stepper_2d
 
@@ -551,7 +555,7 @@ contains
       integer, intent(in) :: istage
       real(SP), intent(in) :: dt, time
 
-      integer :: i
+      integer :: i, ncap
 
       associate (f => this%fields, lp => this%grid%lp, &
                  phy => this%physics, num => this%numerics)
@@ -730,7 +734,9 @@ contains
                                VIS_SCHEME_DEFAULT, &
                                this%breaking%swe_eta_dep, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
-                               this%undertow_u, this%undertow_v)
+                               this%undertow_u, this%undertow_v, &
+                               cap_time=f%cap_time, cap_w=dt/3.0_SP, n_capped=ncap)
+            call stepper_note_cap(this, istage, time, ncap)
          elseif (this%breaking%wavemaker_vis) then
             ! legacy WAVE_BREAKING second branch: zone-only viscosity,
             ! no age tracking
@@ -886,6 +892,70 @@ contains
       end subroutine visc_solve
 
    end subroutine stepper_apply_visc_implicit
+
+   ! ----------------------------------------------------------------
+   ! stepper_note_cap — nu_cap engagement bookkeeping.  Warns once per
+   ! rank on first engagement; step stats count stage-3 evaluations only
+   ! (nu is refreshed every stage, so cap_stages accrues per stage).
+   ! ----------------------------------------------------------------
+   subroutine stepper_note_cap(this, istage, time, ncap)
+      use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, &
+                         MPI_COMM_WORLD, MPI_IN_PLACE
+      class(type_model_stepper_2d), intent(inout) :: this
+      integer, intent(in) :: istage, ncap
+      real(SP), intent(in) :: time
+
+      integer :: gcap
+      character(160) :: msg
+
+      if (ncap > 0) this%cap_stages = this%cap_stages + 1
+      if (istage /= 3) return
+      this%n_steps = this%n_steps + 1
+      if (ncap > 0) then
+         this%cap_steps = this%cap_steps + 1
+         this%cap_peak = max(this%cap_peak, ncap)
+      end if
+      ! the log writer is io-node-only and the surf zone rarely lives on
+      ! rank 0, so the first warning needs a collective; a 1-int reduce
+      ! per step ONLY until it fires, and never for cap-off decks
+      if (this%breaking%nu_cap > 0.0_SP .and. .not. this%cap_warned) then
+         gcap = ncap
+         call MPI_Allreduce(MPI_IN_PLACE, gcap, 1, MPI_INTEGER, MPI_SUM, &
+                            MPI_COMM_WORLD)
+         if (gcap > 0) then
+            this%cap_warned = .true.
+            write (msg, '(A,I0,A,ES10.3,A)') &
+               "breaking.nu_cap engaged (", gcap, " cells, t = ", time, &
+               " s): nu saturated at the dx-scale bound; nu_cap_time maps it"
+            call this%env%log%warning(trim(msg))
+         end if
+      end if
+
+   end subroutine stepper_note_cap
+
+   ! ----------------------------------------------------------------
+   ! stepper_report_cap — end-of-run nu_cap summary, reduced across
+   ! ranks; repeats the engagement warning so it survives a long log.
+   ! ----------------------------------------------------------------
+   subroutine stepper_report_cap(this)
+      use mpi_f08, only: MPI_Allreduce, MPI_INTEGER, MPI_SUM, MPI_MAX, &
+                         MPI_COMM_WORLD, MPI_IN_PLACE
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      integer :: sums(2), peak
+      character(200) :: msg
+
+      sums = [this%cap_steps, this%cap_stages]
+      peak = this%cap_peak
+      call MPI_Allreduce(MPI_IN_PLACE, sums, 2, MPI_INTEGER, MPI_SUM, MPI_COMM_WORLD)
+      call MPI_Allreduce(MPI_IN_PLACE, peak, 1, MPI_INTEGER, MPI_MAX, MPI_COMM_WORLD)
+      if (sums(1) == 0) return
+      write (msg, '(A,I0,A,I0,A,I0,A)') &
+         "breaking.nu_cap engaged on ", sums(1), " of ", this%n_steps, &
+         " steps (peak ", peak, " cells/rank); nu_cap_time maps where"
+      call this%env%log%warning(trim(msg))
+
+   end subroutine stepper_report_cap
 
    ! ----------------------------------------------------------------
    ! legacy GET_Eta_U_V_HU_HV: from the current (eta, p, q) rebuild H,

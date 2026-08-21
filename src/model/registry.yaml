@@ -134,6 +134,15 @@ variables:
     fill_value:     -9999.0
     latex:          "$t_{\\mathrm{arr}}$"
 
+  - name:           nu_cap_time
+    legacy_name:    ~
+    long_name:      "time with the breaker viscosity cap engaged"
+    standard_name:  ""
+    funwave_name:   "breaker_viscosity_cap_engaged_time"
+    units:          "s"
+    fill_value:     -9999.0
+    latex:          "$T_{\\nu,\\mathrm{cap}}$"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # sections — hierarchical metadata tree (registry v2)

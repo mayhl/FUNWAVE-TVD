@@ -64,6 +64,7 @@ module model_fields_2d_mod
       ! Allocated by alloc_breaking(); unallocated = breaking disabled.
       ! Velocity gradients are recomputed each step (same stencil as dispersion.F).
       real(SP), allocatable :: nu_break(:, :) !< breaking eddy viscosity        [m2/s]  (nu_break)
+      real(SP), allocatable :: cap_time(:, :) !< time with nu_cap engaged       [s]     (nu_cap_time)
       real(SP), allocatable :: age_break(:, :)!< breaking-event age             [s]     (AGE_BREAKING)
       real(SP), allocatable :: ux(:, :)       !< du/dx                          [1/s]   (Ux)
       real(SP), allocatable :: uy(:, :)       !< du/dy                          [1/s]   (Uy)
@@ -139,6 +140,7 @@ contains
       nloc = grid%local_ny + 2*ng
 
       allocate (this%nu_break(mloc, nloc), source=0.0_SP)
+      allocate (this%cap_time(mloc, nloc), source=0.0_SP)
       allocate (this%age_break(mloc, nloc), source=0.0_SP)
       allocate (this%ux(mloc, nloc), source=0.0_SP)
       allocate (this%uy(mloc, nloc), source=0.0_SP)
@@ -180,6 +182,7 @@ contains
 
       ! Optional breaking-physics fields: present only after alloc_breaking().
       if (allocated(this%nu_break)) call registry%register("nu_break", this%nu_break)
+      if (allocated(this%cap_time)) call registry%register("nu_cap_time", this%cap_time)
       if (allocated(this%age_break)) call registry%register("age_break", this%age_break)
       if (allocated(this%d_break)) call registry%register("d_break", this%d_break)
    end subroutine fields_register
@@ -219,6 +222,7 @@ contains
       if (allocated(this%arr_time)) deallocate (this%arr_time)
 
       if (allocated(this%nu_break)) deallocate (this%nu_break)
+      if (allocated(this%cap_time)) deallocate (this%cap_time)
       if (allocated(this%age_break)) deallocate (this%age_break)
       if (allocated(this%ux)) deallocate (this%ux)
       if (allocated(this%uy)) deallocate (this%uy)

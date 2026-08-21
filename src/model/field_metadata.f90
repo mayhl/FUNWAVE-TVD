@@ -66,6 +66,9 @@ contains
       case ("arr_time")
          m%units = "s"
          m%long_name = "wave front arrival time"
+      case ("nu_cap_time")
+         m%units = "s"
+         m%long_name = "time with the breaker viscosity cap engaged"
       end select
    end function field_meta
 

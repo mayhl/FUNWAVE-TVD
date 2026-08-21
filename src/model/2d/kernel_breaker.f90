@@ -50,7 +50,8 @@ contains
                             dx, dy, dt, t_brk, advance_age, min_depth_frc, &
                             cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap, &
                             vis_scheme, swe_eta_dep, in_wm_zone, &
-                            nu_break, age, roller_flux, undertow_u, undertow_v)
+                            nu_break, age, roller_flux, undertow_u, undertow_v, &
+                            cap_time, cap_w, n_capped)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: etax(:, :), etay(:, :), etat(:, :)
       real(SP), intent(in)  :: eta(:, :), depth(:, :), h(:, :)
@@ -64,9 +65,15 @@ contains
       logical, intent(in)  :: in_wm_zone(:, :)
       real(SP), intent(inout) :: nu_break(:, :), age(:, :)
       real(SP), intent(inout) :: roller_flux(:, :), undertow_u(:, :), undertow_v(:, :)
+      ! cap-engagement diagnostics: per-cell engaged time (accrues cap_w
+      ! seconds per stage evaluation the clamp fires -- the caller passes
+      ! dt/3 so a fully-capped step accrues dt) + interior count this call
+      real(SP), intent(inout), optional :: cap_time(:, :)
+      real(SP), intent(in), optional :: cap_w
+      integer, intent(out), optional :: n_capped
 
-      integer  :: i, j
-      real(SP) :: c_shallow, thr1, thr2, cap1
+      integer  :: i, j, ncap
+      real(SP) :: c_shallow, thr1, thr2, cap1, capw
       real(SP) :: angle, c, c1, r, b
       real(SP) :: age1, age2, age3
       real(SP) :: propx, propy, propxy
@@ -209,16 +216,28 @@ contains
       ! legacy), so an uncapped nu at an energetic breakpoint can sit
       ! several-fold over the stable bound — the open-water viscous
       ! blow-up mechanism.  Applies to the wavemaker zone too.
+      ncap = 0
+      capw = 1.0_SP
+      if (present(cap_w)) capw = cap_w
       if (nu_cap > 0.0_SP) then
-         !$omp parallel do default(shared) schedule(static) private(i, cap1)
+         !$omp parallel do default(shared) schedule(static) private(i, cap1) &
+         !$omp reduction(+:ncap)
          do j = lp%jb - 1, lp%je + 1
             do i = lp%ib - 1, lp%ie + 1
                cap1 = nu_cap/(2.0_SP*dt*(1.0_SP/(dx(i, j)*dx(i, j)) &
                                          + 1.0_SP/(dy(i, j)*dy(i, j))))
-               nu_break(i, j) = min(nu_break(i, j), cap1)
+               if (nu_break(i, j) > cap1) then
+                  nu_break(i, j) = cap1
+                  if (i >= lp%ib .and. i <= lp%ie .and. &
+                      j >= lp%jb .and. j <= lp%je) then
+                     ncap = ncap + 1
+                     if (present(cap_time)) cap_time(i, j) = cap_time(i, j) + capw
+                  end if
+               end if
             end do
          end do
       end if
+      if (present(n_capped)) n_capped = ncap
 
    end subroutine wave_breaking
 
