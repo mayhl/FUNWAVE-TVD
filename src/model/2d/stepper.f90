@@ -37,6 +37,7 @@ module model_stepper_2d_mod
    use core_stepper_engine_mod, only: type_stepper_model
    use core_solver_tridiag_mod, only: trid_x, trid_x_periodic, trid_y, &
                                       trid_y_periodic, type_trid_workspace
+   use model_kernel_visc_mod, only: cal_visc_assemble_x, cal_visc_assemble_y
 
    use model_fields_2d_mod, only: type_fields_2d
    use model_bc_mod, only: type_model_bc
@@ -151,6 +152,9 @@ module model_stepper_2d_mod
 
       ! Per-step state (legacy MODULE GLOBAL equivalents).
       real(SP), allocatable :: u0(:, :), v0(:, :)      ! U0/V0 at step start
+      ! step-start hu/hv + a solve buffer, only under stage_split (the
+      ! pre-blend IMEX correction re-injects the undiffused step-start state)
+      real(SP), allocatable :: hu0(:, :), hv0(:, :), vzb(:, :)
       real(SP), allocatable :: etat(:, :), ut(:, :), vt(:, :)
       real(SP), allocatable :: etax(:, :), etay(:, :)
       real(SP), allocatable :: u4(:, :), v4(:, :)
@@ -394,6 +398,10 @@ contains
             call this%tws%alloc(mloc, nloc)
       end if
 
+      if (this%breaking%per_stage) &
+         allocate (this%hu0(mloc, nloc), this%hv0(mloc, nloc), &
+                   this%vzb(mloc, nloc), source=0.0_SP)
+
       allocate (this%u0(mloc, nloc), source=0.0_SP)
       allocate (this%v0(mloc, nloc), source=0.0_SP)
       allocate (this%etat(mloc, nloc), source=0.0_SP)
@@ -514,6 +522,11 @@ contains
 
          this%u0 = f%u
          this%v0 = f%v
+
+         if (this%breaking%per_stage) then
+            this%hu0 = f%hu
+            this%hv0 = f%hv
+         end if
       end associate
 
    end subroutine stepper_pre_step
@@ -618,7 +631,9 @@ contains
          if (allocated(this%nu_vis)) then
             this%nu_vis = 0.0_SP
             if (phy%viscosity_breaking .or. this%breaking%wavemaker_vis) then
-               this%nu_vis = f%nu_break
+               ! split_implicit relocates nu_break to the per-step ADI
+               ! solve; hull and sponge viscosity stay explicit
+               if (.not. this%breaking%split_implicit) this%nu_vis = f%nu_break
                if (ves_vis_on(this)) then
                   this%nu_vis = this%nu_vis + this%vessel%vis_2d
                end if
@@ -741,9 +756,136 @@ contains
          ! the aux ODE must not see)
          if (istage == 3) call this%sponge%apply_pml(f, this%grid, dt)
 
+         ! breaker viscosity as an operator-split solve: backward-Euler
+         ! ADI on Hu/Hv, increment folded into the conserved p/q exactly
+         ! where the explicit source fed them (design_visc_implicit).
+         ! stage_split diffuses each stage's Euler predictor BEFORE the
+         ! SSP blend (IMEX-SSP Lie): emulated post-blend as
+         ! q = S(q) + alpha_k (q0 - S(q0)), full dt every stage
+         if (this%breaking%split_implicit .and. phy%viscosity_breaking) then
+            if (this%breaking%per_stage) then
+               call stepper_apply_visc_implicit(this, dt, RK_ALPHA(istage))
+               call this%bc%exchange_state(this%grid, f)
+            else if (istage == 3) then
+               call stepper_apply_visc_implicit(this, dt)
+               call this%bc%exchange_state(this%grid, f)
+            end if
+         end if
+
       end associate
 
    end subroutine stepper_stage
+
+   ! ----------------------------------------------------------------
+   ! stepper_apply_visc_implicit — operator-split breaker viscosity:
+   ! (I - dt dx nu dx)(I - dt dy nu dy) q = q_old on q = hu, hv, one
+   ! Lie split per step.  The increment updates p/q (the conserved
+   ! variables the explicit source fed) plus u/v/hu/hv for the
+   ! consumers between here and the next stage's flux sync.
+   ! ----------------------------------------------------------------
+   subroutine stepper_apply_visc_implicit(this, dt, alpha)
+      class(type_model_stepper_2d), intent(inout) :: this
+      real(SP), intent(in) :: dt
+      ! stage_split only: the SSP blend weight of the step-start state --
+      ! q = S(q) + alpha (q0 - S(q0)) undoes the diffusion the blend
+      ! wrongly applied to the alpha q0 share (pre-blend IMEX, exact)
+      real(SP), intent(in), optional :: alpha
+
+      real(SP) :: qn, alf
+      logical  :: edge_w, edge_e, edge_s, edge_n, corr
+      integer  :: i, j, ivar
+
+      alf = 0.0_SP
+      if (present(alpha)) alf = alpha
+      corr = alf > 0.0_SP
+
+      associate (f => this%fields, lp => this%grid%lp, &
+                 phy => this%physics, num => this%numerics)
+
+         edge_w = .not. phy%periodic_x .and. this%grid%iproc == 0
+         edge_e = .not. phy%periodic_x .and. &
+                  this%grid%iproc == this%grid%nx_proc - 1
+         edge_s = .not. phy%periodic .and. this%grid%jproc == 0
+         edge_n = .not. phy%periodic .and. &
+                  this%grid%jproc == this%grid%ny_proc - 1
+
+         do ivar = 1, 2
+            if (corr) then
+               if (ivar == 1) then
+                  call visc_solve(this%hu0)
+               else
+                  call visc_solve(this%hv0)
+               end if
+               this%vzb = this%ews%f
+            end if
+            if (ivar == 1) then
+               call visc_solve(f%hu)
+            else
+               call visc_solve(f%hv)
+            end if
+
+            do j = lp%jb, lp%je
+               do i = lp%ib, lp%ie
+                  qn = this%ews%f(i, j)
+                  if (ivar == 1) then
+                     if (corr) qn = qn + alf*(this%hu0(i, j) - this%vzb(i, j))
+                     f%p(i, j) = f%p(i, j) + qn - f%hu(i, j)
+                  else
+                     if (corr) qn = qn + alf*(this%hv0(i, j) - this%vzb(i, j))
+                     f%q(i, j) = f%q(i, j) + qn - f%hv(i, j)
+                  end if
+               end do
+            end do
+         end do
+
+         ! recover u/v/hu/hv through the standard path (dispersion
+         ! inversion + Froude cap + masks) — the explicit source is
+         ! diffusion-then-cap, so the split must be too; a hand-rolled
+         ! dq/heff update here under-ran the swash tongue by ~20%
+         call this%sync_from_flux()
+
+      end associate
+
+   contains
+
+      ! ADI solve S(src) -> ews%f (x factor, then y reading ws%f; the
+      ! coupling lives in the bands, so no ghost fill between factors)
+      subroutine visc_solve(src)
+         real(SP), intent(in) :: src(:, :)
+
+         associate (f => this%fields, lp => this%grid%lp, &
+                    phy => this%physics)
+            call cal_visc_assemble_x(lp, dt, this%breaking%theta, &
+                                     this%inv_dx, f%mask, &
+                                     f%nu_break, src, edge_w, edge_e, &
+                                     this%ews%a, this%ews%c, this%ews%d)
+            if (phy%periodic_x) then
+               call trid_x_periodic(lp, this%grid, this%ews%a, this%ews%c, &
+                                    this%ews%d, this%tws, this%ews%f)
+            else
+               call trid_x(lp, this%grid, this%ews%a, this%ews%c, &
+                           this%ews%d, this%ews%f)
+            end if
+            ! theta < 1: the y explicit part reads x-solve neighbours the
+            ! interior-only trid output does not carry across seams
+            if (this%breaking%theta < 1.0_SP) &
+               call this%bc%exchange_scalar(this%grid, this%ews%f)
+            call cal_visc_assemble_y(lp, dt, this%breaking%theta, &
+                                     this%inv_dy, f%mask, &
+                                     f%nu_break, this%ews%f, edge_s, edge_n, &
+                                     this%ews%a, this%ews%c, this%ews%d)
+            if (phy%periodic) then
+               call trid_y_periodic(lp, this%grid, this%ews%a, this%ews%c, &
+                                    this%ews%d, this%tws, this%ews%f)
+            else
+               call trid_y(lp, this%grid, this%ews%a, this%ews%c, &
+                           this%ews%d, this%ews%f)
+            end if
+         end associate
+
+      end subroutine visc_solve
+
+   end subroutine stepper_apply_visc_implicit
 
    ! ----------------------------------------------------------------
    ! legacy GET_Eta_U_V_HU_HV: from the current (eta, p, q) rebuild H,
@@ -861,9 +1003,9 @@ contains
 
             ! real dispersion-gate weight off the settled mask9 (halos valid)
             call update_disp_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
-                                   this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
-                                   this%m9_forced, f%disp_w, &
-                                   num%MinDepth, this%breaking%wetdry_disp_ramp)
+                                    this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
+                                    this%m9_forced, f%disp_w, &
+                                    num%MinDepth, this%breaking%wetdry_disp_ramp)
             ! latch only once the vessel is NOT blanking mask9 — else a
             ! mid-run deactivation (is_activated -> F) would leave m9_settled
             ! true and freeze mask9 with the stale hull zeros; the guard's
@@ -912,10 +1054,10 @@ contains
          end block
          call this%sponge%pml_blank_mask9(f%mask9)
          call update_disp_weight(f%eta, f%depth, f%mask9, &
-                                this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
-                                this%breaking%swe_eta_ramp, this%m9_forced, &
-                                f%disp_w, this%numerics%MinDepth, &
-                                this%breaking%wetdry_disp_ramp)
+                                 this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
+                                 this%breaking%swe_eta_ramp, this%m9_forced, &
+                                 f%disp_w, this%numerics%MinDepth, &
+                                 this%breaking%wetdry_disp_ramp)
 
          ! carried fws face restore (18c): the first stage's etat reads the
          ! interface flux one row past the interior, which the interior-only

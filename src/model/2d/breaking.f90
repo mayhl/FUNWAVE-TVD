@@ -50,6 +50,7 @@ module model_breaking_mod
                                         DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP, &
                                         DEF_BREAKING_WETDRY_DISP_RAMP, &
                                         DEF_BREAKING_T_BRK, DEF_BREAKING_AGE_PER_STAGE, &
+                                        DEF_BREAKING_SOLVER, DEF_BREAKING_THETA, &
                                         DEF_BREAKING_SWE_GATE, DEF_BREAKING_NU_CAP
 
    implicit none
@@ -60,6 +61,9 @@ module model_breaking_mod
    character(len=20), parameter :: BREAKING_MODELS(3) = &
                                    [character(len=20) :: "eddy_viscosity", "shock_capturing", &
                                                           "wavemaker_viscosity"]
+   character(len=20), parameter :: VISC_SOLVERS(3) = &
+                                   [character(len=20) :: "explicit", "split_implicit", &
+                                                          "stage_split"]
 
    type, extends(type_model_base) :: type_model_breaking
 
@@ -109,6 +113,16 @@ module model_breaking_mod
       ! clamp nu_break at this fraction of the explicit-diffusion stability
       ! bound (the Laplacian rides the advective-CFL dt); 0 = off (legacy)
       real(SP) :: nu_cap = 0.0_SP
+      ! breaker-viscosity integrator: explicit source (legacy), the
+      ! once-per-step operator-split ADI solve on Hu/Hv, or the same solve
+      ! inside every RK stage -- both splits unconditionally stable, so
+      ! nu_cap never engages there
+      character(:), allocatable :: solver
+      logical  :: split_implicit = .false.
+      logical  :: per_stage = .false.
+      ! implicitness weight of the split solve: 1 = backward Euler,
+      ! 0.5 = Crank-Nicolson (A-stable for theta >= 0.5)
+      real(SP) :: theta = 1.0_SP
 
    contains
       procedure :: read_input => breaking_read_input
@@ -132,6 +146,18 @@ contains
       call sub_env%yaml%read_enum("model", BREAKING_MODELS, val=this%model, &
                                   default=DEF_BREAKING_MODEL)
       call sub_env%yaml%read("roller", val=this%roller, default=DEF_BREAKING_ROLLER)
+      if (trim(this%model) /= "shock_capturing") then
+         call sub_env%yaml%read_enum("solver", VISC_SOLVERS, silent=no_key, &
+                                     val=this%solver, default=DEF_BREAKING_SOLVER)
+         this%split_implicit = trim(this%solver) /= "explicit"
+         this%per_stage = trim(this%solver) == "stage_split"
+         if (this%split_implicit) then
+            call sub_env%yaml%read("theta", silent=no_key, val=this%theta, &
+                                   default=DEF_BREAKING_THETA)
+            if (this%theta < 0.5_SP .or. this%theta > 1.0_SP) &
+               call env%log%exit_on_error("breaking/theta: must be in [0.5, 1]")
+         end if
+      end if
       if (sub_env%yaml%has_key("show_breaking")) then
          call env%log%exit_on_error("breaking/show_breaking: retired — the"// &
                                     " breaker-diagnostics pass is derived from the model and"// &
@@ -154,8 +180,12 @@ contains
          call sub_env%yaml%read("t_brk", silent=no_key, val=this%t_brk, default=DEF_BREAKING_T_BRK)
          call sub_env%yaml%read("age_per_stage", silent=no_key, val=this%age_per_stage, &
                                 default=DEF_BREAKING_AGE_PER_STAGE)
-         call sub_env%yaml%read("nu_cap", silent=no_key, val=this%nu_cap, &
-                                default=DEF_BREAKING_NU_CAP)
+         ! inapplicable under the implicit solve -- leaving it unread lets
+         ! the unread-key detector flag a stale nu_cap in the deck
+         if (.not. this%split_implicit) then
+            call sub_env%yaml%read("nu_cap", silent=no_key, val=this%nu_cap, &
+                                   default=DEF_BREAKING_NU_CAP)
+         end if
       end if
       ! the gate is structural under the other models — the knob only means
       ! something where legacy forces mask9 to 1

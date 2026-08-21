@@ -10,6 +10,7 @@ target_sources(
           kernel_breaker.f90
           kernel_etauv.f90
           kernel_sources.f90
+          kernel_visc.f90
           geometry.f90
           bc.f90
           simulation.f90

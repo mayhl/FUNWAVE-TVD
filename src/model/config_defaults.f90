@@ -56,10 +56,12 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_BREAKING_NU_BKG = "0.0"
    character(*), parameter :: DEF_BREAKING_NU_CAP = "0.0"
    character(*), parameter :: DEF_BREAKING_ROLLER = "NO"
+   character(*), parameter :: DEF_BREAKING_SOLVER = "explicit"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_DEP = "0.8"
    character(*), parameter :: DEF_BREAKING_SWE_ETA_RAMP = "0.1"
    character(*), parameter :: DEF_BREAKING_SWE_GATE = "NO"
    character(*), parameter :: DEF_BREAKING_T_BRK = "20.0"
+   character(*), parameter :: DEF_BREAKING_THETA = "1.0"
    character(*), parameter :: DEF_BREAKING_VISBRK = "0.0"
    character(*), parameter :: DEF_BREAKING_WETDRY_DISP_RAMP = "0.0"
    ! ── dispersion ──
