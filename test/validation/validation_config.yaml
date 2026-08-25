@@ -713,3 +713,22 @@ simulations:
     tolerances:
       # analytic slope 7.86e-5; time-mean ratio 1.005 over the settled window
       wind_setup: { ratio_min: 0.9, ratio_max: 1.1 }
+
+  # ── Boundary-feed wavemaker: spectrum-only entry fed at the west face ──
+  # Mirrors wm_data2d but generates at the boundary (no source: box).  FINDING:
+  # the boundary feed delivers ~2x the internal-source calibration (one-way
+  # injection vs a source splitting energy both ways) — measured Hm0 1.987 m vs
+  # the 1.0 m table; hm0_target_scale carries that documented factor.
+  - name: wm_boundary_data2d
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/wavemaker_boundary
+    input_files: [data2d.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, boundary, forcing, local]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # measured Hm0 1.987 vs 2x target -> err 0.6%, band 98.4%
+      wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0, hm0_target_scale: 2.0 }

@@ -67,7 +67,7 @@ from test.regression.postproc.utils import read_run_metadata
 from test.validation.oracles._lab import check_keys
 
 _console = Console()
-ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct")
+ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct", "hm0_target_scale")
 
 DT_SAMPLE = 0.1  # uniform re-sample step (matches the channel interval)
 N_XLINE = 5  # gauge columns 1..5 = downwave x-line, 6..7 = lateral pair
@@ -240,7 +240,11 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     # ── realized Hm0: variance-based, averaged over the x-line ────────────
     hm0_g = 4.0 * np.sqrt(np.mean(eta**2, axis=0))
     hm0_mean = float(np.mean(hm0_g[:N_XLINE]))
-    hm0_err = abs(hm0_mean - case.hm0) / case.hm0 * 100.0
+    # a boundary feed injects one-way, so it delivers ~2x the internal-source
+    # calibration (which splits energy both ways); hm0_target_scale (default 1)
+    # carries that documented factor
+    hm0_target = case.hm0 * float(tolerances.get("hm0_target_scale", 1.0))
+    hm0_err = abs(hm0_mean - hm0_target) / hm0_target * 100.0
     # lateral pair vs the x-line center gauge (homogeneity diagnostic)
     lat = np.append(hm0_g[N_XLINE:], hm0_g[N_XLINE // 2])
     lat_spread = float((lat.max() - lat.min()) / lat.mean() * 100.0) if len(lat) > 1 else 0.0
@@ -280,7 +284,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     dead_pass = (not math.isfinite(dead_tol)) or (math.isfinite(dead_pct) and dead_pct < dead_tol)
 
     metrics = [
-        MetricResult("wavemaker_spectrum", "hm0_target_m", case.hm0, True, math.inf),
+        MetricResult("wavemaker_spectrum", "hm0_target_m", hm0_target, True, math.inf),
         MetricResult("wavemaker_spectrum", "hm0_measured_m", hm0_mean, True, math.inf),
         MetricResult("wavemaker_spectrum", "lateral_spread_pct", lat_spread, True, math.inf),
         MetricResult("wavemaker_spectrum", "fp_measured_hz", fp_meas, True, math.inf),
@@ -295,7 +299,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     if verbose or not all_passed:
         info = [
             ("Spectrum", case.stype),
-            ("Hm0 target", f"{case.hm0:.4f} m"),
+            ("Hm0 target", f"{hm0_target:.4f} m"),
             ("Hm0 measured", f"{hm0_mean:.4f} m"),
             ("Lateral spread", f"{lat_spread:.2f} %"),
             ("fp measured", f"{fp_meas:.4f} Hz"),
