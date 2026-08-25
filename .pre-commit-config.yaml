@@ -25,6 +25,12 @@ repos:
   # A separately pinned hook repo can drift from pyproject and fight the gate.
   - repo: local
     hooks:
+      - id: gen-registry-check
+        name: registry codegen in sync
+        entry: uv run scripts/gen_registry.py --check
+        language: system
+        pass_filenames: false
+        files: '^(src/model/registry\.yaml|src/model/config_defaults\.f90|src/model/field_metadata\.f90|docs/guide/config_reference\.md)$'
       - id: fprettify
         name: fprettify
         entry: uv run fprettify
