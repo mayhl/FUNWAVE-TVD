@@ -1,0 +1,9 @@
+# Kobayashi & Lawrence (2004) maximum erosion/deposition growth per solitary wave
+# source: digitized from CACR-16-02 Fig 4.5 (measured markers)
+# columns: wave emax_over_h dmax_over_h
+# note: normalized by H0 = 0.216 m; wave-4 dmax 0.202 cross-checks the Fig 4.4
+# note: profile trace (0.209)
+     1        0.056        0.119
+     2        0.140        0.149
+     3        0.178        0.189
+     4        0.256        0.202

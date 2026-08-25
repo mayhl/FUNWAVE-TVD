@@ -1,0 +1,72 @@
+# Kobayashi & Lawrence (2004) bed evolution under a breaking solitary wave;
+# model setup after CACR-16-02 sec 4.1 (dx 25 mm, Cd 0.01, solitary IC at
+# x = 5 m).  Single wave: the 4-wave sequence needs bed carry-over between
+# runs, so the gated case scores wave 1 of the Fig 4.5 growth curves.
+
+grid:
+  # 3-row flume (suite idiom; the paper's 1240x6 at dy 0.4 m traps an
+  # aspect instability in the dispersion solve).  The domain puts the
+  # beach top at +0.87 m, above the swash reach.  dx 50 mm, NOT the
+  # paper's 25 mm: at 25 mm the backwash scour feedback digs single-cell
+  # holes and the survival is decomposition-dependent (np 1-4 live,
+  # np 5+ die at t~19 at ANY CFL); 50 mm is rank-robust 1-8 and scores
+  # closer to measured -- the finer extremes were front-cell artifacts
+  cell_size: [0.05, 0.05]
+  n_cells: [800, 3]
+  bathymetry:
+    type: slope
+    depth: 0.8
+    slope: 0.0833333333
+    x0: 20.0
+simulation:
+  title: lab_kl_erosion
+  # the event window: swash complete, first re-reflection not yet back.
+  # Running longer lets the closed flume's seiche keep moving sand the
+  # lab tank (absorbing paddle, minutes of settling) never did -- at 60 s
+  # the spurious late transport doubles Dmax
+  total_time: 20.0
+  screen_interval: 10.0
+initial:
+  solitary:
+    amplitude: 0.216
+    depth: 0.8
+    x_center: 5.0
+# shock-capturing as the source paper (CACR-16-02 rides Shi 2012 TVD);
+# at dx/h ~ 1/32 the viscous arms sit inside the bore-closure dx wall
+breaking:
+  model: shock_capturing
+friction:
+  cd: 0.01
+sediment:
+  d50: 0.00018
+  specific_gravity: 2.6
+  porosity: 0.4
+  settling_velocity: 0.02
+  bed_change: true
+  bedload: true
+  morph_interval: 0.05
+  # swash erosion lives inside the default 0.1 m cutoff
+  min_depth_pickup: 0.01
+numerics:
+  cfl: 0.5
+  # 0.001 dies in the supercritical backwash film at t~16 (Fr 4.3,
+  # H ~ 2 cm); 0.01 is the CACR-16-02 field-case value
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: bed
+      geometry: field
+      variables: [sediment_dchgs, sediment_dchgb]
+      interval: 10.0
+    - name: line
+      geometry: gauges
+      variables: [eta]
+      interval: 0.05
+  geometries:
+    - name: gauges
+      type: transect
+      start: [20.0, 0.04]
+      end: [30.0, 0.04]
+      n_points: 41

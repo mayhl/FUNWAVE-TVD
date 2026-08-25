@@ -1,0 +1,60 @@
+# Pintado-Patino et al. (2016) dam-break over an erodible 1:7 sand beach;
+# model setup after CACR-16-02 sec 4.2 (dx 1 cm, Cd 0.0025, dam break as a
+# surface IC, hard bottom on the bare floor seaward of the toe).  Comparable
+# window is the first swash only: the experiment's second gate blocked the
+# reflected bore, which the model cannot represent (CACR-16-02 p.65).
+
+grid:
+  cell_size: [0.01, 0.01]
+  n_cells: [1100, 3]
+  bathymetry:
+    type: slope
+    depth: 0.06
+    slope: 0.1428571429
+    x0: 5.5
+simulation:
+  title: lab_pp_dambreak
+  # the comparison regime ends when the reflected bore reaches the beach
+  # (CACR-16-02 p.65); the model's un-gated reflection then drives a
+  # suspended-load scour runaway at the eroded scarp (t ~ 8.9 s)
+  total_time: 8.5
+  screen_interval: 2.0
+initial:
+  fields:
+    eta: eta_ic.txt
+# the reservoir step is a bore from t = 0 (eta/h = 12): shock capturing
+# with its structural SWE gate, as in the source runs
+breaking:
+  model: shock_capturing
+friction:
+  cd: 0.0025
+sediment:
+  d50: 0.0004
+  specific_gravity: 2.65
+  porosity: 0.4
+  settling_velocity: 0.0514
+  bed_change: true
+  bedload: true
+  hard_bottom:
+    file: hard_bottom.txt
+numerics:
+  cfl: 0.5
+  min_depth: 0.001
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: bed
+      geometry: field
+      variables: [sediment_dchgs, sediment_dchgb]
+      interval: 4.25
+    - name: stations
+      geometry: gauges
+      variables: [eta, u]
+      interval: 0.02
+  geometries:
+    - name: gauges
+      type: transect
+      start: [2.0, 0.015]
+      end: [9.0, 0.015]
+      n_points: 29

@@ -564,3 +564,48 @@ simulations:
         sigma_rmse_pct: 8.5
         skew_rmse_pct: 30.0
         asym_rmse_pct: 15.0
+
+  # ── Kobayashi & Lawrence 2004: bed change under a breaking solitary wave ─
+  # Wave 1 of the Fig 4.5 growth curves; CACR-16-02's own model matched emax
+  # and ran dmax ~half of measured, so the deposition gate stays inherited-loose
+  - name: lab_kl_erosion
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/kobayashi_lawrence
+    input_files: [kl_erosion.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, sediment, 1d, local]
+    postprocess:
+      morphology: test.validation.oracles.morphology
+    tolerances:
+      morphology:
+        growth: erosion_growth.txt
+        h0: 0.216
+        wave: 1
+        emax_rel_err_pct: 60.0
+        dmax_rel_err_pct: 75.0
+    known_fail: 'swash erosion ~2.6x measured at the event window (deposition arm passes); chained per-wave increments track -- calibration rung open'
+
+  # ── Pintado-Patino et al. 2016: dam-break swash over an erodible beach ──
+  # Runs to 8.5 s — the paper's own comparison regime (before the reflected
+  # bore, which the experiment's second gate blocked, reaches the beach).
+  # Gates: profile NRMSE + the erosion-trough location; the deposition peak
+  # reports ungated (measured settles fully, the model's suspended load is
+  # still aloft — CACR-16-02 p.69).
+  - name: lab_pp_dambreak
+    exe_type: validation-2d
+    np_pin: 2
+    input: test/validation/inputs/pintado_patino
+    input_files: [pp_dambreak.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [lab, sediment, 1d, local]
+    postprocess:
+      morphology: test.validation.oracles.morphology
+    tolerances:
+      morphology:
+        bedchange: bedchange_10s.txt
+        gate_x: 1.0
+        bedchange_nrmse_pct: 60.0
+        trough_offset_m: 0.3
