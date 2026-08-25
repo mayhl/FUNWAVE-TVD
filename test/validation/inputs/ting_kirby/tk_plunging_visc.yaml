@@ -38,6 +38,9 @@ numerics:
   min_depth: 0.001
 breaking:
   model: eddy_viscosity
+  # explicit diffusion source dies mid-run on ifx (nu_break over the
+  # stability bound); the split solve is unconditionally stable
+  solver: split_implicit
 output:
   result_folder: ./output/
   depth_out: true

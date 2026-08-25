@@ -1536,7 +1536,12 @@ contains
 
       logical :: has_break
 
-      has_break = this%physics%viscosity_breaking &
+      ! split_implicit carries nu_break in the per-step ADI solve, so the
+      ! single-source alias must NOT hand it to the explicit Laplacian too
+      ! (the assembled-array branch already skips it at merge time); the
+      ! wavemaker_viscosity zone term stays explicit either way
+      has_break = (this%physics%viscosity_breaking &
+                   .and. .not. this%breaking%split_implicit) &
                   .or. this%breaking%wavemaker_vis
       if (allocated(this%nu_vis)) then
          nu => this%nu_vis

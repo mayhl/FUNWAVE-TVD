@@ -18,7 +18,10 @@ refs:
     cmake_flags: ["HYPRE_DIR={repo_root}/extern/hypre/installed"]
 
 executables:
-  # ── 2D  (ref: regression-ref/v4.0-modern @ ac15e8f — post-cord-cut baseline) ───────
+  # ── 2D  (ref: regression-ref/v4.0-modern @ 206842a — single-application
+  #    breaker viscosity absorbed 2026-08-22 (the 1449539 pin carried the
+  #    doubled explicit+split dissipation); drift signal on the viscous cases
+  #    restarts from this pin: ref and dev src are identical for one cycle) ───
   # NOTE: the ZERO_PHASE build flag is retired — the seeded per-entry phase
   # draw is deterministic per compiler, so refs carry the seeded realization
   # (a deck may still set wavemaker zero_phase: for parity work).

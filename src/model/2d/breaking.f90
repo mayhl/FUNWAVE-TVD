@@ -12,14 +12,16 @@
 !    roller:        <bool>   enable the surface roller (nee ROLLER;
 !                            forces eddy_viscosity, as legacy), default NO
 !    show_breaking: <bool>   enable breaking detection,          default YES
-!    cbrk1:         <real>   onset breaking threshold,           default 0.65
+!    cbrk1:         <real>   onset breaking threshold,           default 0.55
 !    cbrk2:         <real>   cessation breaking threshold,       default 0.35
 !    visbrk:        <real>   breaking viscosity,                 default 0.0
 !    nu_bkg:        <real>   background viscosity floor,         default 0.0
 !    swe_eta_dep:   <real>   bore-regime eta/h threshold,        default 0.8
 !    swe_gate:      <bool>   SWE gate under eddy_viscosity,      default NO
 !    swe_eta_ramp:  <real>   SWE-gate smoothstep taper width,    default 0.1
-!    wetdry_disp_ramp: <real> wet/dry dispersion taper (x min_depth), default 0
+!    wetdry_disp_ramp: <real> wet/dry dispersion taper (x min_depth), default 3
+!    solver:        <enum>   explicit | split_implicit | stage_split,
+!                            default split_implicit
 !
 !  Variant keys are read CONDITIONALLY so the unread-key detector flags
 !  inapplicable knobs: cbrk1/cbrk2 need the breaker kernel (eddy_viscosity
@@ -79,7 +81,7 @@ module model_breaking_mod
       ! solution-neutral; off by default = skip the diagnostics cost)
       logical  :: show_breaking = .false.
 
-      real(SP) :: cbrk1 = 0.65_SP
+      real(SP) :: cbrk1 = 0.55_SP
       real(SP) :: cbrk2 = 0.35_SP
       real(SP) :: wavemaker_cbrk = 1.0_SP
 
@@ -105,7 +107,7 @@ module model_breaking_mod
       ! wet/dry-proximity dispersion taper (multiples of min_depth); 0 = off.
       ! Mode-independent -- the viscous path has no SWE gate, so swash-edge
       ! mask flips otherwise radiate through the dispersive terms
-      real(SP) :: wetdry_disp_ramp = 0.0_SP
+      real(SP) :: wetdry_disp_ramp = 3.0_SP
       ! apply the SWE gate under eddy_viscosity as a dispersion amplitude
       ! cap at steep bores; false = legacy (dispersion never gated -- the
       ! open-water surf blow-up mechanism)
@@ -118,7 +120,7 @@ module model_breaking_mod
       ! inside every RK stage -- both splits unconditionally stable, so
       ! nu_cap never engages there
       character(:), allocatable :: solver
-      logical  :: split_implicit = .false.
+      logical  :: split_implicit = .true.
       logical  :: per_stage = .false.
       ! implicitness weight of the split solve: 1 = backward Euler,
       ! 0.5 = Crank-Nicolson (A-stable for theta >= 0.5)
@@ -138,6 +140,7 @@ contains
       logical :: no_blk, no_key
 
       this%model = "eddy_viscosity"
+      this%solver = "split_implicit"
 
       sub_env = get_sub_env(env, "breaking", is_empty=no_blk)
       this%is_activated = .not. no_blk
@@ -146,7 +149,10 @@ contains
       call sub_env%yaml%read_enum("model", BREAKING_MODELS, val=this%model, &
                                   default=DEF_BREAKING_MODEL)
       call sub_env%yaml%read("roller", val=this%roller, default=DEF_BREAKING_ROLLER)
-      if (trim(this%model) /= "shock_capturing") then
+      ! eddy_viscosity only: the split solve is not wired for the
+      ! wavemaker_viscosity zone term (it stays an explicit source), so
+      ! leaving solver unread there lets the detector flag it
+      if (trim(this%model) == "eddy_viscosity") then
          call sub_env%yaml%read_enum("solver", VISC_SOLVERS, silent=no_key, &
                                      val=this%solver, default=DEF_BREAKING_SOLVER)
          this%split_implicit = trim(this%solver) /= "explicit"
@@ -157,6 +163,12 @@ contains
             if (this%theta < 0.5_SP .or. this%theta > 1.0_SP) &
                call env%log%exit_on_error("breaking/theta: must be in [0.5, 1]")
          end if
+      else
+         ! the type initializers carry the eddy_viscosity defaults; the
+         ! zone term feeds the explicit source, so force that path
+         this%solver = "explicit"
+         this%split_implicit = .false.
+         this%per_stage = .false.
       end if
       if (sub_env%yaml%has_key("show_breaking")) then
          call env%log%exit_on_error("breaking/show_breaking: retired — the"// &
