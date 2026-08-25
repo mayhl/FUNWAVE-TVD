@@ -1,0 +1,32 @@
+# Still-water-level validation — a flat, still, unforced basin with a nonzero
+# grid.water_level must keep the surface at zero.  The level is baked into the
+# depth datum at init and output eta is referenced to it (registry water_level),
+# so a correct run holds eta = 0 to roundoff; a level that leaked into the eta
+# frame, or a startup transient from the depth re-stagger, shows up as max|eta|.
+# d = 5 m, W = 1.229 m (the XBeach Ian hotstart t = 0 still-water datum).
+
+grid:
+  cell_size: [2.0, 2.0]
+  n_cells: [50, 3]
+  water_level: 1.229
+  bathymetry:
+    type: flat
+    depth: 5.0
+simulation:
+  title: water_level_still
+  total_time: 60.0
+  screen_interval: 20.0
+numerics:
+  cfl: 0.5
+  froude_cap: 3.0
+  min_depth: 0.01
+breaking:
+  model: shock_capturing
+output:
+  format: ascii
+  depth_out: true
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 5.0

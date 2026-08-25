@@ -609,3 +609,24 @@ simulations:
         gate_x: 1.0
         bedchange_nrmse_pct: 60.0
         trough_offset_m: 0.3
+
+  # ── Still-water level: grid.water_level on a flat, unforced basin ──
+  # The level bakes into the depth datum (depth = d + W) and the surface stays
+  # quiescent (eta referenced to the level).  Gates the datum shift and the
+  # residual surface excursion.  The (d, W) vs (d + W, 0) bit-identical
+  # cross-check (which also exercises the wavemaker DEP_WK shift) is reported
+  # in the forcing-validation task writeup, not gated here (a single-deck
+  # oracle cannot compare two runs).
+  - name: wl_still
+    exe_type: validation-2d
+    np_pin: 1
+    input: test/validation/inputs/water_level
+    input_files: [wl_still.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, water_level, forcing, local]
+    postprocess:
+      still_water: test.validation.oracles.still_water
+    tolerances:
+      # measured: max|eta| 3.3e-6 m (numerical flat-state floor), datum_err 0
+      still_water: { max_eta_m: 1.0e-3, depth_datum_err_m: 1.0e-6 }
