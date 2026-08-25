@@ -67,6 +67,11 @@ module core_grid_mod
       real(SP), allocatable :: dx(:, :), dy(:, :)
       real(SP), allocatable :: inv_dx(:, :), inv_dy(:, :)  ! precomputed 1/dx, 1/dy
       real(SP), allocatable :: x(:, :), y(:, :)       ! physical coordinates (local metres)
+      ! east/north seam ownership coordinates: the NEIGHBOR'S first interior
+      ! center as the neighbor computed it (rebuilding it as x(last)+dx
+      ! rounds differently and a station on the exact center lands on both
+      ! ranks, or neither); terminal and periodic-wrap edges keep the sum
+      real(SP) :: x_seam = 0.0_SP, y_seam = 0.0_SP
       ! Persistent halo strip buffers (allocated at setup) — halo_exchange
       ! runs tens of fields per stage, so per-call heap churn is measurable.
       ! Pointer (not allocatable) components so the intent(in) grid dummies
@@ -738,6 +743,8 @@ contains
          end do
       end do
 
+      call init_seam_coords(this)
+
    end subroutine init_spacing_uniform
 
    subroutine init_spacing_variable(this, dx, dy)
@@ -793,6 +800,8 @@ contains
          this%y(:, j) = this%y(:, j - 1) + dy(1, j - 1)
       end do
 
+      call init_seam_coords(this)
+
    end subroutine init_spacing_variable
 
    ! Spherical (lon/lat) grid spacing.
@@ -841,7 +850,35 @@ contains
             this%y(i, j) = real(this%jbegin + j - 2, SP)*dy0_val
          end do
       end do
+      call init_seam_coords(this)
+
    end subroutine init_spacing_spherical
+
+   ! Seam ownership coordinates for the station/transect interpolator:
+   ! Sendrecv each rank's first interior center to its west/south
+   ! neighbor so both sides of a seam test the bitwise-same value.  A
+   ! periodic wrap delivers the domain-start coordinate, which the
+   ! monotonicity guard rejects in favor of the sum fallback.
+   subroutine init_seam_coords(this)
+      class(type_grid_2d), intent(inout) :: this
+
+      integer :: ierr
+      real(SP) :: xr, yr
+
+      this%x_seam = this%x(this%local_nx, 1) + this%dx(this%local_nx, 1)
+      this%y_seam = this%y(1, this%local_ny) + this%dy(1, this%local_ny)
+
+      xr = -1.0_SP; yr = -1.0_SP
+      call MPI_Sendrecv(this%x(1, 1), 1, MPI_SP, this%back_rank, 71, &
+                        xr, 1, MPI_SP, this%shore_rank, 71, &
+                        this%cart_comm, MPI_STATUS_IGNORE, ierr)
+      call MPI_Sendrecv(this%y(1, 1), 1, MPI_SP, this%right_rank, 72, &
+                        yr, 1, MPI_SP, this%left_rank, 72, &
+                        this%cart_comm, MPI_STATUS_IGNORE, ierr)
+      if (xr > this%x(this%local_nx, 1)) this%x_seam = xr
+      if (yr > this%y(1, this%local_ny)) this%y_seam = yr
+
+   end subroutine init_seam_coords
 
    ! Spacing arrays only — init_spacing_* re-allocate after this, so the
    ! halo buffers (grid-lifetime, owned by setup) must survive

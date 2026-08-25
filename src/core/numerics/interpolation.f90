@@ -187,15 +187,18 @@ contains
       in_x = (li >= 1) .and. (li <= grid%local_nx)
       in_y = (lj >= 1) .and. (lj <= grid%local_ny)
 
+      ! the half-open guard compares against the neighbor's own first
+      ! center (grid%x_seam): rebuilding it as x(last)+dx rounds
+      ! differently and a station on the exact center is double-owned
       if (grid%is_shore_boundary) then
          in_x = in_x .and. (xq <= grid%x(grid%local_nx, 1))
       else
-         in_x = in_x .and. (xq < grid%x(grid%local_nx, 1) + grid%dx(grid%local_nx, 1))
+         in_x = in_x .and. (xq < grid%x_seam)
       end if
       if (grid%is_left_boundary) then
          in_y = in_y .and. (yq <= grid%y(1, grid%local_ny))
       else
-         in_y = in_y .and. (yq < grid%y(1, grid%local_ny) + grid%dy(1, grid%local_ny))
+         in_y = in_y .and. (yq < grid%y_seam)
       end if
 
       point_is_local = in_x .and. in_y
