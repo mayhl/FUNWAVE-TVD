@@ -124,7 +124,7 @@ module model_meteo_mod
    type, extends(type_model_base) :: type_model_meteo
 
       ! sub-model switches (legacy METEO_FORCING dispatcher)
-      logical :: meteo_gausian = .false.
+      logical :: meteo_gaussian = .false.
       logical :: wind_constant_field = .false.
       logical :: wind_holland_model = .false.
       logical :: slide_model = .false.
@@ -136,7 +136,7 @@ module model_meteo_mod
       real(SP) :: cdw = 0.002_SP
       real(SP) :: wind_crest_percent = LARGE
 
-      type(type_path) :: gausian_file
+      type(type_path) :: gaussian_file
       type(type_path) :: constant_wind_file
       type(type_path) :: storm_file        ! Holland Pn/Pc/A/B track
       type(type_path) :: slide_file        ! landslide geometry + X/Y track
@@ -206,11 +206,11 @@ contains
 
       ! sub-model blocks: presence = model on (nee the four dispatcher bools)
       blk = sub_env%yaml%cast_dictionary("gaussian", no_key)
-      this%meteo_gausian = .not. no_key
-      if (this%meteo_gausian) then
+      this%meteo_gaussian = .not. no_key
+      if (this%meteo_gaussian) then
          ! the pulse IS a pressure field (legacy mod_meteo.F:206 forces it on)
          this%air_pressure = .true.
-         call blk%read_input_path("file", silent=no_key, val=this%gausian_file)
+         call blk%read_input_path("file", silent=no_key, val=this%gaussian_file)
          if (no_key) call env%log%exit_on_error( &
             "meteo: gaussian requires file (the storm track)")
       end if
@@ -262,7 +262,7 @@ contains
             "meteo: slide requires file (the geometry + track)")
       end if
 
-      if (.not. (this%meteo_gausian .or. this%wind_constant_field .or. &
+      if (.not. (this%meteo_gaussian .or. this%wind_constant_field .or. &
                  this%wind_holland_model .or. this%slide_model)) then
          call env%log%exit_on_error( &
             "meteo: block present but no sub-model (gaussian/wind/holland/slide)")
@@ -332,7 +332,7 @@ contains
 
       if (.not. this%is_activated) return
 
-      need_pressure = this%meteo_gausian .or. this%wind_holland_model &
+      need_pressure = this%meteo_gaussian .or. this%wind_holland_model &
                       .or. this%slide_model
       need_wind = this%wind_constant_field .or. this%wind_holland_model
       ! Xco/Yco are used by the spatial pressure models; a uniform wind does not
@@ -382,7 +382,7 @@ contains
          end if
       end associate
 
-      if (this%meteo_gausian) call gausian_setup(this)
+      if (this%meteo_gaussian) call gaussian_setup(this)
       if (this%wind_constant_field) call constant_wind_setup(this)
       if (this%wind_holland_model) call holland_setup(this)
       if (this%slide_model) call slide_setup(this)
@@ -392,11 +392,11 @@ contains
    ! Open the storm track, skip its three banner lines, read the first record
    ! into slot2, then copy ALL seven fields to slot1 (slot1 is also refreshed
    ! from slot2 on each record advance now -- NOTE 1).
-   subroutine gausian_setup(this)
+   subroutine gaussian_setup(this)
       class(type_model_meteo), intent(inout) :: this
       character(len=80) :: header
 
-      open (newunit=this%unit_track, file=this%gausian_file%root, &
+      open (newunit=this%unit_track, file=this%gaussian_file%root, &
             status='old', action='read')
       read (this%unit_track, *) header                  ! title
       read (this%unit_track, *) header                  ! storm name
@@ -411,7 +411,7 @@ contains
       this%sigx1 = this%sigx2
       this%sigy1 = this%sigy2
       this%th1 = this%th2
-   end subroutine gausian_setup
+   end subroutine gaussian_setup
 
    ! Open the Holland track, skip its three banner lines, read the first record
    ! (Time, X, Y, Pn, Pc, A, B) into slot2, then copy ALL seven to slot1 (the
@@ -501,7 +501,7 @@ contains
 
       if (.not. this%is_activated) return
 
-      if (this%meteo_gausian) call gausian_forcing(this, time, h)
+      if (this%meteo_gaussian) call gaussian_forcing(this, time, h)
       if (this%wind_constant_field) &
          call constant_wind_forcing(this, time, h, eta, etax, etay, etat, &
                                     etamean, h_max)
@@ -515,7 +515,7 @@ contains
    ! Legacy MeteoGausian_Forcing: one optional record advance (t/x/y only,
    ! NOTE 1), linear-in-time blend, the rotated Gaussian pressure, then the
    ! -g*H*grad forcing.
-   subroutine gausian_forcing(this, time, h)
+   subroutine gaussian_forcing(this, time, h)
       class(type_model_meteo), intent(inout) :: this
       real(SP), intent(in) :: time, h(:, :)
 
@@ -581,7 +581,7 @@ contains
 
       call pressure_gradient(this, h)
 
-   end subroutine gausian_forcing
+   end subroutine gaussian_forcing
 
    ! Legacy Constant_Wind_Forcing: advance the series index by one, blend WU/WV
    ! into a uniform wind, optionally adjust by the wave celerity, build the

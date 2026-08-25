@@ -1193,7 +1193,7 @@ contains
       ! legacy OUTPUT_METEO writes StormPressureTotal_ (Pstorm_) under OUT_METEO
       ! for every spatial pressure model (Gausian/Holland/Slide); a wind-only
       ! field has no pressure array to register
-      if (this%meteo%is_activated .and. (this%meteo%meteo_gausian &
+      if (this%meteo%is_activated .and. (this%meteo%meteo_gaussian &
                                          .or. this%meteo%wind_holland_model .or. this%meteo%slide_model)) then
          call registry%register("meteo_pressure", this%meteo%p_total)
       end if
