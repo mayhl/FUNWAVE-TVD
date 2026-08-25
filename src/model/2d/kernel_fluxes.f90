@@ -70,7 +70,7 @@ module model_kernel_fluxes_mod
    public :: construction, fluxes_ho_blocked
    public :: construction_ho_minmod, construction_ho_mlp
    public :: construction_weno
-   public :: fluxes, flux_wall_bc, flux_dry_bc
+   public :: fluxes, flux_wall_bc, flux_flather_bc, flux_dry_bc
 
 contains
 
@@ -1327,6 +1327,110 @@ contains
       end if
 
    end subroutine flux_wall_bc
+
+   ! ----------------------------------------------------------------
+   ! flux_flather_bc — Flather radiation on a forced open face (the
+   ! characteristic BC track).  Instead of walling the face, impose the
+   ! boundary-normal mass flux from the linearized Flather condition,
+   !   $$ u_n = u_{ext} \mp \sqrt{g/H}\,(\xi - \eta_{ext}) $$
+   ! (minus at west/south, plus at east/north; $\xi$ the interior-side
+   ! face reconstruction, H the face total depth).  When the interior
+   ! matches the target the prescribed flux is imposed exactly (no strip
+   ! attenuation); deviations radiate out at $\sqrt{gH}$.  The normal
+   ! momentum flux is advective + hydrostatic, the tangential rides the
+   ! target velocity.  A face thinner than min_depth falls back to a wall.
+   ! Faces indexed [W, E, S, N]; called after flux_wall_bc, on the faces
+   ! flux_wall_bc left unfilled (fill flags cleared for Flather faces).
+   ! ----------------------------------------------------------------
+   subroutine flux_flather_bc(lp, flather, eta_ext, u_ext, v_ext, &
+                              gamma3, min_depth, depthx, depthy, ws)
+      type(type_loop_bounds), intent(in) :: lp
+      logical, intent(in) :: flather(4)
+      real(SP), intent(in) :: eta_ext(4), u_ext(4), v_ext(4)
+      real(SP), intent(in) :: gamma3, min_depth
+      real(SP), intent(in) :: depthx(:, :), depthy(:, :)
+      type(type_flux_workspace), intent(inout) :: ws
+
+      real(SP) :: xi, h_face, cf, un, vn
+      integer :: i, j
+
+      if (flather(1)) then          ! west
+         do j = lp%jb, lp%je
+            xi = ws%etarxr(lp%ib, j)
+            h_face = depthx(lp%ib, j) + xi
+            if (h_face > min_depth) then
+               cf = sqrt(GRAV/h_face)
+               un = u_ext(1) - cf*(xi - eta_ext(1))
+               ws%p(lp%ib, j) = h_face*un
+               ws%fx(lp%ib, j) = ws%p(lp%ib, j)*un &
+                                 + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ib, j))
+               ws%gx(lp%ib, j) = ws%p(lp%ib, j)*v_ext(1)
+            else
+               ws%p(lp%ib, j) = 0.0_SP
+               ws%fx(lp%ib, j) = 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ib, j))
+               ws%gx(lp%ib, j) = 0.0_SP
+            end if
+         end do
+      end if
+
+      if (flather(2)) then          ! east
+         do j = lp%jb, lp%je
+            xi = ws%etarxl(lp%ie + 1, j)
+            h_face = depthx(lp%ie + 1, j) + xi
+            if (h_face > min_depth) then
+               cf = sqrt(GRAV/h_face)
+               un = u_ext(2) + cf*(xi - eta_ext(2))
+               ws%p(lp%ie + 1, j) = h_face*un
+               ws%fx(lp%ie + 1, j) = ws%p(lp%ie + 1, j)*un &
+                                     + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ie + 1, j))
+               ws%gx(lp%ie + 1, j) = ws%p(lp%ie + 1, j)*v_ext(2)
+            else
+               ws%p(lp%ie + 1, j) = 0.0_SP
+               ws%fx(lp%ie + 1, j) = 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ie + 1, j))
+               ws%gx(lp%ie + 1, j) = 0.0_SP
+            end if
+         end do
+      end if
+
+      if (flather(3)) then          ! south
+         do i = lp%ib, lp%ie
+            xi = ws%etaryr(i, lp%jb)
+            h_face = depthy(i, lp%jb) + xi
+            if (h_face > min_depth) then
+               cf = sqrt(GRAV/h_face)
+               vn = v_ext(3) - cf*(xi - eta_ext(3))
+               ws%q(i, lp%jb) = h_face*vn
+               ws%fy(i, lp%jb) = ws%q(i, lp%jb)*u_ext(3)
+               ws%gy(i, lp%jb) = ws%q(i, lp%jb)*vn &
+                                 + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthy(i, lp%jb))
+            else
+               ws%q(i, lp%jb) = 0.0_SP
+               ws%fy(i, lp%jb) = 0.0_SP
+               ws%gy(i, lp%jb) = 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthy(i, lp%jb))
+            end if
+         end do
+      end if
+
+      if (flather(4)) then          ! north
+         do i = lp%ib, lp%ie
+            xi = ws%etaryl(i, lp%je + 1)
+            h_face = depthy(i, lp%je + 1) + xi
+            if (h_face > min_depth) then
+               cf = sqrt(GRAV/h_face)
+               vn = v_ext(4) + cf*(xi - eta_ext(4))
+               ws%q(i, lp%je + 1) = h_face*vn
+               ws%fy(i, lp%je + 1) = ws%q(i, lp%je + 1)*u_ext(4)
+               ws%gy(i, lp%je + 1) = ws%q(i, lp%je + 1)*vn &
+                                     + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthy(i, lp%je + 1))
+            else
+               ws%q(i, lp%je + 1) = 0.0_SP
+               ws%fy(i, lp%je + 1) = 0.0_SP
+               ws%gy(i, lp%je + 1) = 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthy(i, lp%je + 1))
+            end if
+         end do
+      end if
+
+   end subroutine flux_flather_bc
 
    ! ----------------------------------------------------------------
    ! flux_dry_bc — dry-cell face flux enforcement (the "mask points"

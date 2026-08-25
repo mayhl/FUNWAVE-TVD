@@ -84,6 +84,11 @@ module model_tide_mod
       logical :: tide_west = .true., tide_east = .true.
       logical :: tide_south = .true., tide_north = .true.
 
+      ! Flather radiation faces (forcing without sponge.direct): the target
+      ! rides the boundary-normal flux (kernel flux_flather_bc), NOT this
+      ! relaxation strip, so apply_bc skips them
+      logical :: flather(4) = .false.
+
       ! current relaxation targets — CONSTANT values, or the DATA
       ! interpolants refreshed by update_data
       real(SP) :: eta_west = 0.0_SP, u_west = 0.0_SP, v_west = 0.0_SP
@@ -354,7 +359,7 @@ contains
       mloc = size(eta, 1)
       nloc = size(eta, 2)
 
-      if (this%tide_west) then
+      if (this%tide_west .and. .not. this%flather(FACE_W)) then
          do j = 1, nloc
             do i = 1, min(this%iwidth(FACE_W), mloc)
                if (mask(i, j) == 1) then
@@ -366,7 +371,7 @@ contains
          end do
       end if
 
-      if (this%tide_east) then
+      if (this%tide_east .and. .not. this%flather(FACE_E)) then
          do j = 1, nloc
             do i = max(1, mloc - this%iwidth(FACE_E) + 1), mloc
                if (mask(i, j) == 1) then
@@ -378,7 +383,7 @@ contains
          end do
       end if
 
-      if (this%tide_south) then
+      if (this%tide_south .and. .not. this%flather(FACE_S)) then
          do j = 1, min(this%iwidth(FACE_S), nloc)
             do i = 1, mloc
                if (mask(i, j) == 1) then
@@ -390,7 +395,7 @@ contains
          end do
       end if
 
-      if (this%tide_north) then
+      if (this%tide_north .and. .not. this%flather(FACE_N)) then
          do j = max(1, nloc - this%iwidth(FACE_N) + 1), nloc
             do i = 1, mloc
                if (mask(i, j) == 1) then

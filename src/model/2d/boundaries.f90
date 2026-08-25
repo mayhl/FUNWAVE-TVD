@@ -109,9 +109,10 @@ module model_boundaries_mod
    character(5), parameter :: FACE_KEY(4) = ['west ', 'east ', 'south', 'north']
 
    ! derived BC per face (indexes DERIVED_NAME)
-   integer, parameter :: BC_WALL = 1, BC_SPONGE = 2, BC_RELAX = 3
-   character(14), parameter :: DERIVED_NAME(3) = &
-                               ['wall          ', 'sponge        ', 'relaxation    ']
+   integer, parameter :: BC_WALL = 1, BC_SPONGE = 2, BC_RELAX = 3, BC_FLATHER = 4
+   character(14), parameter :: DERIVED_NAME(4) = &
+                               ['wall          ', 'sponge        ', 'relaxation    ', &
+                                'characteristic']
 
    ! shared sponge coefficients (boundaries.sponge): seeds mirror the
    ! per-face registry defaults; a present shared sub-block flips the
@@ -209,16 +210,20 @@ contains
 
             ! derivation table (design-config-reorg)
             if (forced(f)) then
-               if (.not. sponge%direct_on(f)) &
-                  call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
-                                             ": forcing without sponge.direct derives a characteristic"// &
-                                             " face — pending (add sponge: {width, direct} for relaxation)")
-               derived(f) = BC_RELAX
-               ! the tide strip inherits the face sponge geometry +
-               ! direct coefficients (rung 11)
-               tide%width_m(f) = sponge%width(f)
-               tide%r_face(f) = sponge%r_direct(f)
-               tide%a_face(f) = sponge%a_direct(f)
+               if (.not. sponge%direct_on(f)) then
+                  ! forcing without a relaxation strip -> Flather radiation:
+                  ! the target rides the boundary-normal flux, outgoing waves
+                  ! radiate at sqrt(gH).  No strip geometry to inherit.
+                  derived(f) = BC_FLATHER
+                  tide%flather(f) = .true.
+               else
+                  derived(f) = BC_RELAX
+                  ! the tide strip inherits the face sponge geometry +
+                  ! direct coefficients (rung 11)
+                  tide%width_m(f) = sponge%width(f)
+                  tide%r_face(f) = sponge%r_direct(f)
+                  tide%a_face(f) = sponge%a_direct(f)
+               end if
             else if (sponge%width(f) > 0.0_SP) then
                derived(f) = BC_SPONGE
             end if

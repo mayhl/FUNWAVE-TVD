@@ -64,7 +64,7 @@ module model_stepper_2d_mod
                                           cal_dispersion_derivs, &
                                           cal_dispersion_assemble
    use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, &
-                                      flux_wall_bc, flux_dry_bc
+                                      flux_wall_bc, flux_flather_bc, flux_dry_bc
    use model_kernel_sources_mod, only: cal_sources
    use model_kernel_etauv_mod, only: type_etauv_workspace, cal_rk_update, &
                                      cal_etauv_assemble_x, cal_etauv_assemble_y, &
@@ -323,6 +323,13 @@ contains
       else
          call this%bc%init(grid, "nothing")
       end if
+
+      ! Flather faces own the boundary-normal flux (flux_flather_bc); the
+      ! wall fill must not zero it there ([W, E, S, N])
+      if (this%tide%flather(1)) this%bc%fill_west = .false.
+      if (this%tide%flather(2)) this%bc%fill_east = .false.
+      if (this%tide%flather(3)) this%bc%fill_south = .false.
+      if (this%tide%flather(4)) this%bc%fill_north = .false.
 
       ! legacy EXCHANGE ghost gates (old/bc.F:441-449): AGE_BREAKING
       ! travels only under VISCOSITY_BREAKING, nu_break also under
@@ -609,6 +616,20 @@ contains
          call flux_wall_bc(lp, this%bc%fill_west, this%bc%fill_east, &
                            this%bc%fill_south, this%bc%fill_north, &
                            phy%Gamma3, this%depth_fx, this%depth_fy, this%fws)
+
+         ! Flather radiation on forced open faces (characteristic BC track):
+         ! impose the tide target through the boundary-normal flux, radiate
+         ! the outgoing residual.  Runs after the wall fill it replaces.
+         if (any(this%tide%flather)) &
+            call flux_flather_bc(lp, this%tide%flather, &
+                                 [this%tide%eta_west, this%tide%eta_east, &
+                                  this%tide%eta_south, this%tide%eta_north], &
+                                 [this%tide%u_west, this%tide%u_east, &
+                                  this%tide%u_south, this%tide%u_north], &
+                                 [this%tide%v_west, this%tide%v_east, &
+                                  this%tide%v_south, this%tide%v_north], &
+                                 phy%Gamma3, num%MinDepth, &
+                                 this%depth_fx, this%depth_fy, this%fws)
 
          ! dry-cell faces after the wall fills (legacy BOUNDARY_CONDITION
          ! order); walls here are topological, not the bc fill flags
