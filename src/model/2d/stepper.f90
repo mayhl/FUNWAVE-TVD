@@ -396,9 +396,13 @@ contains
       this%fws%gx = 0.0_SP; this%fws%gy = 0.0_SP
 
       call this%ews%alloc(mloc, nloc)
-      if (this%physics%dispersion) then
-         call this%dws%alloc(mloc, nloc)
-         if (this%physics%periodic .or. this%physics%periodic_x) &
+      if (this%physics%dispersion) call this%dws%alloc(mloc, nloc)
+      ! the split visc solve rides the same periodic trid variants, so
+      ! the workspace cannot key on dispersion alone (nswe + periodic
+      ! channel segfaulted on the unallocated a_loc)
+      if (this%physics%periodic .or. this%physics%periodic_x) then
+         if (this%physics%dispersion .or. &
+             (this%breaking%split_implicit .and. this%physics%viscosity_breaking)) &
             call this%tws%alloc(mloc, nloc)
       end if
 
