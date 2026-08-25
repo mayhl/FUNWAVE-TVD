@@ -256,7 +256,7 @@ def _is_1d_mode(ref_meta: RunMetadata) -> bool:
 
 def _load_mask(meta: RunMetadata, idx: int) -> np.ndarray | None:
     """Return boolean (ny, nx) wet mask for step idx, or None if unavailable."""
-    p = meta.output_dir / f"mask_{idx:05d}"
+    p = meta.field_path("mask", idx)
     if not p.exists():
         return None
     return meta.read_field(p) > 0
@@ -471,8 +471,8 @@ def _make_failure_figures(
     # Read and pre-mask all selected steps
     pairs: list[tuple[np.ndarray, np.ndarray]] = []
     for step in steps:
-        ref_arr = ref_meta.read_field(ref_meta.output_dir / f"{prefix}_{step:05d}").astype(float)
-        dev_arr = dev_meta.read_field(dev_meta.output_dir / f"{prefix}_{step:05d}").astype(float)
+        ref_arr = ref_meta.read_field(ref_meta.field_path(prefix, step)).astype(float)
+        dev_arr = dev_meta.read_field(dev_meta.field_path(prefix, step)).astype(float)
         ref_mask = _load_mask(ref_meta, step)
         dev_mask = _load_mask(dev_meta, step)
         if ref_mask is not None:

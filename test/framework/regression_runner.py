@@ -7,6 +7,7 @@ import os
 import shutil
 import subprocess
 import importlib
+import traceback
 import copy
 from collections import deque
 from dataclasses import dataclass
@@ -327,6 +328,9 @@ class RegressionRunner(BaseRunner):
             except Exception as exc:
                 result.status = "POSTPROCESS_ERROR"
                 result.notes += f"\n[{kind}] {type(exc).__name__}: {exc}"
+                # the console line is the only surviving record on a board --
+                # the report JSON omits notes and a later leg overwrites it
+                self.reporter.error(f"    [{kind}] {traceback.format_exc()}")
                 return result
 
         gated = [m for s in result.subsections for m in s.metrics if math.isfinite(m.tolerance)]
@@ -864,6 +868,8 @@ class RegressionRunner(BaseRunner):
             self.reporter.error(f"    unexpected pass — remove known_fail: {sim.get('known_fail')} from regression_config.yaml")
         elif result.status in ("SIM_FAILED", "POSTPROCESS_ERROR"):
             self.reporter.error(result_line)
+            for line in result.notes.strip().splitlines():
+                self.reporter.error(f"    {line}")
         else:
             self.reporter.warn(result_line)
         return result
