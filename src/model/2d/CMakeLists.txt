@@ -49,6 +49,7 @@ if(USE_OPENMP)
     kernel_masks.f90
     kernel_dispersion.f90
     kernel_breaker.f90
+    kernel_visc.f90
     kernel_etauv.f90
     TARGET_DIRECTORY
     ${main_lib}_model
