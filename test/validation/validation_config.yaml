@@ -694,3 +694,22 @@ simulations:
       # u/v only = half the invariant; eta column is zero so reference the
       # 1.0 m incident range explicitly -> measured 0.502
       flather_transmission: { ratio_min: 0.45, ratio_max: 0.55, reference_pp_m: 1.0 }
+
+  # ── Wind setup: meteo.wind steady-state balance ──
+  # Closed basin, steady uniform wind ramped on over ~2 seiche periods; the
+  # oracle time-averages the fitted surface slope and gates it against the
+  # analytic d(eta)/dx = (rho_a/rho) Cd_w W^2 / (g h).  Flux-form stress, no
+  # 1/h, so it is bounded as h -> 0.
+  - name: wind_setup
+    exe_type: validation-2d
+    np_pin: 1
+    input: test/validation/inputs/wind_setup
+    input_files: [wind_setup.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, meteo, wind, forcing, local]
+    postprocess:
+      wind_setup: test.validation.oracles.wind_setup
+    tolerances:
+      # analytic slope 7.86e-5; time-mean ratio 1.005 over the settled window
+      wind_setup: { ratio_min: 0.9, ratio_max: 1.1 }
