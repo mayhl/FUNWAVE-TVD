@@ -782,6 +782,19 @@ contains
             end if
          end if
 
+         ! suspended-load diffusion as the same once-per-step split (the
+         ! Elder flux left the stage residual under sediment split_implicit)
+         if (this%sediment%is_activated .and. this%sediment%split_implicit &
+             .and. istage == 3) then
+            call this%sediment%diffuse_implicit(this%bc, this%grid, dt, &
+                                                phy%periodic_x, phy%periodic, &
+                                                this%inv_dx, this%inv_dy, &
+                                                f%mask, f%u, f%v, &
+                                                this%vessel%is_activated .and. &
+                                                this%vessel%propeller, &
+                                                prop_upc(this))
+         end if
+
       end associate
 
    end subroutine stepper_stage

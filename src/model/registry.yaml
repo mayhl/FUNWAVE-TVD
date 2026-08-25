@@ -602,12 +602,14 @@ sections:
     doc: "Sediment — single grain size, morphology, avalanching, cohesive, and flow-feedback sub-blocks."
     keys:
       scheme: {legacy: Sed_Scheme, default: upwinding, units: ~, values: [upwinding, tvd], doc: Advection scheme for suspended load.}
+      solver: {legacy: ~, default: split_implicit, units: ~, values: [explicit, split_implicit], doc: "Suspended-load diffusion integrator: a once-per-step operator-split backward-Euler ADI solve on CH (unconditionally stable), or the explicit face flux inside the RK stages (legacy; clamped at the stability bound, which the Elder diffusivity tops under ~0.5 m cells)."}
       d50: {legacy: D50, default: ~, units: m, latex: '$D_{50}$', doc: 'Median grain diameter (absent: 0.5 mm sand / 5 nm mud by cohesive).'}
       specific_gravity: {legacy: Sdensity, default: 2.68, units: ~, latex: $s$, doc: Sediment specific gravity.}
       porosity: {legacy: n_porosity, default: 0.47, units: ~, latex: $n$, doc: Bed porosity.}
       settling_velocity: {legacy: WS, default: ~, units: m/s, latex: $w_s$, doc: Settling velocity (absent = computed from grain size).}
       shields_cr: {legacy: Shields_cr, default: 0.055, units: ~, latex: '$\theta_{cr}$', doc: Critical Shields parameter for suspension.}
       min_depth_pickup: {legacy: MinDepthPickup, default: 0.1, units: m, doc: Minimum water depth for pickup.}
+      pickup_ramp: {legacy: ~, default: 0.0, units: ~, doc: "Wet/dry-proximity source taper: multiples of min_depth_pickup over which the sand pickup, the bedload flux, and the split-diffusion faces smoothstep up from zero at the cutoff; 0 = off (legacy hard switch). The wetdry_disp_ramp idiom applied to the sediment column."}
       pickup_reduction: {legacy: PickupReduction, default: true, units: ~, doc: Reduce pickup on steep slopes.}
       reduction_parameter: {legacy: ReductionParameter, default: 0.65, units: ~, doc: Slope pickup-reduction coefficient (requires pickup_reduction).}
       c_limiter: {legacy: C_limiter, default: ~, units: ~, doc: Suspended-concentration limiter (presence enables).}

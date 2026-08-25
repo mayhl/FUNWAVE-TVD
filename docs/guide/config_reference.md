@@ -321,12 +321,14 @@ Sediment — single grain size, morphology, avalanching, cohesive, and flow-feed
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `scheme` | `upwinding` | `Sed_Scheme` | — | Advection scheme for suspended load. One of `upwinding` \| `tvd`. |
+| `solver` | `split_implicit` | — | — | Suspended-load diffusion integrator: a once-per-step operator-split backward-Euler ADI solve on CH (unconditionally stable), or the explicit face flux inside the RK stages (legacy; clamped at the stability bound, which the Elder diffusivity tops under ~0.5 m cells). One of `explicit` \| `split_implicit`. |
 | `d50` | — | `D50` | m | Median grain diameter (absent: 0.5 mm sand / 5 nm mud by cohesive). |
 | `specific_gravity` | `2.68` | `Sdensity` | — | Sediment specific gravity. |
 | `porosity` | `0.47` | `n_porosity` | — | Bed porosity. |
 | `settling_velocity` | — | `WS` | m/s | Settling velocity (absent = computed from grain size). |
 | `shields_cr` | `0.055` | `Shields_cr` | — | Critical Shields parameter for suspension. |
 | `min_depth_pickup` | `0.1` | `MinDepthPickup` | m | Minimum water depth for pickup. |
+| `pickup_ramp` | `0.0` | — | — | Wet/dry-proximity source taper: multiples of min_depth_pickup over which the sand pickup, the bedload flux, and the split-diffusion faces smoothstep up from zero at the cutoff; 0 = off (legacy hard switch). The wetdry_disp_ramp idiom applied to the sediment column. |
 | `pickup_reduction` | `true` | `PickupReduction` | — | Reduce pickup on steep slopes. |
 | `reduction_parameter` | `0.65` | `ReductionParameter` | — | Slope pickup-reduction coefficient (requires pickup_reduction). |
 | `c_limiter` | — | `C_limiter` | — | Suspended-concentration limiter (presence enables). |

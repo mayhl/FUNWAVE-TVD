@@ -88,6 +88,8 @@
 !
 !  YAML block: sediment:           (top-level; omit to disable)
 !    scheme:             <str>     upwinding | tvd,     default upwinding
+!    solver:             <str>     explicit | split_implicit,
+!                                  default split_implicit
 !                                  (nee Sed_Scheme; strict enum, the legacy
 !                                  3-char prefix match is gone)
 !    d50:                <real>    grain size (m); ABSENT -> 0.0005, or 5e-6
@@ -97,6 +99,8 @@
 !    settling_velocity:  <real>    (m/s, nee WS); ABSENT -> formula
 !    shields_cr:         <real>    critical Shields,    default 0.055
 !    min_depth_pickup:   <real>    pickup cutoff (m),   default 0.1
+!    pickup_ramp:        <real>    wet/dry source taper (x min_depth_pickup),
+!                                  default 0
 !    pickup_reduction:   <bool>    cap on c_b,          default YES
 !    reduction_parameter: <real>   that cap,            default 0.65
 !                                  (rejected when pickup_reduction is off)
@@ -247,14 +251,17 @@ module model_sediment_mod
    use core_grid_mod, only: type_grid_2d, type_loop_bounds
    use core_path_mod, only: type_path
 
+   use core_solver_tridiag_mod, only: trid_x, trid_x_periodic, trid_y, &
+                                      trid_y_periodic, type_trid_workspace
    use model_base_mod, only: type_model_base
    use model_bc_mod, only: type_model_bc
    use model_geometry_mod, only: read_field_ascii, stagger_depth
    use core_yaml_file_mod, only: type_yaml_reader
-   use model_config_defaults_mod, only: DEF_SEDIMENT_SCHEME, &
+   use model_config_defaults_mod, only: DEF_SEDIMENT_SCHEME, DEF_SEDIMENT_SOLVER, &
                                         DEF_SEDIMENT_SPECIFIC_GRAVITY, DEF_SEDIMENT_POROSITY, &
                                         DEF_SEDIMENT_SHIELDS_CR, &
                                         DEF_SEDIMENT_MIN_DEPTH_PICKUP, &
+                                        DEF_SEDIMENT_PICKUP_RAMP, &
                                         DEF_SEDIMENT_PICKUP_REDUCTION, &
                                         DEF_SEDIMENT_REDUCTION_PARAMETER, &
                                         DEF_SEDIMENT_BED_CHANGE, DEF_SEDIMENT_BEDLOAD, &
@@ -278,6 +285,9 @@ module model_sediment_mod
    real(SP), parameter :: KAPPA_VK = 0.4_SP
    ! diffusivity coefficient, legacy 5.93 * ubar_star * hbar
    real(SP), parameter :: K_DIFF = 5.93_SP
+
+   character(len=20), parameter :: SED_SOLVERS(2) = &
+                                   [character(len=20) :: "explicit", "split_implicit"]
    ! van Rijn reference-concentration coefficients
    real(SP), parameter :: VR_COEF = 0.015_SP, VR_DSTAR_EXP = -0.3_SP
    ! Cao (2004) deposition cap on (1-n)/c
@@ -298,6 +308,10 @@ module model_sediment_mod
 
       ! ---- config
       character(:), allocatable :: sed_scheme
+      ! diffusion integrator: the split ADI solve is the default -- the
+      ! Elder diffusivity tops the explicit bound under ~0.5 m cells
+      character(:), allocatable :: solver
+      logical  :: split_implicit = .true.
       logical  :: upwinding = .true.
       logical  :: pickup_reduction = .true.
       logical  :: use_climiter = .false.
@@ -322,6 +336,8 @@ module model_sediment_mod
       real(SP) :: shields_cr = ZERO
       real(SP) :: shields_cr_bedload = ZERO
       real(SP) :: min_depth_pickup = ZERO
+      ! wet/dry source taper width (x min_depth_pickup); 0 = legacy hard switch
+      real(SP) :: pickup_ramp = ZERO
       real(SP) :: reduction_parameter = ZERO
       real(SP) :: c_limiter = ZERO
       real(SP) :: morph_interval = ZERO
@@ -365,6 +381,10 @@ module model_sediment_mod
       ! ---- face fluxes (advection + diffusion), rebuilt every stage
       real(SP), allocatable :: scal_x(:, :), scal_y(:, :)
 
+      ! ---- split-diffusion ADI bands + solve buffer (split_implicit only)
+      real(SP), allocatable :: dif_a(:, :), dif_c(:, :), dif_d(:, :), dif_f(:, :)
+      type(type_trid_workspace) :: dif_tws
+
       ! ---- morphology.  bed_flux is CELL-centred (legacy BedFluxX/Y), not a
       ! face flux; zb is positive for erosion; zs is the hard bottom (LARGE
       ! where there is none, so the clamp never bites)
@@ -393,6 +413,7 @@ module model_sediment_mod
       procedure :: init_compute => sediment_init_compute
       procedure :: save_step0 => sediment_save_step0
       procedure :: update => sediment_update
+      procedure :: diffuse_implicit => sediment_diffuse_implicit
       procedure :: morphology => sediment_morphology
       procedure :: free => sediment_free
    end type type_model_sediment
@@ -433,6 +454,10 @@ contains
          call env%log%exit_on_error( &
             "sediment: scheme must be upwinding or tvd, got "//this%sed_scheme)
       end select
+
+      call sub_env%yaml%read_enum("solver", SED_SOLVERS, silent=no_key, &
+                                  val=this%solver, default=DEF_SEDIMENT_SOLVER)
+      this%split_implicit = trim(this%solver) == "split_implicit"
 
       ! ---- cohesive block, read ahead of d50 because presence selects d50's
       ! fallback (nee the CohesiveSediment bool)
@@ -488,6 +513,8 @@ contains
       call sub_env%yaml%read("min_depth_pickup", silent=no_key, &
                              val=this%min_depth_pickup, &
                              default=DEF_SEDIMENT_MIN_DEPTH_PICKUP)
+      call sub_env%yaml%read("pickup_ramp", silent=no_key, val=this%pickup_ramp, &
+                             default=DEF_SEDIMENT_PICKUP_RAMP)
 
       call sub_env%yaml%read("pickup_reduction", silent=no_key, &
                              val=this%pickup_reduction, &
@@ -619,6 +646,12 @@ contains
          allocate (this%scal_x(m + 1, n), source=ZERO)
          allocate (this%scal_y(m, n + 1), source=ZERO)
 
+         if (this%split_implicit) then
+            allocate (this%dif_a(m, n), this%dif_c(m, n), &
+                      this%dif_d(m, n), this%dif_f(m, n), source=ZERO)
+            call this%dif_tws%alloc(m, n)
+         end if
+
          allocate (this%bed_flux_x(m, n), source=ZERO)
          allocate (this%bed_flux_y(m, n), source=ZERO)
          allocate (this%zb(m, n), source=ZERO)
@@ -714,7 +747,9 @@ contains
 
       call sediment_advect(this, grid%lp, mask, p_face, q_face, roller, &
                            undertow_u, undertow_v)
-      call sediment_diffuse(this, grid%lp, inv_dx, inv_dy, mask, u, v, prop_on, upc)
+      ! split_implicit relocates the Elder flux to the per-step ADI solve
+      if (.not. this%split_implicit) &
+         call sediment_diffuse(this, grid%lp, dt, inv_dx, inv_dy, mask, u, v, prop_on, upc)
       call sediment_flux_bc(this, grid, mask)
       call sediment_solve(this, grid%lp, alpha, beta, dt, inv_dx, inv_dy, mask)
       call bc%exchange_scalar(grid, this%ch)
@@ -808,9 +843,10 @@ contains
    ! ustar_c is computed locally on each face: the x sweep at cell (i,j), the
    ! y sweep at (i,j) again, so k2/k4 each average the two cells they straddle.
    ! ----------------------------------------------------------------
-   subroutine sediment_diffuse(this, lp, inv_dx, inv_dy, mask, u, v, prop_on, upc)
+   subroutine sediment_diffuse(this, lp, dt, inv_dx, inv_dy, mask, u, v, prop_on, upc)
       class(type_model_sediment), intent(inout) :: this
       type(type_loop_bounds), intent(in) :: lp
+      real(SP), intent(in) :: dt
       real(SP), intent(in) :: inv_dx(:, :), inv_dy(:, :)
       integer, intent(in) :: mask(:, :)
       real(SP), intent(in) :: u(:, :), v(:, :)
@@ -821,7 +857,15 @@ contains
       real(SP), intent(in) :: upc(:, :)
 
       integer :: i, j
-      real(SP) :: ustar_c, ustar_c_j, ustar_c2, ustar_c4, k2, k4
+      real(SP) :: ustar_c, ustar_c_j, ustar_c2, ustar_c4, k2, k4, hbar
+
+      ! face clamp at the explicit-diffusion stability bound: the Elder
+      ! coefficient 5.93 u* h tops the bound several-fold at lab dx and C
+      ! grows a factor per step -- the uncapped-breaker-nu disease.  The
+      ! face diffusion number k hbar dt/dx^2 is held to 0.2 per sweep,
+      ! saturating the mixing under refinement.  FUTURE: fold C into the
+      ! split ADI solve and retire the clamp
+      real(SP), parameter :: DIFF_NUM_MAX = 0.2_SP
 
       do j = lp%jb, lp%je
          do i = lp%ib, lp%ie + 1
@@ -833,8 +877,9 @@ contains
                   ustar_c2 = shear_velocity(this, u(i - 1, j), v(i - 1, j), &
                                             this%hpo(i - 1, j))
                   if (prop_on) ustar_c2 = ustar_c2 + upc(i - 1, j)
-                  k2 = K_DIFF*(ustar_c2 + ustar_c) &
-                       *(this%hpo(i - 1, j) + this%hpo(i, j))/4.0_SP
+                  hbar = (this%hpo(i - 1, j) + this%hpo(i, j))*0.5_SP
+                  k2 = K_DIFF*(ustar_c2 + ustar_c)*hbar*0.5_SP
+                  k2 = min(k2, DIFF_NUM_MAX/(inv_dx(i, j)**2*dt*hbar))
                   this%scal_x(i, j) = this%scal_x(i, j) &
                                       - k2*(this%hpo(i - 1, j) + this%hpo(i, j)) &
                                       *(this%ch(i, j) - this%ch(i - 1, j)) &
@@ -853,8 +898,9 @@ contains
                   if (prop_on) ustar_c4 = ustar_c4 + upc(i, j - 1)
                   ustar_c_j = shear_velocity(this, u(i, j), v(i, j), this%hpo(i, j))
                   if (prop_on) ustar_c_j = ustar_c_j + upc(i, j)
-                  k4 = K_DIFF*(ustar_c4 + ustar_c_j) &
-                       *(this%hpo(i, j) + this%hpo(i, j - 1))/4.0_SP
+                  hbar = (this%hpo(i, j - 1) + this%hpo(i, j))*0.5_SP
+                  k4 = K_DIFF*(ustar_c4 + ustar_c_j)*hbar*0.5_SP
+                  k4 = min(k4, DIFF_NUM_MAX/(inv_dy(i, j)**2*dt*hbar))
                   this%scal_y(i, j) = this%scal_y(i, j) &
                                       - k4*(this%hpo(i, j - 1) + this%hpo(i, j)) &
                                       *(this%ch(i, j) - this%ch(i, j - 1)) &
@@ -865,6 +911,182 @@ contains
       end do
 
    end subroutine sediment_diffuse
+
+   ! ----------------------------------------------------------------
+   ! Once-per-step operator-split solve of the suspended-load diffusion
+   ! (the breaker-viscosity split's precedent): the Elder face flux drops
+   ! out of the stage residual and CH gets a backward-Euler ADI solve
+   !   $$ \left(h - \Delta t\,\partial_x k\bar h^2\,\partial_x\right)
+   !      \left(h - \Delta t\,\partial_y k\bar h^2\,\partial_y\right)
+   !      \tfrac{c^{n+1}}{h} = h\,c^* $$
+   ! Solved in C with the row scaled by h/dt, so the matrix is an
+   ! M-matrix whatever the depth contrast (the CH form divides the
+   ! off-diagonals by the NEIGHBOUR depth and loses dominance at the
+   ! wet/dry front); flux form in C conserves the total CH.  A dry cell
+   ! is an identity row and only global walls zero faces (the
+   ! visc-solve closure).  Faces with a cell at or below min_depth_pickup carry
+   ! no flux: mixing into a min_depth film cell converts the transferred
+   ! mass into huge C (tiny column) and the deposition spike blows the
+   ! bed -- the same shallow cutoff that gates the pickup.
+   ! Unconditionally stable -- the explicit path's diffusivity clamp does
+   ! not apply here.
+   ! ----------------------------------------------------------------
+   subroutine sediment_diffuse_implicit(this, bc, grid, dt, periodic_x, periodic_y, &
+                                        inv_dx, inv_dy, mask, u, v, prop_on, upc)
+      class(type_model_sediment), intent(inout) :: this
+      type(type_model_bc), intent(in) :: bc
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: dt
+      logical, intent(in) :: periodic_x, periodic_y
+      real(SP), intent(in) :: inv_dx(:, :), inv_dy(:, :)
+      integer, intent(in) :: mask(:, :)
+      real(SP), intent(in) :: u(:, :), v(:, :)
+      logical, intent(in) :: prop_on
+      real(SP), intent(in) :: upc(:, :)
+
+      integer :: i, j
+      real(SP) :: usc, usn, w, e, b, hb
+      logical :: edge_w, edge_e, edge_s, edge_n
+
+      if (.not. (this%is_activated .and. this%split_implicit)) return
+
+      edge_w = .not. periodic_x .and. grid%iproc == 0
+      edge_e = .not. periodic_x .and. grid%iproc == grid%nx_proc - 1
+      edge_s = .not. periodic_y .and. grid%jproc == 0
+      edge_n = .not. periodic_y .and. grid%jproc == grid%ny_proc - 1
+
+      associate (lp => grid%lp)
+
+         ! x factor
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               w = ZERO; e = ZERO
+               if (mask(i, j) > 0) then
+                  usc = face_ustar(this, u, v, prop_on, upc, i, j)
+                  if (mask(i - 1, j) > 0 .and. this%hpo(i - 1, j) > this%min_depth_pickup &
+                      .and. this%hpo(i, j) > this%min_depth_pickup &
+                      .and. .not. (edge_w .and. i == lp%ib)) then
+                     usn = face_ustar(this, u, v, prop_on, upc, i - 1, j)
+                     hb = (this%hpo(i - 1, j) + this%hpo(i, j))*0.5_SP
+                     w = K_DIFF*(usn + usc)*0.5_SP*hb*hb*inv_dx(i, j)**2 &
+                         *pickup_weight(this, this%hpo(i - 1, j)) &
+                         *pickup_weight(this, this%hpo(i, j))
+                  end if
+                  if (mask(i + 1, j) > 0 .and. this%hpo(i + 1, j) > this%min_depth_pickup &
+                      .and. this%hpo(i, j) > this%min_depth_pickup &
+                      .and. .not. (edge_e .and. i == lp%ie)) then
+                     usn = face_ustar(this, u, v, prop_on, upc, i + 1, j)
+                     hb = (this%hpo(i, j) + this%hpo(i + 1, j))*0.5_SP
+                     e = K_DIFF*(usc + usn)*0.5_SP*hb*hb*inv_dx(i, j)**2 &
+                         *pickup_weight(this, this%hpo(i, j)) &
+                         *pickup_weight(this, this%hpo(i + 1, j))
+                  end if
+               end if
+               b = this%hpo(i, j)/dt + w + e
+               this%dif_a(i, j) = -w/b
+               this%dif_c(i, j) = -e/b
+               this%dif_d(i, j) = this%hpo(i, j)/dt*this%ch(i, j)/b
+            end do
+         end do
+         if (periodic_x) then
+            call trid_x_periodic(lp, grid, this%dif_a, this%dif_c, &
+                                 this%dif_d, this%dif_tws, this%dif_f)
+         else
+            call trid_x(lp, grid, this%dif_a, this%dif_c, this%dif_d, this%dif_f)
+         end if
+
+         ! y factor, reading the x solve (coupling lives in the bands, so
+         ! no ghost fill between factors under backward Euler)
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               w = ZERO; e = ZERO
+               if (mask(i, j) > 0) then
+                  usc = face_ustar(this, u, v, prop_on, upc, i, j)
+                  if (mask(i, j - 1) > 0 .and. this%hpo(i, j - 1) > this%min_depth_pickup &
+                      .and. this%hpo(i, j) > this%min_depth_pickup &
+                      .and. .not. (edge_s .and. j == lp%jb)) then
+                     usn = face_ustar(this, u, v, prop_on, upc, i, j - 1)
+                     hb = (this%hpo(i, j - 1) + this%hpo(i, j))*0.5_SP
+                     w = K_DIFF*(usn + usc)*0.5_SP*hb*hb*inv_dy(i, j)**2 &
+                         *pickup_weight(this, this%hpo(i, j - 1)) &
+                         *pickup_weight(this, this%hpo(i, j))
+                  end if
+                  if (mask(i, j + 1) > 0 .and. this%hpo(i, j + 1) > this%min_depth_pickup &
+                      .and. this%hpo(i, j) > this%min_depth_pickup &
+                      .and. .not. (edge_n .and. j == lp%je)) then
+                     usn = face_ustar(this, u, v, prop_on, upc, i, j + 1)
+                     hb = (this%hpo(i, j) + this%hpo(i, j + 1))*0.5_SP
+                     e = K_DIFF*(usc + usn)*0.5_SP*hb*hb*inv_dy(i, j)**2 &
+                         *pickup_weight(this, this%hpo(i, j)) &
+                         *pickup_weight(this, this%hpo(i, j + 1))
+                  end if
+               end if
+               b = this%hpo(i, j)/dt + w + e
+               this%dif_a(i, j) = -w/b
+               this%dif_c(i, j) = -e/b
+               this%dif_d(i, j) = this%hpo(i, j)/dt*this%dif_f(i, j)/b
+            end do
+         end do
+         if (periodic_y) then
+            call trid_y_periodic(lp, grid, this%dif_a, this%dif_c, &
+                                 this%dif_d, this%dif_tws, this%dif_f)
+         else
+            call trid_y(lp, grid, this%dif_a, this%dif_c, this%dif_d, this%dif_f)
+         end if
+
+         ! commit with the stage solve's clip + limiter semantics
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               if (mask(i, j) > 0) then
+                  this%ch(i, j) = max(this%dif_f(i, j), ZERO)
+                  this%chh(i, j) = this%ch(i, j)*this%hpo(i, j)
+                  if (this%use_climiter) then
+                     if (this%ch(i, j) > this%c_limiter) then
+                        this%ch(i, j) = this%c_limiter
+                        this%chh(i, j) = this%ch(i, j)*this%hpo(i, j)
+                     end if
+                  end if
+               end if
+            end do
+         end do
+
+      end associate
+
+      call bc%exchange_scalar(grid, this%ch)
+
+   end subroutine sediment_diffuse_implicit
+
+   ! pickup_weight -- wet/dry-proximity source taper (the wetdry_disp_ramp
+   ! idiom on the sediment column): smoothstep over
+   ! [min_depth_pickup, (1+ramp)*min_depth_pickup].  Ramp 0 = 1.0 -- the
+   ! legacy hard switches stand alone
+   pure function pickup_weight(this, hp) result(wgt)
+      class(type_model_sediment), intent(in) :: this
+      real(SP), intent(in) :: hp
+      real(SP) :: wgt
+
+      if (this%pickup_ramp <= ZERO) then
+         wgt = 1.0_SP
+      else
+         wgt = (hp - this%min_depth_pickup) &
+               /(this%pickup_ramp*this%min_depth_pickup)
+         wgt = min(1.0_SP, max(ZERO, wgt))
+         wgt = wgt*wgt*(3.0_SP - 2.0_SP*wgt)
+      end if
+   end function pickup_weight
+
+   ! face_ustar -- the diffusion coefficient's cell shear velocity with the
+   ! propeller jet folded in (NOTE 22)
+   pure function face_ustar(this, u, v, prop_on, upc, i, j) result(us)
+      class(type_model_sediment), intent(in) :: this
+      real(SP), intent(in) :: u(:, :), v(:, :), upc(:, :)
+      logical, intent(in) :: prop_on
+      integer, intent(in) :: i, j
+      real(SP) :: us
+
+      us = shear_velocity(this, u(i, j), v(i, j), this%hpo(i, j))
+      if (prop_on) us = us + upc(i, j)
+   end function face_ustar
 
    ! Log-law bed shear velocity
    !   $$ u_* = \frac{0.4\,\sqrt{u^2+v^2}}{\ln(30 h_{po}/k_s) - 1} $$
@@ -1036,7 +1258,8 @@ contains
                         reduction = 1.0_SP
                      end if
                      c_a = reduction*c_b*this%d50/(0.01_SP*this%hpo(i, j))
-                     this%pickup(i, j) = max(ZERO, c_a*this%ws)
+                     this%pickup(i, j) = max(ZERO, c_a*this%ws) &
+                                         *pickup_weight(this, this%hpo(i, j))
                   else
                      this%pickup(i, j) = ZERO
                   end if
@@ -1050,7 +1273,8 @@ contains
                         end if
                         bedf = MPM_COEF &
                                *(this%tau_xy(i, j) - this%tau_cr_bedload)**1.5_SP &
-                               /GRAV/(this%sdensity - 1.0_SP)
+                               /GRAV/(this%sdensity - 1.0_SP) &
+                               *pickup_weight(this, this%hpo(i, j))
                         this%bed_flux_x(i, j) = bedf*cos(angle_cur)
                         this%bed_flux_y(i, j) = bedf*sin(angle_cur)
                      else

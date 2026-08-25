@@ -138,11 +138,13 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SEDIMENT_FEEDBACK_MOMENT_EXG = "NO"
    character(*), parameter :: DEF_SEDIMENT_MIN_DEPTH_PICKUP = "0.1"
    character(*), parameter :: DEF_SEDIMENT_MORPH_FACTOR = "1"
+   character(*), parameter :: DEF_SEDIMENT_PICKUP_RAMP = "0.0"
    character(*), parameter :: DEF_SEDIMENT_PICKUP_REDUCTION = "YES"
    character(*), parameter :: DEF_SEDIMENT_POROSITY = "0.47"
    character(*), parameter :: DEF_SEDIMENT_REDUCTION_PARAMETER = "0.65"
    character(*), parameter :: DEF_SEDIMENT_SCHEME = "upwinding"
    character(*), parameter :: DEF_SEDIMENT_SHIELDS_CR = "0.055"
+   character(*), parameter :: DEF_SEDIMENT_SOLVER = "split_implicit"
    character(*), parameter :: DEF_SEDIMENT_SPECIFIC_GRAVITY = "2.68"
    ! ── simulation ──
    character(*), parameter :: DEF_SIMULATION_SCREEN_INTERVAL = "1.0"
