@@ -12,9 +12,9 @@
 !      the generation coefficients, update_source refreshes the mass
 !      array each stage (WK_REG + WK_IRR/TMA/JON live; WK_TIME and
 !      WK_NEW_* pending).
-!    * boundary types (ABS, LEFT_BC_IRR, LEF_SOL): own the west ghost
+!    * boundary types (boundary, LEFT_BC_IRR, LEF_SOL): own the west ghost
 !      strip each step — the BC service must skip the wall mirror there
-!      (fill_west=.false. in kernel_bc).  ABS = a spectrum-only entry
+!      (fill_west=.false. in kernel_bc).  boundary = a spectrum-only (nee ABS) entry
 !      referenced by boundaries.west.forcing.wavemaker (the face reader
 !      resolves the name and fills the strip/depth fields; config reorg
 !      rung 3b); LEFT_BC_IRR/ABS_1D are deprecated pending the
@@ -106,7 +106,7 @@ module model_wavemaker_mod
       character(:), allocatable :: WAVE_DATA_TYPE    ! YAML key: WAVE_DATA_TYPE
 
       ! Spectrum-only entry awaiting a boundaries face reference; the face
-      ! reader resolves it to type ABS (unresolved = init_compute error)
+      ! reader resolves it to type boundary (unresolved = init_compute error)
       logical  :: boundary_candidate = .false.
 
       ! Shared position / depth / ramp
@@ -211,11 +211,11 @@ module model_wavemaker_mod
       real(SP), allocatable :: wave_comp(:, :)        ! (NumWaveComp, 3)
       real(SP), allocatable :: D_genS(:), Beta_genS(:)
 
-      ! Boundary wavemaker (ABS / LEFT_BC_IRR): dense eta/u/v series
+      ! Boundary wavemaker (boundary / LEFT_BC_IRR): dense eta/u/v series
       ! modes (legacy Cm_eta..Sm_v), component frequencies + phases,
-      ! and the ABS relaxation sponge
+      ! and the boundary relaxation sponge
       logical  :: left_bc_source = .false.            ! LEFT_BC_IRR ghost-strip fill
-      logical  :: abs_source = .false.                ! ABS relaxation
+      logical  :: boundary_source = .false.                ! boundary-feed relaxation
       real(SP), allocatable :: Cm_eta(:, :, :), Sm_eta(:, :, :)
       real(SP), allocatable :: Cm_u(:, :, :), Sm_u(:, :, :)
       real(SP), allocatable :: Cm_v(:, :, :), Sm_v(:, :, :)
@@ -895,7 +895,7 @@ contains
    ! ----------------------------------------------------------------
    ! Still-water offset on the reference depths (legacy init.F:801-810):
    ! the source-box depth shifts always, the boundary-series depth only
-   ! for the LEFT_BC_IRR family (modern ABS — its DepthWaveMaker is the
+   ! for the LEFT_BC_IRR family (modern boundary — its DepthWaveMaker is the
    ! legacy Dep_Ser source).  Called by main between bathy correction
    ! and init_compute, so the spectral solves see the shifted depths.
    ! ----------------------------------------------------------------
@@ -904,7 +904,7 @@ contains
       real(SP), intent(in) :: water_level
 
       this%DEP_WK = this%DEP_WK + water_level
-      if (this%wavemaker_type == "ABS") &
+      if (this%wavemaker_type == "boundary") &
          this%DepthWaveMaker = this%DepthWaveMaker + water_level
 
    end subroutine wavemaker_apply_water_level
@@ -934,7 +934,7 @@ contains
       integer :: i, j, mloc, nloc
 
       ! spectrum-only entry nobody claimed (boundaries reader resolves the
-      ! reference to ABS) — a silent no-op here would drop the wavemaker
+      ! reference to boundary) — a silent no-op here would drop the wavemaker
       if (this%wavemaker_type == "PENDING_BOUNDARY") &
          call env%log%exit_on_error("wavemaker: spectrum-only entry '"//this%name// &
                                     "' is not referenced by a boundaries face forcing/wavemaker")
@@ -949,8 +949,8 @@ contains
       case ("WK_TIME")
          this%has_mass_source = .true.
          this%time_series_source = .true.
-      case ("ABS")
-         this%abs_source = .true.
+      case ("boundary")
+         this%boundary_source = .true.
       case ("LEFT_BC_IRR")
          this%left_bc_source = .true.
       case default
@@ -961,7 +961,7 @@ contains
       ! gfortran's default RANDOM_NUMBER randomizes per process (per run AND per
       ! rank), which desyncs the phase realization across ranks and breaks
       ! hotstart restart coherence; a fixed, rank-uniform seed fixes both.
-      if (this%spectral_source .or. this%abs_source .or. this%left_bc_source) &
+      if (this%spectral_source .or. this%boundary_source .or. this%left_bc_source) &
          call seed_wave_phases(this%seed)
 
       ! legacy uses the scalar spacing (DXg) throughout the wavemaker
@@ -983,7 +983,7 @@ contains
 
       ! boundary wavemakers build the series modes only — no mass
       ! source, zone box, or breaker zone
-      if (this%abs_source .or. this%left_bc_source) then
+      if (this%boundary_source .or. this%left_bc_source) then
          call boundary_init_compute(this, grid, periodic, env, beta_ref)
          return
       end if
@@ -1173,7 +1173,7 @@ contains
    !             + S_{m,k}\sin(\sigma_k t_s + \phi_k) $$
    ! (u, v likewise), then hu = (d + eta) u, hv = (d + eta) v.
    !
-   ! ABS (legacy ABSORBING_GENERATING_BC): relax eta toward the series
+   ! boundary (legacy ABSORBING_GENERATING_BC): relax eta toward the series
    ! over the whole domain through the wavemaker sponge,
    !   $$ \eta := \eta_{in} + (\eta - \eta_{in})/s(i), \qquad
    !      \eta_{in} = \sum_k C_{m,k}\cos(\tfrac{\pi}{2} + \sigma_k t + \phi_k)
@@ -1230,7 +1230,7 @@ contains
          return
       end if
 
-      if (this%abs_source) then
+      if (this%boundary_source) then
          if (associated(this%tide)) then
             gen_abs = this%tide%tidal_bc_gen_abs
          else
@@ -1320,7 +1320,7 @@ contains
       this%spectral_source = .false.
       this%time_series_source = .false.
       this%left_bc_source = .false.
-      this%abs_source = .false.
+      this%boundary_source = .false.
 
    end subroutine wavemaker_free
 
@@ -2007,7 +2007,7 @@ contains
    ! of WAVEMAKER_INITIALIZATION + init.F CALCULATE_SPONGE_MAKER).
    ! Builds the six dense series modes at the linear-theory reference
    ! level $z = |1 + \beta_{ref}|\,h_s$ (legacy CALCULATE_TMA_Cm_Sm[_
-   ! EQUAL_DFREQ]); ABS additionally builds the relaxation sponge.
+   ! EQUAL_DFREQ]); the boundary feed additionally builds the relaxation sponge.
    ! WAVE_DATA_TYPE = DATA reads a 2D (freq x dir) spectrum from
    ! WaveCompFile instead (legacy io.F block + CALCULATE_DATA2D_Cm_Sm);
    ! the file header then overrides Nfreq.
@@ -2063,7 +2063,7 @@ contains
                                       beta_ref)
       end if
 
-      if (this%abs_source) then
+      if (this%boundary_source) then
          allocate (this%sponge_maker(mloc, nloc), source=1.0_SP)
          call fill_sponge_maker(grid, this%WidthWaveMaker, &
                                 this%R_sponge_wavemaker, &
@@ -2369,7 +2369,7 @@ contains
    end subroutine data_series_coefficients
 
    ! ----------------------------------------------------------------
-   ! Private: ABS relaxation sponge (legacy CALCULATE_SPONGE_MAKER,
+   ! Private: boundary relaxation sponge (legacy CALCULATE_SPONGE_MAKER,
    ! old/sponge.F): west strip of global width $W/\Delta x + N_{ghost}$,
    !   $$ s(i) = \max\!\big(A^{\,r}, 1\big), \qquad
    !      r = R^{\lfloor 50 (i_g - 1) / (I_w - 1) \rfloor} $$
@@ -2801,7 +2801,7 @@ contains
 
       lam = 0.0_SP
       h = this%DEP_WK
-      if (this%abs_source .or. this%left_bc_source) then
+      if (this%boundary_source .or. this%left_bc_source) then
          if (this%DepthWaveMaker > 0.0_SP) h = this%DepthWaveMaker
       end if
       if (h <= 0.0_SP) return
@@ -2810,10 +2810,10 @@ contains
       case ("WK_REG")
          if (this%Tperiod > 0.0_SP) lam = dispersion_wavelength(1.0_SP/this%Tperiod, h)
       case ("WK_IRR", "TMA_1D", "JON_1D", "JON_2D", "WK_NEW_IRR", &
-            "ABS", "LEFT_BC_IRR")
+            "boundary", "LEFT_BC_IRR")
          if (this%FreqMin <= 0.0_SP .or. this%FreqMax <= this%FreqMin &
              .or. this%FreqPeak <= 0.0_SP) return
-         if (this%abs_source .or. this%left_bc_source) then
+         if (this%boundary_source .or. this%left_bc_source) then
             is_jonswap = .false.
             if (allocated(this%WAVE_DATA_TYPE)) then
                if (len(this%WAVE_DATA_TYPE) >= 3) &

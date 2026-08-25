@@ -303,7 +303,7 @@ contains
       this%wm_bc => null()
       do i = 1, size(wavemakers)
          if (wavemakers(i)%has_mass_source) this%wm_src => wavemakers(i)
-         if (wavemakers(i)%abs_source .or. wavemakers(i)%left_bc_source .or. &
+         if (wavemakers(i)%boundary_source .or. wavemakers(i)%left_bc_source .or. &
              wavemakers(i)%wavemaker_type == "LEF_SOL") this%wm_bc => wavemakers(i)
       end do
       this%sponge => sponge

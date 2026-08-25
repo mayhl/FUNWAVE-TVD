@@ -88,11 +88,9 @@ contains
 
       logical :: west_owned_by_wavemaker
 
-      ! legacy: WaveMaker(1:3)=='ABS' .or. WaveMaker(1:11)=='LEFT_BC_IRR'
+      ! west ghost owned by a boundary-feed wavemaker (nee ABS) or LEFT_BC_IRR
       west_owned_by_wavemaker = .false.
-      if (len(wavemaker_type) >= 3) then
-         if (wavemaker_type(1:3) == "ABS") west_owned_by_wavemaker = .true.
-      end if
+      if (wavemaker_type == "boundary") west_owned_by_wavemaker = .true.
       if (len(wavemaker_type) >= 11) then
          if (wavemaker_type(1:11) == "LEFT_BC_IRR") west_owned_by_wavemaker = .true.
       end if

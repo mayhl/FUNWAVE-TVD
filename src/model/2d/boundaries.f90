@@ -662,7 +662,7 @@ contains
       ! series reference depth (nee DepthWaveMaker; no DEP_WK fallback —
       ! a boundary entry has no source box)
       call frc_yaml%read("depth", val=wavemaker%DepthWaveMaker)
-      wavemaker%wavemaker_type = "ABS"
+      wavemaker%wavemaker_type = "boundary"
 
       ! optional tide target on the same face = generating-absorbing (nee
       ! GEN_ABS): eta constant XOR file series; u/v targets are unused by
