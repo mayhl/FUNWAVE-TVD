@@ -48,8 +48,10 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import check_keys
 
 _console = Console()
+ACCEPTED_KEYS = ("mass_drift_pct", "energy_drift_pct")
 
 G = 9.81  # m s-2
 
@@ -115,6 +117,7 @@ def _windowed_decay_pct(y: np.ndarray) -> float:
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "conservation")
     meta = read_run_metadata(dev_dir)
 
     dep_files = meta.output_files("DEPTH_OUT")

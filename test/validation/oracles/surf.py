@@ -19,11 +19,12 @@ import numpy as np
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
 from test.validation.oracles import wave_stats
-from test.validation.oracles._lab import load_deck, new_figure, nrmse_pct, read_table, save_figure
+from test.validation.oracles._lab import check_keys, load_deck, new_figure, nrmse_pct, read_table, save_figure
 
 MIN_WAVES = 5  # stations with fewer zero-crossing waves are swash/dry — excluded
 
 _LABEL = "Surf profiles"
+ACCEPTED_KEYS = ("heights", "setup", "window_s", "channel", "height_stat", "height_nrmse_pct", "setup_nrmse_pct")
 
 
 def _skip(msg: str) -> SubsectionResult:
@@ -48,6 +49,7 @@ def _station_x(deck: dict, channel: str | None) -> np.ndarray:
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "surf")
     h_name = tolerances.get("heights")
     s_name = tolerances.get("setup")
     if not (h_name or s_name):

@@ -48,12 +48,17 @@ def run(
     ref_map = {v.prefix: v for v in ref_vars}
     dev_map = {v.prefix: v for v in dev_vars}
     common = sorted(ref_map.keys() & dev_map.keys())
-    missing = sorted((ref_map.keys() | dev_map.keys()) - ref_map.keys() & dev_map.keys())
+    missing = sorted(ref_map.keys() ^ dev_map.keys())  # in one run only
 
     all_output = ref_map.keys() | dev_map.keys()
+    # a tolerated variable absent from either run fails loudly: a WARN here
+    # let a variable the dev run stopped writing pass every board
     for pfx in sorted(tolerances):
-        if pfx != "default" and pfx not in all_output:
-            _console.print(f"[yellow]WARN:[/yellow] tolerance specified for '{pfx}' but no output files found")
+        if pfx != "default" and pfx not in common:
+            _console.print(
+                f"[red]FAIL:[/red] tolerance specified for '{pfx}' but it is "
+                f"{'missing from one run' if pfx in all_output else 'in neither run'}"
+            )
 
     metrics = []
     rows: list[_Row] = []

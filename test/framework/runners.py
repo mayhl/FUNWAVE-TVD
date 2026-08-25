@@ -84,10 +84,15 @@ class UnitTestRunner(BaseRunner):
         available_tests = [line.strip() for line in ctest_list_proc.stdout.splitlines() if "Test #" in line]
         available_test_names = [line.split(":", 1)[1].split()[0].strip() for line in available_tests if ":" in line]
 
-        # Check for orphans: any test in ctest not in test_config.yaml
-        for test in available_test_names:
-            if test not in all_defined_tests:
-                self.reporter.warn(f"Test '{test}' discovered by ctest is missing from test_config.yaml")
+        # Orphans: a suite ctest knows but test_config.yaml does not never
+        # runs -- three suites sat there silently (audit 2026-08-22), so CI
+        # mode fails on them rather than warning
+        orphans = [t for t in available_test_names if t not in all_defined_tests]
+        for test in orphans:
+            self.reporter.warn(f"Test '{test}' discovered by ctest is missing from test_config.yaml")
+        if orphans and self.mode == "ci":
+            self.reporter.error(f"{len(orphans)} registered suite(s) not in test_config.yaml")
+            return False
 
         groups = groups_from_yaml
 
@@ -115,7 +120,8 @@ class UnitTestRunner(BaseRunner):
 
                     # Use ctest to execute the test, leveraging CMake's CTestTestfile configuration
                     proc = subprocess.run(
-                        ["ctest", "-R", f"^{test_name}$", "--output-on-failure"],
+                        # a name that matches nothing must not pass (ctest -R exits 0)
+                        ["ctest", "-R", f"^{test_name}$", "--no-tests=error", "--output-on-failure"],
                         cwd=self.build_dir,
                         capture_output=True,
                         text=True,

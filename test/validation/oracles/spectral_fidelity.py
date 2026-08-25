@@ -40,8 +40,10 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import check_keys
 
 _console = Console()
+ACCEPTED_KEYS = ("hm0_error_pct", "band_error_pct")
 
 G = 9.81  # m s-2
 
@@ -124,6 +126,7 @@ def _find_station_files(output_dir: Path) -> list[Path]:
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "spectral_fidelity")
     output_dir = read_run_metadata(dev_dir).output_dir
     sta_files = _find_station_files(output_dir)
     if not sta_files:

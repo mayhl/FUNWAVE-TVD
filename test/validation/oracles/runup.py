@@ -45,8 +45,10 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import check_keys
 
 _console = Console()
+ACCEPTED_KEYS = ("runup_error_pct",)
 
 
 def _deck_params(run_dir: Path) -> tuple[float, float, float, float]:
@@ -56,12 +58,12 @@ def _deck_params(run_dir: Path) -> tuple[float, float, float, float]:
         cfg = yaml.safe_load(f)
     sol = cfg["initial"]["solitary"]
     bathy = cfg["grid"]["bathymetry"]
-    return (float(sol["amplitude"]), float(sol["depth"]),
-            float(bathy["slope"]), float(bathy["x0"]))
+    return (float(sol["amplitude"]), float(sol["depth"]), float(bathy["slope"]), float(bathy["x0"]))
 
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "runup")
     meta = read_run_metadata(dev_dir)
 
     dep_files = meta.output_files("DEPTH_OUT")
@@ -97,9 +99,14 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
 
     if verbose or not ok:
-        table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", show_edge=False,
-                      pad_edge=True, title="[bold]Solitary Runup (Synolakis)[/bold]",
-                      title_justify="left")
+        table = Table(
+            box=box.SIMPLE_HEAD,
+            header_style="bold cyan",
+            show_edge=False,
+            pad_edge=True,
+            title="[bold]Solitary Runup (Synolakis)[/bold]",
+            title_justify="left",
+        )
         table.add_column("Metric", min_width=22)
         table.add_column("Value", justify="right", min_width=14)
         table.add_column("Tolerance", justify="right", min_width=12)

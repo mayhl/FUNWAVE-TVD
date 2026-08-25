@@ -47,9 +47,10 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
-from test.validation.oracles._lab import frame_times
+from test.validation.oracles._lab import check_keys, frame_times
 
 _console = Console()
+ACCEPTED_KEYS = ("celerity_error_pct", "amplitude_decay_pct", "shape_error_pct")
 
 G = 9.81  # m s-2
 
@@ -61,7 +62,6 @@ def _deck_params(run_dir: Path) -> tuple[float, float, float]:
         cfg = yaml.safe_load(f)
     sol = cfg.get("initial", {}).get("solitary", {})
     return float(sol["amplitude"]), float(sol["depth"]), float(sol.get("angle", 0.0))
-
 
 
 def _crest(row: np.ndarray, dx: float) -> tuple[float, float]:
@@ -102,6 +102,7 @@ def _fourier_shift(row: np.ndarray, shift_cells: float) -> np.ndarray:
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "soliton")
     meta = read_run_metadata(dev_dir)
 
     eta_files = meta.output_files("ETA")
@@ -164,15 +165,27 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
 
     if verbose or not (c_ok and a_ok and s_ok):
-        _print_table(len(eta_files), c_ana, c_fit, celerity_error, tol_c, c_ok,
-                     amp_2nd, amp_last, amplitude_decay, tol_a, a_ok,
-                     shape_error, tol_s, s_ok)
+        _print_table(
+            len(eta_files),
+            c_ana,
+            c_fit,
+            celerity_error,
+            tol_c,
+            c_ok,
+            amp_2nd,
+            amp_last,
+            amplitude_decay,
+            tol_a,
+            a_ok,
+            shape_error,
+            tol_s,
+            s_ok,
+        )
 
     return SubsectionResult(kind="statistics", label="Soliton", metrics=metrics)
 
 
-def _print_table(n, c_ana, c_fit, c_err, tol_c, c_ok, amp_2nd, amp_last,
-                 a_dec, tol_a, a_ok, s_err, tol_s, s_ok) -> None:
+def _print_table(n, c_ana, c_fit, c_err, tol_c, c_ok, amp_2nd, amp_last, a_dec, tol_a, a_ok, s_err, tol_s, s_ok) -> None:
     table = Table(
         box=box.SIMPLE_HEAD,
         header_style="bold cyan",

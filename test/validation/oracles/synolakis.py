@@ -17,11 +17,12 @@ import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
-from test.validation.oracles._lab import frame_times, load_deck, new_figure, read_table, save_figure
+from test.validation.oracles._lab import check_keys, frame_times, load_deck, new_figure, read_table, save_figure
 
 G = 9.81  # m s-2
 
 _LABEL = "Synolakis runup"
+ACCEPTED_KEYS = ("profiles", "profile_nrmse_pct")
 
 
 def _skip(msg: str) -> SubsectionResult:
@@ -47,6 +48,7 @@ def _model_profile(meta, eta_files, times, t_want, dep):
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "synolakis")
     names = tolerances.get("profiles") or []
     if not names:
         return _skip("tolerances block needs profiles:")

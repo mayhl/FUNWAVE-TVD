@@ -38,6 +38,18 @@ def load_deck(run_dir: Path) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Tolerance keys
+# ---------------------------------------------------------------------------
+
+
+def check_keys(tolerances: dict, accepted: tuple[str, ...], oracle: str) -> None:
+    """Raise on tolerance keys the oracle never reads (a misspelt gate would pass on its default)."""
+    unknown = set(tolerances) - set(accepted)
+    if unknown:
+        raise ValueError(f"{oracle}: unknown tolerance key(s) {sorted(unknown)}; accepted: {accepted}")
+
+
+# ---------------------------------------------------------------------------
 # Error norms
 # ---------------------------------------------------------------------------
 
@@ -85,7 +97,6 @@ def nrmse_pct(measured: np.ndarray, model: np.ndarray, norm: str = "max") -> flo
     else:
         ref = float(np.max(np.abs(m)))
     return 100.0 * err / ref if ref > 0.0 else float("inf")
-
 
 
 # ---------------------------------------------------------------------------

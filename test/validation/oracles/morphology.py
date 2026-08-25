@@ -24,9 +24,20 @@ import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
-from test.validation.oracles._lab import new_figure, read_table, save_figure
+from test.validation.oracles._lab import check_keys, new_figure, read_table, save_figure
 
 _LABEL = "Morphology"
+ACCEPTED_KEYS = (
+    "bedchange",
+    "gate_x",
+    "bedchange_nrmse_pct",
+    "trough_offset_m",
+    "growth",
+    "wave",
+    "h0",
+    "emax_rel_err_pct",
+    "dmax_rel_err_pct",
+)
 
 
 def _skip(msg: str) -> SubsectionResult:
@@ -50,6 +61,7 @@ def _final_dz(meta) -> tuple[np.ndarray, np.ndarray]:
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "morphology")
     meta = read_run_metadata(dev_dir)
     try:
         x_mod, dz_mod = _final_dz(meta)
@@ -74,8 +86,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         # (CACR-16-02 p.69) and reports ungated
         tr_off = float(xm[int(np.argmin(fit))] - xm[int(np.argmin(dzm))])
         tr_tol = float(tolerances.get("trough_offset_m", math.inf))
-        metrics.append(MetricResult("morphology", "trough_offset_m", tr_off,
-                                    abs(tr_off) < tr_tol, tr_tol))
+        metrics.append(MetricResult("morphology", "trough_offset_m", tr_off, abs(tr_off) < tr_tol, tr_tol))
         pk_off = float(xm[int(np.argmax(fit))] - xm[int(np.argmax(dzm))])
         metrics.append(MetricResult("morphology", "peak_offset_m", pk_off, True, math.inf))
         ax.plot(xm, dzm, "-", color="#2563eb", label="measured")

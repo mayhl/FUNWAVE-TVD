@@ -64,8 +64,10 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import check_keys
 
 _console = Console()
+ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct")
 
 DT_SAMPLE = 0.1  # uniform re-sample step (matches the channel interval)
 N_XLINE = 5  # gauge columns 1..5 = downwave x-line, 6..7 = lateral pair
@@ -209,6 +211,7 @@ def _line_powers(x: np.ndarray, dt: float, lines: np.ndarray) -> np.ndarray:
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     """Oracle entry point (ref_dir is None in oracle mode and unused)."""
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "wavemaker_spectrum")
     label = "Wavemaker Spectrum"
     output_dir = read_run_metadata(dev_dir).output_dir
 

@@ -18,9 +18,25 @@ import numpy as np
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
 from test.validation.oracles import wave_stats
-from test.validation.oracles._lab import new_figure, nrmse_pct, read_table, save_figure
+from test.validation.oracles._lab import check_keys, new_figure, nrmse_pct, read_table, save_figure
 
 _LABEL = "Lab gauges"
+ACCEPTED_KEYS = (
+    "file",
+    "gauges",
+    "channel",
+    "align",
+    "max_lag_s",
+    "window_s",
+    "mode",
+    "stat_exclude",
+    "height_error_pct",
+    "sigma_error_pct",
+    "sigma_rmse_pct",
+    "skew_rmse_pct",
+    "asym_rmse_pct",
+    "gauge_nrmse_pct",
+)
 
 
 def _skip(msg: str) -> SubsectionResult:
@@ -30,6 +46,7 @@ def _skip(msg: str) -> SubsectionResult:
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "gauges")
     file_name = tolerances.get("file")
     if not file_name:
         return _skip("tolerances block needs file:")

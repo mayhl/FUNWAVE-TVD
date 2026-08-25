@@ -58,9 +58,10 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.regression.postproc.utils import read_run_metadata
-from test.validation.oracles._lab import frame_times
+from test.validation.oracles._lab import check_keys, frame_times
 
 _console = Console()
+ACCEPTED_KEYS = ("runup_amp_error_pct",)
 
 G = 9.81
 
@@ -74,14 +75,16 @@ def _deck_params(run_dir: Path) -> tuple[float, float, float, float, float]:
     wm = cfg["wavemaker"]
     if isinstance(wm, list):
         wm = wm[0]
-    return (float(wm["spectrum"]["period"]), float(bathy["depth"]),
-            float(bathy["slope"]), float(bathy["x0"]),
-            float(wm["source"]["x_center"]))
+    return (
+        float(wm["spectrum"]["period"]),
+        float(bathy["depth"]),
+        float(bathy["slope"]),
+        float(bathy["x0"]),
+        float(wm["source"]["x_center"]),
+    )
 
 
-
-def _linear_amplification(x: np.ndarray, dep: np.ndarray, omega: float,
-                          h0: float, x_match: float) -> float:
+def _linear_amplification(x: np.ndarray, dep: np.ndarray, omega: float, h0: float, x_match: float) -> float:
     """Amplification |eta(shore)| / |A+| by RK4 over the actual depth profile.
 
     Integrates the flux-form linear SWE seaward from a two-term series start
@@ -109,7 +112,7 @@ def _linear_amplification(x: np.ndarray, dep: np.ndarray, omega: float,
 
     def rhs(xx: float, y: np.ndarray) -> np.ndarray:
         h = max(float(np.interp(xx, x, dep)), 1e-6)
-        return np.array([y[1] / (G * h), -omega**2 * y[0]])
+        return np.array([y[1] / (G * h), -(omega**2) * y[0]])
 
     y = np.array([eta, phi])
     step = -(x[1] - x[0]) / 4.0
@@ -132,6 +135,7 @@ def _linear_amplification(x: np.ndarray, dep: np.ndarray, omega: float,
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = False) -> SubsectionResult:
     dev_dir = Path(dev_dir)
+    check_keys(tolerances, ACCEPTED_KEYS, "runup_cg")
     meta = read_run_metadata(dev_dir)
 
     dep_files = meta.output_files("DEPTH_OUT")
@@ -161,7 +165,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     dt_f = float(np.median(np.diff(times)))
     n_win = min(5 * int(round(period / dt_f)), n)
     steady = np.zeros(n, dtype=bool)
-    steady[n - n_win:] = True
+    steady[n - n_win :] = True
 
     eta1 = np.zeros(meta.nx, dtype=complex)
     r_up, r_down = -np.inf, np.inf
@@ -195,9 +199,14 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
 
     if verbose or not ok:
-        table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", show_edge=False,
-                      pad_edge=True, title="[bold]Periodic Runup (Carrier-Greenspan)[/bold]",
-                      title_justify="left")
+        table = Table(
+            box=box.SIMPLE_HEAD,
+            header_style="bold cyan",
+            show_edge=False,
+            pad_edge=True,
+            title="[bold]Periodic Runup (Carrier-Greenspan)[/bold]",
+            title_justify="left",
+        )
         table.add_column("Metric", min_width=22)
         table.add_column("Value", justify="right", min_width=14)
         table.add_column("Tolerance", justify="right", min_width=12)
