@@ -49,9 +49,13 @@ module model_checkpoint_mod
 
    private
    public :: write_checkpoint_core, read_checkpoint_core
+   public :: write_checkpoint_sediment, read_checkpoint_sediment
 
    ! Bump when the core.bin layout changes; read rejects an unknown version.
    integer, parameter :: CORE_VERSION = 3
+   ! sediment.bin: depth + the suspended/bed accumulators the morphology
+   ! cannot rebuild (zb, dchg, ch all derive from these + depth_ini)
+   integer, parameter :: SED_VERSION = 1
 
 contains
 
@@ -109,6 +113,87 @@ contains
 
       call g%finalize()
    end subroutine write_checkpoint_core
+
+   ! Gather the sediment state interiors to the IO rank and write
+   ! <dir>sediment.bin: the evolved depth plus the two load accumulators
+   ! and the suspended mass -- everything zb/dchg/ch derive from.
+   subroutine write_checkpoint_sediment(env, comm, grid, depth, chh, susp_load, &
+                                        bed_load, dir)
+      type(type_env), intent(inout) :: env
+      type(type_comm), intent(inout) :: comm
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: depth(:, :), chh(:, :)
+      real(SP), intent(in) :: susp_load(:, :), bed_load(:, :)
+      character(*), intent(in) :: dir
+
+      type(type_output_gatherer) :: g
+      real(SP), allocatable :: gd(:, :), gc(:, :), gs(:, :), gb(:, :)
+      integer :: unit
+
+      call g%init_field(grid, comm)
+      call alloc_global(comm, grid, gd)
+      call alloc_global(comm, grid, gc)
+      call alloc_global(comm, grid, gs)
+      call alloc_global(comm, grid, gb)
+
+      call gather_interior(g, comm, grid, depth, gd)
+      call gather_interior(g, comm, grid, chh, gc)
+      call gather_interior(g, comm, grid, susp_load, gs)
+      call gather_interior(g, comm, grid, bed_load, gb)
+
+      if (comm%is_io_node()) then
+         open (newunit=unit, file=trim(dir)//"sediment.bin", access="stream", &
+               form="unformatted", status="replace", action="write")
+         write (unit) SED_VERSION, grid%M, grid%N
+         write (unit) gd, gc, gs, gb
+         close (unit)
+         call env%log%info("checkpoint: wrote "//trim(dir)//"sediment.bin")
+      end if
+
+      call g%finalize()
+   end subroutine write_checkpoint_sediment
+
+   ! Read <dir>sediment.bin and slice this subdomain's interior; absent bin
+   ! => found = .false. and the module cold-inits (the mode-3 chaining
+   ! policy).  Ghosts are the caller's job.
+   subroutine read_checkpoint_sediment(env, grid, depth, chh, susp_load, &
+                                       bed_load, dir, found)
+      type(type_env), intent(inout) :: env
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: depth(:, :), chh(:, :)
+      real(SP), intent(inout) :: susp_load(:, :), bed_load(:, :)
+      character(*), intent(in) :: dir
+      logical, intent(out) :: found
+
+      real(SP), allocatable :: gd(:, :), gc(:, :), gs(:, :), gb(:, :)
+      character(:), allocatable :: fname
+      integer :: unit, ver, mm, nn
+
+      fname = trim(dir)//"sediment.bin"
+      inquire (file=fname, exist=found)
+      if (.not. found) return
+
+      allocate (gd(grid%M, grid%N), gc(grid%M, grid%N), &
+                gs(grid%M, grid%N), gb(grid%M, grid%N))
+      open (newunit=unit, file=fname, access="stream", &
+            form="unformatted", status="old", action="read")
+      read (unit) ver, mm, nn
+      if (ver /= SED_VERSION) &
+         call env%log%exit_on_error("read_checkpoint_sediment: unknown version")
+      if (mm /= grid%M .or. nn /= grid%N) &
+         call env%log%exit_on_error("read_checkpoint_sediment: grid size mismatch")
+      read (unit) gd, gc, gs, gb
+      close (unit)
+
+      associate (lp => grid%lp, ib => grid%ibegin, ie => grid%istop, &
+                 jb => grid%jbegin, je => grid%jstop)
+         depth(lp%ib:lp%ie, lp%jb:lp%je) = gd(ib:ie, jb:je)
+         chh(lp%ib:lp%ie, lp%jb:lp%je) = gc(ib:ie, jb:je)
+         susp_load(lp%ib:lp%ie, lp%jb:lp%je) = gs(ib:ie, jb:je)
+         bed_load(lp%ib:lp%ie, lp%jb:lp%je) = gb(ib:ie, jb:je)
+      end associate
+
+   end subroutine read_checkpoint_sediment
 
    ! Read <dir>core.bin on every rank and slice this subdomain's interior into
    ! the live core fields (plus the interface flux workspace pflux/qflux);

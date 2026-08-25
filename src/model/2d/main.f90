@@ -27,7 +27,8 @@ module model_main_mod
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
    use model_initial_mod, only: type_model_initial
-   use model_checkpoint_mod, only: write_checkpoint_core, read_checkpoint_core
+   use model_checkpoint_mod, only: write_checkpoint_core, read_checkpoint_core, &
+                                   write_checkpoint_sediment, read_checkpoint_sediment
    use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers
    use model_sponge_mod, only: type_model_sponge
    use model_boundaries_mod, only: boundaries_read_input
@@ -619,6 +620,39 @@ contains
 
    end subroutine load_checkpoint
 
+   ! Restore <dir>sediment.bin behind the core restore: depth + the load
+   ! accumulators come from the bin, everything else derives (zb from
+   ! depth - depth_ini, dchg from the accumulators, ch from chh and the
+   ! restored column).  Absent bin => cold sediment (mode-3 chaining).
+   subroutine load_checkpoint_sediment(this)
+      class(type_model_main), intent(inout) :: this
+
+      character(:), allocatable :: dir
+      logical :: found
+
+      dir = trim(this%hot_start%checkpoint)
+      if (dir(len(dir):len(dir)) /= "/") dir = dir//"/"
+
+      associate (f => this%fields, sed => this%sediment, lp => this%grid%lp)
+         call read_checkpoint_sediment(this%env, this%grid, f%depth, sed%chh, &
+                                       sed%susp_load, sed%bed_load, dir, found)
+         if (.not. found) return
+
+         call ghost_fill_replicate(this, f%depth)
+         call ghost_fill_replicate(this, sed%chh)
+         call ghost_fill_replicate(this, sed%susp_load)
+         call ghost_fill_replicate(this, sed%bed_load)
+
+         sed%zb = (f%depth - sed%depth_ini)/real(sed%morph_factor, SP)
+         sed%dchg_s = sed%susp_load/(1.0_SP - sed%n_porosity)
+         sed%dchg_b = sed%bed_load/(1.0_SP - sed%n_porosity)
+         sed%ch = sed%chh/max(f%eta + f%depth, this%numerics%MinDepth)
+
+         call stagger_depth(lp, f%depth, f%depth_x, f%depth_y)
+      end associate
+
+   end subroutine load_checkpoint_sediment
+
    ! Write the checkpoint set to output%checkpoint (mkdir + core.bin now; later
    ! per-module bins appended behind this dispatcher).
    subroutine write_checkpoint_set(this, time)
@@ -642,6 +676,12 @@ contains
       call write_checkpoint_core(this%env, this%env%comm, this%grid, &
                                  this%fields, this%registry%get("p_flux"), &
                                  this%registry%get("q_flux"), time, dir)
+
+      if (this%sediment%is_activated) &
+         call write_checkpoint_sediment(this%env, this%env%comm, this%grid, &
+                                        this%fields%depth, this%sediment%chh, &
+                                        this%sediment%susp_load, &
+                                        this%sediment%bed_load, dir)
 
    end subroutine write_checkpoint_set
 
@@ -736,6 +776,8 @@ contains
       ! legacy SEDIMENT_INITIAL: zeroed transport state plus the grain
       ! parameters, which depend on config alone
       call this%sediment%init_compute(this%grid, this%env, this%fields%depth)
+      if (this%hot_start%use_checkpoint .and. this%sediment%is_activated) &
+         call load_checkpoint_sediment(this)
       ! legacy METEO_INITIAL: builds the ghost-inclusive pressure lattice and
       ! opens the storm-track file, so the grid must already be spaced
       call this%meteo%init_compute(this%grid)
