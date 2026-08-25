@@ -170,8 +170,8 @@ module model_wavemaker_mod
       real(SP) :: CrestLimit = 0.0_SP
       real(SP) :: TroughLimit = 0.0_SP
 
-      ! Absorbing-generating — ABS, LEFT_BC_IRR
-      real(SP) :: DepthWaveMaker = 0.0_SP   ! DepthWaveMaker / DEP_WK fallback → DEP_Ser
+      ! Boundary-feed relaxation (nee ABS / LEFT_BC_IRR)
+      real(SP) :: DepthWaveMaker = 0.0_SP   ! forcing.depth (nee DEP_Ser); required, no DEP_WK fallback
       real(SP) :: WidthWaveMaker = 0.0_SP
       real(SP) :: R_sponge_wavemaker = 0.0_SP
       real(SP) :: A_sponge_wavemaker = 0.0_SP
@@ -1165,7 +1165,10 @@ contains
    ! exchange and before the sponge (legacy call order).  No-op for
    ! non-boundary types.
    !
-   ! LEFT_BC_IRR (legacy IRREGULAR_LEFT_BC): on the west-boundary rank
+   ! LEFT_BC_IRR (legacy IRREGULAR_LEFT_BC) — UNREACHABLE: the type is
+   ! rejected at read (deprecated, pending the characteristic BC track), so
+   ! left_bc_source never sets; kept until the char BC track lands.  On the
+   ! west-boundary rank
    ! only, overwrite the ghost strip $i \le N_{ghost}$ (all j, ghosts
    ! included) with the series state at the legacy stage time
    !   $$ t_s = t + (s - 1)\,\Delta t/3 $$
