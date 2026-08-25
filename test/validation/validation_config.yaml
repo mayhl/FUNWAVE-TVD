@@ -630,3 +630,67 @@ simulations:
     tolerances:
       # measured: max|eta| 3.3e-6 m (numerical flat-state floor), datum_err 0
       still_water: { max_eta_m: 1.0e-3, depth_datum_err_m: 1.0e-6 }
+
+  # ── Flather open boundary (characteristic BC track): tide transmission ──
+  # forcing: without sponge.direct derives a Flather radiation face — imposes
+  # the target through the boundary-normal flux and radiates outgoing energy,
+  # unlike the relaxation strip (which attenuates to 0.2-0.4).  Slow tide
+  # (T=300s >> 45s basin transit) so the interior co-oscillates.  The three
+  # progressive arms expose the Riemann-invariant structure: the full (eta,u)
+  # invariant transmits fully, either half transmits at ~0.5.
+  - name: tide_flather_coosc
+    exe_type: validation-2d
+    np_pin: 1
+    input: test/validation/inputs/tide_flather
+    input_files: [coosc.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, tide, flather, forcing, local]
+    postprocess:
+      flather_transmission: test.validation.oracles.flather_transmission
+    tolerances:
+      # measured 1.009 (relaxation strip: 0.40)
+      flather_transmission: { ratio_min: 0.9, ratio_max: 1.1 }
+
+  - name: tide_flather_prog_etauv
+    exe_type: validation-2d
+    np_pin: 1
+    input: test/validation/inputs/tide_flather
+    input_files: [prog_etauv.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, tide, flather, forcing, local]
+    postprocess:
+      flather_transmission: test.validation.oracles.flather_transmission
+    tolerances:
+      # full incident R+ = u + sqrt(g/h) eta -> measured 1.003
+      flather_transmission: { ratio_min: 0.9, ratio_max: 1.1 }
+
+  - name: tide_flather_prog_eta
+    exe_type: validation-2d
+    np_pin: 1
+    input: test/validation/inputs/tide_flather
+    input_files: [prog_eta.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, tide, flather, forcing, local]
+    postprocess:
+      flather_transmission: test.validation.oracles.flather_transmission
+    tolerances:
+      # eta only = half the Riemann invariant -> measured 0.502
+      flather_transmission: { ratio_min: 0.45, ratio_max: 0.55 }
+
+  - name: tide_flather_prog_uvonly
+    exe_type: validation-2d
+    np_pin: 1
+    input: test/validation/inputs/tide_flather
+    input_files: [prog_uvonly.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, tide, flather, forcing, local]
+    postprocess:
+      flather_transmission: test.validation.oracles.flather_transmission
+    tolerances:
+      # u/v only = half the invariant; eta column is zero so reference the
+      # 1.0 m incident range explicitly -> measured 0.502
+      flather_transmission: { ratio_min: 0.45, ratio_max: 0.55, reference_pp_m: 1.0 }

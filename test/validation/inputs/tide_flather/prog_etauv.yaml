@@ -1,0 +1,16 @@
+# Flather progressive: incident forced at west, east radiates (zero target).
+# etauv imposes the full Riemann invariant R+ = u + sqrt(g/h) eta (ratio ~1.0);
+# eta-only or u/v-only supply half the invariant (ratio ~0.5).
+grid: {cell_size: [2.0, 2.0], n_cells: [200, 3], bathymetry: {type: flat, depth: 8.0}}
+simulation: {title: tide_flather_prog_etauv, total_time: 900.0, screen_interval: 300.0}
+boundaries:
+  west: {forcing: {file: data/tide_etauv.txt}}
+  east: {forcing: {file: data/tide_zero.txt}}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 3.0, min_depth: 0.01}
+breaking: {model: shock_capturing}
+output:
+  format: ascii
+  depth_out: true
+  channels:
+    - {name: fields, geometry: field, variables: [eta], interval: 10.0}
