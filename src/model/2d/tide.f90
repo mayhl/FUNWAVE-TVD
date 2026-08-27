@@ -89,6 +89,13 @@ module model_tide_mod
       ! relaxation strip, so apply_bc skips them
       logical :: flather(4) = .false.
 
+      ! Flather external-target arrays along each face (west/east indexed
+      ! in j over nloc, south/north in i over mloc; sized (max(mloc,nloc),
+      ! 4)).  Rebuilt per step by build_flather_target: the tide scalar
+      ! broadcast uniform, then any boundary wavemaker ADDS its incident
+      ! series on top, so a tide and a wave superpose on one face
+      real(SP), allocatable :: eta_ext(:, :), u_ext(:, :), v_ext(:, :)
+
       ! current relaxation targets — CONSTANT values, or the DATA
       ! interpolants refreshed by update_data
       real(SP) :: eta_west = 0.0_SP, u_west = 0.0_SP, v_west = 0.0_SP
@@ -120,6 +127,7 @@ module model_tide_mod
       procedure :: read_input => tide_read_input
       procedure :: init_compute => tide_init_compute
       procedure :: update_data => tide_update_data
+      procedure :: build_flather_target => tide_build_flather_target
       procedure :: apply_bc => tide_apply_bc
       procedure :: data_mode => tide_data_mode
       procedure :: free => tide_free
@@ -175,6 +183,13 @@ contains
       nloc = grid%lp%nloc
       allocate (this%sponge_west(mloc, nloc), this%sponge_east(mloc, nloc), &
                 this%sponge_south(mloc, nloc), this%sponge_north(mloc, nloc))
+
+      ! Flather external-target arrays (see the type declaration): a single
+      ! (max(mloc,nloc), 4) block indexed per face, zero until build_flather
+      if (any(this%flather)) &
+         allocate (this%eta_ext(max(mloc, nloc), 4), &
+                   this%u_ext(max(mloc, nloc), 4), &
+                   this%v_ext(max(mloc, nloc), 4), source=0.0_SP)
 
       associate (Mglob => grid%M, Nglob => grid%N, &
                  px => grid%nx_proc, py => grid%ny_proc, &
@@ -292,6 +307,45 @@ contains
       end if
 
    end subroutine tide_update_data
+
+   ! ----------------------------------------------------------------
+   ! Rebuild the Flather external-target arrays for the current step: the
+   ! (constant or streamed) tide scalar broadcast uniform along each
+   ! flather face.  A boundary wavemaker then ADDS its incident series on
+   ! top (wavemaker_add_flather_target), so the two superpose on one face;
+   ! the kernel flux_flather_bc reads these arrays every RK stage.
+   ! ----------------------------------------------------------------
+   subroutine tide_build_flather_target(this)
+      class(type_model_tide), intent(inout) :: this
+
+      if (.not. allocated(this%eta_ext)) return
+
+      this%eta_ext = 0.0_SP
+      this%u_ext = 0.0_SP
+      this%v_ext = 0.0_SP
+
+      if (this%flather(FACE_W)) then
+         this%eta_ext(:, FACE_W) = this%eta_west
+         this%u_ext(:, FACE_W) = this%u_west
+         this%v_ext(:, FACE_W) = this%v_west
+      end if
+      if (this%flather(FACE_E)) then
+         this%eta_ext(:, FACE_E) = this%eta_east
+         this%u_ext(:, FACE_E) = this%u_east
+         this%v_ext(:, FACE_E) = this%v_east
+      end if
+      if (this%flather(FACE_S)) then
+         this%eta_ext(:, FACE_S) = this%eta_south
+         this%u_ext(:, FACE_S) = this%u_south
+         this%v_ext(:, FACE_S) = this%v_south
+      end if
+      if (this%flather(FACE_N)) then
+         this%eta_ext(:, FACE_N) = this%eta_north
+         this%u_ext(:, FACE_N) = this%u_north
+         this%v_ext(:, FACE_N) = this%v_north
+      end if
+
+   end subroutine tide_build_flather_target
 
    subroutine series_advance(unit, time, dt, t1, e1, su1, sv1, &
                              t2, e2, su2, sv2, tgt_eta, tgt_u, tgt_v, hit_eof)

@@ -580,6 +580,17 @@ contains
             call this%tide%update_data(time, dt)
          end if
 
+         ! rebuild the frozen-per-step Flather external target: the tide
+         ! scalar broadcast uniform, then each boundary wavemaker adds its
+         ! incident series (superposed).  Must precede flux_flather_bc, and
+         ! reuses the same target across the 3 RK stages (TIME is frozen)
+         if (istage == 1 .and. any(this%tide%flather)) then
+            call this%tide%build_flather_target()
+            do i = 1, size(this%wavemakers)
+               call this%wavemakers(i)%add_flather_target(this%grid, this%tide, time)
+            end do
+         end if
+
          ! per-step rainfall refresh (legacy PRECIPITATION_DISTRIBUTION
          ! before the RK loop, same already-advanced TIME)
          if (istage == 1 .and. this%precipitation%is_activated) then
@@ -622,13 +633,8 @@ contains
          ! the outgoing residual.  Runs after the wall fill it replaces.
          if (any(this%tide%flather)) &
             call flux_flather_bc(lp, this%tide%flather, &
-                                 [this%tide%eta_west, this%tide%eta_east, &
-                                  this%tide%eta_south, this%tide%eta_north], &
-                                 [this%tide%u_west, this%tide%u_east, &
-                                  this%tide%u_south, this%tide%u_north], &
-                                 [this%tide%v_west, this%tide%v_east, &
-                                  this%tide%v_south, this%tide%v_north], &
-                                 phy%Gamma3, num%MinDepth, &
+                                 this%tide%eta_ext, this%tide%u_ext, &
+                                 this%tide%v_ext, phy%Gamma3, num%MinDepth, &
                                  this%depth_fx, this%depth_fy, this%fws)
 
          ! dry-cell faces after the wall fills (legacy BOUNDARY_CONDITION

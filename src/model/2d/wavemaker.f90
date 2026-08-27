@@ -216,6 +216,10 @@ module model_wavemaker_mod
       ! and the boundary relaxation sponge
       logical  :: left_bc_source = .false.            ! LEFT_BC_IRR ghost-strip fill
       logical  :: boundary_source = .false.                ! boundary-feed relaxation
+      ! nonzero (FACE_W/E/S/N) => this boundary feed rides a Flather face:
+      ! the incident series is added to the tide external target instead of
+      ! relaxed through a strip (no sponge_maker built)
+      integer  :: flather_face = 0
       real(SP), allocatable :: Cm_eta(:, :, :), Sm_eta(:, :, :)
       real(SP), allocatable :: Cm_u(:, :, :), Sm_u(:, :, :)
       real(SP), allocatable :: Cm_v(:, :, :), Sm_v(:, :, :)
@@ -232,6 +236,7 @@ module model_wavemaker_mod
       procedure :: init_compute => wavemaker_init_compute
       procedure :: update_source => wavemaker_update_source
       procedure :: apply_boundary => wavemaker_apply_boundary
+      procedure :: add_flather_target => wavemaker_add_flather_target
       procedure :: fill_in_zone => wavemaker_fill_in_zone
       procedure :: free => wavemaker_free
    end type type_model_wavemaker
@@ -1234,6 +1239,10 @@ contains
       end if
 
       if (this%boundary_source) then
+         ! Flather feed: the incident series is added to the external
+         ! target (wavemaker_add_flather_target) and rides the flux BC,
+         ! not this relaxation strip
+         if (this%flather_face /= 0) return
          if (associated(this%tide)) then
             gen_abs = this%tide%tidal_bc_gen_abs
          else
@@ -1281,6 +1290,69 @@ contains
       end if
 
    end subroutine wavemaker_apply_boundary
+
+   ! ----------------------------------------------------------------
+   ! Add this boundary feed's incident (eta, u, v) series to the tide
+   ! Flather external target along its face, evaluated at the boundary
+   ! line (first interior cell) from the precomputed modes and frozen at
+   ! the step TIME like the tide scalar.  The series carries a progressive
+   ! wave (eta and u in phase, no PI/2 relaxation offset), so feeding both
+   ! realises the full incident Riemann invariant; it superposes on
+   ! whatever the tide broadcast onto the same face.
+   ! ----------------------------------------------------------------
+   subroutine wavemaker_add_flather_target(this, grid, tide, time)
+      use core_grid_mod, only: type_grid_2d
+      use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
+      class(type_model_wavemaker), intent(in) :: this
+      type(type_grid_2d), intent(in) :: grid
+      type(type_model_tide), intent(inout) :: tide
+      real(SP), intent(in) :: time
+
+      real(SP) :: bb(this%Nfreq), cc(this%Nfreq)
+      real(SP) :: ein, uin, vin
+      integer :: i, j, kf, iline, jline, f
+
+      if (.not. this%boundary_source) return
+      if (this%flather_face == 0) return
+      f = this%flather_face
+
+      do kf = 1, this%Nfreq
+         bb(kf) = cos(this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
+         cc(kf) = sin(this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
+      end do
+
+      select case (f)
+      case (FACE_W, FACE_E)
+         iline = grid%lp%ib
+         if (f == FACE_E) iline = grid%lp%ie
+         do j = 1, grid%lp%nloc
+            ein = 0.0_SP; uin = 0.0_SP; vin = 0.0_SP
+            do kf = 1, this%Nfreq
+               ein = ein + this%Cm_eta(iline, j, kf)*bb(kf) + this%Sm_eta(iline, j, kf)*cc(kf)
+               uin = uin + this%Cm_u(iline, j, kf)*bb(kf) + this%Sm_u(iline, j, kf)*cc(kf)
+               vin = vin + this%Cm_v(iline, j, kf)*bb(kf) + this%Sm_v(iline, j, kf)*cc(kf)
+            end do
+            tide%eta_ext(j, f) = tide%eta_ext(j, f) + ein
+            tide%u_ext(j, f) = tide%u_ext(j, f) + uin
+            tide%v_ext(j, f) = tide%v_ext(j, f) + vin
+         end do
+      case (FACE_S, FACE_N)
+         jline = grid%lp%jb
+         if (f == FACE_N) jline = grid%lp%je
+         do i = 1, grid%lp%mloc
+            ein = 0.0_SP; uin = 0.0_SP; vin = 0.0_SP
+            do kf = 1, this%Nfreq
+               ein = ein + this%Cm_eta(i, jline, kf)*bb(kf) + this%Sm_eta(i, jline, kf)*cc(kf)
+               uin = uin + this%Cm_u(i, jline, kf)*bb(kf) + this%Sm_u(i, jline, kf)*cc(kf)
+               vin = vin + this%Cm_v(i, jline, kf)*bb(kf) + this%Sm_v(i, jline, kf)*cc(kf)
+            end do
+            tide%eta_ext(i, f) = tide%eta_ext(i, f) + ein
+            tide%u_ext(i, f) = tide%u_ext(i, f) + uin
+            tide%v_ext(i, f) = tide%v_ext(i, f) + vin
+         end do
+      end select
+
+   end subroutine wavemaker_add_flather_target
 
    ! ----------------------------------------------------------------
    ! Wavemaker-zone flags for the breaker (legacy per-cell box test in
@@ -2066,7 +2138,9 @@ contains
                                       beta_ref)
       end if
 
-      if (this%boundary_source) then
+      ! a Flather boundary feed rides the external target (no relaxation
+      ! strip), so its sponge_maker profile is never built
+      if (this%boundary_source .and. this%flather_face == 0) then
          allocate (this%sponge_maker(mloc, nloc), source=1.0_SP)
          call fill_sponge_maker(grid, this%WidthWaveMaker, &
                                 this%R_sponge_wavemaker, &

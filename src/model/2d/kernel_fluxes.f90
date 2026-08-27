@@ -1346,7 +1346,7 @@ contains
                               gamma3, min_depth, depthx, depthy, ws)
       type(type_loop_bounds), intent(in) :: lp
       logical, intent(in) :: flather(4)
-      real(SP), intent(in) :: eta_ext(4), u_ext(4), v_ext(4)
+      real(SP), intent(in) :: eta_ext(:, :), u_ext(:, :), v_ext(:, :)
       real(SP), intent(in) :: gamma3, min_depth
       real(SP), intent(in) :: depthx(:, :), depthy(:, :)
       type(type_flux_workspace), intent(inout) :: ws
@@ -1360,11 +1360,11 @@ contains
             h_face = depthx(lp%ib, j) + xi
             if (h_face > min_depth) then
                cf = sqrt(GRAV/h_face)
-               un = u_ext(1) - cf*(xi - eta_ext(1))
+               un = u_ext(j, 1) - cf*(xi - eta_ext(j, 1))
                ws%p(lp%ib, j) = h_face*un
                ws%fx(lp%ib, j) = ws%p(lp%ib, j)*un &
                                  + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ib, j))
-               ws%gx(lp%ib, j) = ws%p(lp%ib, j)*v_ext(1)
+               ws%gx(lp%ib, j) = ws%p(lp%ib, j)*v_ext(j, 1)
             else
                ws%p(lp%ib, j) = 0.0_SP
                ws%fx(lp%ib, j) = 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ib, j))
@@ -1379,11 +1379,11 @@ contains
             h_face = depthx(lp%ie + 1, j) + xi
             if (h_face > min_depth) then
                cf = sqrt(GRAV/h_face)
-               un = u_ext(2) + cf*(xi - eta_ext(2))
+               un = u_ext(j, 2) + cf*(xi - eta_ext(j, 2))
                ws%p(lp%ie + 1, j) = h_face*un
                ws%fx(lp%ie + 1, j) = ws%p(lp%ie + 1, j)*un &
                                      + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ie + 1, j))
-               ws%gx(lp%ie + 1, j) = ws%p(lp%ie + 1, j)*v_ext(2)
+               ws%gx(lp%ie + 1, j) = ws%p(lp%ie + 1, j)*v_ext(j, 2)
             else
                ws%p(lp%ie + 1, j) = 0.0_SP
                ws%fx(lp%ie + 1, j) = 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthx(lp%ie + 1, j))
@@ -1398,9 +1398,9 @@ contains
             h_face = depthy(i, lp%jb) + xi
             if (h_face > min_depth) then
                cf = sqrt(GRAV/h_face)
-               vn = v_ext(3) - cf*(xi - eta_ext(3))
+               vn = v_ext(i, 3) - cf*(xi - eta_ext(i, 3))
                ws%q(i, lp%jb) = h_face*vn
-               ws%fy(i, lp%jb) = ws%q(i, lp%jb)*u_ext(3)
+               ws%fy(i, lp%jb) = ws%q(i, lp%jb)*u_ext(i, 3)
                ws%gy(i, lp%jb) = ws%q(i, lp%jb)*vn &
                                  + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthy(i, lp%jb))
             else
@@ -1417,9 +1417,9 @@ contains
             h_face = depthy(i, lp%je + 1) + xi
             if (h_face > min_depth) then
                cf = sqrt(GRAV/h_face)
-               vn = v_ext(4) + cf*(xi - eta_ext(4))
+               vn = v_ext(i, 4) + cf*(xi - eta_ext(i, 4))
                ws%q(i, lp%je + 1) = h_face*vn
-               ws%fy(i, lp%je + 1) = ws%q(i, lp%je + 1)*u_ext(4)
+               ws%fy(i, lp%je + 1) = ws%q(i, lp%je + 1)*u_ext(i, 4)
                ws%gy(i, lp%je + 1) = ws%q(i, lp%je + 1)*vn &
                                      + 0.5_SP*GRAV*(gamma3*xi*xi + 2.0_SP*xi*depthy(i, lp%je + 1))
             else

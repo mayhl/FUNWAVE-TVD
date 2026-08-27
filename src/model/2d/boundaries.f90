@@ -138,11 +138,11 @@ contains
       type(type_model_wavemaker), intent(inout) :: wavemakers(:)
 
       type(type_env) :: bnd_env
-      type(type_yaml_reader) :: face_yaml
+      type(type_yaml_reader) :: face_yaml, wm_sp, wm_sub
       type(type_sponge_defaults) :: defs
       type(type_string), allocatable :: axes(:)
       character(:), allocatable :: assert_val
-      logical :: no_bnd, no_face, no_key
+      logical :: no_bnd, no_face, no_key, no_sp, no_blk, wm_direct
       logical :: forced(4), wm_forced(4), has_file(4), has_const(4)
       integer :: derived(4), wm_idx(4)
       integer :: f, i, itmp
@@ -199,12 +199,26 @@ contains
                                 has_file(f), has_const(f))
 
          if (wm_forced(f)) then
-            ! wavemaker-fed face: the sponge block IS the relaxation strip
-            ! (nee WidthWaveMaker/R_,A_sponge_wavemaker; gen-abs routes it
-            ! to the tide profile instead) — NOT the sponge model
-            call read_wavemaker_strip(env, face_yaml, wavemakers(wm_idx(f)), f, &
-                                      tide, defs)
-            derived(f) = BC_RELAX
+            ! wavemaker-fed face: a sponge.direct block IS the relaxation
+            ! strip (nee WidthWaveMaker/R_,A_sponge_wavemaker; gen-abs
+            ! routes it to the tide profile instead) — NOT the sponge model.
+            ! Absent (and not gen-abs), the incident series rides the
+            ! boundary-normal flux as a Flather external target
+            wm_sp = face_yaml%cast_dictionary("sponge", no_sp)
+            wm_direct = .false.
+            if (.not. no_sp) then
+               wm_sub = wm_sp%cast_dictionary("direct", no_blk)
+               wm_direct = .not. no_blk
+            end if
+            if (wm_direct .or. tide%tidal_bc_gen_abs) then
+               call read_wavemaker_strip(env, face_yaml, wavemakers(wm_idx(f)), f, &
+                                         tide, defs)
+               derived(f) = BC_RELAX
+            else
+               derived(f) = BC_FLATHER
+               tide%flather(f) = .true.
+               wavemakers(wm_idx(f))%flather_face = f
+            end if
          else
             call read_face_sponge(env, face_yaml, sponge, f, defs)
 
@@ -241,7 +255,8 @@ contains
          end if
 
          if (wm_forced(f)) then
-            call env%log%info("boundaries: "//trim(FACE_KEY(f))//" = relaxation"// &
+            call env%log%info("boundaries: "//trim(FACE_KEY(f))//" = "// &
+                              trim(DERIVED_NAME(derived(f)))// &
                               " (wavemaker '"//wavemakers(wm_idx(f))%name//"')")
          else
             call env%log%info("boundaries: "//trim(FACE_KEY(f))//" = "// &
@@ -260,7 +275,8 @@ contains
       tide%tide_south = forced(FACE_S)
       tide%tide_north = forced(FACE_N)
       tide%tidal_bc_abs = any(forced)
-      tide%is_activated = tide%tidal_bc_abs .or. tide%tidal_bc_gen_abs
+      tide%is_activated = tide%tidal_bc_abs .or. tide%tidal_bc_gen_abs &
+                          .or. any(tide%flather)
       if (any(has_file) .and. any(has_const)) &
          call env%log%exit_on_error("boundaries: forcing targets must be all"// &
                                     " constants or all files — mixing is pending")
