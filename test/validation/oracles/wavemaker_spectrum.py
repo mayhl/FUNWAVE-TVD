@@ -67,7 +67,7 @@ from test.regression.postproc.utils import read_run_metadata
 from test.validation.oracles._lab import check_keys
 
 _console = Console()
-ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct", "hm0_target_scale")
+ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct")
 
 DT_SAMPLE = 0.1  # uniform re-sample step (matches the channel interval)
 N_XLINE = 5  # gauge columns 1..5 = downwave x-line, 6..7 = lateral pair
@@ -240,10 +240,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     # ── realized Hm0: variance-based, averaged over the x-line ────────────
     hm0_g = 4.0 * np.sqrt(np.mean(eta**2, axis=0))
     hm0_mean = float(np.mean(hm0_g[:N_XLINE]))
-    # a boundary feed injects one-way, so it delivers ~2x the internal-source
-    # calibration (which splits energy both ways); hm0_target_scale (default 1)
-    # carries that documented factor
-    hm0_target = case.hm0 * float(tolerances.get("hm0_target_scale", 1.0))
+    hm0_target = case.hm0
     hm0_err = abs(hm0_mean - hm0_target) / hm0_target * 100.0
     # lateral pair vs the x-line center gauge (homogeneity diagnostic)
     lat = np.append(hm0_g[N_XLINE:], hm0_g[N_XLINE // 2])

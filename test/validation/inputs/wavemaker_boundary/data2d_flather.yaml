@@ -1,0 +1,32 @@
+# Boundary-feed wavemaker on a FLATHER face: identical to data2d.yaml but the
+# west forcing.wavemaker carries NO sponge block, so it derives a Flather
+# radiation face (boundaries rung).  The incident (eta, u, v) series rides the
+# boundary-normal flux as the external target instead of relaxing through a
+# strip -- transmits the incident faithfully (no strip attenuation) and radiates
+# the outgoing residual.  forcing.depth is the series reference depth.  Oracle
+# recovers Hm0 downwave vs the 1.0 m table target (scale set measure-first).
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [500, 80]
+  bathymetry: {type: flat, depth: 10.0}
+simulation: {title: wm_boundary_data2d_flather, total_time: 340.0, screen_interval: 100.0}
+wavemaker:
+  name: westfeed
+  seed: 66
+  spectrum: {type: spectrum_2d, file: data/wk2d_flat.txt}
+boundaries:
+  west:
+    forcing: {wavemaker: westfeed, depth: 10.0}
+  east:
+    sponge: {width: 160.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
+breaking: {model: shock_capturing, Cbrk1: 0.65, Cbrk2: 0.35}
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [265.0, 275.0, 285.0, 295.0, 305.0, 285.0, 285.0]
+      y: [80.0, 80.0, 80.0, 80.0, 80.0, 40.0, 120.0]
+      variables: [eta]
+      interval: 0.1

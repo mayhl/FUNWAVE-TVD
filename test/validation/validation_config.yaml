@@ -715,10 +715,12 @@ simulations:
       wind_setup: { ratio_min: 0.9, ratio_max: 1.1 }
 
   # ── Boundary-feed wavemaker: spectrum-only entry fed at the west face ──
-  # Mirrors wm_data2d but generates at the boundary (no source: box).  FINDING:
-  # the boundary feed delivers ~2x the internal-source calibration (one-way
-  # injection vs a source splitting energy both ways) — measured Hm0 1.987 m vs
-  # the 1.0 m table; hm0_target_scale carries that documented factor.
+  # Mirrors wm_data2d but generates at the boundary (no source: box).  Now
+  # transmits at ~1.0x the table (measured Hm0 1.026 m), matching the internal
+  # source, after the directional-phase-coherence fix (wavemaker.f90): the
+  # boundary path previously collapsed all of a frequency's directions onto one
+  # phase (legacy Phase_LEFT(:,1)), so periodic-y direction snapping added them
+  # coherently and piled up energy (old measured 1.987 m ~ 2x).
   - name: wm_boundary_data2d
     exe_type: validation-2d
     np_pin: 4
@@ -730,5 +732,28 @@ simulations:
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
-      # measured Hm0 1.987 vs 2x target -> err 0.6%, band 98.4%
-      wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0, hm0_target_scale: 2.0 }
+      # measured Hm0 1.026 vs 1x target -> err 2.6%, band 99.5%
+      wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+
+  # ── Boundary-feed wavemaker on a FLATHER face (no west sponge) ──
+  # Same feed as wm_boundary_data2d but the incident series rides the
+  # boundary-normal flux as the Flather external target instead of relaxing
+  # through a strip (wavemaker-Flather stage 2).  Transmits at ~1.0x
+  # (measured Hm0 0.979 m) after the directional-phase-coherence fix, matching
+  # both the strip and the internal source.  A residual ~2% under 1.0 is the
+  # dispersive Flather mismatch (this spectrum spans kh~0.7-3; the fed
+  # u_ext != cf*eta_ext radiates a sliver back) — compose with an interior
+  # absorber for a strongly dispersive boundary sea.
+  - name: wm_boundary_flather
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/wavemaker_boundary
+    input_files: [data2d_flather.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, boundary, flather, forcing, local]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      # measured Hm0 0.979 vs 1x target -> err 2.1%, band 99.3%
+      wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
