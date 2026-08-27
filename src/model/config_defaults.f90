@@ -171,6 +171,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY = "NO"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS = "45"
+   character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_GROUP_COHERENCE = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD = "grid"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS = "24"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_FORMAT = "DATA_1D"

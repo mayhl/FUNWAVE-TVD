@@ -51,7 +51,8 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.discretization.theta_bins` | `24` | `Ntheta` | — | *(jonswap/tma)* Directional bin count (requires a directional: block; 1D runs force 1). |
 | `spectrum.discretization.equal_energy` | `false` | `EqualEnergy` | — | *(jonswap/tma)* Equal-energy frequency binning. |
 | `spectrum.discretization.method` | `grid` | — | — | *(jonswap/tma)* Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*). One of `grid` \| `single_dir_per_freq`. |
-| `spectrum.discretization.coherence_percent` | `0.0` | `alpha_c` | % | *(jonswap/tma)* Percent of components sharing a frequency. |
+| `spectrum.discretization.coherence_percent` | `0.0` | — | % | *(jonswap/tma/spectrum_2d)* Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse). |
+| `spectrum.discretization.group_coherence` | `0.0` | `alpha_c` | % | *(jonswap/tma)* Salatin frequency-grouping coherence: percent of components sharing a frequency (single_dir_per_freq only). |
 | `spectrum.file` | — | `WaveCompFile` | — | *(components/spectrum_2d)* Wave-component / 2D-spectrum data file. |
 | `spectrum.n` | `1` | `NumWaveComp` | — | *(components)* Number of wave components. |
 | `spectrum.period_peak` | `0.0` | `PeakPeriod` | s | *(components)* Peak period (components store a period here). |

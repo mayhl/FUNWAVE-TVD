@@ -71,6 +71,7 @@ module model_wavemaker_mod
                                         DEF_WAVEMAKER_SPECTRUM_DIRECTION, &
                                         DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT, &
+                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_GROUP_COHERENCE, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS, &
                                         DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD, &
@@ -147,10 +148,17 @@ module model_wavemaker_mod
       integer  :: Ntheta = 1
       real(SP) :: Sigma_Theta = 0.0_SP
       ! single-dir discretization (nee WK_NEW_*): one direction per
-      ! frequency component; alpha_c coherence rides on its equal-df
-      ! ladder (regime rules enforced in read_input)
+      ! frequency component; alpha_c (deck group_coherence) rides on its
+      ! equal-df ladder (regime rules enforced in read_input)
       logical  :: single_dir = .false.
       real(SP) :: alpha_c = 0.0_SP
+      ! directional-phase coherence (deck coherence_percent, stored 0..1):
+      ! fraction by which the directions of one frequency share a phase.
+      ! 0 = independent phases per (freq, dir) (realistic sea, the grid
+      ! source's default); 1 = all directions share the anchor phase (the
+      ! legacy Phase_LEFT(:,1) collapse).  Applies to every directional
+      ! type; wk_apply_coherence realises it
+      real(SP) :: dir_coherence = 0.0_SP
       ! normalize: total — Hm0 refers to the full spectrum and the
       ! [min, max] band carries only its natural energy share; default
       ! band renormalizes the band to the full Hm0 (legacy)
@@ -456,6 +464,27 @@ contains
    end subroutine wk_solve_components
 
    ! ----------------------------------------------------------------
+   ! Directional-phase coherence: blend each direction's phase toward the
+   ! per-frequency anchor (direction 1) by rho in [0, 1].  rho = 0 leaves
+   ! the independent draw untouched (realistic sea); rho = 1 makes every
+   ! direction of a frequency share the anchor phase (the legacy
+   ! Phase_LEFT(:, 1) collapse).  The endpoints are exact; intermediate rho
+   ! is a linear phase blend.  phi is (nfreq, ndir), radians.
+   ! ----------------------------------------------------------------
+   subroutine wk_apply_coherence(phi, rho)
+      real(SP), intent(inout) :: phi(:, :)
+      real(SP), intent(in) :: rho
+      integer :: kf, kd
+
+      if (rho <= 0.0_SP) return
+      do kf = 1, size(phi, 1)
+         do kd = 2, size(phi, 2)
+            phi(kf, kd) = (1.0_SP - rho)*phi(kf, kd) + rho*phi(kf, 1)
+         end do
+      end do
+   end subroutine wk_apply_coherence
+
+   ! ----------------------------------------------------------------
    ! Private: dense modes from a solved component set (legacy
    ! CALCULATE_Cm_Sm / CALCULATE_NEW_Cm_Sm collapsed), ghost-inclusive:
    !   $$ C_m(x,y) = \sum_c D_c\,e^{-\beta_c(x - x_c)^2}
@@ -711,13 +740,19 @@ contains
          this%eqe_dir = eqe_mode == "dir" .or. eqe_mode == "both"
          call blk%read_enum("method", [character(19) :: "grid", "single_dir_per_freq"], &
                             val=method, default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD)
-         call blk%read("coherence_percent", silent=no_key, val=this%alpha_c, &
+         ! directional-phase coherence (0..100 %, stored 0..1): applies to
+         ! every directional type (grid source + boundary feed)
+         call blk%read("coherence_percent", silent=no_key, val=this%dir_coherence, &
                        default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT)
+         this%dir_coherence = max(0.0_SP, min(1.0_SP, this%dir_coherence/100.0_SP))
+         ! Salatin frequency-grouping coherence (nee alpha_c): single-dir only
+         call blk%read("group_coherence", silent=no_key, val=this%alpha_c, &
+                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_GROUP_COHERENCE)
          this%single_dir = method == "single_dir_per_freq"
-         ! regime rules: coherence = same-frequency hosts, meaningless on the
-         ! grid whose theta rows are already phase-locked per frequency
+         ! regime rules: group coherence = same-frequency hosts, meaningless
+         ! on the grid whose theta rows already share a frequency per row
          if (this%alpha_c /= 0.0_SP .and. .not. this%single_dir) &
-            call env%log%exit_on_error("wavemaker/discretization: coherence_percent"// &
+            call env%log%exit_on_error("wavemaker/discretization: group_coherence"// &
                                        " requires method: single_dir_per_freq")
          if (this%single_dir .and. this%eqe_dir) then
             call env%log%info("wavemaker/discretization: single_dir_per_freq draws"// &
@@ -1534,6 +1569,10 @@ contains
          call random_number(phase2)
          phase2 = phase2*2.0_SP*PI
       end if
+      ! directional-phase coherence (no-op at the default 0; single-dir has
+      ! one theta column so the blend is inert there — group coherence owns
+      ! that regime)
+      call wk_apply_coherence(phase2, this%dir_coherence)
       c = 0
       do kf = 1, disc%nfreq
          do ktheta = 1, nt_draw
@@ -2180,6 +2219,7 @@ contains
       real(SP) :: freq(this%Nfreq), energy_bin(this%Nfreq)
       real(SP) :: wkn(this%Nfreq), theta(this%Ntheta), ag(this%Ntheta)
       real(SP) :: amp(this%Nfreq, this%Ntheta)
+      real(SP) :: phase2d(this%Nfreq, this%Ntheta)
       real(SP) :: Ef, alpha_spec, alpha1, tb, tc, h_ser, zlev
       real(SP) :: theta_per, transfer, arg
       integer :: kf, ktheta, i, j
@@ -2188,12 +2228,17 @@ contains
       if (h_ser == 0.0_SP .or. this%FreqPeak == 0.0_SP .or. this%FreqMax == 0.0_SP) &
          error stop "wavemaker: re-set DepthWaveMaker, FreqPeak, FreqMax for wavemaker"
 
+      ! per-(freq, theta) phase so the directions add incoherently (legacy
+      ! drew one phase per frequency, collapsing them); the shared temporal
+      ! phase is then zero and the per-direction phase rides the arg below
       if (this%zero_phase) then
-         this%Phase_Ser = 0.0_SP
+         phase2d = 0.0_SP
       else
-         call random_number(this%Phase_Ser)
-         this%Phase_Ser = this%Phase_Ser*2.0_SP*PI
+         call random_number(phase2d)
+         phase2d = phase2d*2.0_SP*PI
       end if
+      call wk_apply_coherence(phase2d, this%dir_coherence)
+      this%Phase_Ser = 0.0_SP
 
       call new_parametric_spectrum(is_jonswap, this%FreqPeak, h_ser, &
                                    this%GammaTMA, spec)
@@ -2263,7 +2308,8 @@ contains
             do j = 1, grid%lp%nloc
                do i = 1, grid%lp%mloc
                   arg = wkn(kf)*sin(theta_per)*this%ymk_wk(j) &
-                        + wkn(kf)*cos(theta_per)*this%xmk_wk(i)
+                        + wkn(kf)*cos(theta_per)*this%xmk_wk(i) &
+                        + phase2d(kf, ktheta)
                   this%Cm_eta(i, j, kf) = this%Cm_eta(i, j, kf) &
                                           + amp(kf, ktheta)*cos(arg)
                   this%Sm_eta(i, j, kf) = this%Sm_eta(i, j, kf) &
@@ -2343,6 +2389,10 @@ contains
          call random_number(phase_left)
          phase_left = phase_left*2.0_SP*PI
       end if
+      ! directional-phase coherence: legacy collapsed all directions onto
+      ! phase_left(:, 1) (dir_coherence = 1); the default 0 keeps the drawn
+      ! per-direction phases so the directions add incoherently
+      call wk_apply_coherence(phase_left, this%dir_coherence)
 
       do j = 1, num_freq
          if (per_ser(j) == 0.0_SP) &
@@ -2391,7 +2441,10 @@ contains
 
       do kf = 1, this%Nfreq
          this%Segma_Ser(kf) = 2.0*PI/per_ser(kf)
-         this%Phase_Ser(kf) = phase_left(kf, 1)
+         ! the per-(freq, dir) phase now rides the spatial arg below, so the
+         ! shared temporal phase is zero (was phase_left(kf, 1), the legacy
+         ! collapse that made every direction coherent)
+         this%Phase_Ser(kf) = 0.0_SP
          ! Newton from the shallow-water guess (legacy literals)
          celerity = sqrt(GRAV*h_ser)
          wkn(kf) = 2.0*PI/(celerity*per_ser(kf))
@@ -2425,7 +2478,8 @@ contains
             do j = 1, grid%lp%nloc
                do i = 1, grid%lp%mloc
                   arg = wkn(kf)*sin(theta_per)*this%ymk_wk(j) &
-                        + wkn(kf)*cos(theta_per)*this%xmk_wk(i)
+                        + wkn(kf)*cos(theta_per)*this%xmk_wk(i) &
+                        + phase_left(kf, kdir)
                   this%Cm_eta(i, j, kf) = this%Cm_eta(i, j, kf) &
                                           + amp_ser(kf, kdir)*cos(arg)
                   this%Sm_eta(i, j, kf) = this%Sm_eta(i, j, kf) &
