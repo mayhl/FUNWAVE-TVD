@@ -201,6 +201,54 @@ contains
       @assertEqual(ZERO, total, 1.0e-9_SP)
    end subroutine test_slender_integrates_to_zero
 
+   ! Type 2 pressure (polynomial-Gaussian patch): full Pvessel dead centre,
+   ! smoothly tapered, and exactly zero outside the hull rectangle.  Symmetric
+   ! about the keel like type 1.
+   @test
+   subroutine test_pressure_type2_center_and_zero_outside()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      real(SP) :: eta(MLOC, NLOC)
+      integer :: d
+
+      call make_vessel(v, grid, 2, ZERO)
+      eta = ZERO
+      call vessel_pressure_source(v, grid, 1, 20.0_SP, 20.0_SP, eta)
+
+      ! dead centre -> full pressure
+      @assertEqual(3.0_SP, v%p_each(NG + 1 + 20, NG + 1 + 20), TOL)
+      ! outside the hull rectangle (L=+15 > 0.5*20) and beam (W=+8 > 0.5*10)
+      @assertEqual(ZERO, v%p_each(NG + 1 + 35, NG + 1 + 20), TOL)
+      @assertEqual(ZERO, v%p_each(NG + 1 + 20, NG + 1 + 28), TOL)
+      ! symmetric about the keel
+      do d = 1, 4
+         @assertEqual(v%p_each(NG + 1 + 20, NG + 1 + 20 + d), &
+                      v%p_each(NG + 1 + 20, NG + 1 + 20 - d), TOL)
+      end do
+   end subroutine test_pressure_type2_center_and_zero_outside
+
+   ! Type 2 slender (parallel midbody): the dipole is confined to the bow and
+   ! stern tapers, exactly zero through the midbody, still antisymmetric so its
+   ! integral vanishes.
+   @test
+   subroutine test_slender_type2_midbody_zero_ends_dipole()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+
+      call make_vessel(v, grid, 2, ZERO)
+      call vessel_slender_source(v, grid, 1, 20.0_SP, 20.0_SP)
+
+      ! midbody is flat: zero at centre and out to |L| < 0.5*len*alpha = 5
+      @assertEqual(ZERO, v%flux_grad_each(NG + 1 + 20, NG + 1 + 20), TOL)
+      @assertEqual(ZERO, v%flux_grad_each(NG + 1 + 23, NG + 1 + 20), TOL)
+      ! bow taper (5 < L < 10) is nonzero, stern is its mirror
+      @assertTrue(v%flux_grad_each(NG + 1 + 27, NG + 1 + 20) > 0.1_SP)
+      @assertEqual(-v%flux_grad_each(NG + 1 + 27, NG + 1 + 20), &
+                   v%flux_grad_each(NG + 1 + 13, NG + 1 + 20), 1.0e-9_SP)
+      ! net displacement is zero
+      @assertEqual(ZERO, sum(v%flux_grad_each), 1.0e-9_SP)
+   end subroutine test_slender_type2_midbody_zero_ends_dipole
+
    ! Drive the track reader through vessel_update: the hull takes its heading
    ! and velocity from the track segment slope (a 45-deg track, so they cannot
    ! come from the setup), imprints a pressure patch while on the track, and
