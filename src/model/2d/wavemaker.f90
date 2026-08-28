@@ -94,6 +94,10 @@ module model_wavemaker_mod
    public :: read_wavemakers
    public :: wk_regular_coefficients
    public :: wavemaker_lambda_low
+   ! reader-agnostic boundary spectrum interchange + its periodic-y seam
+   ! metric — public for unit tests and the future NetCDF reader
+   public :: type_bnd_spectrum
+   public :: bnd_seam_fraction
 
    ! Default wavemaker phase-RNG seed — matches the legacy WAVE_COHERENCE
    ! fixed-seed convention (a fixed, nonzero value keeps runs reproducible).
@@ -105,6 +109,10 @@ module model_wavemaker_mod
       character(:), allocatable :: name              ! YAML key: name (face reference target)
       character(:), allocatable :: WaveCompFile      ! YAML key: WaveCompFile
       character(:), allocatable :: WAVE_DATA_TYPE    ! YAML key: WAVE_DATA_TYPE
+      ! spatially-varying boundary feed: a manifest of "y_loc file" anchor
+      ! spectra interpolated along the face (YAML key spectrum: locations);
+      ! absent => the single-spectrum feed (one anchor, uniform along y)
+      character(:), allocatable :: loclist_file      ! YAML key: locations
 
       ! Spectrum-only entry awaiting a boundaries face reference; the face
       ! reader resolves it to type boundary (unresolved = init_compute error)
@@ -263,6 +271,24 @@ module model_wavemaker_mod
       real(SP), allocatable :: phase(:)     ! rad
       integer, allocatable :: slot(:)       ! Cm/Sm frequency slot
    end type type_component_set
+
+   ! ── boundary 2-D spectrum, reader-agnostic (spatially-varying feed) ──
+   ! One or more anchor spectra on a SHARED (freq, dir) grid, tagged with
+   ! their alongshore coordinate.  The ASCII loclist reader fills this;
+   ! a future format: netcdf reader fills the same type (the efth station
+   ! model) so the interpolation downstream never sees the file.  nloc = 1
+   ! is the single-spectrum feed (uniform along y); nloc >= 2 interpolates.
+   type :: type_bnd_spectrum
+      integer :: nfreq = 0, ndir = 0, nloc = 0
+      real(SP), allocatable :: y_loc(:)        ! model alongshore coord [m], ascending
+      real(SP), allocatable :: per_ser(:)      ! period [s] (nfreq)
+      real(SP), allocatable :: theta_ser(:)    ! direction [rad] (ndir)
+      real(SP), allocatable :: amp(:, :, :)    ! component amplitude (nfreq, ndir, nloc)
+      real(SP), allocatable :: phase(:, :, :)  ! phase [rad] (nfreq, ndir, nloc)
+      ! direction convention carried for the future NetCDF path to validate
+      ! against; the ASCII reader stamps the current (Cartesian) assumption
+      character(16) :: dir_convention = "cartesian"
+   end type type_bnd_spectrum
 
    ! wk_solve_components periodic-y snap selector
    integer, parameter :: SNAP_NONE = 0      ! non-periodic or pre-snapped
@@ -660,7 +686,7 @@ contains
       character(:), allocatable :: stype, method, legacy_type, normalize
       character(:), allocatable :: eqe_mode
       character(8) :: def_bins
-      logical :: no_key, has_dir
+      logical :: no_key, no_file, has_dir
       logical :: no_spec, no_blk, no_freq, no_per, no_brk
       real(SP) :: p_tmp
 
@@ -833,9 +859,20 @@ contains
          this%wavemaker_type = "WK_TIME"
 
       case ("spectrum_2d")
-         call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
-         if (no_key) call env%log%exit_on_error( &
-            "wavemaker/spectrum: spectrum_2d needs a file: (2D-spectrum data)")
+         ! locations: (a "y_loc file" manifest) selects the spatially-varying
+         ! feed and supplies the anchor files; file: is the single-spectrum
+         ! form.  Exactly one must be present.
+         call spec_yaml%read("locations", silent=no_key, val=this%loclist_file)
+         if (.not. no_key) then
+            call spec_yaml%read("file", silent=no_file, val=this%WaveCompFile)
+            if (.not. no_file) call env%log%exit_on_error( &
+               "wavemaker/spectrum: spectrum_2d takes file: OR locations:, not both")
+         else
+            call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
+            if (no_key) call env%log%exit_on_error( &
+               "wavemaker/spectrum: spectrum_2d needs a file: (2D-spectrum data)"// &
+               " or locations: (a spatially-varying manifest)")
+         end if
          call spec_yaml%read("format", val=this%WAVE_DATA_TYPE, &
                              default=DEF_WAVEMAKER_SPECTRUM_FORMAT)
          this%wavemaker_type = "WK_DATA2D"
@@ -2137,20 +2174,17 @@ contains
       real(SP), intent(in) :: beta_ref
 
       logical :: is_jonswap, is_data
-      integer :: mloc, nloc, num_dir
-      real(SP), allocatable :: per_ser(:), theta_ser(:)
-      real(SP), allocatable :: amp_ser(:, :), phase_left(:, :)
+      integer :: mloc, nloc
+      type(type_bnd_spectrum) :: set
 
       is_data = .false.
       if (len(this%WAVE_DATA_TYPE) >= 4) &
          is_data = this%WAVE_DATA_TYPE(1:4) == "DATA"
 
       ! the DATA file header sets the series length (legacy io.F reads
-      ! the spectrum before WAVEMAKER_INITIALIZATION)
-      if (is_data) then
-         call read_boundary_2d_spectrum(this, num_dir, per_ser, theta_ser, &
-                                        amp_ser, phase_left)
-      end if
+      ! the spectrum before WAVEMAKER_INITIALIZATION); one anchor for the
+      ! single-spectrum feed, several for the spatially-varying manifest
+      if (is_data) call build_bnd_spectrum(this, grid, env, set)
 
       mloc = grid%lp%mloc
       nloc = grid%lp%nloc
@@ -2163,9 +2197,11 @@ contains
                 this%Segma_Ser(this%Nfreq), this%Phase_Ser(this%Nfreq))
 
       if (is_data) then
-         call data_series_coefficients(this, grid, periodic, beta_ref, &
-                                       num_dir, per_ser, theta_ser, &
-                                       amp_ser, phase_left)
+         call data_series_coefficients(this, grid, periodic, beta_ref, set)
+         ! the periodic-y wrap sees two different spectra at the domain ends;
+         ! measure that discontinuity rather than blend it away (seam is 0
+         ! for a single anchor)
+         if (set%nloc > 1) call report_seam(this, grid, set, env)
       else
          ! legacy keys the JONSWAP switch off WAVE_DATA_TYPE here, not
          ! the wavemaker name
@@ -2330,35 +2366,33 @@ contains
    end subroutine tma_series_coefficients
 
    ! ----------------------------------------------------------------
-   ! Private: read the boundary 2D spectrum from WaveCompFile (legacy
-   ! io.F WAVE_DATA_TYPE DATA block): NumFreq NumDir / PeakPeriod
-   ! (unused) / NumFreq frequencies / NumDir directions (degrees) /
-   ! NumDir rows of NumFreq amplitudes / optional NumDir rows of
-   ! NumFreq phases (degrees).  Frequencies invert to periods (legacy
-   ! bare STOP on zero); directions convert via DEG2RAD; input
-   ! phases via the truncated-pi literal.
-   ! Missing phases: zero for parity builds, RANDOM_NUMBER otherwise
-   ! (legacy rand()-based phase is compiler-specific).  Overrides Nfreq from
-   ! the file header.
+   ! Private: read ONE boundary 2D spectrum file (legacy io.F
+   ! WAVE_DATA_TYPE DATA block): NumFreq NumDir / PeakPeriod (unused) /
+   ! NumFreq frequencies / NumDir directions (degrees) / NumDir rows of
+   ! NumFreq amplitudes / optional NumDir rows of NumFreq phases
+   ! (degrees).  Frequencies invert to periods (legacy bare STOP on
+   ! zero); directions convert via DEG2RAD; input phases convert to
+   ! radians.  Pure read — no this-state, no RNG, no coherence: the phase
+   ! POLICY (draw a realization, share it across anchors) is the
+   ! assembler's, so a spatially-varying feed can hold phase common
+   ! across locations while only the energy varies.  input_phase reports
+   ! whether the file carried phases (else phase2 is left zero).
    ! ----------------------------------------------------------------
-   subroutine read_boundary_2d_spectrum(this, num_dir, per_ser, theta_ser, &
-                                        amp_ser, phase_left)
-      class(type_model_wavemaker), intent(inout) :: this
-      integer, intent(out) :: num_dir
+   subroutine read_one_spectrum(fname, per_ser, theta_ser, amp2, phase2, input_phase)
+      character(*), intent(in) :: fname
       real(SP), allocatable, intent(out) :: per_ser(:), theta_ser(:)
-      real(SP), allocatable, intent(out) :: amp_ser(:, :), phase_left(:, :)
+      real(SP), allocatable, intent(out) :: amp2(:, :), phase2(:, :)
+      logical, intent(out) :: input_phase
 
-      integer :: unit, ios, i, j, num_freq
-      logical :: input_phase
+      integer :: unit, ios, i, j, num_freq, num_dir
       real(SP) :: peak_period
 
-      open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
-            action="read", iostat=ios)
-      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      open (newunit=unit, file=trim(fname), status="old", action="read", iostat=ios)
+      if (ios /= 0) error stop "wavemaker: cannot open a boundary spectrum file"
       read (unit, *, iostat=ios) num_freq, num_dir
-      if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+      if (ios /= 0) error stop "wavemaker: boundary spectrum short read"
       allocate (per_ser(num_freq), theta_ser(num_dir))
-      allocate (amp_ser(num_freq, num_dir), phase_left(num_freq, num_dir))
+      allocate (amp2(num_freq, num_dir), phase2(num_freq, num_dir), source=0.0_SP)
       read (unit, *, iostat=ios) peak_period ! kept for format consistency
       do j = 1, num_freq
          read (unit, *, iostat=ios) per_ser(j) ! read in as frequency
@@ -2367,87 +2401,280 @@ contains
          read (unit, *, iostat=ios) theta_ser(i)
       end do
       do i = 1, num_dir
-         read (unit, *, iostat=ios) (amp_ser(j, i), j=1, num_freq)
+         read (unit, *, iostat=ios) (amp2(j, i), j=1, num_freq)
       end do
-      if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+      if (ios /= 0) error stop "wavemaker: boundary spectrum short read"
       ! phases are optional: EOF leaves input_phase false (legacy END= jump)
       input_phase = .true.
       do i = 1, num_dir
-         read (unit, *, iostat=ios) (phase_left(j, i), j=1, num_freq)
+         read (unit, *, iostat=ios) (phase2(j, i), j=1, num_freq)
          if (ios /= 0) then
             input_phase = .false.
+            phase2 = 0.0_SP
             exit
          end if
       end do
       close (unit)
 
-      if (input_phase) then
-         phase_left = phase_left*DEG2RAD
-      elseif (this%zero_phase) then
-         phase_left = 0.0_SP
-      else
-         call random_number(phase_left)
-         phase_left = phase_left*2.0_SP*PI
-      end if
-      ! directional-phase coherence: legacy collapsed all directions onto
-      ! phase_left(:, 1) (dir_coherence = 1); the default 0 keeps the drawn
-      ! per-direction phases so the directions add incoherently
-      call wk_apply_coherence(phase_left, this%dir_coherence)
-
+      if (input_phase) phase2 = phase2*DEG2RAD
       do j = 1, num_freq
          if (per_ser(j) == 0.0_SP) &
-            error stop "wavemaker: zero frequency in WaveCompFile"
+            error stop "wavemaker: zero frequency in a boundary spectrum"
          per_ser(j) = 1.0_SP/per_ser(j)
       end do
       theta_ser = theta_ser*DEG2RAD
 
-      this%Nfreq = num_freq
-
-   end subroutine read_boundary_2d_spectrum
+   end subroutine read_one_spectrum
 
    ! ----------------------------------------------------------------
-   ! Private: series modes from the WaveCompFile 2D spectrum (legacy
-   ! CALCULATE_DATA2D_Cm_Sm): component amplitudes enter directly and
-   ! the wave number comes from a Newton solve of the full dispersion
-   ! relation seeded with the shallow-water guess (tol 1e-8, 1000
-   ! iterations — NOT the TMA closed form),
+   ! Private: assemble the boundary spectrum set (reader-agnostic).  The
+   ! single-spectrum feed (file:) yields one anchor at y = 0 (uniform
+   ! along the face); the manifest (locations:) yields several anchors on
+   ! a shared (freq, dir) grid, tagged with their along-face coordinate
+   ! and sorted ascending for the downstream interpolation.  A manifest
+   ! line is "<coord> file" or a bare "file"; the coordinate is
+   ! all-or-none, and when omitted everywhere the anchors are spread
+   ! equispaced along the fed face (endpoints inclusive) in manifest order.
+   !
+   ! Phase policy (Note 1): a file WITHOUT phases contributes only energy;
+   ! we draw ONE realization and share it across every anchor, so the
+   ! spatial variation is in amplitude alone and the complex blend cannot
+   ! self-cancel mid-domain (independent per-anchor random phases would).
+   ! A file WITH phases keeps its own; the two modes must not be mixed.
+   ! zero_phase forces the parity-build zero.  Coherence (Note 2) folds
+   ! the directions per anchor exactly as the single-spectrum path did.
+   ! Overrides Nfreq from the file header.
+   ! ----------------------------------------------------------------
+   subroutine build_bnd_spectrum(this, grid, env, set)
+      use core_grid_mod, only: type_grid_2d
+      use model_sponge_mod, only: FACE_S, FACE_N
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      type(type_env), intent(inout) :: env
+      type(type_bnd_spectrum), intent(out) :: set
+
+      real(SP), allocatable :: per0(:), th0(:), amp2(:, :), ph2(:, :)
+      real(SP), allocatable :: y_raw(:)
+      character(256), allocatable :: files(:)
+      character(256) :: line, fname
+      character(:), allocatable :: base
+      integer :: unit, ios, k, nl, n, slash, n_with_pos
+      real(SP) :: yk, tol, l_face
+      logical :: input_phase, any_phase, all_phase, use_manifest
+
+      use_manifest = .false.
+      if (allocated(this%loclist_file)) use_manifest = len_trim(this%loclist_file) > 0
+
+      if (use_manifest) then
+         ! ── pass 1: count anchor lines (skip blanks and '#' comments) ──
+         open (newunit=unit, file=trim(this%loclist_file), status="old", &
+               action="read", iostat=ios)
+         if (ios /= 0) call env%log%exit_on_error( &
+            "wavemaker/spectrum: cannot open locations manifest "//trim(this%loclist_file))
+         nl = 0
+         do
+            read (unit, "(a)", iostat=ios) line
+            if (ios /= 0) exit
+            line = adjustl(line)
+            if (len_trim(line) == 0) cycle
+            if (line(1:1) == "#") cycle
+            nl = nl + 1
+         end do
+         if (nl < 1) call env%log%exit_on_error( &
+            "wavemaker/spectrum: locations manifest has no anchors")
+         allocate (y_raw(nl), files(nl))
+         ! anchor file paths resolve relative to the manifest's directory
+         base = ""
+         slash = index(this%loclist_file, "/", back=.true.)
+         if (slash > 0) base = this%loclist_file(1:slash)
+         ! ── pass 2: a line is "<coord> file" (a space splits the two) or a
+         !    bare "file" (position omitted -> equispaced); the coordinate is
+         !    all-or-none across the manifest ──
+         rewind (unit)
+         k = 0
+         n_with_pos = 0
+         do
+            read (unit, "(a)", iostat=ios) line
+            if (ios /= 0) exit
+            line = adjustl(line)
+            if (len_trim(line) == 0) cycle
+            if (line(1:1) == "#") cycle
+            k = k + 1
+            if (index(trim(line), " ") > 0) then
+               read (line, *, iostat=ios) yk, fname
+               if (ios /= 0) call env%log%exit_on_error( &
+                  "wavemaker/spectrum: bad manifest line (want '<coord> file'): "//trim(line))
+               y_raw(k) = yk
+               n_with_pos = n_with_pos + 1
+            else
+               fname = trim(line)
+               y_raw(k) = 0.0_SP     ! filled equispaced below when no line carries a coord
+            end if
+            if (fname(1:1) == "/") then
+               files(k) = fname
+            else
+               files(k) = base//trim(fname)
+            end if
+         end do
+         close (unit)
+
+         if (n_with_pos > 0 .and. n_with_pos < nl) call env%log%exit_on_error( &
+            "wavemaker/spectrum: give a coordinate for all manifest anchors or none")
+         ! ── coordinate omitted everywhere: equispaced along the fed face,
+         !    endpoints inclusive, in MANIFEST ORDER (there is no coord to sort
+         !    on, so first line = face start, last = face end) ──
+         if (n_with_pos == 0 .and. nl > 1) then
+            if (this%flather_face == FACE_S .or. this%flather_face == FACE_N) then
+               l_face = real(grid%M - 1, SP)*grid%dx0
+            else
+               l_face = real(grid%N - 1, SP)*grid%dy0
+            end if
+            do k = 1, nl
+               y_raw(k) = real(k - 1, SP)/real(nl - 1, SP)*l_face
+            end do
+         end if
+      else
+         nl = 1
+         allocate (y_raw(1), files(1))
+         y_raw(1) = 0.0_SP
+         files(1) = this%WaveCompFile
+      end if
+
+      ! ── read every anchor onto the first anchor's (freq, dir) grid ──
+      call read_one_spectrum(trim(files(1)), per0, th0, amp2, ph2, input_phase)
+      set%nfreq = size(per0)
+      set%ndir = size(th0)
+      set%nloc = nl
+      allocate (set%per_ser(set%nfreq), source=per0)
+      allocate (set%theta_ser(set%ndir), source=th0)
+      allocate (set%amp(set%nfreq, set%ndir, nl), set%phase(set%nfreq, set%ndir, nl))
+      allocate (set%y_loc(nl))
+      set%y_loc = y_raw
+      set%amp(:, :, 1) = amp2
+      set%phase(:, :, 1) = ph2
+      any_phase = input_phase
+      all_phase = input_phase
+      tol = 1.0e-4_SP
+
+      do k = 2, nl
+         call read_one_spectrum(trim(files(k)), per0, th0, amp2, ph2, input_phase)
+         if (size(per0) /= set%nfreq .or. size(th0) /= set%ndir) &
+            call env%log%exit_on_error( &
+            "wavemaker/spectrum: anchor "//trim(files(k))// &
+            " has a different (freq, dir) grid than the first")
+         if (any(abs(per0 - set%per_ser) > tol*abs(set%per_ser)) .or. &
+             any(abs(th0 - set%theta_ser) > tol)) &
+            call env%log%exit_on_error( &
+            "wavemaker/spectrum: anchor "//trim(files(k))// &
+            " frequency/direction values differ from the first")
+         set%amp(:, :, k) = amp2
+         set%phase(:, :, k) = ph2
+         any_phase = any_phase .or. input_phase
+         all_phase = all_phase .and. input_phase
+      end do
+
+      if (any_phase .and. .not. all_phase) call env%log%exit_on_error( &
+         "wavemaker/spectrum: mix of anchors with and without phases —"// &
+         " supply phases for all or none")
+
+      ! ── phase policy: shared realization when the files carry none ──
+      if (.not. all_phase) then
+         if (this%zero_phase) then
+            set%phase = 0.0_SP
+         else
+            call random_number(amp2)     ! reuse amp2 as an (nfreq, ndir) scratch
+            amp2 = amp2*2.0_SP*PI
+            do k = 1, nl
+               set%phase(:, :, k) = amp2
+            end do
+         end if
+      end if
+
+      ! ── directional-phase coherence, per anchor (single-spectrum parity) ──
+      do k = 1, nl
+         call wk_apply_coherence(set%phase(:, :, k), this%dir_coherence)
+      end do
+
+      ! ── sort anchors ascending in y (insertion; nloc is small) ──
+      call sort_anchors(set)
+
+      this%Nfreq = set%nfreq
+
+   end subroutine build_bnd_spectrum
+
+   ! Insertion sort of the anchor slices by ascending y_loc.
+   subroutine sort_anchors(set)
+      type(type_bnd_spectrum), intent(inout) :: set
+      integer :: i, j
+      real(SP) :: yk
+      real(SP), allocatable :: amp_k(:, :), ph_k(:, :)
+
+      allocate (amp_k(set%nfreq, set%ndir), ph_k(set%nfreq, set%ndir))
+      do i = 2, set%nloc
+         yk = set%y_loc(i)
+         amp_k = set%amp(:, :, i)
+         ph_k = set%phase(:, :, i)
+         j = i - 1
+         do while (j >= 1)
+            if (set%y_loc(j) <= yk) exit
+            set%y_loc(j + 1) = set%y_loc(j)
+            set%amp(:, :, j + 1) = set%amp(:, :, j)
+            set%phase(:, :, j + 1) = set%phase(:, :, j)
+            j = j - 1
+         end do
+         set%y_loc(j + 1) = yk
+         set%amp(:, :, j + 1) = amp_k
+         set%phase(:, :, j + 1) = ph_k
+      end do
+
+   end subroutine sort_anchors
+
+   ! ----------------------------------------------------------------
+   ! Private: series modes from a boundary 2D spectrum set (legacy
+   ! CALCULATE_DATA2D_Cm_Sm, generalised to a spatially-varying feed).
+   ! Component amplitudes enter directly and the wave number comes from a
+   ! Newton solve of the full dispersion relation seeded with the
+   ! shallow-water guess (tol 1e-8, 1000 iterations — NOT the TMA closed
+   ! form),
    !   $$ \sigma = 2\pi/T, \qquad F(k) = g\,k\tanh(k h_s) - \sigma^2 . $$
-   ! The modes are phase-free like the TMA path; the input phases
-   ! enter only through the per-frequency Phase_Ser = column-1 phase
-   ! (legacy collapses the direction axis "to make consistent with cm
-   ! and sm").
+   ! The shared temporal phase is zero; the per-(freq, dir) phase rides
+   ! the spatial arg.  For nloc >= 2 the per-component amplitude and phase
+   ! are interpolated along the face between the two bracketing anchors as
+   ! a COMPLEX blend (a e^{i phi}) — linear phase would wrap, and the
+   ! complex envelope is the physically correct blend of two wave fields;
+   ! the alongshore weight uses the shared clamped primitive interp_weight
+   ! (no extrapolation past the end anchors).  nloc = 1 collapses to the
+   ! single-spectrum feed exactly.
    ! ----------------------------------------------------------------
-   subroutine data_series_coefficients(this, grid, periodic, beta_ref, &
-                                       num_dir, per_ser, theta_ser, &
-                                       amp_ser, phase_left)
+   subroutine data_series_coefficients(this, grid, periodic, beta_ref, set)
       use core_grid_mod, only: type_grid_2d
       use core_constants_mod, only: GRAV
+      use core_time_series_mod, only: interp_weight
+      use model_sponge_mod, only: FACE_S, FACE_N
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
       real(SP), intent(in) :: beta_ref
-      integer, intent(in) :: num_dir
-      real(SP), intent(in) :: per_ser(:), theta_ser(:)
-      real(SP), intent(in) :: amp_ser(:, :), phase_left(:, :)
+      type(type_bnd_spectrum), intent(in) :: set
 
       real(SP) :: wkn(this%Nfreq)
       real(SP) :: h_ser, zlev, celerity, fk, fkdif
-      real(SP) :: theta_per, transfer, arg
-      integer :: kf, kdir, i, j, iter
+      real(SP) :: theta_per, transfer, arg, amp_j, ph_j, wj, ar, ai
+      integer :: kf, kdir, i, j, iter, lo, hi, fidx
+      integer, allocatable :: blo(:)
+      real(SP), allocatable :: bwgt(:)
+      logical :: face_is_x
 
       h_ser = this%DepthWaveMaker
       if (h_ser == 0.0_SP) &
          error stop "wavemaker: re-set DepthWaveMaker for wavemaker"
 
       do kf = 1, this%Nfreq
-         this%Segma_Ser(kf) = 2.0*PI/per_ser(kf)
-         ! the per-(freq, dir) phase now rides the spatial arg below, so the
-         ! shared temporal phase is zero (was phase_left(kf, 1), the legacy
-         ! collapse that made every direction coherent)
+         this%Segma_Ser(kf) = 2.0*PI/set%per_ser(kf)
          this%Phase_Ser(kf) = 0.0_SP
          ! Newton from the shallow-water guess (legacy literals)
          celerity = sqrt(GRAV*h_ser)
-         wkn(kf) = 2.0*PI/(celerity*per_ser(kf))
+         wkn(kf) = 2.0*PI/(celerity*set%per_ser(kf))
          iter = 0
          do
             fk = GRAV*wkn(kf)*tanh(wkn(kf)*h_ser) - this%Segma_Ser(kf)**2
@@ -2459,6 +2686,18 @@ contains
          end do
       end do
 
+      ! ── per-cell along-FACE bracket (lo anchor + weight toward lo+1);
+      !    the anchor coordinate runs along the fed face — x for a S/N
+      !    face, y for W/E (and the west relaxation strip, flather_face 0) ──
+      face_is_x = this%flather_face == FACE_S .or. this%flather_face == FACE_N
+      if (face_is_x) then
+         allocate (blo(grid%lp%mloc), bwgt(grid%lp%mloc))
+         call alongshore_bracket(set, this%xmk_wk, grid%lp%mloc, blo, bwgt)
+      else
+         allocate (blo(grid%lp%nloc), bwgt(grid%lp%nloc))
+         call alongshore_bracket(set, this%ymk_wk, grid%lp%nloc, blo, bwgt)
+      end if
+
       ! linear-theory velocity reference level (legacy Zlev)
       zlev = abs(1.0_SP + beta_ref)*h_ser
 
@@ -2467,37 +2706,191 @@ contains
       this%Cm_v = 0.0_SP; this%Sm_v = 0.0_SP
 
       do kf = 1, this%Nfreq
-         do kdir = 1, num_dir
+         do kdir = 1, set%ndir
             if (periodic) then
-               call calc_periodic_theta(wkn(kf), theta_ser(kdir), grid%dy0, &
+               call calc_periodic_theta(wkn(kf), set%theta_ser(kdir), grid%dy0, &
                                         grid%N, theta_per)
             else
-               theta_per = theta_ser(kdir)
+               theta_per = set%theta_ser(kdir)
             end if
             transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
             do j = 1, grid%lp%nloc
                do i = 1, grid%lp%mloc
+                  ! complex blend of the bracketing anchors along the face
+                  ! axis (fidx = i for a S/N face, j otherwise); a no-op
+                  ! constant when nloc = 1
+                  fidx = merge(i, j, face_is_x)
+                  lo = blo(fidx); hi = min(lo + 1, set%nloc); wj = bwgt(fidx)
+                  ar = (1.0_SP - wj)*set%amp(kf, kdir, lo)*cos(set%phase(kf, kdir, lo)) &
+                       + wj*set%amp(kf, kdir, hi)*cos(set%phase(kf, kdir, hi))
+                  ai = (1.0_SP - wj)*set%amp(kf, kdir, lo)*sin(set%phase(kf, kdir, lo)) &
+                       + wj*set%amp(kf, kdir, hi)*sin(set%phase(kf, kdir, hi))
+                  amp_j = sqrt(ar*ar + ai*ai)
+                  ph_j = atan2(ai, ar)
                   arg = wkn(kf)*sin(theta_per)*this%ymk_wk(j) &
                         + wkn(kf)*cos(theta_per)*this%xmk_wk(i) &
-                        + phase_left(kf, kdir)
-                  this%Cm_eta(i, j, kf) = this%Cm_eta(i, j, kf) &
-                                          + amp_ser(kf, kdir)*cos(arg)
-                  this%Sm_eta(i, j, kf) = this%Sm_eta(i, j, kf) &
-                                          + amp_ser(kf, kdir)*sin(arg)
+                        + ph_j
+                  this%Cm_eta(i, j, kf) = this%Cm_eta(i, j, kf) + amp_j*cos(arg)
+                  this%Sm_eta(i, j, kf) = this%Sm_eta(i, j, kf) + amp_j*sin(arg)
                   this%Cm_u(i, j, kf) = this%Cm_u(i, j, kf) &
-                                        + amp_ser(kf, kdir)*transfer*cos(theta_per)*cos(arg)
+                                        + amp_j*transfer*cos(theta_per)*cos(arg)
                   this%Sm_u(i, j, kf) = this%Sm_u(i, j, kf) &
-                                        + amp_ser(kf, kdir)*transfer*cos(theta_per)*sin(arg)
+                                        + amp_j*transfer*cos(theta_per)*sin(arg)
                   this%Cm_v(i, j, kf) = this%Cm_v(i, j, kf) &
-                                        + amp_ser(kf, kdir)*transfer*sin(theta_per)*cos(arg)
+                                        + amp_j*transfer*sin(theta_per)*cos(arg)
                   this%Sm_v(i, j, kf) = this%Sm_v(i, j, kf) &
-                                        + amp_ser(kf, kdir)*transfer*sin(theta_per)*sin(arg)
+                                        + amp_j*transfer*sin(theta_per)*sin(arg)
                end do
             end do
          end do
       end do
 
    end subroutine data_series_coefficients
+
+   ! ----------------------------------------------------------------
+   ! Private: for each local alongshore cell, the low anchor index and the
+   ! clamped weight toward the next anchor (interp_weight — no
+   ! extrapolation past the ends).  nloc = 1 pins every cell to anchor 1
+   ! with weight 0.
+   ! ----------------------------------------------------------------
+   subroutine alongshore_bracket(set, ymk, ncell, jlo, jwgt)
+      use core_time_series_mod, only: interp_weight
+      type(type_bnd_spectrum), intent(in) :: set
+      real(SP), intent(in) :: ymk(:)
+      integer, intent(in) :: ncell
+      integer, intent(out) :: jlo(:)
+      real(SP), intent(out) :: jwgt(:)
+
+      integer :: j, m
+      real(SP) :: y
+
+      do j = 1, ncell
+         if (set%nloc == 1) then
+            jlo(j) = 1; jwgt(j) = 0.0_SP
+            cycle
+         end if
+         y = ymk(j)
+         if (y <= set%y_loc(1)) then
+            jlo(j) = 1; jwgt(j) = 0.0_SP
+         else if (y >= set%y_loc(set%nloc)) then
+            jlo(j) = set%nloc - 1; jwgt(j) = 1.0_SP
+         else
+            do m = 1, set%nloc - 1
+               if (y < set%y_loc(m + 1)) exit
+            end do
+            jlo(j) = m
+            jwgt(j) = interp_weight(y, set%y_loc(m), set%y_loc(m + 1))
+         end if
+      end do
+
+   end subroutine alongshore_bracket
+
+   ! ----------------------------------------------------------------
+   ! Private: quantify the periodic seam.  A periodic domain wraps the
+   ! last along-face cell onto the first, but a spatially-varying feed
+   ! interpolates two different spectra at the two ends of the fed face,
+   ! so the wrap carries a discontinuity.  We report it rather than blend
+   ! it away: the RMS complex jump between the feed at the two face ends
+   ! (0 and the global face extent), as a fraction of the local signal
+   ! amplitude.  Computed from the set + global extent, so it is
+   ! rank-independent (identical on every rank); the logger prints once.
+   ! Reads ~sqrt(2) for fully independent ends, ~0 when the ends agree.
+   ! ----------------------------------------------------------------
+   subroutine report_seam(this, grid, set, env)
+      use core_grid_mod, only: type_grid_2d
+      use model_sponge_mod, only: FACE_S, FACE_N
+      class(type_model_wavemaker), intent(in) :: this
+      type(type_grid_2d), intent(in) :: grid
+      type(type_bnd_spectrum), intent(in) :: set
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: f_end, frac
+      character(160) :: msg
+
+      ! seam spans the fed face: the full x-extent for a S/N face, y for W/E
+      if (this%flather_face == FACE_S .or. this%flather_face == FACE_N) then
+         f_end = real(grid%M - 1, SP)*grid%dx0
+      else
+         f_end = real(grid%N - 1, SP)*grid%dy0
+      end if
+      frac = bnd_seam_fraction(set, 0.0_SP, f_end)
+
+      write (msg, "(a,i0,a,f8.2,a,f8.2,a,f6.1,a)") &
+         "wavemaker: spatially-varying feed, ", set%nloc, &
+         " anchors on y=[", set%y_loc(1), ",", set%y_loc(set%nloc), &
+         "] m; periodic-y seam = ", 100.0_SP*frac, "% of local amplitude (unblended)"
+      call env%log%info(trim(msg))
+
+   end subroutine report_seam
+
+   ! ----------------------------------------------------------------
+   ! RMS complex jump between the feed at two alongshore stations (the
+   ! periodic-y domain ends), as a fraction of the local signal
+   ! amplitude: sqrt( sum |A_south - A_north|^2 / sum <|A|^2> ) over the
+   ! (freq, dir) components, each A the clamped complex blend of the
+   ! bracketing anchors.  ~sqrt(2) for fully independent ends, 0 when they
+   ! agree.  Pure — the report_seam logger and the unit test share it.
+   ! ----------------------------------------------------------------
+   pure function bnd_seam_fraction(set, y_south, y_north) result(frac)
+      type(type_bnd_spectrum), intent(in) :: set
+      real(SP), intent(in) :: y_south, y_north
+      real(SP) :: frac
+
+      real(SP) :: seam_e, tot_e, as_r, as_i, an_r, an_i, ws, wn
+      integer :: kf, kdir, los, hos, lon, hon
+
+      call seam_bracket(set, y_south, los, hos, ws)
+      call seam_bracket(set, y_north, lon, hon, wn)
+
+      seam_e = 0.0_SP; tot_e = 0.0_SP
+      do kf = 1, set%nfreq
+         do kdir = 1, set%ndir
+            as_r = (1.0_SP - ws)*set%amp(kf, kdir, los)*cos(set%phase(kf, kdir, los)) &
+                   + ws*set%amp(kf, kdir, hos)*cos(set%phase(kf, kdir, hos))
+            as_i = (1.0_SP - ws)*set%amp(kf, kdir, los)*sin(set%phase(kf, kdir, los)) &
+                   + ws*set%amp(kf, kdir, hos)*sin(set%phase(kf, kdir, hos))
+            an_r = (1.0_SP - wn)*set%amp(kf, kdir, lon)*cos(set%phase(kf, kdir, lon)) &
+                   + wn*set%amp(kf, kdir, hon)*cos(set%phase(kf, kdir, hon))
+            an_i = (1.0_SP - wn)*set%amp(kf, kdir, lon)*sin(set%phase(kf, kdir, lon)) &
+                   + wn*set%amp(kf, kdir, hon)*sin(set%phase(kf, kdir, hon))
+            seam_e = seam_e + (as_r - an_r)**2 + (as_i - an_i)**2
+            tot_e = tot_e + 0.5_SP*(as_r**2 + as_i**2 + an_r**2 + an_i**2)
+         end do
+      end do
+
+      if (tot_e > 0.0_SP) then
+         frac = sqrt(seam_e/tot_e)
+      else
+         frac = 0.0_SP
+      end if
+
+   end function bnd_seam_fraction
+
+   ! Scalar alongshore bracket (low index, high index, clamped weight) for
+   ! a single query y — the seam-probe form of alongshore_bracket.
+   pure subroutine seam_bracket(set, y, lo, hi, w)
+      use core_time_series_mod, only: interp_weight
+      type(type_bnd_spectrum), intent(in) :: set
+      real(SP), intent(in) :: y
+      integer, intent(out) :: lo, hi
+      real(SP), intent(out) :: w
+
+      integer :: m
+
+      if (y <= set%y_loc(1)) then
+         lo = 1; w = 0.0_SP
+      else if (y >= set%y_loc(set%nloc)) then
+         lo = set%nloc - 1; w = 1.0_SP
+      else
+         do m = 1, set%nloc - 1
+            if (y < set%y_loc(m + 1)) exit
+         end do
+         lo = m
+         w = interp_weight(y, set%y_loc(m), set%y_loc(m + 1))
+      end if
+      hi = min(lo + 1, set%nloc)
+
+   end subroutine seam_bracket
 
    ! ----------------------------------------------------------------
    ! Private: boundary relaxation sponge (legacy CALCULATE_SPONGE_MAKER,
