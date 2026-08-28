@@ -1,0 +1,3 @@
+# y_loc(m)  spectrum_file (relative to this manifest)
+40.0   wk2d_A.txt
+280.0  wk2d_B.txt

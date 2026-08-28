@@ -1,0 +1,33 @@
+# Boundary-feed wavemaker on the EAST Flather face (all-boundary rung): the
+# mirror of data2d_flather.yaml with the feed and the absorber swapped.  The
+# east forcing.wavemaker carries no sponge -> a Flather radiation face; the
+# face_relative frame (default) rotates theta = 0 to the east inward normal
+# (-x), so the SAME 1.0 m table radiates westward into the domain.  The west
+# sponge absorbs the transmitted wave.  Oracle recovers Hm0 in the interior vs
+# the 1.0 m target, exactly as the west case does — coverage that the feed
+# works on a non-west boundary end-to-end.
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [500, 80]
+  bathymetry: {type: flat, depth: 10.0}
+simulation: {title: wm_boundary_data2d_flather_east, total_time: 340.0, screen_interval: 100.0}
+wavemaker:
+  name: eastfeed
+  seed: 66
+  spectrum: {type: spectrum_2d, file: data/wk2d_flat.txt}
+boundaries:
+  east:
+    forcing: {wavemaker: eastfeed, depth: 10.0}
+  west:
+    sponge: {width: 160.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
+breaking: {model: shock_capturing, Cbrk1: 0.65, Cbrk2: 0.35}
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [195.0, 205.0, 215.0, 225.0, 235.0, 215.0, 215.0]
+      y: [80.0, 80.0, 80.0, 80.0, 80.0, 40.0, 120.0]
+      variables: [eta]
+      interval: 0.1

@@ -1,0 +1,36 @@
+# Spatially-varying boundary-feed wavemaker (case A: periodic-y).  The west
+# feed reads a two-anchor manifest (locations:) instead of one spectrum: the
+# spectrum interpolates along the face between anchor A (Hm0 0.5 m) at y = 40
+# and anchor B (Hm0 1.5 m) at y = 280, both single-direction (theta = 0) scaled
+# copies of one flat 41-line ladder so Hm0 varies LINEARLY in y.  An alongshore
+# station line at x = 285 samples the GRADIENT INTERIOR; the oracle checks Hm0(y)
+# against the interpolated target.  Periodic-y wraps A onto B (a 0.5 <-> 1.5 seam
+# at y = 0 == 320); its diffraction reaches ~100 m inward, so the stations sit in
+# y = [120, 240] (>= 80 m off the wrap) — the clean zone.  The seam magnitude
+# itself is unit-tested, and case B (non-periodic) removes it entirely.
+grid:
+  cell_size: [1.0, 4.0]
+  n_cells: [500, 80]
+  bathymetry: {type: flat, depth: 10.0}
+simulation: {title: wm_boundary_varying, total_time: 340.0, screen_interval: 100.0}
+wavemaker:
+  name: westfeed
+  seed: 66
+  spectrum: {type: spectrum_2d, locations: data/locations.txt}
+boundaries:
+  west:
+    forcing: {wavemaker: westfeed, depth: 10.0}
+    sponge: {width: 80.0, direct: {r: 0.85, a: 5.0}}
+  east:
+    sponge: {width: 160.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
+breaking: {model: shock_capturing, Cbrk1: 0.65, Cbrk2: 0.35}
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [285.0, 285.0, 285.0, 285.0]
+      y: [120.0, 160.0, 200.0, 240.0]
+      variables: [eta]
+      interval: 0.1

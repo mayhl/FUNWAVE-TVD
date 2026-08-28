@@ -757,3 +757,64 @@ simulations:
     tolerances:
       # measured Hm0 0.979 vs 1x target -> err 2.1%, band 99.3%
       wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+
+  # ── Boundary-feed wavemaker on the EAST Flather face (all-boundary rung) ──
+  # Mirror of wm_boundary_flather with the feed on the east face; the
+  # face_relative frame rotates theta = 0 to the east inward normal, so the
+  # 1.0 m table radiates westward.  Confirms the feed transmits on a non-west
+  # boundary; the west sponge absorbs the through wave.
+  - name: wm_boundary_flather_east
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/wavemaker_boundary
+    input_files: [data2d_flather_east.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, boundary, flather, allbnd, forcing, local]
+    postprocess:
+      wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
+    tolerances:
+      wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+
+  # ── spatially-varying boundary feed: Hm0 profile along the face ──
+  # Case A (periodic-y).  The west feed reads a two-anchor manifest so the fed
+  # spectrum interpolates along the face: Hm0 0.5 m at y = 40 to 1.5 m at
+  # y = 280 (single-direction scaled copies -> linear Hm0 in y).  An alongshore
+  # station line at x = 285 (>= 40 m off the periodic wrap) samples the clamped
+  # ends and the gradient; the oracle checks measured Hm0(y) vs the interpolated
+  # target end-to-end through the solver.  theta = 0 keeps the columns
+  # quasi-independent so a near-boundary gauge reads its local fed Hm0.
+  - name: wm_boundary_varying
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/wavemaker_boundary_varying
+    input_files: [data2d_varying.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, boundary, varying, forcing, local]
+    postprocess:
+      wavemaker_boundary_varying: test.validation.oracles.wavemaker_boundary_varying
+    tolerances:
+      wavemaker_boundary_varying: { hm0_profile_err_pct: 15.0 }
+
+  # ── spatially-varying boundary feed, case B: non-periodic (no seam) ──
+  # Same rig without periodic-y (N/S default to solid walls), so there is no
+  # wrap seam and the station line spans the FULL gradient y = [40, 280] with
+  # the low anchor recovered EXACTLY (0.0 % at y = 40).  The trade vs case A:
+  # the wall blocks the gradient-driven alongshore adjustment, leaving a
+  # ~10 % interior Hm0 deficit that grows with amplitude (11.1 % at the high
+  # anchor) — where case A's periodic interior was near-exact.  N/S sponges
+  # would remove both the seam and the wall deficit (a future variant).
+  - name: wm_boundary_varying_nonper
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/wavemaker_boundary_varying
+    input_files: [data2d_varying_nonper.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, boundary, varying, nonper, forcing, local]
+    postprocess:
+      wavemaker_boundary_varying: test.validation.oracles.wavemaker_boundary_varying
+    tolerances:
+      # measured: anchor exact (0%), interior deficit to 11.1% at the high anchor
+      wavemaker_boundary_varying: { hm0_profile_err_pct: 15.0 }
