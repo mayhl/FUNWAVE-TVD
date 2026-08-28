@@ -254,12 +254,13 @@ contains
    ! Legacy VESSEL_INITIAL: open one vessel_NNNNN per hull, read its geometry
    ! and first track point, and leave the unit open -- VESSEL_FORCING streams
    ! the rest of the track from it, one segment at a time.
-   subroutine vessel_init_compute(this, grid, env, result_folder, t_start)
+   subroutine vessel_init_compute(this, grid, env, result_folder, t_start, is_hotstart)
       class(type_model_vessel), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       type(type_env), intent(inout) :: env
       character(*), intent(in) :: result_folder
       real(SP), intent(in) :: t_start
+      logical, intent(in) :: is_hotstart
 
       integer :: k, i, j, ios, u
       character(len=256) :: fname
@@ -268,6 +269,12 @@ contains
       real(SP) :: e0, t0, x0, y0
 
       if (.not. this%is_activated) return
+
+      ! the initial-draft eta-sink (MakeVesselDraft) fires only on a COLD start;
+      ! on a hotstart the restored surface already carries the hull's hole, so
+      ! re-sinking it would double-apply the draft (a self-consistency round-trip
+      ! catches this)
+      this%make_draft = .not. is_hotstart
 
       this%result_folder = result_folder
       this%is_io_rank = env%comm%is_io_node()

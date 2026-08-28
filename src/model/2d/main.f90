@@ -772,7 +772,9 @@ contains
       ! is evaluated on -- so the grid must already be spaced
       call this%vessel%init_compute(this%grid, this%env, &
                                     this%output%result_folder, &
-                                    this%simulation%t_start)
+                                    this%simulation%t_start, &
+                                    this%hot_start%use_checkpoint .or. &
+                                    this%hot_start%is_activated)
       ! legacy SEDIMENT_INITIAL: zeroed transport state plus the grain
       ! parameters, which depend on config alone
       call this%sediment%init_compute(this%grid, this%env, this%fields%depth)
