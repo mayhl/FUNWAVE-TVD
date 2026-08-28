@@ -1,0 +1,31 @@
+# Vessel checkpoint round-trip — a slender hull generating its own wake.
+# SLENDER source (make_draft's eta-sink is inert since p_total stays zero, so
+# the restart re-init adds nothing there); NSWE so the round-trip is exactly
+# bitwise (tol 0).  The harness derives the A / B1 / B2 legs; on restart the
+# vessel reader re-seeds and catches up to the checkpoint time BY TIME (records
+# every 2 s, checkpoint at 4 s), so the wake over T/2->T must match A bitwise.
+grid:
+  cell_size: [1.0, 1.0]
+  n_cells: [200, 40]
+  n_procs: [1, 1]
+  bathymetry: {type: flat, depth: 10.0}
+simulation:
+  title: vessel_slender
+  total_time: 8.0
+boundaries:
+  periodic: [y]
+dispersion:
+  scheme: nswe
+vessel:
+  folder: ./data/
+  count: 1
+numerics:
+  dt: 0.02
+  min_depth: 0.01
+output:
+  result_folder: ./out/
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 8.0

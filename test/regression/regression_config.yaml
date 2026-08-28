@@ -215,6 +215,47 @@ simulations:
     tolerances:
       field: { default: 0.0 }
 
+  # vessel_slender: vessel-reader restart round-trip (no ref branch).  A slender
+  # hull transit run 0->T vs 0->T/2 + restart T/2->T must leave the same
+  # core.bin.  The reader keeps no checkpoint state; on restart it re-seeds and
+  # catches up to the checkpoint time BY TIME (track records every 2 s,
+  # checkpoint at 4 s), so this guards that the caught-up bracket reproduces the
+  # continuous run.  SLENDER (make_draft's eta-sink stays inert, p_total zero) +
+  # NSWE make it exactly bitwise (tol 0).  decomp [1,1] like the other
+  # round-trips.  A byte-vs-ref case is not possible: the reader migration
+  # deliberately changed the near-record-boundary interpolation, so dev and the
+  # old-vessel ref differ by design.
+  - name: vessel_slender
+    test_type: self_consistency
+    exe_type: central
+    input: test/regression/inputs/vessel
+    input_file: vessel_slender.yaml
+    decomp: [1, 1]
+    binary: funwave
+    tags: [vessel, smoke]
+    postprocess:
+      field: test.regression.postproc.checkpoint_compare
+    tolerances:
+      field: { default: 0.0 }
+
+  # vessel_pressure: the pressure-hull twin of vessel_slender.  Its make_draft
+  # eta-sink fires on the cold legs (A, B1) but is skipped on the restart leg
+  # (vessel init takes the hotstart flag), so the round-trip is bitwise (tol 0).
+  # Regresses the double-sink-on-restart fix; also covers the PRESSURE source
+  # path across a checkpoint.
+  - name: vessel_pressure
+    test_type: self_consistency
+    exe_type: central
+    input: test/regression/inputs/vessel_pressure
+    input_file: vessel_pressure.yaml
+    decomp: [1, 1]
+    binary: funwave
+    tags: [vessel, smoke]
+    postprocess:
+      field: test.regression.postproc.checkpoint_compare
+    tolerances:
+      field: { default: 0.0 }
+
   # wavemaker_repro_tma: deterministic phase-seed guard (ZERO_PHASE off).
   # Runs the irregular-TMA deck twice with the same dev binary and asserts the
   # two end-of-run core.bin files are BITWISE identical (tol 0). ny_proc=2 splits

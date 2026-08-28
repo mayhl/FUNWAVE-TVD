@@ -1,0 +1,30 @@
+# Vessel checkpoint round-trip -- a PRESSURE hull generating its own wake.
+# make_draft (the initial eta-sink) fires only on the COLD legs (A, B1); on
+# the restart leg it is skipped (vessel init takes the hotstart flag), so the
+# round-trip is exactly bitwise (tol 0) -- this regresses the fix for the
+# double-sink-on-restart bug.  NSWE; the reader catches up by TIME on restart.
+grid:
+  cell_size: [1.0, 1.0]
+  n_cells: [200, 40]
+  n_procs: [1, 1]
+  bathymetry: {type: flat, depth: 10.0}
+simulation:
+  title: vessel_pressure
+  total_time: 8.0
+boundaries:
+  periodic: [y]
+dispersion:
+  scheme: nswe
+vessel:
+  folder: ./data/
+  count: 1
+numerics:
+  dt: 0.02
+  min_depth: 0.01
+output:
+  result_folder: ./out/
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta]
+      interval: 8.0

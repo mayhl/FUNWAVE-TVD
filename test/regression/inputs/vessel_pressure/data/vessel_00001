@@ -1,0 +1,10 @@
+pressure hull, +x transit for the checkpoint round-trip
+PRESSURE 1
+length width alpha1 alpha2 beta Pvessel
+20.0 10.0 0.5 0.5 0.5 0.1
+time x y
+0.0  40.0  20.0
+2.0  60.0  20.0
+4.0  80.0  20.0
+6.0  100.0 20.0
+8.0  120.0 20.0
