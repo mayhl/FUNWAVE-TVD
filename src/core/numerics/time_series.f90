@@ -29,6 +29,7 @@ module core_time_series_mod
    private
 
    public :: type_time_series
+   public :: interp_weight
 
    type :: type_time_series
       integer :: unit = -1
@@ -105,13 +106,28 @@ contains
       end do
 
       if (this%t2 > this%t1) then
-         frac = (tq - this%t1)/(this%t2 - this%t1)
-         frac = max(0.0_SP, min(1.0_SP, frac))  ! no extrapolation
+         frac = interp_weight(tq, this%t1, this%t2)
       else
          frac = 1.0_SP                          ! collapsed bracket -> latest
       end if
       out = this%f1*(1.0_SP - frac) + this%f2*frac
    end subroutine ts_sample
+
+   ! Clamped linear blend fraction of xq within [x1, x2], in [0, 1] so a
+   ! query outside the bracket holds the nearest endpoint (no
+   ! extrapolation).  The shared interpolation contract for the time
+   ! bracket here and the alongshore boundary-spectrum blend; a collapsed
+   ! bracket (x2 <= x1) returns 0 (the low endpoint).
+   pure function interp_weight(xq, x1, x2) result(frac)
+      real(SP), intent(in) :: xq, x1, x2
+      real(SP) :: frac
+
+      if (x2 > x1) then
+         frac = max(0.0_SP, min(1.0_SP, (xq - x1)/(x2 - x1)))
+      else
+         frac = 0.0_SP
+      end if
+   end function interp_weight
 
    ! Current-segment slope d(field)/dt = (f2 - f1)/(t2 - t1), zero on a
    ! collapsed bracket (single record, before the first, or EOF-frozen).
