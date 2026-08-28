@@ -10,6 +10,7 @@ qadd_pfunit_ctest(test_yaml_parallel 2)
 qadd_pfunit_ctest(test_time_utils)
 qadd_pfunit_ctest(test_memory)
 qadd_pfunit_ctest(test_interpolation 2)
+qadd_pfunit_ctest(test_time_series)
 
 qadd_pfunit_ctest(test_accumulators)
 qadd_pfunit_ctest(test_crs)

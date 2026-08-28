@@ -1,0 +1,155 @@
+! allow(E001)
+module test_time_series
+
+   use FUnit
+   use core_constants_mod, only: SP
+   use core_time_series_mod, only: type_time_series
+   implicit none
+
+contains
+
+   ! Write a header line plus (t, f) records to a scratch file.
+   subroutine write_series(fname, t, f)
+      character(*), intent(in) :: fname
+      real(SP), intent(in) :: t(:), f(:)
+      integer :: u, i
+
+      open (newunit=u, file=fname, status='replace', action='write')
+      write (u, '(A)') '# t  f'
+      do i = 1, size(t)
+         write (u, *) t(i), f(i)
+      end do
+      close (u)
+   end subroutine write_series
+
+   ! Linear-in-time blend inside a bracket, with the bracket advancing one
+   ! record at a time as the query time moves forward.
+   @test
+   subroutine test_linear_interp()
+      type(type_time_series) :: s
+      real(SP) :: out(1)
+
+      call write_series('ts_a.txt', [real(SP) :: 0., 10., 20.], &
+                        [real(SP) :: 0., 10., 30.])
+      call s%open('ts_a.txt', 1, .true.)
+      call s%sample(0.0_SP, out)
+      @assertEqual(0.0_SP, out(1), 1.0e-6_SP)
+      call s%sample(5.0_SP, out)
+      @assertEqual(5.0_SP, out(1), 1.0e-6_SP)
+      call s%sample(15.0_SP, out)
+      @assertEqual(20.0_SP, out(1), 1.0e-6_SP)
+      call s%close()
+   end subroutine test_linear_interp
+
+   ! A single query that jumps past several records keeps the TIGHT bracket
+   ! (the low slot slides on every read, unlike a slide-once advance).
+   @test
+   subroutine test_multi_record_catchup()
+      type(type_time_series) :: s
+      real(SP) :: out(1)
+
+      call write_series('ts_b.txt', [real(SP) :: 0., 10., 20., 30., 40.], &
+                        [real(SP) :: 0., 1., 2., 3., 4.])
+      call s%open('ts_b.txt', 1, .true.)
+      call s%sample(35.0_SP, out)
+      @assertEqual(3.5_SP, out(1), 1.0e-6_SP)
+      call s%close()
+   end subroutine test_multi_record_catchup
+
+   ! Past the last record the bracket freezes at it and eof is raised.
+   @test
+   subroutine test_eof_freeze()
+      type(type_time_series) :: s
+      real(SP) :: out(1)
+
+      call write_series('ts_c.txt', [real(SP) :: 0., 10.], [real(SP) :: 0., 5.])
+      call s%open('ts_c.txt', 1, .true.)
+      call s%sample(5.0_SP, out)
+      @assertEqual(2.5_SP, out(1), 1.0e-6_SP)
+      call s%sample(100.0_SP, out)
+      @assertEqual(5.0_SP, out(1), 1.0e-6_SP)
+      @assertTrue(s%eof)
+      call s%close()
+   end subroutine test_eof_freeze
+
+   ! A query before the first record holds the first value (clamped bracket),
+   ! never extrapolates below it.
+   @test
+   subroutine test_hold_before_first()
+      type(type_time_series) :: s
+      real(SP) :: out(1)
+
+      call write_series('ts_d.txt', [real(SP) :: 10., 20.], [real(SP) :: 5., 15.])
+      call s%open('ts_d.txt', 1, .true.)
+      call s%sample(0.0_SP, out)
+      @assertEqual(5.0_SP, out(1), 1.0e-6_SP)
+      call s%close()
+   end subroutine test_hold_before_first
+
+   ! rate returns the current-segment slope after a sample, and zero on a
+   ! collapsed bracket (before the first record).
+   @test
+   subroutine test_rate()
+      type(type_time_series) :: s
+      real(SP) :: out(1), r(1)
+
+      call write_series('ts_r.txt', [real(SP) :: 0., 10., 20.], &
+                        [real(SP) :: 0., 5., 25.])
+      call s%open('ts_r.txt', 1, .true.)
+      call s%sample(-5.0_SP, out)   ! before the first record -> collapsed
+      call s%rate(r)
+      @assertEqual(0.0_SP, r(1), 1.0e-6_SP)
+      call s%sample(5.0_SP, out)    ! segment [0,10]: slope (5-0)/10
+      call s%rate(r)
+      @assertEqual(0.5_SP, r(1), 1.0e-6_SP)
+      call s%sample(15.0_SP, out)   ! segment [10,20]: slope (25-5)/10
+      call s%rate(r)
+      @assertEqual(2.0_SP, r(1), 1.0e-6_SP)
+      call s%close()
+   end subroutine test_rate
+
+   ! attach adopts an already-open unit past a caller-consumed preamble,
+   ! seeding from the caller's first record and streaming the rest.
+   @test
+   subroutine test_attach()
+      type(type_time_series) :: s
+      real(SP) :: out(1), t0, f0(1)
+      integer :: u
+      character(len=1) :: dummy
+
+      open (newunit=u, file='ts_at.txt', status='replace', action='write')
+      write (u, '(A)') '# preamble the caller reads'
+      write (u, *) 0.0_SP, 0.0_SP
+      write (u, *) 10.0_SP, 10.0_SP
+      close (u)
+      open (newunit=u, file='ts_at.txt', status='old', action='read')
+      read (u, '(A)') dummy          ! caller consumes the preamble
+      read (u, *) t0, f0             ! caller reads the first record
+      call s%attach(u, t0, f0)
+      call s%sample(0.0_SP, out)
+      @assertEqual(0.0_SP, out(1), 1.0e-6_SP)
+      call s%sample(5.0_SP, out)     ! streams the second record and interpolates
+      @assertEqual(5.0_SP, out(1), 1.0e-6_SP)
+      call s%close()
+   end subroutine test_attach
+
+   ! Multiple fields per record blend independently.
+   @test
+   subroutine test_multifield()
+      type(type_time_series) :: s
+      real(SP) :: out(2)
+      integer :: u
+
+      open (newunit=u, file='ts_e.txt', status='replace', action='write')
+      write (u, '(A)') '# t  f1  f2'
+      write (u, *) 0.0_SP, 0.0_SP, 100.0_SP
+      write (u, *) 10.0_SP, 10.0_SP, 200.0_SP
+      close (u)
+      call s%open('ts_e.txt', 2, .true.)
+      call s%sample(5.0_SP, out)
+      @assertEqual(5.0_SP, out(1), 1.0e-6_SP)
+      @assertEqual(150.0_SP, out(2), 1.0e-6_SP)
+      call s%close()
+   end subroutine test_multifield
+
+end module test_time_series
