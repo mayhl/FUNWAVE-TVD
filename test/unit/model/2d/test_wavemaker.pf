@@ -10,7 +10,10 @@ module test_wavemaker
    use core_grid_mod, only: type_grid_2d
    use model_initial_mod, only: type_model_initial
    use model_breaking_mod, only: type_model_breaking
-   use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers
+   use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers, &
+                                  type_bnd_spectrum, bnd_seam_fraction, &
+                                  DIR_CARTESIAN
+   use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
 
    implicit none
 
@@ -232,5 +235,251 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_read_coexist_multi_entry
+
+   ! ----------------------------------------------------------------
+   ! Spatially-varying boundary feed.  Write a single-direction (theta=0)
+   ! 2D spectrum at two anchors with different amplitudes, and a manifest
+   ! placing them at y = 2 and y = 5 on an 8-cell face.  With theta = 0 the
+   ! spatial ramp has no y term, so the per-frequency envelope
+   ! sqrt(Cm_eta^2 + Sm_eta^2) equals the blended component amplitude at
+   ! every cross-shore i — an exact readout of the alongshore blend and
+   ! its end-clamps.  zero_phase makes the complex blend collapse to a
+   ! linear amplitude interpolation.
+   ! ----------------------------------------------------------------
+
+   ! nfreq=2, ndir=1 (theta=0), NO phase block -> the energy-only path.
+   subroutine write_spec2d_1dir(fname, a1, a2)
+      character(*), intent(in) :: fname
+      real(SP), intent(in) :: a1, a2
+      integer :: unit
+      open (newunit=unit, file=fname, status='replace', action='write')
+      write (unit, '(I0,1X,I0)') 2, 1
+      write (unit, '(F6.2)') 10.0_SP
+      write (unit, '(F6.3)') 0.10_SP
+      write (unit, '(F6.3)') 0.20_SP
+      write (unit, '(F8.2)') 0.0_SP
+      write (unit, '(2F10.5)') a1, a2
+      close (unit)
+   end subroutine write_spec2d_1dir
+
+   subroutine init_bnd_varying(this, wm, manifest, face, absolute)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker), intent(inout) :: wm
+      character(*), intent(in) :: manifest
+      integer, intent(in), optional :: face   ! fed face (default west/relaxation, axis = y)
+      logical, intent(in), optional :: absolute   ! absolute direction frame (default face-relative)
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(type_env)     :: env
+      call open_env(this, env, comm)
+      grid%M = 6; grid%N = 8
+      grid%nx_proc = 1; grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+      wm%wavemaker_type = 'boundary'
+      wm%WAVE_DATA_TYPE = 'DATA'
+      wm%loclist_file = manifest
+      wm%DepthWaveMaker = DEP_SP
+      wm%zero_phase = .true.
+      if (present(face)) wm%flather_face = face
+      if (present(absolute)) then
+         if (absolute) wm%dir_convention = DIR_CARTESIAN
+      end if
+      call wm%init_compute(grid, .false., env, -0.531_SP)
+   end subroutine init_bnd_varying
+
+   ! Clamped linear reference blend (must mirror interp_weight).
+   pure function expect_blend(y, yl, al, yh, ah) result(v)
+      real(SP), intent(in) :: y, yl, al, yh, ah
+      real(SP) :: v, w
+      w = max(0.0_SP, min(1.0_SP, (y - yl)/(yh - yl)))
+      v = (1.0_SP - w)*al + w*ah
+   end function expect_blend
+
+   @test(npes=[1])
+   subroutine test_bnd_varying_blend(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm
+      integer :: unit, j, ic
+      real(SP) :: y, e1, e2, env_ib, env_ie
+
+      call write_spec2d_1dir('bv_A.txt', 0.05_SP, 0.06_SP)
+      call write_spec2d_1dir('bv_B.txt', 0.15_SP, 0.12_SP)
+      open (newunit=unit, file='bv_loc.txt', status='replace', action='write')
+      write (unit, '(A)') '# y_loc  file'
+      write (unit, '(A)') '2.0 bv_A.txt'
+      write (unit, '(A)') '5.0 bv_B.txt'
+      close (unit)
+
+      call init_bnd_varying(this, wm, 'bv_loc.txt')
+
+      ic = size(wm%Cm_eta, 1)/2      ! a mid cross-shore column
+      do j = 1, size(wm%Cm_eta, 2)
+         y = wm%ymk_wk(j)
+         e1 = sqrt(wm%Cm_eta(ic, j, 1)**2 + wm%Sm_eta(ic, j, 1)**2)
+         e2 = sqrt(wm%Cm_eta(ic, j, 2)**2 + wm%Sm_eta(ic, j, 2)**2)
+         ! blended amplitude, clamped past the y = 2 and y = 5 anchors
+         @assertEqual(expect_blend(y, 2.0_SP, 0.05_SP, 5.0_SP, 0.15_SP), e1, TOL_SP)
+         @assertEqual(expect_blend(y, 2.0_SP, 0.06_SP, 5.0_SP, 0.12_SP), e2, TOL_SP)
+         ! envelope is independent of the cross-shore column (theta = 0)
+         env_ib = sqrt(wm%Cm_eta(1, j, 1)**2 + wm%Sm_eta(1, j, 1)**2)
+         env_ie = sqrt(wm%Cm_eta(size(wm%Cm_eta, 1), j, 1)**2 &
+                       + wm%Sm_eta(size(wm%Cm_eta, 1), j, 1)**2)
+         @assertEqual(env_ib, env_ie, TOL_SP)
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_bnd_varying_blend
+
+   ! ----------------------------------------------------------------
+   ! Coordinate omitted -> anchors distributed equispaced along the face
+   ! (endpoints inclusive) in manifest order.  Two bare-filename anchors on
+   ! the N = 8, dy = 1 face (L_face = 7) land at y = 0 and y = 7, so the
+   ! envelope blends linearly across the whole span.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_bnd_varying_equispaced(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm
+      integer :: unit, j, ic
+      real(SP) :: y, e1, e2
+
+      call write_spec2d_1dir('bve_A.txt', 0.05_SP, 0.06_SP)
+      call write_spec2d_1dir('bve_B.txt', 0.15_SP, 0.12_SP)
+      open (newunit=unit, file='bve_loc.txt', status='replace', action='write')
+      write (unit, '(A)') '# no coordinates -> equispaced in this order'
+      write (unit, '(A)') 'bve_A.txt'
+      write (unit, '(A)') 'bve_B.txt'
+      close (unit)
+
+      call init_bnd_varying(this, wm, 'bve_loc.txt')
+
+      ic = size(wm%Cm_eta, 1)/2
+      do j = 1, size(wm%Cm_eta, 2)
+         y = wm%ymk_wk(j)
+         e1 = sqrt(wm%Cm_eta(ic, j, 1)**2 + wm%Sm_eta(ic, j, 1)**2)
+         e2 = sqrt(wm%Cm_eta(ic, j, 2)**2 + wm%Sm_eta(ic, j, 2)**2)
+         ! equispaced anchors at y = 0 and y = 7 (L_face = (8-1)*1)
+         @assertEqual(expect_blend(y, 0.0_SP, 0.05_SP, 7.0_SP, 0.15_SP), e1, TOL_SP)
+         @assertEqual(expect_blend(y, 0.0_SP, 0.06_SP, 7.0_SP, 0.12_SP), e2, TOL_SP)
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_bnd_varying_equispaced
+
+   ! ----------------------------------------------------------------
+   ! Face-aware blend axis: a S/N-fed feed must interpolate along x, not y.
+   ! With flather_face = FACE_S and anchors placed along x (at x = 1 and
+   ! x = 4), the per-frequency envelope must vary with the cross-shore
+   ! column i (xmk_wk) and be CONSTANT down j — the mirror of the west
+   ! case, and the only cover for the S/N -> x branch.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_bnd_varying_face_axis(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm
+      integer :: unit, i, j
+      real(SP) :: x, e_here, e_j1
+
+      call write_spec2d_1dir('bvf_A.txt', 0.05_SP, 0.06_SP)
+      call write_spec2d_1dir('bvf_B.txt', 0.15_SP, 0.12_SP)
+      open (newunit=unit, file='bvf_loc.txt', status='replace', action='write')
+      write (unit, '(A)') '1.0 bvf_A.txt'
+      write (unit, '(A)') '4.0 bvf_B.txt'
+      close (unit)
+
+      call init_bnd_varying(this, wm, 'bvf_loc.txt', face=FACE_S)
+
+      do i = 1, size(wm%Cm_eta, 1)
+         x = wm%xmk_wk(i)
+         ! blend runs along x (the fed S face), clamped past x = 1 and x = 4
+         e_here = sqrt(wm%Cm_eta(i, 2, 1)**2 + wm%Sm_eta(i, 2, 1)**2)
+         @assertEqual(expect_blend(x, 1.0_SP, 0.05_SP, 4.0_SP, 0.15_SP), e_here, TOL_SP)
+         ! and it is constant down j (no y dependence in the amplitude)
+         do j = 1, size(wm%Cm_eta, 2)
+            e_j1 = sqrt(wm%Cm_eta(i, j, 1)**2 + wm%Sm_eta(i, j, 1)**2)
+            @assertEqual(e_here, e_j1, TOL_SP)
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_bnd_varying_face_axis
+
+   ! ----------------------------------------------------------------
+   ! Face-relative frame: a theta = 0 feed must propagate INTO the domain
+   ! on every face.  For a single direction Cm_u = (transfer cos theta) Cm_eta
+   ! and Cm_v = (transfer sin theta) Cm_eta pointwise, so sum(Cm_u*Cm_eta)
+   ! carries the sign of the boundary-normal velocity: +x for west, -x for
+   ! east; sum(Cm_v*Cm_eta) is +y for south, -y for north.  Absolute frame
+   ! leaves theta = 0 pointing +x on every face (east then radiates outward,
+   ! sum(Cm_u*Cm_eta) > 0) — the control that the rotation is frame-gated.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_bnd_face_relative_orientation(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm(4), wabs
+      integer :: unit, k, faces(4)
+      real(SP) :: s_u, s_v, s_in
+
+      call write_spec2d_1dir('bo_A.txt', 0.08_SP, 0.05_SP)
+      open (newunit=unit, file='bo_loc.txt', status='replace', action='write')
+      write (unit, '(A)') '1.0 bo_A.txt'
+      close (unit)
+
+      ! inward-normal velocity sum must be positive on every face: +x west,
+      ! -x east, +y south, -y north (sign folded into s_in below)
+      faces = [FACE_W, FACE_E, FACE_S, FACE_N]
+      do k = 1, 4
+         call init_bnd_varying(this, wm(k), 'bo_loc.txt', face=faces(k))
+         s_u = sum(wm(k)%Cm_u*wm(k)%Cm_eta)
+         s_v = sum(wm(k)%Cm_v*wm(k)%Cm_eta)
+         select case (faces(k))
+         case (FACE_W)
+            s_in = s_u
+         case (FACE_E)
+            s_in = -s_u
+         case (FACE_S)
+            s_in = s_v
+         case default
+            s_in = -s_v
+         end select
+         @assertTrue(s_in > 0.0_SP)
+      end do
+
+      ! absolute frame leaves an east feed pointing +x (outward), a control
+      ! that the rotation is gated on the frame
+      call init_bnd_varying(this, wabs, 'bo_loc.txt', face=FACE_E, absolute=.true.)
+      s_u = sum(wabs%Cm_u*wabs%Cm_eta)
+      @assertTrue(s_u > 0.0_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_bnd_face_relative_orientation
+
+   ! ----------------------------------------------------------------
+   ! Periodic seam metric: two anchors at the domain ends carry the full
+   ! discontinuity.  For amplitudes 0.05 and 0.15 (shared zero phase) the
+   ! fraction is |0.05-0.15| / sqrt(0.5(0.05^2+0.15^2)) = 0.8944; equal
+   ! anchors give exactly zero.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_bnd_seam_fraction(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_bnd_spectrum) :: set
+
+      set%nfreq = 1; set%ndir = 1; set%nloc = 2
+      allocate (set%y_loc(2), set%per_ser(1), set%theta_ser(1))
+      allocate (set%amp(1, 1, 2), set%phase(1, 1, 2))
+      set%y_loc = [0.0_SP, 10.0_SP]
+      set%per_ser = [10.0_SP]; set%theta_ser = [0.0_SP]
+      set%phase = 0.0_SP
+
+      set%amp(1, 1, 1) = 0.05_SP; set%amp(1, 1, 2) = 0.15_SP
+      @assertEqual(0.894427_SP, bnd_seam_fraction(set, 0.0_SP, 10.0_SP), 1.0e-5_SP)
+
+      set%amp(1, 1, 1) = 0.10_SP; set%amp(1, 1, 2) = 0.10_SP
+      @assertEqual(0.0_SP, bnd_seam_fraction(set, 0.0_SP, 10.0_SP), 1.0e-6_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_bnd_seam_fraction
 
 end module test_wavemaker

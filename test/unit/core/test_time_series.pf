@@ -3,10 +3,25 @@ module test_time_series
 
    use FUnit
    use core_constants_mod, only: SP
-   use core_time_series_mod, only: type_time_series
+   use core_time_series_mod, only: type_time_series, interp_weight
    implicit none
 
 contains
+
+   ! Shared clamped-linear-weight primitive: interior fraction, clamps
+   ! outside the bracket (no extrapolation), and a collapsed bracket
+   ! returns the low endpoint.
+   @test
+   subroutine test_interp_weight()
+      @assertEqual(0.0_SP, interp_weight(0.0_SP, 0.0_SP, 10.0_SP), 1.0e-6_SP)
+      @assertEqual(0.25_SP, interp_weight(2.5_SP, 0.0_SP, 10.0_SP), 1.0e-6_SP)
+      @assertEqual(1.0_SP, interp_weight(10.0_SP, 0.0_SP, 10.0_SP), 1.0e-6_SP)
+      ! clamped: below and above the bracket hold the endpoints
+      @assertEqual(0.0_SP, interp_weight(-5.0_SP, 0.0_SP, 10.0_SP), 1.0e-6_SP)
+      @assertEqual(1.0_SP, interp_weight(99.0_SP, 0.0_SP, 10.0_SP), 1.0e-6_SP)
+      ! collapsed bracket -> low endpoint (0)
+      @assertEqual(0.0_SP, interp_weight(5.0_SP, 3.0_SP, 3.0_SP), 1.0e-6_SP)
+   end subroutine test_interp_weight
 
    ! Write a header line plus (t, f) records to a scratch file.
    subroutine write_series(fname, t, f)
