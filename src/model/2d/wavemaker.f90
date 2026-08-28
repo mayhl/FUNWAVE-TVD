@@ -98,6 +98,15 @@ module model_wavemaker_mod
    ! metric — public for unit tests and the future NetCDF reader
    public :: type_bnd_spectrum
    public :: bnd_seam_fraction
+   public :: DIR_LOCAL, DIR_CARTESIAN, DIR_NAUTICAL
+
+   ! boundary-feed direction convention (deck convention:): local =
+   ! face-relative (theta = 0 is the fed face's inward normal, the default);
+   ! cartesian = domain grid axis (theta = 0 is +x); nautical = compass
+   ! azimuth (CW from true North) rotated to the grid via grid.crs (pending)
+   integer, parameter :: DIR_LOCAL = 0
+   integer, parameter :: DIR_CARTESIAN = 1
+   integer, parameter :: DIR_NAUTICAL = 2
 
    ! Default wavemaker phase-RNG seed — matches the legacy WAVE_COHERENCE
    ! fixed-seed convention (a fixed, nonzero value keeps runs reproducible).
@@ -236,6 +245,11 @@ module model_wavemaker_mod
       ! the incident series is added to the tide external target instead of
       ! relaxed through a strip (no sponge_maker built)
       integer  :: flather_face = 0
+      ! direction convention (deck convention:): DIR_LOCAL (face-relative,
+      ! default) / DIR_CARTESIAN (domain grid) / DIR_NAUTICAL (azimuth + CRS,
+      ! pending).  Applied as a per-face rotation of the component direction
+      ! at build (see face_normal_offset).
+      integer  :: dir_convention = DIR_LOCAL
       real(SP), allocatable :: Cm_eta(:, :, :), Sm_eta(:, :, :)
       real(SP), allocatable :: Cm_u(:, :, :), Sm_u(:, :, :)
       real(SP), allocatable :: Cm_v(:, :, :), Sm_v(:, :, :)
@@ -683,7 +697,7 @@ contains
       type(type_model_breaking), intent(in), optional :: breaking
 
       type(type_yaml_reader) :: spec_yaml, blk, brk_yaml
-      character(:), allocatable :: stype, method, legacy_type, normalize
+      character(:), allocatable :: stype, method, legacy_type, normalize, dir_str
       character(:), allocatable :: eqe_mode
       character(8) :: def_bins
       logical :: no_key, no_file, has_dir
@@ -876,6 +890,23 @@ contains
          call spec_yaml%read("format", val=this%WAVE_DATA_TYPE, &
                              default=DEF_WAVEMAKER_SPECTRUM_FORMAT)
          this%wavemaker_type = "WK_DATA2D"
+      end select
+
+      ! direction convention for a boundary feed (its own key -- direction:
+      ! is the regular wave's propagation angle).  Unused by the internal
+      ! source.
+      call spec_yaml%read_enum("convention", [character(9) :: "local", &
+                                              "cartesian", "nautical"], &
+                               val=dir_str, default="local")
+      select case (trim(dir_str))
+      case ("local")
+         this%dir_convention = DIR_LOCAL
+      case ("cartesian")
+         this%dir_convention = DIR_CARTESIAN
+      case ("nautical")
+         call env%log%exit_on_error("wavemaker/spectrum: convention: nautical is"// &
+                                    " pending (grid.crs azimuth rotation not yet"// &
+                                    " wired) -- use local or cartesian")
       end select
 
       if (this%single_dir .and. stype /= "jonswap" .and. stype /= "tma") &
@@ -2243,6 +2274,7 @@ contains
                                       beta_ref)
       use core_grid_mod, only: type_grid_2d
       use core_constants_mod, only: GRAV, SMALL
+      use model_sponge_mod, only: FACE_S, FACE_N
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic, is_jonswap
@@ -2256,9 +2288,10 @@ contains
       real(SP) :: wkn(this%Nfreq), theta(this%Ntheta), ag(this%Ntheta)
       real(SP) :: amp(this%Nfreq, this%Ntheta)
       real(SP) :: phase2d(this%Nfreq, this%Ntheta)
-      real(SP) :: Ef, alpha_spec, alpha1, tb, tc, h_ser, zlev
+      real(SP) :: Ef, alpha_spec, alpha1, tb, tc, h_ser, zlev, off, theta_use
       real(SP) :: theta_per, transfer, arg
       integer :: kf, ktheta, i, j
+      logical :: face_is_x
 
       h_ser = this%DepthWaveMaker
       if (h_ser == 0.0_SP .or. this%FreqPeak == 0.0_SP .or. this%FreqMax == 0.0_SP) &
@@ -2332,14 +2365,22 @@ contains
       this%Cm_u = 0.0_SP; this%Sm_u = 0.0_SP
       this%Cm_v = 0.0_SP; this%Sm_v = 0.0_SP
 
+      face_is_x = this%flather_face == FACE_S .or. this%flather_face == FACE_N
+      off = face_normal_offset(this)
       do kf = 1, this%Nfreq
          do ktheta = 1, this%Ntheta
+            theta_use = theta(ktheta)
+            if (this%dir_convention == DIR_CARTESIAN) theta_use = theta_use - off
             if (periodic) then
-               call calc_periodic_theta(wkn(kf), theta(ktheta), grid%dy0, &
-                                        grid%N, theta_per)
+               if (face_is_x) then
+                  call calc_periodic_theta(wkn(kf), theta_use, grid%dx0, grid%M, theta_per)
+               else
+                  call calc_periodic_theta(wkn(kf), theta_use, grid%dy0, grid%N, theta_per)
+               end if
             else
-               theta_per = theta(ktheta)
+               theta_per = theta_use
             end if
+            theta_per = theta_per + off
             transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
             do j = 1, grid%lp%nloc
                do i = 1, grid%lp%mloc
@@ -2646,6 +2687,32 @@ contains
    ! (no extrapolation past the end anchors).  nloc = 1 collapses to the
    ! single-spectrum feed exactly.
    ! ----------------------------------------------------------------
+   ! ----------------------------------------------------------------
+   ! Absolute angle of the fed face's inward normal (W:+x=0, E:-x=pi,
+   ! S:+y=pi/2, N:-y=-pi/2; 0 for a non-Flather west feed).  The component
+   ! direction is snapped/range-checked in the FACE-RELATIVE frame (angle
+   ! from this normal, so |theta| < 90 = entering) and then rotated by this
+   ! offset into the domain-Cartesian angle the mode build uses.  In the
+   ! absolute deck frame the input is already domain-Cartesian, so we
+   ! subtract the offset to recover the face-relative angle first.
+   ! ----------------------------------------------------------------
+   pure function face_normal_offset(this) result(off)
+      use model_sponge_mod, only: FACE_E, FACE_S, FACE_N
+      type(type_model_wavemaker), intent(in) :: this
+      real(SP) :: off
+
+      off = 0.0_SP
+      select case (this%flather_face)
+      case (FACE_E)
+         off = PI
+      case (FACE_S)
+         off = 0.5_SP*PI
+      case (FACE_N)
+         off = -0.5_SP*PI
+      end select
+
+   end function face_normal_offset
+
    subroutine data_series_coefficients(this, grid, periodic, beta_ref, set)
       use core_grid_mod, only: type_grid_2d
       use core_constants_mod, only: GRAV
@@ -2658,7 +2725,7 @@ contains
       type(type_bnd_spectrum), intent(in) :: set
 
       real(SP) :: wkn(this%Nfreq)
-      real(SP) :: h_ser, zlev, celerity, fk, fkdif
+      real(SP) :: h_ser, zlev, celerity, fk, fkdif, off, theta_use
       real(SP) :: theta_per, transfer, arg, amp_j, ph_j, wj, ar, ai
       integer :: kf, kdir, i, j, iter, lo, hi, fidx
       integer, allocatable :: blo(:)
@@ -2698,6 +2765,10 @@ contains
          call alongshore_bracket(set, this%ymk_wk, grid%lp%nloc, blo, bwgt)
       end if
 
+      ! inward-normal angle of the fed face; the component direction is
+      ! snapped/checked face-relative to it, then rotated into it
+      off = face_normal_offset(this)
+
       ! linear-theory velocity reference level (legacy Zlev)
       zlev = abs(1.0_SP + beta_ref)*h_ser
 
@@ -2707,12 +2778,21 @@ contains
 
       do kf = 1, this%Nfreq
          do kdir = 1, set%ndir
+            ! face-relative angle (subtract the normal in the absolute frame),
+            ! snapped along the fed face's alongshore axis (x for S/N, y for
+            ! W/E), then rotated by the normal into the domain-Cartesian angle
+            theta_use = set%theta_ser(kdir)
+            if (this%dir_convention == DIR_CARTESIAN) theta_use = theta_use - off
             if (periodic) then
-               call calc_periodic_theta(wkn(kf), set%theta_ser(kdir), grid%dy0, &
-                                        grid%N, theta_per)
+               if (face_is_x) then
+                  call calc_periodic_theta(wkn(kf), theta_use, grid%dx0, grid%M, theta_per)
+               else
+                  call calc_periodic_theta(wkn(kf), theta_use, grid%dy0, grid%N, theta_per)
+               end if
             else
-               theta_per = set%theta_ser(kdir)
+               theta_per = theta_use
             end if
+            theta_per = theta_per + off
             transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
             do j = 1, grid%lp%nloc
                do i = 1, grid%lp%mloc

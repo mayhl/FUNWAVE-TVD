@@ -211,6 +211,10 @@ contains
                wm_direct = .not. no_blk
             end if
             if (wm_direct .or. tide%tidal_bc_gen_abs) then
+               if (f /= FACE_W) call env%log%exit_on_error( &
+                  "boundaries/"//trim(FACE_KEY(f))//"/forcing: a wavemaker"// &
+                  " RELAXATION strip (sponge.direct) is west-only — omit"// &
+                  " sponge.direct to feed this face via Flather instead")
                call read_wavemaker_strip(env, face_yaml, wavemakers(wm_idx(f)), f, &
                                          tide, defs)
                derived(f) = BC_RELAX
@@ -666,10 +670,9 @@ contains
       has_file = .false.
       has_const = .false.
 
-      if (f /= FACE_W) &
-         call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
-                                    "/forcing: wavemaker-fed faces other than west are"// &
-                                    " pending (legacy ABS relaxes a west strip)")
+      ! a wavemaker feed rides any face via the Flather target; the
+      ! relaxation-strip form (sponge.direct) is still west-only (the strip
+      ! geometry is not yet generalized) — gated in derive_face_bc
       if (.not. wavemaker%boundary_candidate) &
          call env%log%exit_on_error("boundaries/west/forcing: wavemaker '"//wm_name// &
                                     "' does not name a spectrum-only wavemaker entry")
