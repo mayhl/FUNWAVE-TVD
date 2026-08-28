@@ -104,6 +104,7 @@ module model_vessel_mod
    use core_constants_mod, only: SP, ZERO, SMALL, PI, GRAV, RHO_WATER, N_GHOST, MPI_SP
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d
+   use core_time_series_mod, only: type_time_series
    use core_time_utils_mod, only: type_timing_control
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
@@ -145,11 +146,10 @@ module model_vessel_mod
       real(SP), allocatable :: length(:), width(:)
       real(SP), allocatable :: alpha1(:), alpha2(:), beta(:), p_ves(:)
 
-      ! path state: segment endpoints 1 (behind) and 2 (ahead)
-      real(SP), allocatable :: t1(:), x1(:), y1(:)
-      real(SP), allocatable :: t2(:), x2(:), y2(:)
+      ! path state: one time-series reader per hull, streaming (x, y) records;
+      ! heading + velocity come from its current-segment slope
+      type(type_time_series), allocatable :: track(:)
       real(SP), allocatable :: theta(:), u_vel(:), v_vel(:)
-      integer, allocatable  :: unit_track(:)
 
       ! resistance, per hull
       real(SP), allocatable :: res_x(:), res_y(:)
@@ -265,7 +265,7 @@ contains
       character(len=256) :: fname
       character(len=80)  :: hull_name
       logical :: found
-      real(SP) :: e0
+      real(SP) :: e0, t0, x0, y0
 
       if (.not. this%is_activated) return
 
@@ -280,10 +280,8 @@ contains
          allocate (this%source_type(n), this%vessel_type(n))
          allocate (this%length(n), this%width(n))
          allocate (this%alpha1(n), this%alpha2(n), this%beta(n), this%p_ves(n))
-         allocate (this%t1(n), this%x1(n), this%y1(n))
-         allocate (this%t2(n), this%x2(n), this%y2(n))
+         allocate (this%track(n))
          allocate (this%theta(n), this%u_vel(n), this%v_vel(n))
-         allocate (this%unit_track(n))
          allocate (this%res_x(n), this%res_y(n))
          allocate (this%res_pos_x(n), this%res_neg_x(n))
          allocate (this%res_pos_y(n), this%res_neg_y(n))
@@ -363,7 +361,6 @@ contains
             open (newunit=u, file=trim(fname), status="old", action="read", iostat=ios)
             if (ios /= 0) call env%log%exit_on_error( &
                "vessel: cannot open "//trim(fname))
-            this%unit_track(k) = u
 
             read (u, '(A80)', iostat=ios) hull_name
             read (u, *, iostat=ios) this%source_type(k), this%vessel_type(k)
@@ -414,17 +411,16 @@ contains
             end if
 
             read (u, *, iostat=ios)   ! track header
-            read (u, *, iostat=ios) this%t2(k), this%x2(k), this%y2(k)
+            read (u, *, iostat=ios) t0, x0, y0
             if (ios /= 0) call env%log%exit_on_error( &
                "vessel: "//trim(fname)//": cannot parse the first track point")
 
-            ! legacy seeds segment 1 == segment 2, so the hull sits still until
-            ! the first VESSEL_FORCING advances the track
-            this%t1(k) = this%t2(k)
-            this%x1(k) = this%x2(k)
-            this%y1(k) = this%y2(k)
+            ! seed segment 1 == segment 2 (the reader holds the first record
+            ! until the first VESSEL_FORCING advances the track); the open unit
+            ! streams the remaining records
+            call this%track(k)%attach(u, t0, [x0, y0])
 
-            if (this%t2(k) > t_start) call env%log%exit_on_error( &
+            if (t0 > t_start) call env%log%exit_on_error( &
                "vessel: "//trim(fname)//": the track starts after the simulation "// &
                "does.  Legacy would imprint this hull at the ORIGIN, at an "// &
                "uninitialised heading, until its start time -- there is no "// &
@@ -452,8 +448,8 @@ contains
       real(SP), intent(inout) :: eta(:, :), eta0(:, :)
       real(SP), intent(in) :: depth(:, :), h(:, :)
 
-      integer :: k, i, j, ii, jj, ios
-      real(SP) :: tmp1, tmp2, xves, yves
+      integer :: k, i, j, ii, jj
+      real(SP) :: xves, yves, pos(2), vel(2)
 
       if (.not. this%is_activated) return
 
@@ -469,49 +465,22 @@ contains
 
          hull: do k = 1, this%n_vessel
 
-            if (time > this%t1(k) .and. time > this%t2(k)) then
+            ! interpolate the hull position at TIME; the reader advances its own
+            ! bracket (sliding all fields, catching up past a coarse dt)
+            call this%track(k)%sample(time, pos)
 
-               this%t1(k) = this%t2(k)
-               this%x1(k) = this%x2(k)
-               this%y1(k) = this%y2(k)
+            ! track exhausted: the hull silently VANISHES rather than stopping
+            ! (legacy END= skipped every source call, p_total already zero)
+            if (this%track(k)%eof) cycle hull
 
-               ! legacy walks the track until the far endpoint is past the step,
-               ! so a dt larger than the track interval cannot stall the hull
-               do while (this%t2(k) < time + dt)
-                  read (this%unit_track(k), *, iostat=ios) &
-                     this%t2(k), this%x2(k), this%y2(k)
-                  ! track exhausted: legacy's END= jumps past every source call
-                  ! below, and p_total/flux_grad are already zero -- so the hull
-                  ! silently VANISHES rather than stopping (NOTE 1)
-                  if (ios /= 0) cycle hull
-               end do
+            xves = pos(1)
+            yves = pos(2)
 
-               this%theta(k) = atan2(this%y2(k) - this%y1(k), this%x2(k) - this%x1(k))
-
-               if ((this%t2(k) - this%t1(k)) > ZERO) then
-                  this%u_vel(k) = (this%x2(k) - this%x1(k))/(this%t2(k) - this%t1(k))
-                  this%v_vel(k) = (this%y2(k) - this%y1(k))/(this%t2(k) - this%t1(k))
-               end if
-
-            end if
-
-            ! linear interpolation along the current segment
-            tmp1 = ZERO
-            tmp2 = ZERO
-            if (time > this%t1(k)) then
-               if (this%t1(k) == this%t2(k)) then
-                  ! unreachable: the EOF cycle above takes this path out (NOTE 1)
-                  tmp1 = ZERO
-                  tmp2 = ZERO
-               else
-                  tmp2 = (this%t2(k) - time) &
-                         /max(SMALL, abs(this%t2(k) - this%t1(k)))
-                  tmp1 = 1.0_SP - tmp2
-               end if
-            end if
-
-            xves = this%x2(k)*tmp1 + this%x1(k)*tmp2
-            yves = this%y2(k)*tmp1 + this%y1(k)*tmp2
+            ! heading + velocity from the current-segment slope
+            call this%track(k)%rate(vel)
+            this%u_vel(k) = vel(1)
+            this%v_vel(k) = vel(2)
+            this%theta(k) = atan2(vel(2), vel(1))
 
             select case (this%source_type(k) (1:2))
             case ("PR")
@@ -851,13 +820,11 @@ contains
       class(type_model_vessel), intent(inout) :: this
 
       integer :: k
-      logical :: is_open
-
-      if (allocated(this%unit_track)) then
-         do k = 1, size(this%unit_track)
-            inquire (unit=this%unit_track(k), opened=is_open)
-            if (is_open) close (this%unit_track(k))
+      if (allocated(this%track)) then
+         do k = 1, size(this%track)
+            call this%track(k)%close()
          end do
+         deallocate (this%track)
       end if
 
       if (this%opened) then
@@ -875,16 +842,9 @@ contains
       if (allocated(this%alpha2)) deallocate (this%alpha2)
       if (allocated(this%beta)) deallocate (this%beta)
       if (allocated(this%p_ves)) deallocate (this%p_ves)
-      if (allocated(this%t1)) deallocate (this%t1)
-      if (allocated(this%x1)) deallocate (this%x1)
-      if (allocated(this%y1)) deallocate (this%y1)
-      if (allocated(this%t2)) deallocate (this%t2)
-      if (allocated(this%x2)) deallocate (this%x2)
-      if (allocated(this%y2)) deallocate (this%y2)
       if (allocated(this%theta)) deallocate (this%theta)
       if (allocated(this%u_vel)) deallocate (this%u_vel)
       if (allocated(this%v_vel)) deallocate (this%v_vel)
-      if (allocated(this%unit_track)) deallocate (this%unit_track)
       if (allocated(this%res_x)) deallocate (this%res_x)
       if (allocated(this%res_y)) deallocate (this%res_y)
       if (allocated(this%res_pos_x)) deallocate (this%res_pos_x)

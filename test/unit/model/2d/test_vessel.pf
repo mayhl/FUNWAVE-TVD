@@ -6,6 +6,7 @@ module test_vessel
    use core_grid_mod, only: type_grid_2d
    use model_vessel_mod, only: type_model_vessel, vessel_pressure_source, &
                                vessel_slender_source
+   use model_bc_mod, only: type_model_bc
 
    implicit none
 
@@ -199,5 +200,55 @@ contains
       total = sum(v%flux_grad_each)
       @assertEqual(ZERO, total, 1.0e-9_SP)
    end subroutine test_slender_integrates_to_zero
+
+   ! Drive the track reader through vessel_update: the hull takes its heading
+   ! and velocity from the track segment slope (a 45-deg track, so they cannot
+   ! come from the setup), imprints a pressure patch while on the track, and
+   ! VANISHES once the track is exhausted.
+   @test
+   subroutine test_track_advance_and_vanish()
+      type(type_model_vessel) :: v
+      type(type_grid_2d) :: grid
+      type(type_model_bc) :: bc
+      real(SP) :: eta(MLOC, NLOC), eta0(MLOC, NLOC)
+      real(SP) :: depth(MLOC, NLOC), h(MLOC, NLOC)
+      real(SP) :: t0, x0, y0
+      integer :: u
+
+      call make_vessel(v, grid, 1, ZERO)
+      allocate (v%track(1), v%u_vel(1), v%v_vel(1))
+      allocate (v%p_x(MLOC, NLOC), v%p_y(MLOC, NLOC))
+      v%propeller = .false.
+      v%deep_draft = .false.
+      v%make_draft = .false.
+
+      ! straight 45-deg track: (x, y) advance together at 1 m/s each
+      open (newunit=u, file='vtrack.txt', status='replace', action='write')
+      write (u, '(A)') '# t x y'
+      write (u, *) 0.0_SP, 5.0_SP, 5.0_SP
+      write (u, *) 10.0_SP, 15.0_SP, 15.0_SP
+      write (u, *) 20.0_SP, 25.0_SP, 25.0_SP
+      close (u)
+      open (newunit=u, file='vtrack.txt', status='old', action='read')
+      read (u, '(A)') ! header
+      read (u, *) t0, x0, y0
+      call v%track(1)%attach(u, t0, [x0, y0])
+
+      eta = ZERO; eta0 = ZERO; depth = 10.0_SP; h = 10.0_SP
+
+      ! on the first segment: slope 1 m/s in x and y, heading 45 deg, present
+      call v%update(bc, grid, 5.0_SP, 1.0_SP, eta, eta0, depth, h)
+      @assertEqual(1.0_SP, v%u_vel(1), 1.0e-6_SP)
+      @assertEqual(1.0_SP, v%v_vel(1), 1.0e-6_SP)
+      @assertEqual(PI/4.0_SP, v%theta(1), 1.0e-6_SP)
+      @assertTrue(any(v%p_total /= ZERO))
+
+      ! past the last record: the hull vanishes, no pressure imprint
+      call v%update(bc, grid, 100.0_SP, 1.0_SP, eta, eta0, depth, h)
+      @assertTrue(v%track(1)%eof)
+      @assertTrue(all(v%p_total == ZERO))
+
+      call v%track(1)%close()
+   end subroutine test_track_advance_and_vanish
 
 end module test_vessel
