@@ -29,11 +29,12 @@
 !       (mod_tide.F:635), so south/north-only tide turns TIDAL_BC_ABS off
 !    2. NOTE: TIDE_BC strips are LOCAL indices on every rank — interior ranks
 !       relax their own subdomain edges through factors within 1e-15 of 1
-!    3. NOTE: DATA EOF on any boundary skips the remaining boundaries AND the
-!       current interpolation (END=120 jumps to the subroutine tail), so all
-!       targets freeze at their last computed values
-!    4. NOTE: DATA targets are ZERO until TIME passes the first record (both
-!       interpolation weights stay 0), not the first record's values
+!    3. DIVERGES from legacy: the shared time-series reader
+!       (core_time_series_mod) freezes each boundary at its OWN last record
+!       past EOF, not all boundaries on the first EOF (legacy END=120)
+!    4. DIVERGES from legacy: DATA targets hold the FIRST record's values
+!       before TIME reaches it (clamped bracket), not zero (legacy left both
+!       interpolation weights at 0 until TIME passed the first record)
 !    5. NOTE: eta/u/v are relaxed but P/Q/HU/HV are not rebuilt — the
 !       inconsistency rides into the next stage's fluxes like legacy
 !
@@ -47,6 +48,7 @@ module model_tide_mod
    use core_env_mod, only: type_env
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
+   use core_time_series_mod, only: type_time_series
    use model_base_mod, only: type_model_base
    use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
 
@@ -105,18 +107,9 @@ module model_tide_mod
 
       type(type_path) :: file_west, file_east, file_south, file_north
 
-      ! DATA streaming state: open unit + bracketing records per boundary
-      ! newunit units are negative; -1 marks never-opened
-      integer :: unit_west = -1, unit_east = -1
-      integer :: unit_south = -1, unit_north = -1
-      real(SP) :: t1_w = 0.0_SP, e1_w = 0.0_SP, su1_w = 0.0_SP, sv1_w = 0.0_SP
-      real(SP) :: t2_w = 0.0_SP, e2_w = 0.0_SP, su2_w = 0.0_SP, sv2_w = 0.0_SP
-      real(SP) :: t1_e = 0.0_SP, e1_e = 0.0_SP, su1_e = 0.0_SP, sv1_e = 0.0_SP
-      real(SP) :: t2_e = 0.0_SP, e2_e = 0.0_SP, su2_e = 0.0_SP, sv2_e = 0.0_SP
-      real(SP) :: t1_s = 0.0_SP, e1_s = 0.0_SP, su1_s = 0.0_SP, sv1_s = 0.0_SP
-      real(SP) :: t2_s = 0.0_SP, e2_s = 0.0_SP, su2_s = 0.0_SP, sv2_s = 0.0_SP
-      real(SP) :: t1_n = 0.0_SP, e1_n = 0.0_SP, su1_n = 0.0_SP, sv1_n = 0.0_SP
-      real(SP) :: t2_n = 0.0_SP, e2_n = 0.0_SP, su2_n = 0.0_SP, sv2_n = 0.0_SP
+      ! DATA streaming state: one time-series reader per boundary
+      ! (FACE_W..FACE_N), opened lazily when the tide is DATA-driven
+      type(type_time_series) :: series(4)
 
       ! inverted relaxation profiles (legacy SPONGE_TIDE_*), local
       ! ghost-inclusive windows
@@ -218,18 +211,14 @@ contains
       ! units 201-204); first line is a header, first record seeds both
       ! bracket points
       if (this%data_mode()) then
-         if (this%tide_west) call series_open(this%file_west%root, this%unit_west, &
-                                              this%t1_w, this%e1_w, this%su1_w, this%sv1_w, &
-                                              this%t2_w, this%e2_w, this%su2_w, this%sv2_w)
-         if (this%tide_east) call series_open(this%file_east%root, this%unit_east, &
-                                              this%t1_e, this%e1_e, this%su1_e, this%sv1_e, &
-                                              this%t2_e, this%e2_e, this%su2_e, this%sv2_e)
-         if (this%tide_south) call series_open(this%file_south%root, this%unit_south, &
-                                               this%t1_s, this%e1_s, this%su1_s, this%sv1_s, &
-                                               this%t2_s, this%e2_s, this%su2_s, this%sv2_s)
-         if (this%tide_north) call series_open(this%file_north%root, this%unit_north, &
-                                               this%t1_n, this%e1_n, this%su1_n, this%sv1_n, &
-                                               this%t2_n, this%e2_n, this%su2_n, this%sv2_n)
+         if (this%tide_west) &
+            call this%series(FACE_W)%open(this%file_west%root, 3, .true.)
+         if (this%tide_east) &
+            call this%series(FACE_E)%open(this%file_east%root, 3, .true.)
+         if (this%tide_south) &
+            call this%series(FACE_S)%open(this%file_south%root, 3, .true.)
+         if (this%tide_north) &
+            call this%series(FACE_N)%open(this%file_north%root, 3, .true.)
       end if
 
       ! legacy REMOVE_SPONGE (TIDAL_BC_ABS only): the width zeroing is
@@ -242,19 +231,6 @@ contains
       end if
 
    end subroutine tide_init_compute
-
-   subroutine series_open(fname, unit, t1, e1, su1, sv1, t2, e2, su2, sv2)
-      character(*), intent(in) :: fname
-      integer, intent(out) :: unit
-      real(SP), intent(out) :: t1, e1, su1, sv1, t2, e2, su2, sv2
-
-      character(len=80) :: header
-
-      open (newunit=unit, file=fname, status='old', action='read')
-      read (unit, '(A80)') header
-      read (unit, *) t2, e2, su2, sv2
-      t1 = t2; e1 = e2; su1 = su2; sv1 = sv2
-   end subroutine series_open
 
    logical function tide_data_mode(this)
       class(type_model_tide), intent(in) :: this
@@ -271,39 +247,30 @@ contains
    ! (weights zero before the first record — see header NOTE 4).
    ! EOF anywhere aborts the whole call (header NOTE 3).
    ! ----------------------------------------------------------------
+   ! Refresh the DATA relaxation targets from the per-boundary series at the
+   ! current model time (dt is unused: the shared reader brackets the query
+   ! time itself and each boundary freezes independently past its own EOF).
    subroutine tide_update_data(this, time, dt)
       class(type_model_tide), intent(inout) :: this
       real(SP), intent(in) :: time, dt
 
-      logical :: hit_eof
+      real(SP) :: out(3)
 
       if (this%tide_west) then
-         call series_advance(this%unit_west, time, dt, &
-                             this%t1_w, this%e1_w, this%su1_w, this%sv1_w, &
-                             this%t2_w, this%e2_w, this%su2_w, this%sv2_w, &
-                             this%eta_west, this%u_west, this%v_west, hit_eof)
-         if (hit_eof) return
+         call this%series(FACE_W)%sample(time, out)
+         this%eta_west = out(1); this%u_west = out(2); this%v_west = out(3)
       end if
       if (this%tide_east) then
-         call series_advance(this%unit_east, time, dt, &
-                             this%t1_e, this%e1_e, this%su1_e, this%sv1_e, &
-                             this%t2_e, this%e2_e, this%su2_e, this%sv2_e, &
-                             this%eta_east, this%u_east, this%v_east, hit_eof)
-         if (hit_eof) return
+         call this%series(FACE_E)%sample(time, out)
+         this%eta_east = out(1); this%u_east = out(2); this%v_east = out(3)
       end if
       if (this%tide_south) then
-         call series_advance(this%unit_south, time, dt, &
-                             this%t1_s, this%e1_s, this%su1_s, this%sv1_s, &
-                             this%t2_s, this%e2_s, this%su2_s, this%sv2_s, &
-                             this%eta_south, this%u_south, this%v_south, hit_eof)
-         if (hit_eof) return
+         call this%series(FACE_S)%sample(time, out)
+         this%eta_south = out(1); this%u_south = out(2); this%v_south = out(3)
       end if
       if (this%tide_north) then
-         call series_advance(this%unit_north, time, dt, &
-                             this%t1_n, this%e1_n, this%su1_n, this%sv1_n, &
-                             this%t2_n, this%e2_n, this%su2_n, this%sv2_n, &
-                             this%eta_north, this%u_north, this%v_north, hit_eof)
-         if (hit_eof) return
+         call this%series(FACE_N)%sample(time, out)
+         this%eta_north = out(1); this%u_north = out(2); this%v_north = out(3)
       end if
 
    end subroutine tide_update_data
@@ -346,52 +313,6 @@ contains
       end if
 
    end subroutine tide_build_flather_target
-
-   subroutine series_advance(unit, time, dt, t1, e1, su1, sv1, &
-                             t2, e2, su2, sv2, tgt_eta, tgt_u, tgt_v, hit_eof)
-      integer, intent(in) :: unit
-      real(SP), intent(in) :: time, dt
-      real(SP), intent(inout) :: t1, e1, su1, sv1, t2, e2, su2, sv2
-      real(SP), intent(inout) :: tgt_eta, tgt_u, tgt_v
-      logical, intent(out) :: hit_eof
-
-      real(SP) :: w1, w2
-      integer :: ios
-
-      hit_eof = .false.
-
-      if (time > t1 .and. time > t2) then
-         t1 = t2; e1 = e2; su1 = su2; sv1 = sv2
-         do while (t2 < time + dt)
-            ! EOF leaves t2/e2/su2/sv2 at the last read record, and the
-            ! caller abandons the rest of the update (legacy END=120)
-            read (unit, *, iostat=ios) t2, e2, su2, sv2
-            if (ios /= 0) then
-               hit_eof = .true.
-               return
-            end if
-         end do
-      end if
-
-      w2 = 0.0_SP
-      w1 = 0.0_SP
-      if (time > t1) then
-         ! exact-equality bracket collapse like legacy (single record,
-         ! or duplicate times)
-         if (t1 == t2) then
-            w2 = 0.0_SP
-            w1 = 0.0_SP
-         else
-            w2 = (t2 - time)/max(SMALL, abs(t2 - t1))
-            w1 = 1.0_SP - w2
-         end if
-      end if
-
-      tgt_u = su2*w1 + su1*w2
-      tgt_v = sv2*w1 + sv1*w2
-      tgt_eta = e2*w1 + e1*w2
-
-   end subroutine series_advance
 
    ! ----------------------------------------------------------------
    ! Per-stage boundary relaxation (legacy TIDE_BC), wet cells only:
@@ -466,29 +387,16 @@ contains
    subroutine tide_free(this)
       class(type_model_tide), intent(inout) :: this
 
-      logical :: opened
+      integer :: f
 
       if (allocated(this%sponge_west)) deallocate (this%sponge_west)
       if (allocated(this%sponge_east)) deallocate (this%sponge_east)
       if (allocated(this%sponge_south)) deallocate (this%sponge_south)
       if (allocated(this%sponge_north)) deallocate (this%sponge_north)
 
-      if (this%unit_west /= -1) then
-         inquire (unit=this%unit_west, opened=opened)
-         if (opened) close (this%unit_west)
-      end if
-      if (this%unit_east /= -1) then
-         inquire (unit=this%unit_east, opened=opened)
-         if (opened) close (this%unit_east)
-      end if
-      if (this%unit_south /= -1) then
-         inquire (unit=this%unit_south, opened=opened)
-         if (opened) close (this%unit_south)
-      end if
-      if (this%unit_north /= -1) then
-         inquire (unit=this%unit_north, opened=opened)
-         if (opened) close (this%unit_north)
-      end if
+      do f = FACE_W, FACE_N
+         call this%series(f)%close()
+      end do
 
    end subroutine tide_free
 
