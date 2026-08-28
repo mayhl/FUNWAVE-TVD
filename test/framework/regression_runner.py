@@ -654,6 +654,22 @@ class RegressionRunner(BaseRunner):
 
         return _leg(t_full), _leg(t_chk), _leg(t_full, restart=True)
 
+    def _stage_aux(self, sim, run_dir: str) -> None:
+        """Copy the input dir's data/ subdir into a self-compare leg dir.
+
+        The self_consistency/reproducibility legs run in their own subdir, so
+        aux forcing files (vessel tracks, tide/meteo series) must land beside
+        the deck; the normal run path stages data/ in _setup_run_dir, but the
+        leg path writes only the deck.
+        """
+        data_src = os.path.join(self.repo_root, sim["input"], "data")
+        if os.path.isdir(data_src):
+            os.makedirs(run_dir, exist_ok=True)
+            data_dst = os.path.join(run_dir, "data")
+            if os.path.exists(data_dst):
+                shutil.rmtree(data_dst)
+            shutil.copytree(data_src, data_dst)
+
     def _write_leg(self, deck: dict, run_dir: str, name: str) -> None:
         os.makedirs(run_dir, exist_ok=True)
         rf = (deck.get("output") or {}).get("result_folder")
@@ -688,10 +704,12 @@ class RegressionRunner(BaseRunner):
             a_deck, b1_deck, b2_deck = self._hotstart_legs(self._hotstart_base(sim))
             if kind == "ref":
                 self._write_leg(a_deck, task.ref_run_dir, "A.yaml")
+                self._stage_aux(sim, task.ref_run_dir)
                 return self.provider.submit(binary, "A.yaml", task.ref_run_dir, np=task.eff_np)
             # dev: B1 lays down the checkpoint that B2 restarts from
             self._write_leg(b1_deck, task.curr_run_dir, "B1.yaml")
             self._write_leg(b2_deck, task.curr_run_dir, "B2.yaml")
+            self._stage_aux(sim, task.curr_run_dir)
             st = self._run_blocking(binary, "B1.yaml", task.curr_run_dir, task.eff_np)
             if st != "COMPLETED":
                 self.reporter.warn(f"{sim['name']}: checkpoint leg B1 {st}; restart will fail")
@@ -702,6 +720,7 @@ class RegressionRunner(BaseRunner):
             deck.setdefault("output", {})["checkpoint"] = "./chk"
             run_dir = task.ref_run_dir if kind == "ref" else task.curr_run_dir
             self._write_leg(deck, run_dir, "run.yaml")
+            self._stage_aux(sim, run_dir)
             return self.provider.submit(binary, "run.yaml", run_dir, np=task.eff_np)
         if kind == "ref":
             run_dir, binary, input_file = task.ref_run_dir, os.path.join(task.ref_build_dir, sim["binary"]), task.ref_input
