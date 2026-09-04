@@ -399,7 +399,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `blowup_threshold` | — | `EtaBlowVal` | m | Elevation above which the run aborts (absent = 100*max\|Depth\|). |
 | `vessel.interval` | — | `PLOT_INTV_VESSEL` | s | Vessel resistance-series output cadence. |
 | `geometries.name` | — | — | — | Point-set name (referenced by channels.geometry). |
-| `geometries.type` | — | — | — | Point-set kind. One of `station` \| `transect`. |
+| `geometries.type` | — | — | — | Point-set kind. Station/transect values are BILINEARLY INTERPOLATED from the four surrounding cells, which has a validity consequence worth knowing: dry cells are not neutral (they carry eta = -depth + min_depth), so a point whose stencil straddles the wet/dry line returns a contaminated value with no error. Request `mask` on the same channel to detect it -- the weights sum to 1 and mask is 0/1 per cell, so the interpolated mask is exactly the weighted wet fraction of the stencil: 1.0 means every contributing cell is wet and the value is clean, anything less means it is not. A station outside every rank's subdomain is dropped by the interpolator and reads 0.0 in every variable, mask included. Sampling `mask` at the station cadence also gives the per-station wet-step record for free. One of `station` \| `transect`. |
 | `geometries.file` | — | — | — | Station coordinate file, one "x y" pair (m) per line -- exclusive with x:/y:. |
 | `geometries.x` | — | — | m | Station x-coordinates (equal length with y). |
 | `geometries.y` | — | — | m | Station y-coordinates. |

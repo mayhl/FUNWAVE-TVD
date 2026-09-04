@@ -63,6 +63,27 @@ contains
       case ("u_max")
          m%units = "m s-1"
          m%long_name = "maximum depth-averaged sea water speed"
+      case ("mf_max")
+         m%units = "m3 s-2"
+         m%long_name = "maximum depth-integrated momentum flux"
+      case ("vort_max")
+         m%units = "s-1"
+         m%long_name = "maximum relative vorticity"
+      case ("nu_break")
+         m%units = "m2 s-1"
+         m%long_name = "breaking eddy viscosity"
+      case ("age_break")
+         m%units = "s"
+         m%long_name = "age of the local breaking event"
+      case ("roller_flux")
+         m%units = "m2 s-1"
+         m%long_name = "surface roller volume flux per unit width"
+      case ("undertow_u")
+         m%units = "m2 s-1"
+         m%long_name = "x-component of the roller-driven return flux per unit width"
+      case ("undertow_v")
+         m%units = "m2 s-1"
+         m%long_name = "y-component of the roller-driven return flux per unit width"
       case ("arr_time")
          m%units = "s"
          m%long_name = "wave front arrival time"
