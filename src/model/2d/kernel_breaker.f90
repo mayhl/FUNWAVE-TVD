@@ -74,6 +74,8 @@ contains
 
       integer  :: i, j, ncap
       real(SP) :: c_shallow, thr1, thr2, cap1, capw
+      ! stand-in for an absent cap_time; never indexed (accrue = .false.)
+      real(SP) :: cap_time_absent(1, 1)
       real(SP) :: angle, c, c1, r, b
       real(SP) :: age1, age2, age3
       real(SP) :: propx, propy, propxy
@@ -219,27 +221,61 @@ contains
       ncap = 0
       capw = 1.0_SP
       if (present(cap_w)) capw = cap_w
+      ! apply_nu_cap takes cap_time NON-optionally: naming an absent OPTIONAL
+      ! inside its default(shared) region makes ifx/ifort copy a null
+      ! descriptor when it outlines the region, faulting at the loop head
+      ! even though present() guards every use (see kernel_masks.f90).  The
+      ! absent path passes a 1x1 stand-in the loop never indexes.
       if (nu_cap > 0.0_SP) then
-         !$omp parallel do default(shared) schedule(static) private(i, cap1) &
-         !$omp reduction(+:ncap)
-         do j = lp%jb - 1, lp%je + 1
-            do i = lp%ib - 1, lp%ie + 1
-               cap1 = nu_cap/(2.0_SP*dt*(1.0_SP/(dx(i, j)*dx(i, j)) &
-                                         + 1.0_SP/(dy(i, j)*dy(i, j))))
-               if (nu_break(i, j) > cap1) then
-                  nu_break(i, j) = cap1
-                  if (i >= lp%ib .and. i <= lp%ie .and. &
-                      j >= lp%jb .and. j <= lp%je) then
-                     ncap = ncap + 1
-                     if (present(cap_time)) cap_time(i, j) = cap_time(i, j) + capw
-                  end if
-               end if
-            end do
-         end do
+         if (present(cap_time)) then
+            call apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, capw, &
+                              .true., cap_time, ncap)
+         else
+            call apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, capw, &
+                              .false., cap_time_absent, ncap)
+         end if
       end if
       if (present(n_capped)) n_capped = ncap
 
    end subroutine wave_breaking
+
+   ! ----------------------------------------------------------------
+   ! Explicit-diffusion stability clamp, split out of wave_breaking so
+   ! the cap_time accumulator crosses the OpenMP boundary as a plain
+   ! non-optional array.  accrue = .false. leaves cap_time untouched and
+   ! the caller may pass any valid array.
+   ! ----------------------------------------------------------------
+   subroutine apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, capw, &
+                           accrue, cap_time, ncap)
+      type(type_loop_bounds), intent(in) :: lp
+      real(SP), intent(inout) :: nu_break(:, :)
+      real(SP), intent(in)  :: dx(:, :), dy(:, :)
+      real(SP), intent(in)  :: dt, nu_cap, capw
+      logical, intent(in)  :: accrue
+      real(SP), intent(inout) :: cap_time(:, :)
+      integer, intent(out) :: ncap
+
+      integer  :: i, j
+      real(SP) :: cap1
+
+      ncap = 0
+      !$omp parallel do default(shared) schedule(static) private(i, cap1) &
+      !$omp reduction(+:ncap)
+      do j = lp%jb - 1, lp%je + 1
+         do i = lp%ib - 1, lp%ie + 1
+            cap1 = nu_cap/(2.0_SP*dt*(1.0_SP/(dx(i, j)*dx(i, j)) &
+                                      + 1.0_SP/(dy(i, j)*dy(i, j))))
+            if (nu_break(i, j) > cap1) then
+               nu_break(i, j) = cap1
+               if (i >= lp%ib .and. i <= lp%ie .and. &
+                   j >= lp%jb .and. j <= lp%je) then
+                  ncap = ncap + 1
+                  if (accrue) cap_time(i, j) = cap_time(i, j) + capw
+               end if
+            end if
+         end do
+      end do
+   end subroutine apply_nu_cap
 
    ! ----------------------------------------------------------------
    ! Wavemaker-zone eddy viscosity without the breaking-age scheme
