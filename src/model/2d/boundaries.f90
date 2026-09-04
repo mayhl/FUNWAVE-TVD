@@ -39,11 +39,14 @@
 !    nothing                  -> wall
 !    sponge only              -> sponge     (wall + absorbing strip)
 !    sponge.direct + forcing  -> relaxation (nee TIDAL_BC_ABS)
-!    forcing, no direct       -> characteristic — PENDING (char BC track)
+!    forcing, no direct       -> characteristic (Flather: u_n + sqrt(g/h) eta
+!                                = target, outgoing radiates at sqrt(gH)) —
+!                                a zero-target series is a radiating outflow
 !    forcing: {wavemaker: ..} -> relaxation to the wavemaker signal (nee
-!                                ABS; west only) — the face sponge block
-!                                routes to the wavemaker's strip (nee
-!                                WidthWaveMaker/R_,A_sponge_wavemaker),
+!                                ABS; the relaxation strip is west-only,
+!                                the Flather feed any face) — the face
+!                                sponge block routes to the wavemaker's
+!                                strip (nee WidthWaveMaker/R_,A_sponge_wavemaker),
 !                                NOT the sponge model; + eta/file target
 !                                = generating-absorbing (nee GEN_ABS) —
 !                                the face sponge {width, direct} then
