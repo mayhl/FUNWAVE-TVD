@@ -184,6 +184,8 @@ sections:
       belongs to (untagged keys apply regardless, e.g. source/limiter).
     keys:
       name: { legacy: ~, default: ~, units: ~, doc: "Name (referenced by boundaries.<face>.forcing.wavemaker)." }
+      seed: { legacy: ~, default: 66, units: ~, doc: "Phase-RNG seed for the random spectral realization (reproducible + restart-coherent; entries offset by index)." }
+      zero_phase: { legacy: ~, default: false, units: ~, doc: "Zero every component phase instead of the seeded draw (parity/regression builds)." }
       spectrum.type:
         { legacy: WAVEMAKER, default: ~, units: ~, values: [regular, jonswap, tma, spectrum_2d, components], doc: "Spectrum shape discriminant." }
       spectrum.amplitude: { legacy: AMP_WK, default: 0.0, units: m, latex: "$a$", variant: [regular], doc: "Monochromatic wave amplitude." }
@@ -209,6 +211,8 @@ sections:
       spectrum.discretization.coherence_percent: { legacy: ~, default: 0.0, units: "%", variant: [jonswap, tma, spectrum_2d], doc: "Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse)." }
       spectrum.discretization.group_coherence: { legacy: alpha_c, default: 0.0, units: "%", variant: [jonswap, tma], doc: "Salatin frequency-grouping coherence: percent of components sharing a frequency (single_dir_per_freq only)." }
       spectrum.file: { legacy: WaveCompFile, default: ~, units: ~, variant: [components, spectrum_2d], doc: "Wave-component / 2D-spectrum data file." }
+      spectrum.locations: { legacy: ~, default: ~, units: ~, variant: [spectrum_2d], doc: "Manifest of along-face anchor spectra (`<coord> file` per line; coordinate all-or-none, omitted => equispaced) for a spatially-varying boundary feed; mutually exclusive with spectrum.file." }
+      spectrum.convention: { legacy: ~, default: local, units: ~, values: [local, cartesian, nautical], variant: [jonswap, tma, spectrum_2d], doc: "Boundary-feed direction frame: local (theta=0 is the fed face inward normal), cartesian (theta=0 is grid +x), nautical (azimuth CW from true North via grid.crs; pending)." }
       spectrum.n: { legacy: NumWaveComp, default: 1, units: ~, variant: [components], doc: "Number of wave components." }
       spectrum.period_peak: { legacy: PeakPeriod, default: 0.0, units: s, latex: "$T_p$", variant: [components], doc: "Peak period (components store a period here)." }
       spectrum.format: { legacy: WAVE_DATA_TYPE, default: DATA_1D, units: ~, variant: [spectrum_2d], doc: "2D-spectrum data format." }

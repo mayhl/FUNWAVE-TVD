@@ -157,6 +157,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_VESSEL_DEEP_DRAFT_MASK = "YES"
    character(*), parameter :: DEF_VESSEL_PROPELLER = "NO"
    ! ── wavemaker ──
+   character(*), parameter :: DEF_WAVEMAKER_SEED = "66"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_BREAKING_CBRK = "1.0"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_DELTA = "0.5"
@@ -166,6 +167,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_Y_CENTER = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SOURCE_Y_WIDTH = "999999.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_AMPLITUDE = "0.0"
+   character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_CONVENTION = "local"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DIRECTION = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT = "0.0"
@@ -184,5 +186,6 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_NORMALIZE = "band"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_PERIOD = "0.0"
    character(*), parameter :: DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK = "0.0"
+   character(*), parameter :: DEF_WAVEMAKER_ZERO_PHASE = "NO"
 
 end module model_config_defaults_mod

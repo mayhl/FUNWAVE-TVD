@@ -32,6 +32,8 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
 | `name` | — | — | — | Name (referenced by boundaries.\<face>.forcing.wavemaker). |
+| `seed` | `66` | — | — | Phase-RNG seed for the random spectral realization (reproducible + restart-coherent; entries offset by index). |
+| `zero_phase` | `false` | — | — | Zero every component phase instead of the seeded draw (parity/regression builds). |
 | `spectrum.type` | — | `WAVEMAKER` | — | Spectrum shape discriminant. One of `regular` \| `jonswap` \| `tma` \| `spectrum_2d` \| `components`. |
 | `spectrum.amplitude` | `0.0` | `AMP_WK` | m | *(regular)* Monochromatic wave amplitude. |
 | `spectrum.period` | `0.0` | `Tperiod` | s | *(regular)* Monochromatic wave period. |
@@ -54,6 +56,8 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.discretization.coherence_percent` | `0.0` | — | % | *(jonswap/tma/spectrum_2d)* Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse). |
 | `spectrum.discretization.group_coherence` | `0.0` | `alpha_c` | % | *(jonswap/tma)* Salatin frequency-grouping coherence: percent of components sharing a frequency (single_dir_per_freq only). |
 | `spectrum.file` | — | `WaveCompFile` | — | *(components/spectrum_2d)* Wave-component / 2D-spectrum data file. |
+| `spectrum.locations` | — | — | — | *(spectrum_2d)* Manifest of along-face anchor spectra (`\<coord> file` per line; coordinate all-or-none, omitted => equispaced) for a spatially-varying boundary feed; mutually exclusive with spectrum.file. |
+| `spectrum.convention` | `local` | — | — | *(jonswap/tma/spectrum_2d)* Boundary-feed direction frame: local (theta=0 is the fed face inward normal), cartesian (theta=0 is grid +x), nautical (azimuth CW from true North via grid.crs; pending). One of `local` \| `cartesian` \| `nautical`. |
 | `spectrum.n` | `1` | `NumWaveComp` | — | *(components)* Number of wave components. |
 | `spectrum.period_peak` | `0.0` | `PeakPeriod` | s | *(components)* Peak period (components store a period here). |
 | `spectrum.format` | `DATA_1D` | `WAVE_DATA_TYPE` | — | *(spectrum_2d)* 2D-spectrum data format. |
