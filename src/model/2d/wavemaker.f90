@@ -250,6 +250,12 @@ module model_wavemaker_mod
       ! pending).  Applied as a per-face rotation of the component direction
       ! at build (see face_normal_offset).
       integer  :: dir_convention = DIR_LOCAL
+      ! Cm_/Sm_ index window (see boundary_init_compute): the relaxation
+      ! strip and the LEFT_BC_IRR fill read the whole local field, but a
+      ! Flather feed reads ONE boundary line — the arrays carry the window
+      ! as their bounds so every (i, j) index site stays unchanged, and a
+      ! rank that owns no face gets the empty window (ihi = ilo - 1)
+      integer  :: cm_ilo = 1, cm_ihi = 0, cm_jlo = 1, cm_jhi = 0
       real(SP), allocatable :: Cm_eta(:, :, :), Sm_eta(:, :, :)
       real(SP), allocatable :: Cm_u(:, :, :), Sm_u(:, :, :)
       real(SP), allocatable :: Cm_v(:, :, :), Sm_v(:, :, :)
@@ -2208,6 +2214,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine boundary_init_compute(this, grid, periodic, env, beta_ref)
       use core_grid_mod, only: type_grid_2d
+      use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
@@ -2229,13 +2236,40 @@ contains
 
       mloc = grid%lp%mloc
       nloc = grid%lp%nloc
-      allocate (this%Cm_eta(mloc, nloc, this%Nfreq), &
-                this%Sm_eta(mloc, nloc, this%Nfreq), &
-                this%Cm_u(mloc, nloc, this%Nfreq), &
-                this%Sm_u(mloc, nloc, this%Nfreq), &
-                this%Cm_v(mloc, nloc, this%Nfreq), &
-                this%Sm_v(mloc, nloc, this%Nfreq), &
-                this%Segma_Ser(this%Nfreq), this%Phase_Ser(this%Nfreq))
+
+      ! A relaxation strip can reach across ranks (sponge_maker tapers over
+      ! WidthWaveMaker metres, not one subdomain), so it keeps the whole
+      ! local field; a Flather feed is read at a single boundary line by
+      ! wavemaker_add_flather_target, and only on the rank owning that face.
+      ! Narrowing here is the whole memory story: 6 * mloc * nloc * Nfreq
+      ! reals per rank become one line, or nothing off the face.
+      this%cm_ilo = 1; this%cm_ihi = mloc
+      this%cm_jlo = 1; this%cm_jhi = nloc
+      select case (this%flather_face)
+      case (FACE_W)
+         this%cm_ilo = grid%lp%ib; this%cm_ihi = grid%lp%ib
+         if (.not. grid%is_back_boundary) this%cm_ihi = this%cm_ilo - 1
+      case (FACE_E)
+         this%cm_ilo = grid%lp%ie; this%cm_ihi = grid%lp%ie
+         if (.not. grid%is_shore_boundary) this%cm_ihi = this%cm_ilo - 1
+      case (FACE_S)
+         this%cm_jlo = grid%lp%jb; this%cm_jhi = grid%lp%jb
+         if (.not. grid%is_right_boundary) this%cm_jhi = this%cm_jlo - 1
+      case (FACE_N)
+         this%cm_jlo = grid%lp%je; this%cm_jhi = grid%lp%je
+         if (.not. grid%is_left_boundary) this%cm_jhi = this%cm_jlo - 1
+      end select
+
+      associate (il => this%cm_ilo, ih => this%cm_ihi, &
+                 jl => this%cm_jlo, jh => this%cm_jhi)
+         allocate (this%Cm_eta(il:ih, jl:jh, this%Nfreq), &
+                   this%Sm_eta(il:ih, jl:jh, this%Nfreq), &
+                   this%Cm_u(il:ih, jl:jh, this%Nfreq), &
+                   this%Sm_u(il:ih, jl:jh, this%Nfreq), &
+                   this%Cm_v(il:ih, jl:jh, this%Nfreq), &
+                   this%Sm_v(il:ih, jl:jh, this%Nfreq), &
+                   this%Segma_Ser(this%Nfreq), this%Phase_Ser(this%Nfreq))
+      end associate
 
       if (is_data) then
          call data_series_coefficients(this, grid, periodic, beta_ref, set)
@@ -2392,8 +2426,8 @@ contains
             end if
             theta_per = theta_per + off
             transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
-            do j = 1, grid%lp%nloc
-               do i = 1, grid%lp%mloc
+            do j = this%cm_jlo, this%cm_jhi
+               do i = this%cm_ilo, this%cm_ihi
                   arg = wkn(kf)*sin(theta_per)*this%ymk_wk(j) &
                         + wkn(kf)*cos(theta_per)*this%xmk_wk(i) &
                         + phase2d(kf, ktheta)
@@ -2804,8 +2838,8 @@ contains
             end if
             theta_per = theta_per + off
             transfer = this%Segma_Ser(kf)*cosh(wkn(kf)*zlev)/sinh(wkn(kf)*h_ser)
-            do j = 1, grid%lp%nloc
-               do i = 1, grid%lp%mloc
+            do j = this%cm_jlo, this%cm_jhi
+               do i = this%cm_ilo, this%cm_ihi
                   ! complex blend of the bracketing anchors along the face
                   ! axis (fidx = i for a S/N face, j otherwise); a no-op
                   ! constant when nloc = 1
