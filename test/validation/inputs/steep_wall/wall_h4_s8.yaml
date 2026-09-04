@@ -1,0 +1,92 @@
+# Steep-wall dispersion stability -- DEPTH axis, h=4 m slope=8.
+#
+# Point on the h*grad_h = 32 contour.  Tests whether the stability
+# boundary is organised by slope alone or by slope x depth: the Oahu
+# blow-up face sits in 6-9 m of water (h.gh ~ 13.6) while Holland's
+# steepest cell is a 1.7 m shoreline (h.gh ~ 1.7) -- a factor of 8 apart
+# where the slopes differ by only 1.5x.
+# Hm0 scales with depth (H/h = 0.1875 fixed) so nonlinearity is held
+# and only kh varies.
+#
+# Purpose: a CHEAP reproducer for the Boussinesq-over-steep-bathymetry
+# instability, and the calibration target for dispersion.slope_disp_max.
+# The Oahu harbour case reproduces it only at 15.7 M cells and hours per run;
+# this is 24 k cells and minutes, so a slope_disp_max x slope_disp_ramp sweep
+# is affordable.
+#
+# The series varies ONE number -- bathymetry.slope -- across arms:
+#   0.05  mild 1:20 beach, well inside the Boussinesq mild-slope assumption
+#   1.00  steep
+#   2.00  near-vertical, matching the Barbers Point revetment measured at
+#         ~1.9 (2.35 m of depth change per 1.25 m cell)
+# Everything else is byte-identical, so any difference is the slope alone.
+#
+# Bathymetry is ANALYTIC (type: slope), so there is no committed fixture:
+# depth = 8 - slope*(x - 200) for x >= 200, flat 8 m seaward of that.
+# Shoreline lands at x = 204 m; the domain runs to 400 m so every arm
+# keeps dry land east of its shoreline.
+#
+# Stations sit at x = 50/100/150 m -- seaward of EVERY arm's shoreline, so the
+# same coordinates are comparable across the series and across gate settings.
+# The 50 m station is the far-field control: a slope gate acting at the wall
+# must not move it.
+simulation:
+  title: steep wall dispersion stability (depth 4 m, slope 8)
+  total_time: 600.0
+  screen_interval: 100.0
+grid:
+  cell_size: [1.0, 1.0]
+  n_cells: [400, 60]
+  bathymetry:
+    type: slope
+    depth: 4.0
+    slope: 8.0
+    x0: 200.0
+boundaries:
+  west:
+    sponge:
+      width: 60.0
+      direct: {r: 0.85, a: 5.0}
+  periodic: [y]
+numerics:
+  cfl: 0.35
+  froude_cap: 3.0
+  min_depth: 0.01
+  flux_solver: hllc
+  reconstruction: fourth
+dispersion:
+  scheme: fully_nonlinear
+  beta_ref: -0.531
+breaking:
+  # No cbrk pins: these decks deliberately track the CURRENT breaking
+  # defaults (cbrk1 0.55 as of 2026-08-21).  They were copied from an Oahu
+  # deck that still carried the pre-08-21 cbrk1 0.65, which would have
+  # calibrated the slope gate against a breaking onset nobody runs.
+  model: eddy_viscosity
+friction:
+  cd: 0.0025
+wavemaker:
+  name: seaward
+  seed: 66
+  spectrum:
+    type: jonswap
+    hm0: 0.75
+    gamma: 3.3
+    freq: {peak: 0.125, min: 0.05, max: 0.25}
+    directional: {peak: 0.0, spread: 10.0}
+    discretization: {freq_bins: 45, theta_bins: 12}
+  source:
+    x_center: 100.0
+    y_center: 30.0
+    depth: 4.0
+    delta: 0.5
+output:
+  result_folder: ./output/
+  format: ascii
+  channels:
+    - name: sta
+      type: station
+      x: [50.0, 50.0, 100.0, 100.0, 150.0, 150.0]
+      y: [20.0, 40.0, 20.0, 40.0, 20.0, 40.0]
+      variables: [eta, u]
+      interval: 0.5
