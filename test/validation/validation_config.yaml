@@ -666,19 +666,28 @@ simulations:
       # full incident R+ = u + sqrt(g/h) eta -> measured 1.003
       flather_transmission: { ratio_min: 0.9, ratio_max: 1.1 }
 
+  # np_sweep is the rank-invariance gate on the Flather face.  ny = 3 forces
+  # the np=4 variant to decompose in x (PX=4, seams at i = 50/100/150), which
+  # is the axis that carries the face: flux_flather_bc applies at the RANK-
+  # local lp%ib/lp%ie, so an unmasked face flag makes every interior rank
+  # impose the open BC at its own subdomain edge.  That regression measured
+  # 0.18 m of eta at the seams and a ratio spread of 0.0038; masked by rank
+  # ownership the two decompositions are bitwise (spread 0.0000), so the
+  # 0.001 window sits between the two.
   - name: tide_flather_prog_eta
     exe_type: validation-2d
-    np_pin: 1
+    np_sweep: [1, 4]
     input: test/validation/inputs/tide_flather
     input_files: [prog_eta.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, tide, flather, forcing, local]
+    tags: [validation, 2d, tide, flather, forcing, sweep, local]
     postprocess:
       flather_transmission: test.validation.oracles.flather_transmission
     tolerances:
       # eta only = half the Riemann invariant -> measured 0.502
       flather_transmission: { ratio_min: 0.45, ratio_max: 0.55 }
+    sweep_tolerances: { ratio: 0.001 }
 
   - name: tide_flather_prog_uvonly
     exe_type: validation-2d
@@ -746,17 +755,23 @@ simulations:
   # absorber for a strongly dispersive boundary sea.
   - name: wm_boundary_flather
     exe_type: validation-2d
-    np_pin: 4
+    np_sweep: [1, 4]
     input: test/validation/inputs/wavemaker_boundary
     input_files: [data2d_flather.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, flather, forcing, local]
+    tags: [validation, 2d, wavemaker, boundary, flather, forcing, sweep, local]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
       # measured Hm0 0.979 vs 1x target -> err 2.1%, band 99.3%
       wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
+    # Rank-invariance on a Flather-fed face.  500x80 factorises to PX=4, PY=1,
+    # so np=4 splits ACROSS the fed face -- the decomposition that carried the
+    # unmasked-flag bug (interior ranks imposing the open BC at their own
+    # lp%ib).  Measured spread is 0 on all three metrics; the window is the
+    # soliton sweep's 0.05, far above that and far below a structural shift.
+    sweep_tolerances: { hm0_err_pct: 0.05, band_frac_pct: 0.05, dead_line_pct: 0.05 }
 
   # ── Boundary-feed wavemaker on the EAST Flather face (all-boundary rung) ──
   # Mirror of wm_boundary_flather with the feed on the east face; the
@@ -783,17 +798,26 @@ simulations:
   # 1.0 m table Hm0 transmits.  Proves forcing.wavemaker + forcing.file compose.
   - name: wm_boundary_gen_abs
     exe_type: validation-2d
-    np_pin: 4
+    np_sweep: [1, 4]
     input: test/validation/inputs/wavemaker_boundary
     input_files: [data2d_genabs.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, genabs, forcing, local]
+    tags: [validation, 2d, wavemaker, boundary, genabs, forcing, sweep, local]
     postprocess:
       wavemaker_gen_abs: test.validation.oracles.wavemaker_gen_abs
     tolerances:
       # measured: mean 0.293 vs SWL 0.30 (err 0.007 m); Hm0 0.95-0.99 vs 1.0
       wavemaker_gen_abs: { swl_err_m: 0.03, hm0_err_pct: 15.0 }
+    # Rank-invariance on the RELAXATION path (this deck carries sponge.direct,
+    # so it derives BC_RELAX, not Flather).  Measured spread is 0 on both
+    # metrics.  Note the aggregate statistics are what is invariant here, NOT
+    # the fields: a direct np=1 vs np=4 station-series comparison on the
+    # relaxation path diverges from roundoff (p50 ~1e-4 m, tail 4.3e-2 m over
+    # 340 s), seeded at the noise floor and amplified by the breaking field.
+    # Mean level and Hm0 average that scatter out, which is why they gate
+    # cleanly where a bitwise field check would be flaky.
+    sweep_tolerances: { swl_err_m: 0.0005, hm0_err_pct: 0.05 }
 
   # ── spatially-varying boundary feed: Hm0 profile along the face ──
   # Case A (periodic-y).  The west feed reads a two-anchor manifest so the fed
