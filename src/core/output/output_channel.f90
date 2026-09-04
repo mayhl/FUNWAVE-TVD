@@ -889,15 +889,31 @@ contains
       type(type_comm), intent(inout) :: comm
 
       real(SP), allocatable :: gathered(:), sorted(:)
-      integer :: k, unit
+      integer :: k, unit, n_got
 
       allocate (gathered(merge(this%n_global, 1, comm%is_io_node())))
       call this%gatherer%gather_vals(local_vals, gathered, comm)
 
       if (comm%is_io_node()) then
-         ! Restore point order: gathered is rank-ordered.
+         ! Restore point order: gathered is rank-ordered.  Gatherv fills only
+         ! sum(recv_counts) entries -- stations outside EVERY rank's subdomain
+         ! are dropped by the interpolator and contribute nothing -- so the
+         ! loop must stop there.  Running to n_global read past the gathered
+         ! data and, because point_ids is zero-filled beyond it, wrote to
+         ! sorted(0): an out-of-bounds store of an uninitialised value.
+         !
+         ! Unresolved slots keep the 0.0 initialiser rather than a sentinel.
+         ! Station VALIDITY is reported out-of-band by requesting `mask` on
+         ! the same channel: it rides the same interpolation, so an
+         ! unresolved station reads mask 0 alongside its 0.0 value, and --
+         ! more importantly -- a station that is INSIDE the domain but dry
+         ! or inside a structure reads mask 0 while its field value is a
+         ! meaningless interpolation of dry cells.  A sentinel here would
+         ! catch only the first case and would be static; the mask is
+         ! per-step, which is what a moving wet/dry line needs.
+         n_got = sum(this%gatherer%recv_counts)
          allocate (sorted(this%n_global), source=0.0_SP)
-         do k = 1, this%n_global
+         do k = 1, n_got
             sorted(this%gatherer%point_ids(k)) = gathered(k)
          end do
          if (this%ncp%is_open) then
