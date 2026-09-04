@@ -1424,6 +1424,7 @@ contains
    ! ----------------------------------------------------------------
    subroutine log_blowup_site(this, global_max)
       use, intrinsic :: ieee_arithmetic, only: ieee_is_nan
+      use, intrinsic :: iso_fortran_env, only: output_unit
       class(type_model_stepper_2d), intent(inout) :: this
       real(SP), intent(in) :: global_max
 
@@ -1457,9 +1458,14 @@ contains
                (real(this%grid%jbegin + jmax - lp%jb, SP) + 0.5_SP)*this%grid%dy0, &
                ", depth = ", f%depth(imax, jmax), " m"
             ! direct write, not env%log: write_log drops non-IO ranks, and
-            ! the site holder is almost never rank 0 -- mpiexec still routes
+            ! the site holder is almost never rank 0 -- launchers route
             ! every rank's stdout into the job log
             write (*, '(a)') trim(msg)
+            ! flush BEFORE returning: the caller aborts on the blowup flag
+            ! without unit finalization, and a non-IO rank's buffered stdout
+            ! is then discarded under srun -- the line survived on mpiexec
+            ! only because it line-buffers through the launcher pipe
+            flush (output_unit)
          end if
       end associate
    end subroutine log_blowup_site

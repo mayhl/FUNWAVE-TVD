@@ -68,10 +68,20 @@ contains
    ! Common method to gracefully exit MPI and FORTRAN
    subroutine terminate(filename, line, message)
       use MPI, only: MPI_Abort, MPI_COMM_WORLD
+      use, intrinsic :: iso_fortran_env, only: output_unit, error_unit
       character(*), intent(in) :: filename
       integer, intent(in) :: line
       character(*), optional, intent(in) :: message
-      integer :: ierr
+      integer :: ierr, fstat
+
+      ! MPI_Abort tears every rank down with no unit finalization, so
+      ! anything still buffered on stdout is discarded -- which silently
+      ! ate direct writes from NON-IO ranks (the blow-up site line, lost
+      ! under srun but not under mpiexec, which line-buffers through the
+      ! launcher pipe).  iostat so the abort path itself cannot fault on
+      ! an unconnected unit.
+      flush (output_unit, iostat=fstat)
+      flush (error_unit, iostat=fstat)
 
       if (error_code .eq. 1) then
          call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
