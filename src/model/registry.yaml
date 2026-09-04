@@ -125,6 +125,48 @@ variables:
     fill_value:     -9999.0
     latex:          "$|\\mathbf{u}|_{\\max}$"
 
+  # ── prognostic fluxes and the vector-derived output names ───────────────
+  # p/q are always registered (never demand-gated) and velocity.mag/.dir are
+  # synthesised per step, but none was declared, so all four wrote with no CF
+  # attributes.  NOTE the direction convention: vec_dir = atan2(v, u) in
+  # DEGREES, i.e. counterclockwise from +x -- NOT a compass bearing, so CF's
+  # direction_of_sea_water_velocity would be a mislabel and is deliberately
+  # not claimed here.
+  - name:           p
+    legacy_name:    Ubar
+    long_name:      "x depth-integrated volume flux"
+    standard_name:  ""
+    funwave_name:   "eastward_depth_integrated_volume_flux_per_unit_width"
+    units:          "m2 s-1"
+    fill_value:     -9999.0
+    latex:          "$P = Hu$"
+
+  - name:           q
+    legacy_name:    Vbar
+    long_name:      "y depth-integrated volume flux"
+    standard_name:  ""
+    funwave_name:   "northward_depth_integrated_volume_flux_per_unit_width"
+    units:          "m2 s-1"
+    fill_value:     -9999.0
+    latex:          "$Q = Hv$"
+
+  - name:           velocity.mag
+    legacy_name:    ~
+    long_name:      "depth-averaged sea water speed"
+    standard_name:  "sea_water_speed"
+    units:          "m s-1"
+    fill_value:     -9999.0
+    latex:          "$|\\mathbf{u}|$"
+
+  - name:           velocity.dir
+    legacy_name:    ~
+    long_name:      "current direction, CCW from +x axis"
+    standard_name:  ""
+    funwave_name:   "depth_averaged_current_direction_from_x_axis"
+    units:          "degree"
+    fill_value:     -9999.0
+    latex:          "$\\theta_u$"
+
   # ── breaker diagnostics + remaining running maxima ──────────────────────
   # Registerable and deck-selectable via derive_demand_flags, but undeclared
   # until now, so they wrote with NO CF attributes.  Units taken from the

@@ -63,6 +63,19 @@ contains
       case ("u_max")
          m%units = "m s-1"
          m%long_name = "maximum depth-averaged sea water speed"
+      case ("p")
+         m%units = "m2 s-1"
+         m%long_name = "x depth-integrated volume flux"
+      case ("q")
+         m%units = "m2 s-1"
+         m%long_name = "y depth-integrated volume flux"
+      case ("velocity.mag")
+         m%units = "m s-1"
+         m%long_name = "depth-averaged sea water speed"
+         m%standard_name = "sea_water_speed"
+      case ("velocity.dir")
+         m%units = "degree"
+         m%long_name = "current direction, CCW from +x axis"
       case ("mf_max")
          m%units = "m3 s-2"
          m%long_name = "maximum depth-integrated momentum flux"
