@@ -443,6 +443,32 @@ contains
 
    ! Shared by named geometries: entries and channel-inline geometry
    ! (ctx prefixes error messages with the owning entry)
+   ! Grow this%geometries by one entry.
+   !
+   ! Explicit temporary + move_alloc, NOT the self-referential array
+   ! constructor (this%geometries = [this%geometries, g]).  That form on an
+   ! allocatable derived-type array with allocatable components miscompiles
+   ! widely: ifort 2021.4 -O3 and 2021.7 both die here at output init with
+   ! "forrtl: severe (122): invalid attempt to assign into a pointer that is
+   ! not associated", and crayftn 16/18 ICE on the file outright (llvm-gen-
+   ! util.c:1358 "Pointer argument type mismatch").  cce/21 and newer ifx
+   ! tolerate it, which is why this only ever showed up off the main build.
+   subroutine append_geometry(this, g)
+      class(type_model_output), intent(inout) :: this
+      type(type_output_geometry), intent(in) :: g
+
+      type(type_output_geometry), allocatable :: grown(:)
+      integer :: n
+
+      n = 0
+      if (allocated(this%geometries)) n = size(this%geometries)
+      allocate (grown(n + 1))
+      if (n > 0) grown(1:n) = this%geometries
+      grown(n + 1) = g
+      call move_alloc(grown, this%geometries)
+
+   end subroutine append_geometry
+
    subroutine parse_geometry(entry, ctx, sub_env, g, min_spacing)
       type(type_yaml_reader), intent(inout) :: entry
       character(*), intent(in) :: ctx
@@ -603,7 +629,7 @@ contains
                   g_inline%name = cfg%name
                   call parse_geometry(entries(k), "channels: '"//cfg%name//"'", &
                                       sub_env, g_inline, min_spacing)
-                  this%geometries = [this%geometries, g_inline]
+                  call append_geometry(this, g_inline)
                end block
                cfg%geom_idx = size(this%geometries)
             else
@@ -617,7 +643,7 @@ contains
                      g_field%name = "field"
                      g_field%geom_type = "field"
                      allocate (g_field%x(0), g_field%y(0))
-                     this%geometries = [this%geometries, g_field]
+                     call append_geometry(this, g_field)
                   end block
                   cfg%geom_idx = size(this%geometries)
                end if
