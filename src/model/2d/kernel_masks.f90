@@ -122,19 +122,22 @@ contains
    ! blow-up injector of the 2026-07 damping mission.
    ! ----------------------------------------------------------------
    subroutine update_disp_weight(eta, depth, mask9, min_depth_frc, &
-                                swe_eta_dep, swe_eta_ramp, &
-                                mask9_forced, disp_w, &
-                                min_depth, wetdry_disp_ramp)
+                                 swe_eta_dep, swe_eta_ramp, &
+                                 mask9_forced, disp_w, &
+                                 min_depth, wetdry_disp_ramp, slope_gate)
       real(SP), intent(in)  :: eta(:, :), depth(:, :)
       integer, intent(in)  :: mask9(:, :)
       real(SP), intent(in)  :: min_depth_frc, swe_eta_dep, swe_eta_ramp
       logical, intent(in)  :: mask9_forced
       real(SP), intent(out) :: disp_w(:, :)
       real(SP), intent(in)  :: min_depth, wetdry_disp_ramp
+      ! static bathymetry-slope gate (stepper builds it once at init from
+      ! |grad h|); absent = no slope gating, bitwise the old behaviour
+      real(SP), intent(in), optional :: slope_gate(:, :)
 
       real(SP) :: t, s
       integer :: i, j
-      logical :: gate_on, wd_on
+      logical :: gate_on, wd_on, sl_on
 
       ! wet/dry-proximity taper: smoothstep on the water column over
       ! [min_depth, (1+ramp)*min_depth], mode-independent -- kills the
@@ -143,8 +146,9 @@ contains
       ! no SWE gate to do it for free)
       gate_on = swe_eta_ramp > 0.0_SP .and. .not. mask9_forced
       wd_on = wetdry_disp_ramp > 0.0_SP
+      sl_on = present(slope_gate)
 
-      if (.not. (gate_on .or. wd_on)) then
+      if (.not. (gate_on .or. wd_on .or. sl_on)) then
          disp_w = real(mask9, SP)
          return
       end if
@@ -167,6 +171,22 @@ contains
             end if
          end do
       end do
+
+      ! bathymetry-slope gate: already a smoothstep, static.  Applied in its
+      ! own loop, NOT inside the region above: naming an absent OPTIONAL
+      ! anywhere in a default(shared) region makes ifx/ifort copy its
+      ! descriptor when it outlines the region, so the null faults at the
+      ! loop head even though sl_on guards every actual use.  gfortran
+      ! captures by reference and -O0 does not outline, which is why both
+      ! hide it.  Here the region is entered only when the gate is present.
+      if (sl_on) then
+         !$omp parallel do default(shared) schedule(static) private(i)
+         do j = 1, size(mask9, 2)
+            do i = 1, size(mask9, 1)
+               disp_w(i, j) = disp_w(i, j)*slope_gate(i, j)
+            end do
+         end do
+      end if
    end subroutine update_disp_weight
 
 end module model_kernel_masks_mod

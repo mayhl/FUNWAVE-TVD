@@ -41,7 +41,9 @@ module model_physics_mod
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_DISPERSION_BETA_REF, &
-                                        DEF_DISPERSION_SCHEME
+                                        DEF_DISPERSION_SCHEME, &
+                                        DEF_DISPERSION_SLOPE_DISP_MAX, &
+                                        DEF_DISPERSION_SLOPE_DISP_RAMP
 
    implicit none
 
@@ -63,6 +65,16 @@ module model_physics_mod
       ! ported (kernel_etauv), so no YAML key until the feature lands
       logical  :: disp_time_left = .false.
       real(SP) :: Beta_ref = -0.531_SP
+      ! Bathymetry-slope dispersion gate; 0 = off.  Lives HERE, not under
+      ! breaking:, because it is not a breaking mechanism -- it bounds where
+      ! the Boussinesq OPERATOR itself is valid.  The derivation assumes a
+      ! mild slope, so on a near-vertical face digitised into the bathymetry
+      ! the dispersive terms are outside their own validity and go marginally
+      ! unstable, tipping on last-bit arithmetic.  Gating back toward NSWE
+      ! there leaves the geometry -- and overtopping -- untouched, unlike
+      ! smoothing the bathymetry.
+      real(SP) :: slope_disp_max = 0.0_SP
+      real(SP) :: slope_disp_ramp = 0.0_SP
       real(SP) :: Gamma3 = 1.0_SP
       logical  :: viscosity_breaking = .true.   ! set from breaking.model in model_setup
 
@@ -167,6 +179,17 @@ contains
       end if
       call sub_env%yaml%read("beta_ref", silent=no_key, val=this%Beta_ref, &
                              default=DEF_DISPERSION_BETA_REF)
+      call sub_env%yaml%read("slope_disp_max", silent=no_key, val=this%slope_disp_max, &
+                             default=DEF_DISPERSION_SLOPE_DISP_MAX)
+      call sub_env%yaml%read("slope_disp_ramp", silent=no_key, val=this%slope_disp_ramp, &
+                             default=DEF_DISPERSION_SLOPE_DISP_RAMP)
+      ! a hard switch is the known blow-up injector (see update_disp_weight):
+      ! last-bit differences become O(1) residual flips at threshold cells
+      if (this%slope_disp_max > 0.0_SP .and. this%slope_disp_ramp <= 0.0_SP) &
+         call env%log%exit_on_error("dispersion: slope_disp_max needs a"// &
+                                    " positive slope_disp_ramp -- a hard"// &
+                                    " dispersion switch seeds blow-ups")
+
       ! swe_eta_dep/swe_eta_ramp moved to breaking: (the gate IS the
       ! shock-capturing breaking mechanism; dep doubles as the viscous
       ! breaker's onset criterion)

@@ -67,6 +67,8 @@ module model_config_defaults_mod
    ! ── dispersion ──
    character(*), parameter :: DEF_DISPERSION_BETA_REF = "-0.531"
    character(*), parameter :: DEF_DISPERSION_SCHEME = "fully_nonlinear"
+   character(*), parameter :: DEF_DISPERSION_SLOPE_DISP_MAX = "0.0"
+   character(*), parameter :: DEF_DISPERSION_SLOPE_DISP_RAMP = "0.0"
    ! ── foam ──
    character(*), parameter :: DEF_FOAM_BURST_TIME_NON_BREAKING = "1.0"
    character(*), parameter :: DEF_FOAM_CD = "0.5"

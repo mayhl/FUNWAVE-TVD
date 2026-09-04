@@ -138,6 +138,11 @@ module model_stepper_2d_mod
       ! edge ([W, E, S, N])
       logical :: flather_owned(4) = .false.
 
+      ! static bathymetry-slope dispersion gate (breaking.slope_disp_max):
+      ! smoothstep on |grad h|, built ONCE at init since the bathymetry does
+      ! not move.  Unallocated = gate disabled.
+      real(SP), allocatable :: disp_slope_gate(:, :)
+
       ! Kernel workspaces — allocated once, reused every stage.
       type(type_flux_workspace) :: fws
       type(type_disp_workspace) :: dws
@@ -392,6 +397,27 @@ contains
          this%depth_fy(:, 1:nloc) = f%depth_y
          this%depth_fy(:, nloc + 1) = 0.5_SP*(3.0_SP*f%depth(:, nloc) &
                                               - f%depth(:, nloc - 1))
+
+         ! bathymetry-slope dispersion gate: |grad h| by central differences
+         ! on the still-water depth, smoothstepped DOWN to 0 at slope_disp_max.
+         ! Static, so this is the only place it is evaluated.
+         if (physics%slope_disp_max > 0.0_SP) then
+            allocate (this%disp_slope_gate(mloc, nloc), source=1.0_SP)
+            block
+               real(SP) :: gx, gy, sl, w
+               do j = 2, nloc - 1
+                  do i = 2, mloc - 1
+                     gx = 0.5_SP*(f%depth(i + 1, j) - f%depth(i - 1, j))/this%dx(i, j)
+                     gy = 0.5_SP*(f%depth(i, j + 1) - f%depth(i, j - 1))/this%dy(i, j)
+                     sl = sqrt(gx*gx + gy*gy)
+                     w = (physics%slope_disp_max - sl)/physics%slope_disp_ramp
+                     w = min(1.0_SP, max(0.0_SP, w))
+                     this%disp_slope_gate(i, j) = w*w*(3.0_SP - 2.0_SP*w)
+                  end do
+               end do
+            end block
+            call this%grid%halo_exchange(this%disp_slope_gate)
+         end if
 
          ! legacy init.F dry-cell face flattening: every initially-dry
          ! cell gets locally flat face depths (the in-loop update_mask
@@ -1131,10 +1157,18 @@ contains
             call this%sponge%pml_blank_mask9(f%mask9)
 
             ! real dispersion-gate weight off the settled mask9 (halos valid)
-            call update_disp_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
-                                    this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
-                                    this%m9_forced, f%disp_w, &
-                                    num%MinDepth, this%breaking%wetdry_disp_ramp)
+            if (allocated(this%disp_slope_gate)) then
+               call update_disp_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
+                                       this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
+                                       this%m9_forced, f%disp_w, &
+                                       num%MinDepth, this%breaking%wetdry_disp_ramp, &
+                                       this%disp_slope_gate)
+            else
+               call update_disp_weight(f%eta, f%depth, f%mask9, num%MinDepthFrc, &
+                                       this%breaking%swe_eta_dep, this%breaking%swe_eta_ramp, &
+                                       this%m9_forced, f%disp_w, &
+                                       num%MinDepth, this%breaking%wetdry_disp_ramp)
+            end if
             ! latch only once the vessel is NOT blanking mask9 — else a
             ! mid-run deactivation (is_activated -> F) would leave m9_settled
             ! true and freeze mask9 with the stale hull zeros; the guard's
@@ -1182,11 +1216,19 @@ contains
             f%mask9 = nint(rmask)
          end block
          call this%sponge%pml_blank_mask9(f%mask9)
-         call update_disp_weight(f%eta, f%depth, f%mask9, &
-                                 this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
-                                 this%breaking%swe_eta_ramp, this%m9_forced, &
-                                 f%disp_w, this%numerics%MinDepth, &
-                                 this%breaking%wetdry_disp_ramp)
+         if (allocated(this%disp_slope_gate)) then
+            call update_disp_weight(f%eta, f%depth, f%mask9, &
+                                    this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
+                                    this%breaking%swe_eta_ramp, this%m9_forced, &
+                                    f%disp_w, this%numerics%MinDepth, &
+                                    this%breaking%wetdry_disp_ramp, this%disp_slope_gate)
+         else
+            call update_disp_weight(f%eta, f%depth, f%mask9, &
+                                    this%numerics%MinDepthFrc, this%breaking%swe_eta_dep, &
+                                    this%breaking%swe_eta_ramp, this%m9_forced, &
+                                    f%disp_w, this%numerics%MinDepth, &
+                                    this%breaking%wetdry_disp_ramp)
+         end if
 
          ! carried fws face restore (18c): the first stage's etat reads the
          ! interface flux one row past the interior, which the interior-only

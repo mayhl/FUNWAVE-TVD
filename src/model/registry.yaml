@@ -483,6 +483,8 @@ sections:
     doc: "Boussinesq dispersion — named scheme XOR an explicit atomic Gamma triple."
     keys:
       beta_ref: {legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
+      slope_disp_max: {legacy: ~, default: 0.0, units: ~, latex: '$|\\nabla h|_{\\max}$', doc: "Bathymetry-slope dispersion gate: |grad h| at or above which the dispersive terms are fully off (0 = gate disabled). The Boussinesq derivation assumes a mild slope, so on a near-vertical face digitised into the bathymetry the dispersive operator is outside its own validity and goes marginally unstable; gating back toward NSWE there leaves the geometry and overtopping untouched, unlike smoothing the bathymetry. Static (bathymetry-derived), evaluated once at init."}
+      slope_disp_ramp: {legacy: ~, default: 0.0, units: ~, doc: "Slope-gate smoothstep taper width in |grad h| units, below slope_disp_max. Required (positive) whenever slope_disp_max is set: a hard switch turns last-bit differences into O(1) residual flips at threshold cells, which is the known blow-up injector."}
       # gamma triple: atomic (any present => all three) and exclusive with
       # scheme: — expert mode states the whole triple; dispersion stays ON
       # (kernels-off NSWE is reachable only via scheme: nswe)
