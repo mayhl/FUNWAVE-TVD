@@ -31,7 +31,8 @@ module model_simulation_mod
    use model_base_mod, only: type_model_base
 
    use model_config_defaults_mod, only: DEF_SIMULATION_SCREEN_INTERVAL, &
-                                        DEF_SIMULATION_T_START
+                                        DEF_SIMULATION_T_START, &
+                                        DEF_SIMULATION_SPINUP
 
    implicit none
 
@@ -44,6 +45,10 @@ module model_simulation_mod
       real(SP) :: total_time = 0.0_SP
       real(SP) :: t_start = 0.0_SP
       real(SP) :: screen_interval = 0.0_SP
+      !> Spin-up: the running-maximum envelopes and the arrival map do not
+      !! accumulate before this time, so a wavemaker ramp cannot set a
+      !! maximum later reported as a storm peak.  0 = from t=0 (legacy).
+      real(SP) :: spinup = 0.0_SP
 
    contains
       procedure :: read_input => simulation_read_input
@@ -57,7 +62,7 @@ contains
 
       type(type_env) :: sub_env
       type(type_yaml_reader) :: ts_yaml
-      logical :: no_ts, no_title, no_tstart, no_screen
+      logical :: no_ts, no_title, no_tstart, no_screen, no_spin
 
       sub_env = get_sub_env(env, "simulation")
       this%is_activated = .true.
@@ -66,6 +71,7 @@ contains
       if (no_title) this%title = ""
       call sub_env%yaml%read_positive("total_time", val=this%total_time)
       call sub_env%yaml%read("t_start", silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)
+      call sub_env%yaml%read("spinup", silent=no_spin, val=this%spinup, default=DEF_SIMULATION_SPINUP)
       call sub_env%yaml%read("screen_interval", silent=no_screen, &
                              val=this%screen_interval, default=DEF_SIMULATION_SCREEN_INTERVAL)
 

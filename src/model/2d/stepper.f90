@@ -138,6 +138,14 @@ module model_stepper_2d_mod
       ! edge ([W, E, S, N])
       logical :: flather_owned(4) = .false.
 
+      ! true once the run is past simulation.spinup.  Set per step where
+      ! `time` is in scope; consulted by the two envelope-accumulation sites
+      ! (update_max_min here, vort_max inside run_dispersion) so a wavemaker
+      ! ramp cannot set a maximum later reported as a storm peak.  False
+      ! during init, which also stops the stepper_init warm-up dispersion
+      ! call from seeding vort_max before t = 0.
+      logical :: past_spinup = .false.
+
       ! static bathymetry-slope dispersion gate (breaking.slope_disp_max):
       ! smoothstep on |grad h|, built ONCE at init since the bathymetry does
       ! not move.  Unallocated = gate disabled.
@@ -608,6 +616,8 @@ contains
       real(SP), intent(in) :: dt, time
 
       integer :: i, ncap
+
+      this%past_spinup = time >= this%simulation%spinup
 
       associate (f => this%fields, lp => this%grid%lp, &
                  phy => this%physics, num => this%numerics)
@@ -1472,6 +1482,11 @@ contains
          if (.not. (out%OUT_Hmax .or. out%OUT_Hmin .or. out%OUT_Umax &
                     .or. out%OUT_MFmax .or. out%out_arr_time)) return
 
+         ! spin-up gate: these are running envelopes with no reset, so
+         ! without it a ramp transient is baked into every maximum for the
+         ! rest of the run and nothing in the output says so
+         if (.not. this%past_spinup) return
+
          do j = 1, lp%nloc
             do i = 1, lp%mloc
                if (f%mask(i, j) < 1) cycle
@@ -1541,7 +1556,7 @@ contains
                                       this%u4, this%v4, this%u1p, this%v1p, &
                                       this%u1pp, this%v1pp, this%u2, this%v2, &
                                       this%u3, this%v3, &
-                                      out_vormax=this%output%OUT_VORmax, &
+                                      out_vormax=this%output%OUT_VORmax .and. this%past_spinup, &
                                       vort_max=f%vort_max)
       end associate
 

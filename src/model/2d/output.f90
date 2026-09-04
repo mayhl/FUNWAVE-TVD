@@ -141,6 +141,11 @@ module model_output_mod
       real(SP) :: interval = 0.0_SP
       real(SP) :: t_start = 0.0_SP
       logical :: has_t_start = .false.
+      ! t_start: spinup -- resolved against simulation.spinup where the
+      ! channel is built (main), since output: is read without it in scope
+      logical :: t_start_spinup = .false.
+      real(SP) :: t_end = 0.0_SP
+      logical :: has_t_end = .false.
       ! '' inherits the deck default: netcdf when the deck format is
       ! netcdf/pnetcdf, ascii otherwise
       character(8) :: format = ''
@@ -664,8 +669,23 @@ contains
             call split_channel_variables(sub_env, cfg, names)
 
             call entries(k)%read_positive("interval", val=cfg%interval)
-            call entries(k)%read("t_start", silent=no_key, val=cfg%t_start)
-            cfg%has_t_start = .not. no_key
+            ! t_start accepts a real OR the sentinel `spinup`.  YAML scalars
+            ! are text until interpreted, so probe as a string first: a
+            ! numeric value simply falls through to the real read below.
+            block
+               character(:), allocatable :: tstr
+               logical :: no_ts_str
+               call entries(k)%read_string("t_start", silent=no_ts_str, val=tstr)
+               if (.not. no_ts_str) cfg%t_start_spinup = trim(adjustl(tstr)) == "spinup"
+            end block
+            if (cfg%t_start_spinup) then
+               cfg%has_t_start = .true.
+            else
+               call entries(k)%read("t_start", silent=no_key, val=cfg%t_start)
+               cfg%has_t_start = .not. no_key
+            end if
+            call entries(k)%read("t_end", silent=no_key, val=cfg%t_end)
+            cfg%has_t_end = .not. no_key
 
             ! optional format: absence inherits the deck-format default.
             ! Field-geometry channels take the full set; points stay

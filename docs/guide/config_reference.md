@@ -159,6 +159,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 |---|---|---|---|---|
 | `screen_interval` | `1.0` | `SCREEN_INTV` | s | Screen-log / monitor cadence. |
 | `t_start` | `0.0` | `PLOT_START_TIME` | s | Simulation time at which output begins. |
+| `spinup` | `0.0` | — | s | Spin-up duration. The running-maximum envelopes (h_max, h_min, u_max, mf_max, vort_max) and the first-arrival map do not accumulate before it, so a wavemaker ramp cannot set a maximum that is then reported as a storm peak. Channels may also write t_start: spinup to inherit it rather than restating the offset per channel. 0 = accumulate from t=0 (legacy). |
 | `title` | — | `TITLE` | — | Run title (reserved for NetCDF global attrs). |
 | `total_time` | — | `TOTAL_TIME` | s | Total simulated duration. |
 
@@ -411,7 +412,8 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `channels.variables` | — | — | — | Field-registry variable names, vector-derived names (velocity.mag, velocity.dir -- registry vectors: velocity = [u, v]; statistics on .dir are rejected, direction is circular), and product-derived names (hsig = 4.004*std(eta), the Rayleigh H_1/3 constant; its eta source accumulates hidden when not itself requested). |
 | `channels.interval` | — | — | s | Channel flush cadence. |
 | `channels.statistics` | — | — | — | Presence makes the channel windowed (per-interval statistics, no snapshots); absence makes it instantaneous. std is about the window mean (rms includes it); shifted moments keep single precision safe. One of `min` \| `max` \| `mean` \| `rms` \| `std`. |
-| `channels.t_start` | — | — | s | Channel start time (default simulation t_start). |
+| `channels.t_start` | — | — | s | Channel start time (default simulation t_start). Also accepts the sentinel `spinup`, which resolves to simulation.spinup -- so a campaign whose statistics windows all begin after spin-up states the offset once instead of restating it per channel per run. |
+| `channels.t_end` | — | — | s | Channel end time; absent = unbounded (writes to the end of the run). Bounds a high-cadence channel to part of a long record -- e.g. a 1/30 s field dump over the closing seconds while eta writes throughout -- without paying for the cadence over the whole run. |
 | `channels.format` | — | — | — | Point file format; default follows the deck format (netcdf/pnetcdf selects a netcdf group in diagnostics.nc One of `ascii` \| `netcdf`. |
 | `channels.precision` | `double` | — | — | Field save precision: single halves binary/netcdf storage for high-cadence channels (ascii text unchanged; double = the model working precision). Every channel writes into result_folder/\<name>/ with its own t.out frame index (frame, t, dt) and, for field channels, a grid.txt. One of `single` \| `double`. |
 

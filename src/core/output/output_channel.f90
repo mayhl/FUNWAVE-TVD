@@ -196,6 +196,10 @@ module core_output_channel_mod
       type(type_channel_derived)     :: derived(DERIVED_MAX)
       logical                        :: snapshot = .true.
       real(SP)                       :: t_start = 0.0_SP
+      !> Upper time bound; huge() = unbounded (the default).  Lets a
+      !! high-cadence channel cover part of a long record without the
+      !! tail running to the end of the run.
+      real(SP)                       :: t_end = huge(1.0_SP)
       real(SP)                       :: interval = 0.0_SP
 
       ! Output destination and flush counter
@@ -260,7 +264,7 @@ module core_output_channel_mod
 contains
 
    subroutine channel_init(this, id, geom_type, variables, n_vars, &
-                           statistics, n_stats, snapshot, t_start, interval, &
+                           statistics, n_stats, snapshot, t_start, t_end, interval, &
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
                            file_prefixes, icount_start, var_meta, diag_ncid, &
@@ -273,6 +277,7 @@ contains
       integer, intent(in) :: n_stats
       logical, intent(in) :: snapshot
       real(SP), intent(in) :: t_start, interval
+      real(SP), intent(in), optional :: t_end   ! absent = unbounded
       character(*), intent(in) :: result_folder  ! must include trailing separator
       character(*), intent(in) :: format  ! field: ascii/binary/netcdf/pnetcdf; points: ascii/netcdf
       real(SP), intent(in) :: coords_x(*), coords_y(*)  ! global query coords
@@ -348,6 +353,7 @@ contains
 
       ! Timing control
       this%trigger%t_start = t_start
+      if (present(t_end)) this%t_end = t_end
       this%trigger%interval = interval
       this%trigger%last_triggered = -1.0_SP
 
@@ -465,6 +471,7 @@ contains
 
       this%fired = .false.
       if (t < this%t_start) return
+      if (t > this%t_end) return
 
       ! dt-accumulator mode: legacy PLOT_COUNT frame cadence
       do_flush = this%trigger%should_trigger(t, dt)

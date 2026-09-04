@@ -150,6 +150,7 @@ module model_config_defaults_mod
    character(*), parameter :: DEF_SEDIMENT_SPECIFIC_GRAVITY = "2.68"
    ! ── simulation ──
    character(*), parameter :: DEF_SIMULATION_SCREEN_INTERVAL = "1.0"
+   character(*), parameter :: DEF_SIMULATION_SPINUP = "0.0"
    character(*), parameter :: DEF_SIMULATION_T_START = "0.0"
    ! ── subgrid ──
    character(*), parameter :: DEF_SUBGRID_RATIO = "1"

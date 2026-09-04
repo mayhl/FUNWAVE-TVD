@@ -1085,9 +1085,13 @@ contains
                                        statistics=cfg%statistics, &
                                        n_stats=cfg%n_stats, &
                                        snapshot=cfg%snapshot, &
-                                       t_start=merge(cfg%t_start, &
-                                                     this%simulation%t_start, &
-                                                     cfg%has_t_start), &
+                                       t_start=merge(this%simulation%spinup, &
+                                                     merge(cfg%t_start, &
+                                                           this%simulation%t_start, &
+                                                           cfg%has_t_start), &
+                                                     cfg%t_start_spinup), &
+                                       t_end=merge(cfg%t_end, huge(1.0_SP), &
+                                                   cfg%has_t_end), &
                                        interval=cfg%interval, &
                                        result_folder=folder, format=pfmt, &
                                        coords_x=geom%x, coords_y=geom%y, &
