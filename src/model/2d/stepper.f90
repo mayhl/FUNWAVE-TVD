@@ -132,6 +132,12 @@ module model_stepper_2d_mod
       ! x-sweep RHS — both only on the west-boundary rank
       logical :: west_dirichlet = .false.
 
+      ! tide%flather masked by rank ownership: Flather is a DOMAIN-edge
+      ! condition, but lp%ib/lp%ie are rank-local, so an unmasked face
+      ! flag makes every interior rank impose it at its own subdomain
+      ! edge ([W, E, S, N])
+      logical :: flather_owned(4) = .false.
+
       ! Kernel workspaces — allocated once, reused every stage.
       type(type_flux_workspace) :: fws
       type(type_disp_workspace) :: dws
@@ -330,6 +336,15 @@ contains
       if (this%tide%flather(2)) this%bc%fill_east = .false.
       if (this%tide%flather(3)) this%bc%fill_south = .false.
       if (this%tide%flather(4)) this%bc%fill_north = .false.
+
+      ! ownership mask for the Flather faces — tide%flather keeps its
+      ! config meaning (tide.f90 reads it to EXCLUDE the relaxation on a
+      ! Flather face, on every rank); only the flux application and the
+      ! incident-target build are domain-edge ([W, E, S, N] ->
+      ! back/shore/right/left, the bc.f90 fill_* mapping)
+      this%flather_owned = this%tide%flather .and. &
+                           [grid%is_back_boundary, grid%is_shore_boundary, &
+                            grid%is_right_boundary, grid%is_left_boundary]
 
       ! legacy EXCHANGE ghost gates (old/bc.F:441-449): AGE_BREAKING
       ! travels only under VISCOSITY_BREAKING, nu_break also under
@@ -584,7 +599,7 @@ contains
          ! scalar broadcast uniform, then each boundary wavemaker adds its
          ! incident series (superposed).  Must precede flux_flather_bc, and
          ! reuses the same target across the 3 RK stages (TIME is frozen)
-         if (istage == 1 .and. any(this%tide%flather)) then
+         if (istage == 1 .and. any(this%flather_owned)) then
             call this%tide%build_flather_target()
             do i = 1, size(this%wavemakers)
                call this%wavemakers(i)%add_flather_target(this%grid, this%tide, time)
@@ -631,8 +646,8 @@ contains
          ! Flather radiation on forced open faces (characteristic BC track):
          ! impose the tide target through the boundary-normal flux, radiate
          ! the outgoing residual.  Runs after the wall fill it replaces.
-         if (any(this%tide%flather)) &
-            call flux_flather_bc(lp, this%tide%flather, &
+         if (any(this%flather_owned)) &
+            call flux_flather_bc(lp, this%flather_owned, &
                                  this%tide%eta_ext, this%tide%u_ext, &
                                  this%tide%v_ext, phy%Gamma3, num%MinDepth, &
                                  this%depth_fx, this%depth_fy, this%fws)

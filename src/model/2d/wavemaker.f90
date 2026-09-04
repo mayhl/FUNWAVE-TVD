@@ -1419,6 +1419,16 @@ contains
       if (this%flather_face == 0) return
       f = this%flather_face
 
+      ! domain-edge only: the target line is rank-local (lp%ib/ie, jb/je),
+      ! so an interior rank would add the incident series onto its own
+      ! subdomain edge — same guard the left_bc_source path carries
+      select case (f)
+      case (FACE_W); if (.not. grid%is_back_boundary) return
+      case (FACE_E); if (.not. grid%is_shore_boundary) return
+      case (FACE_S); if (.not. grid%is_right_boundary) return
+      case (FACE_N); if (.not. grid%is_left_boundary) return
+      end select
+
       do kf = 1, this%Nfreq
          bb(kf) = cos(this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
          cc(kf) = sin(this%Segma_Ser(kf)*time + this%Phase_Ser(kf))
