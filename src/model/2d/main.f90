@@ -716,8 +716,11 @@ contains
    ! legacy-style output flags, and hands the loop to the engine.
    ! Hot start (TIME = HotStartTime) is not wired yet.
    ! ----------------------------------------------------------------
-   subroutine model_run(this)
+   subroutine model_run(this, validate)
       class(type_model_main), intent(inout), target :: this
+      ! validate: run setup + every init_compute + stepper wiring, then stop
+      ! before output and the time loop (deck lint); teardown still runs
+      logical, intent(in) :: validate
 
       type(type_model_stepper_2d) :: stepper
       type(type_stepper_engine) :: engine
@@ -800,43 +803,49 @@ contains
                         restart=this%hot_start%use_checkpoint)
       call stepper%register_output(this%registry)
 
-      ! checkpoint restart: the loaded state is the full live core set.  Copy
-      ! the staged interface flux (p_flux/q_flux) into the now-registered
-      ! workspace, then refill the parity ghosts and rebuild H before the run.
-      if (this%hot_start%use_checkpoint) then
-         pf => this%registry%get("p_flux")
-         qf => this%registry%get("q_flux")
-         associate (lp => this%grid%lp)
-            pf(lp%ib:lp%ie, lp%jb:lp%je) = this%chk_pflux(lp%ib:lp%ie, lp%jb:lp%je)
-            qf(lp%ib:lp%ie, lp%jb:lp%je) = this%chk_qflux(lp%ib:lp%ie, lp%jb:lp%je)
-         end associate
-         call stepper%restart_sync()
+      if (validate) then
+         call this%env%log%info("validation complete -- deck parses and initializes")
+      else
+
+         ! checkpoint restart: the loaded state is the full live core set.  Copy
+         ! the staged interface flux (p_flux/q_flux) into the now-registered
+         ! workspace, then refill the parity ghosts and rebuild H before the run.
+         if (this%hot_start%use_checkpoint) then
+            pf => this%registry%get("p_flux")
+            qf => this%registry%get("q_flux")
+            associate (lp => this%grid%lp)
+               pf(lp%ib:lp%ie, lp%jb:lp%je) = this%chk_pflux(lp%ib:lp%ie, lp%jb:lp%je)
+               qf(lp%ib:lp%ie, lp%jb:lp%je) = this%chk_qflux(lp%ib:lp%ie, lp%jb:lp%je)
+            end associate
+            call stepper%restart_sync()
+         end if
+
+         call build_field_channel(this, output_mgr)
+         monitor%mgr => output_mgr
+         monitor%registry => this%registry
+         monitor%comm => this%env%comm
+         monitor%tracer => this%tracer
+         monitor%vessel => this%vessel
+         monitor%fields => this%fields
+         if (this%need_vec_mag) monitor%vec_mag => this%vec_mag
+         if (this%need_vec_dir) monitor%vec_dir => this%vec_dir
+
+         call engine%init(merge(this%hot_start%time, 0.0_SP, &
+                                this%hot_start%is_activated), &
+                          this%simulation%total_time, &
+                          this%simulation%screen_interval)
+         call engine%run(stepper, monitor, this%env%log)
+
+         ! repeat the nu_cap engagement warning where it survives a long log
+         call stepper%report_cap()
+
+         ! checkpoint the final state (this slice: end-of-run only)
+         if (this%output%write_checkpoint) &
+            call write_checkpoint_set(this, engine%clock%current_time)
+
+         call output_mgr%finalize()
       end if
 
-      call build_field_channel(this, output_mgr)
-      monitor%mgr => output_mgr
-      monitor%registry => this%registry
-      monitor%comm => this%env%comm
-      monitor%tracer => this%tracer
-      monitor%vessel => this%vessel
-      monitor%fields => this%fields
-      if (this%need_vec_mag) monitor%vec_mag => this%vec_mag
-      if (this%need_vec_dir) monitor%vec_dir => this%vec_dir
-
-      call engine%init(merge(this%hot_start%time, 0.0_SP, &
-                             this%hot_start%is_activated), &
-                       this%simulation%total_time, &
-                       this%simulation%screen_interval)
-      call engine%run(stepper, monitor, this%env%log)
-
-      ! repeat the nu_cap engagement warning where it survives a long log
-      call stepper%report_cap()
-
-      ! checkpoint the final state (this slice: end-of-run only)
-      if (this%output%write_checkpoint) &
-         call write_checkpoint_set(this, engine%clock%current_time)
-
-      call output_mgr%finalize()
       call stepper%free()
       call this%means%free()
       call this%tide%free()

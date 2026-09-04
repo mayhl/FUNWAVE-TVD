@@ -49,7 +49,8 @@ contains
 
       ! CLI: flags anywhere, first non-flag argument is the deck
       ! (default input.yaml); -l redirects the log (default funwave.log);
-      ! --validate runs the full config read then stops before setup/run
+      ! --validate runs the config read + setup + every module init_compute,
+      ! then stops before output and the time loop (deck lint, no steps)
       quiet = .false.
       dbg = .false.
       validate = .false.
@@ -135,13 +136,9 @@ contains
       logical, intent(in) :: validate
 
       call model%init_from_env(env)
-      ! --validate stops here: the full config read ran (schema, cross-rules,
-      ! input file paths) but nothing is allocated and no output is created
-      if (validate) then
-         call env%log%info("validation complete -- deck OK")
-      else
-         call model%run()
-      end if
+      ! --validate runs setup + every module init_compute (where init-time deck
+      ! errors surface) and stops before output and the time loop
+      call model%run(validate)
       call model%finalize()
    end subroutine run_2d
 
