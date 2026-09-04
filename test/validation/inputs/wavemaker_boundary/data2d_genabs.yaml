@@ -1,0 +1,28 @@
+# Combined forcing (generating-absorbing, nee GEN_ABS): the west face carries
+# BOTH a wavemaker spectrum and a still-water-level file series on one forcing
+# block.  The tide reads the file as the relaxation target (the SWL) while the
+# wavemaker generates the waves through the same strip -- so forcing.wavemaker
+# and forcing.file compose, and a rising SWL can be matched under waves.  The
+# SWL ramps 0 -> 0.3 m by t = 100 s then holds; the near-west station line
+# (just past the relaxation strip) should sit at the elevated mean while the
+# 1.0 m table Hm0 still transmits.
+grid: {cell_size: [1.0, 2.0], n_cells: [500, 80], bathymetry: {type: flat, depth: 10.0}}
+simulation: {title: wm_gen_abs, total_time: 340.0, screen_interval: 100.0}
+wavemaker: {name: westfeed, seed: 66, spectrum: {type: spectrum_2d, file: data/wk2d_flat.txt}}
+boundaries:
+  west:
+    forcing: {wavemaker: westfeed, file: data/swl.txt, depth: 10.0}
+    sponge: {width: 80.0, direct: {r: 0.85, a: 5.0}}
+  east:
+    sponge: {width: 160.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
+breaking: {model: shock_capturing}
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [100.0, 110.0, 120.0, 130.0, 140.0]
+      y: [80.0, 80.0, 80.0, 80.0, 80.0]
+      variables: [eta]
+      interval: 0.1

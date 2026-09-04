@@ -776,6 +776,25 @@ simulations:
     tolerances:
       wavemaker_spectrum: { hm0_err_pct: 15.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
 
+  # ── combined forcing (GEN_ABS): wavemaker spectrum + SWL file on one face ──
+  # The west forcing block carries both a wavemaker and a still-water-level file
+  # series; the tide relaxes to the SWL while the wavemaker generates the waves.
+  # SWL ramps to 0.3 m; the near-west line should sit at that mean while the
+  # 1.0 m table Hm0 transmits.  Proves forcing.wavemaker + forcing.file compose.
+  - name: wm_boundary_gen_abs
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/wavemaker_boundary
+    input_files: [data2d_genabs.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [validation, 2d, wavemaker, boundary, genabs, forcing, local]
+    postprocess:
+      wavemaker_gen_abs: test.validation.oracles.wavemaker_gen_abs
+    tolerances:
+      # measured: mean 0.293 vs SWL 0.30 (err 0.007 m); Hm0 0.95-0.99 vs 1.0
+      wavemaker_gen_abs: { swl_err_m: 0.03, hm0_err_pct: 15.0 }
+
   # ── spatially-varying boundary feed: Hm0 profile along the face ──
   # Case A (periodic-y).  The west feed reads a two-anchor manifest so the fed
   # spectrum interpolates along the face: Hm0 0.5 m at y = 40 to 1.5 m at
