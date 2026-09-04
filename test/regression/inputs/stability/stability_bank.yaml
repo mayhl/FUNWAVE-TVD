@@ -36,8 +36,6 @@ dispersion:
   scheme: fully_nonlinear
 breaking:
   model: eddy_viscosity
-  cbrk1: 0.65
-  cbrk2: 0.35
 friction:
   cd: 0.0025
 output:

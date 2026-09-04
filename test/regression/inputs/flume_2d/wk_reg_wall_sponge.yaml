@@ -55,9 +55,6 @@ numerics:
   cfl: 0.5
   froude_cap: 1.0
   min_depth: 0.01
-breaking:
-  cbrk1: 0.65
-  cbrk2: 0.35
 output:
   result_folder: output/
   format: binary
