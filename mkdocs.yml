@@ -24,7 +24,9 @@ exclude_docs: |
   .DS_Store
   __pycache__/
   _build/
-  hooks.py
+  # diagram sources are content and live beside their page, but they are
+  # source, not site: the hook runs them, the site ships only the SVG
+  *.py
   doxygen-custom.css
   doxygen-footer.html
   doxygen-nav.js
@@ -39,7 +41,13 @@ markdown_extensions:
       generic: true
   - pymdownx.highlight:
       anchor_linenums: true
-  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        # structural diagrams stay text in the page; Material renders them
+        # client-side, so nothing binary and nothing to regenerate
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
   # transclusion: a walkthrough includes the REAL deck with --8<--, never a copy
   - pymdownx.snippets:
       # repo root first so a page can pull in a real deck from test/ or examples/
@@ -86,8 +94,12 @@ nav:
       - Analysis: examples/standing_wave/analysis.md
   - Validation:
     - Overview: validation/index.md
-    - Analytic: validation/analytic/index.md
-    - Lab: validation/lab/index.md
+    - Analytic:
+      - Overview: validation/analytic/index.md
+      - Linear dispersion: validation/analytic/dispersion_2d.md
+    - Lab:
+      - Overview: validation/lab/index.md
+      - Synolakis runup (viscous): validation/lab/lab_synolakis_brk_visc.md
   - Benchmarks:
     - Overview: benchmarks/index.md
   - API Reference: api/index.md
