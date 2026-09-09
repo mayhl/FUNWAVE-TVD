@@ -29,5 +29,7 @@ cd mayhlFUNWAVE
 | ------------------------------------- | ---------------------------------------- |
 | [Model](model/overview.md)            | Governing equations and numerical scheme |
 | [User Guide](guide/installation.md)   | Installation, configuration, output      |
-| [Examples](examples/standing_wave.md) | Step-by-step worked examples             |
+| [Examples](examples/index.md)         | Worked setups you can run yourself       |
+| [Validation](validation/index.md)     | Analytic and laboratory evidence         |
+| [Benchmarks](benchmarks/index.md)     | Cost and scaling measurements            |
 | [API Reference](api/index.md)         | Auto-generated source documentation      |

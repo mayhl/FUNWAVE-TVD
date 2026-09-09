@@ -40,6 +40,11 @@ markdown_extensions:
   - pymdownx.highlight:
       anchor_linenums: true
   - pymdownx.superfences
+  # transclusion: a walkthrough includes the REAL deck with --8<--, never a copy
+  - pymdownx.snippets:
+      # repo root first so a page can pull in a real deck from test/ or examples/
+      base_path: [".", "docs"]
+      check_paths: true
   - pymdownx.tabbed:
       alternate_style: true
   - admonition
@@ -75,5 +80,14 @@ nav:
     - Configuration Reference: guide/config_reference.md
     - Output: guide/output.md
   - Examples:
-    - Standing Wave: examples/standing_wave.md
+    - Overview: examples/index.md
+    - Standing Wave:
+      - Walkthrough: examples/standing_wave/index.md
+      - Analysis: examples/standing_wave/analysis.md
+  - Validation:
+    - Overview: validation/index.md
+    - Analytic: validation/analytic/index.md
+    - Lab: validation/lab/index.md
+  - Benchmarks:
+    - Overview: benchmarks/index.md
   - API Reference: api/index.md

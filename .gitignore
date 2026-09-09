@@ -66,3 +66,6 @@ output/
 Grid_Range.out
 time_dt.out
 LOG.txt
+
+# generated docs artifacts: figures and clips pulled from a board bundle
+docs/_generated/
