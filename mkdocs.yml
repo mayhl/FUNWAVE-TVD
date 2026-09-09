@@ -56,6 +56,13 @@ extra_javascript:
 extra_css:
   - stylesheets/extra.css
 
+# mike owns the versioned layout on the docs branch; Material reads the
+# versions.json it writes and renders the selector from this provider key
+extra:
+  version:
+    provider: mike
+    default: latest
+
 nav:
   - Home: index.md
   - Model:
