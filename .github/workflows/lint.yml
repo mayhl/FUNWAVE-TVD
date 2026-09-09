@@ -13,7 +13,7 @@ jobs:
         run: uv sync --group dev
 
       - name: Check registry codegen sync
-        run: uv run scripts/gen_registry.py --check
+        run: uv run tools/gen_registry.py --check
       
       # Fortran formatting (blocking, post canonical reformat). fprettify 0.3.7 has
       # no --check, so gate on a non-empty -d diff. -d is diff-only; exclude legacy

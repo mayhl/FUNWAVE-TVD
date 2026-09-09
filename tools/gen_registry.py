@@ -16,8 +16,8 @@ tree (readability/de-dup + docs/example-config generation).  Both are read here;
 a section key's default emits the same DEF_ constant it did as a flat parameter.
 
 Usage:
-    uv run scripts/gen_registry.py            # regenerate in place
-    uv run scripts/gen_registry.py --check    # verify committed file is in sync
+    uv run tools/gen_registry.py            # regenerate in place
+    uv run tools/gen_registry.py --check    # verify committed file is in sync
                                               # (exit 1 + diff if stale)
 """
 
@@ -45,8 +45,8 @@ HEADER = """\
 ! =================================================================
 !  GENERATED FILE — DO NOT EDIT.
 !  Source:    src/model/registry.yaml
-!  Generator: scripts/gen_registry.py   (rerun after registry edits)
-!  Sync test: scripts/gen_registry.py --check
+!  Generator: tools/gen_registry.py   (rerun after registry edits)
+!  Sync test: tools/gen_registry.py --check
 ! =================================================================
 !> @file config_defaults.f90
 !> @brief Generated YAML-parameter default constants (registry single source).
@@ -168,8 +168,8 @@ META_HEADER = """\
 ! =================================================================
 !  GENERATED FILE — DO NOT EDIT.
 !  Source:    src/model/registry.yaml
-!  Generator: scripts/gen_registry.py   (rerun after registry edits)
-!  Sync test: scripts/gen_registry.py --check
+!  Generator: tools/gen_registry.py   (rerun after registry edits)
+!  Sync test: tools/gen_registry.py --check
 ! =================================================================
 !> @file field_metadata.f90
 !> @brief Generated CF attribute catalog for output field variables.
@@ -215,8 +215,8 @@ DOCS_HEADER = """\
 <!-- =================================================================
   GENERATED FILE — DO NOT EDIT.
   Source:    src/model/registry.yaml
-  Generator: scripts/gen_registry.py   (rerun after registry edits)
-  Sync test: scripts/gen_registry.py --check
+  Generator: tools/gen_registry.py   (rerun after registry edits)
+  Sync test: tools/gen_registry.py --check
 ================================================================= -->
 
 # Configuration Reference
@@ -338,7 +338,7 @@ def _check_one(path: Path, new: str) -> bool:
         print(f"OK: {path.relative_to(REPO)} is in sync with registry.yaml")
         return True
     print(
-        f"STALE: {path.relative_to(REPO)} does not match registry.yaml — rerun: uv run scripts/gen_registry.py",
+        f"STALE: {path.relative_to(REPO)} does not match registry.yaml — rerun: uv run tools/gen_registry.py",
         file=sys.stderr,
     )
     sys.stderr.writelines(

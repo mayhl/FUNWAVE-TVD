@@ -1,8 +1,8 @@
 <!-- =================================================================
   GENERATED FILE — DO NOT EDIT.
   Source:    src/model/registry.yaml
-  Generator: scripts/gen_registry.py   (rerun after registry edits)
-  Sync test: scripts/gen_registry.py --check
+  Generator: tools/gen_registry.py   (rerun after registry edits)
+  Sync test: tools/gen_registry.py --check
 ================================================================= -->
 
 # Configuration Reference
