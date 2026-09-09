@@ -17,6 +17,18 @@ theme:
 hooks:
   - docs/hooks.py
 
+# Everything under docs_dir is copied into the site verbatim, so build inputs
+# and local cruft ship unless named here -- docs/_build alone was ~7 MB of a
+# stale Sphinx tree, and mike duplicates the payload for every version kept
+exclude_docs: |
+  .DS_Store
+  __pycache__/
+  _build/
+  hooks.py
+  doxygen-custom.css
+  doxygen-footer.html
+  doxygen-nav.js
+
 plugins:
   - search
   - bibtex:
