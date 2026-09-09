@@ -531,6 +531,22 @@ contains
    end subroutine load_obstacle
 
    ! ----------------------------------------------------------------
+   ! Spatially varying drag map (legacy IN_Cd + FRICTION_FILE): the Cd
+   ! field lands in friction's constant base, so the sponge merge and
+   ! sync_base carry it into the effective Cd untouched.  Ghosts follow
+   ! the parallel legacy GetFile — seam exchange, wall replication.
+   ! ----------------------------------------------------------------
+   subroutine load_friction(this)
+      use model_field_input_mod, only: read_field
+      class(type_model_main), intent(inout) :: this
+
+      call read_field(this%env, this%friction%cd_spec, this%grid, &
+                      this%friction%cd_base)
+      call ghost_fill_replicate(this, this%friction%cd_base)
+
+   end subroutine load_friction
+
+   ! ----------------------------------------------------------------
    ! Hot start (legacy INITIAL_UVZ): load eta (+u/v, mask) from the
    ! configured files; ghosts follow legacy GetFile — MPI seams carry
    ! neighbour data, physical walls replicate the edge value.  Bed
@@ -731,6 +747,7 @@ contains
 
       call this%setup()
       call this%friction%init_compute(this%grid)
+      if (this%friction%friction_matrix) call load_friction(this)
       call this%sponge%init_compute(this%grid)
       ! y-PML sigma needs depth (local c + the shoreward gate), which
       ! init_compute's call site predates

@@ -8,8 +8,8 @@
 !  YAML block: friction:       (top-level; omit for zero drag)
 !    cd:      <real>   constant drag coefficient
 !    manning: <real>   Manning n itself; Cd = g*n²/H^(1/3) each timestep
-!    file:    <path>   spatially varying Cd map (nee IN_Cd + CD_FILE);
-!                      init-gated PENDING -- the map read was never implemented
+!    file:    <path>   spatially varying Cd map (nee IN_Cd + FRICTION_FILE),
+!                      read through the field-input seam by the caller
 !
 !  Exactly one of cd | manning | file (exclusive value keys; kills the old
 !  dual-use Cd and the manning/friction_matrix bools).  With manning, call
@@ -21,6 +21,7 @@
 !    05/13/2026  Michael-Angelo Y.H. Lam  (read_input)
 !    06/01/2026  Michael-Angelo Y.H. Lam  (init_compute, free)
 !    06/02/2026  Michael-Angelo Y.H. Lam  (manning flag, update_cd)
+!    09/04/2026  Michael-Angelo Y.H. Lam  (Cd map file)
 !
 !-------------------------------------------------
 
@@ -28,8 +29,8 @@ module model_friction_mod
    use core_constants_mod, only: SP, N_GHOST, GRAV
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d
-   use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
+   use model_field_input_mod, only: type_file_spec, parse_file_spec
 
    implicit none
 
@@ -41,15 +42,19 @@ module model_friction_mod
       logical  :: friction_matrix = .false.
       logical  :: no_cd_file = .true.
       logical  :: manning = .false.
-      type(type_path) :: cd_file
+
+      ! Cd map reference; the map itself lands in cd_base, filled by the
+      ! caller (model main load_friction) once the grid exists
+      type(type_file_spec) :: cd_spec
 
       ! Cd_fixed: constant Manning n (manning=YES) or drag coefficient (manning=NO).
       real(SP) :: Cd_fixed = 0.0_SP
 
       ! cd_base: time-constant drag base, ghost-inclusive.  Holds the constant
-      ! drag coefficient (manning=NO) plus any sponge friction merged in by
-      ! sponge%merge_friction; Manning mode carries a roughness in Cd_fixed
-      ! (not a drag), so its constant part is only the merged sponge term.
+      ! drag coefficient (cd) or the map (file), plus any sponge friction
+      ! merged in by sponge%merge_friction; Manning mode carries a roughness
+      ! in Cd_fixed (not a drag), so its constant part is only the merged
+      ! sponge term.
       real(SP), allocatable :: cd_base(:, :)
 
       ! Ghost-inclusive effective drag cal_sources reads: (local_nx+2*N_GHOST,
@@ -72,6 +77,7 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
+      character(:), allocatable :: ref
       logical :: no_fr, no_cd, no_mn, no_file
       real(SP) :: tmp_r
       integer :: n_keys
@@ -87,9 +93,10 @@ contains
          this%Cd_fixed = tmp_r
          this%manning = .true.
       end if
-      call sub_env%yaml%read_input_path("file", silent=no_file, val=this%cd_file)
+      call sub_env%yaml%read_string("file", silent=no_file, val=ref)
       this%no_cd_file = no_file
       this%friction_matrix = .not. no_file
+      if (.not. no_file) call parse_file_spec(env, "friction/file", ref, this%cd_spec)
 
       n_keys = count([.not. no_cd,.not. no_mn,.not. no_file])
       if (n_keys /= 1) then
@@ -107,19 +114,15 @@ contains
 
       call this%free()
 
-      ! FUTURE: read the spatially varying map from cd_file; gated until wired
-      if (this%friction_matrix) then
-         error stop "friction: file (spatially varying Cd) is pending -- the map read is not implemented"
-      end if
-
       ng = N_GHOST
       mloc_g = grid%local_nx + 2*ng
       nloc_g = grid%local_ny + 2*ng
 
-      ! Constant drag base: the plain Cd (manning=NO) or zero (manning carries
-      ! a roughness in Cd_fixed, not a drag).  sponge%merge_friction adds its
+      ! Constant drag base: the plain Cd (cd), or zero for manning (Cd_fixed
+      ! carries a roughness, not a drag) and for file (the map lands here
+      ! next, through load_friction).  sponge%merge_friction adds its
       ! contribution here; sync_base then pushes it into the effective Cd.
-      if (this%manning) then
+      if (this%manning .or. this%friction_matrix) then
          allocate (this%cd_base(mloc_g, nloc_g), source=0.0_SP)
       else
          allocate (this%cd_base(mloc_g, nloc_g), source=this%Cd_fixed)
@@ -152,8 +155,8 @@ contains
 
       if (.not. this%is_activated .or. .not. this%manning) return
 
-      ! FUTURE: spatially varying Manning n (friction_matrix=YES) needs a
-      ! separate n_raw(:,:) array populated from cd_file in init_compute.
+      ! FUTURE: a spatially varying Manning n needs its own key and a
+      ! separate n_raw(:,:) map; file carries a drag map, not a roughness.
       do j = 1, size(this%Cd, 2)
          do i = 1, size(this%Cd, 1)
             this%Cd(i, j) = this%cd_base(i, j) + GRAV*this%Cd_fixed**2 &

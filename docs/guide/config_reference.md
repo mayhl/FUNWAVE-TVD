@@ -239,7 +239,7 @@ Bottom friction — exactly one of cd, manning (n), or file; section absent = ze
 |---|---|---|---|---|
 | `cd` | — | `Cd` | — | Constant quadratic bottom-drag coefficient. |
 | `manning` | — | — | s m^{-1/3} | Manning roughness n (converted to Cd per cell). |
-| `file` | — | `FRICTION_FILE` | — | Spatially varying Cd map file (init-gated pending). |
+| `file` | — | `FRICTION_FILE` | — | Spatially varying Cd map file — one row of Mglob values per global J, ascii or binary by extension. |
 
 ## `obstacle:`
 
