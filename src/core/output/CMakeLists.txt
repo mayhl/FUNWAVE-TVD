@@ -16,8 +16,8 @@ else()
 endif()
 
 if(FUNWAVE_HAS_PNETCDF)
-  target_include_directories(libcore_output
-                             PUBLIC "$<BUILD_INTERFACE:${PNETCDF_INCLUDE_DIRS}>")
+  target_include_directories(
+    libcore_output PUBLIC "$<BUILD_INTERFACE:${PNETCDF_INCLUDE_DIRS}>")
   target_link_libraries(libcore_output PUBLIC ${PNETCDF_LINK})
 else()
   # dummy `pnetcdf` module: nf90mpi calls error out at first use

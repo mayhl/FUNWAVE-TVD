@@ -923,8 +923,11 @@ class RegressionRunner(BaseRunner):
                     per_np.append((s["np_pin"], r))
             name = f"{group}_sweep"
             if broken or len(per_np) < 2:
-                out.append(SimResult(name=name, status="SIM_FAILED",
-                                     notes=f"sweep incomplete: {', '.join(broken) or 'fewer than 2 variants'}"))
+                out.append(
+                    SimResult(
+                        name=name, status="SIM_FAILED", notes=f"sweep incomplete: {', '.join(broken) or 'fewer than 2 variants'}"
+                    )
+                )
                 self.reporter.error(f"  \\[{name}]  [bold red]✗ SWEEP INCOMPLETE[/bold red]")
                 continue
 
@@ -954,9 +957,14 @@ class RegressionRunner(BaseRunner):
             out.append(res)
 
             if verbose or status == "FAIL":
-                table = Table(box=box.SIMPLE_HEAD, header_style="bold cyan", show_edge=False,
-                              pad_edge=True, title=f"[bold]Decomp Sweep ({group})[/bold]",
-                              title_justify="left")
+                table = Table(
+                    box=box.SIMPLE_HEAD,
+                    header_style="bold cyan",
+                    show_edge=False,
+                    pad_edge=True,
+                    title=f"[bold]Decomp Sweep ({group})[/bold]",
+                    title_justify="left",
+                )
                 table.add_column("Metric", min_width=20)
                 for np_val in nps:
                     table.add_column(f"np={np_val}", justify="right")
@@ -969,8 +977,7 @@ class RegressionRunner(BaseRunner):
                         icon, tol_s = "[dim]—[/dim]", "[dim]—[/dim]"
                     else:
                         tol_s = f"{tol:.4g}"
-                    table.add_row(stat, *[f"{vals[np_val]:.5g}" for np_val in nps],
-                                  f"{spread:.4g}", tol_s, icon)
+                    table.add_row(stat, *[f"{vals[np_val]:.5g}" for np_val in nps], f"{spread:.4g}", tol_s, icon)
                 self.reporter.console.print(table)
 
             icon = "[bold green]✓ PASS[/bold green]" if status == "PASS" else "[bold red]✗ FAIL[/bold red]"
@@ -1079,15 +1086,32 @@ class RegressionRunner(BaseRunner):
         # metric VALUES; the HTML board is presentation-only).  Base is
         # env-overridable so concurrent boards sharing one repo checkout
         # do not clobber each other's report files.
-        report_base = Path(os.environ.get("FUNWAVE_REPORT_BASE",
-                                          str(Path(self.repo_root) / "workspaces" / "regression_report")))
+        report_base = Path(os.environ.get("FUNWAVE_REPORT_BASE", str(Path(self.repo_root) / "workspaces" / "regression_report")))
         report_base.parent.mkdir(parents=True, exist_ok=True)
-        report_base.with_suffix(".json").write_text(json.dumps([
-            {"name": r.name, "status": r.status,
-             "metrics": [{"section": s.label, "variable": m.variable, "stat": m.stat,
-                          "value": m.value, "passed": m.passed, "tolerance": m.tolerance}
-                         for s in r.subsections for m in s.metrics]}
-            for r in sim_results], indent=1))
+        report_base.with_suffix(".json").write_text(
+            json.dumps(
+                [
+                    {
+                        "name": r.name,
+                        "status": r.status,
+                        "metrics": [
+                            {
+                                "section": s.label,
+                                "variable": m.variable,
+                                "stat": m.stat,
+                                "value": m.value,
+                                "passed": m.passed,
+                                "tolerance": m.tolerance,
+                            }
+                            for s in r.subsections
+                            for m in s.metrics
+                        ],
+                    }
+                    for r in sim_results
+                ],
+                indent=1,
+            )
+        )
 
         any_failed = any(r.status not in ("PASS", "XFAIL", "COMPLETED") for r in sim_results)
         # TODO: honour --no-auto-report: skip this block when any_failed but flag is set

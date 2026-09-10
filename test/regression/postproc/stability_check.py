@@ -91,9 +91,7 @@ def run(
             )
         )
     else:
-        metrics.append(
-            MetricResult(variable="eta", stat="max_abs", value=math.inf, passed=False, tolerance=eta_cap)
-        )
+        metrics.append(MetricResult(variable="eta", stat="max_abs", value=math.inf, passed=False, tolerance=eta_cap))
 
     # ---- optional velocity quiescence (final u/v frames) -------------
     if "max_abs_vel" in tol:
@@ -114,8 +112,6 @@ def run(
                     )
                 )
             else:
-                metrics.append(
-                    MetricResult(variable=var, stat="max_abs", value=math.inf, passed=False, tolerance=vel_cap)
-                )
+                metrics.append(MetricResult(variable=var, stat="max_abs", value=math.inf, passed=False, tolerance=vel_cap))
 
     return SubsectionResult(kind="statistics", label="stability sentinel", metrics=metrics)

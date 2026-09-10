@@ -80,9 +80,6 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
 
     if verbose or not (eta_ok and dat_ok):
-        _console.print(
-            f"still_water: d={d} W={w}  max|eta|={max_eta:.3e} (<{tol_eta}) "
-            f"datum_err={depth_err:.3e} (<{tol_dat})"
-        )
+        _console.print(f"still_water: d={d} W={w}  max|eta|={max_eta:.3e} (<{tol_eta}) datum_err={depth_err:.3e} (<{tol_dat})")
 
     return SubsectionResult(kind="statistics", label="Still water level", metrics=metrics)

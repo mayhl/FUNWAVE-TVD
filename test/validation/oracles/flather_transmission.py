@@ -94,7 +94,6 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     ]
     if verbose or not ok:
         _console.print(
-            f"flather_transmission: interior_pp={interior_pp:.4f} ref_pp={ref_pp:.4f} "
-            f"ratio={ratio:.3f} (window [{rmin}, {rmax}])"
+            f"flather_transmission: interior_pp={interior_pp:.4f} ref_pp={ref_pp:.4f} ratio={ratio:.3f} (window [{rmin}, {rmax}])"
         )
     return SubsectionResult(kind="statistics", label="Flather transmission", metrics=metrics)

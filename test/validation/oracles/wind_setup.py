@@ -46,7 +46,7 @@ def _steady_wind_speed(run_dir: Path, deck: dict) -> float:
     fname = deck["meteo"]["wind"]["file"]
     speeds = []
     for k, line in enumerate((run_dir / fname).read_text().splitlines()):
-        if k < 2 or not line.strip():        # skip title + count
+        if k < 2 or not line.strip():  # skip title + count
             continue
         p = line.split()
         if len(p) >= 3:
@@ -72,7 +72,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
 
     # time-mean fitted slope over the settled back half (absorbs residual seiche)
     slopes = []
-    for ep in eta_files[len(eta_files) // 2:]:
+    for ep in eta_files[len(eta_files) // 2 :]:
         row = meta.read_field(ep).astype(float)
         row = row[row.shape[0] // 2, :]
         x = np.arange(row.size) * meta.dx

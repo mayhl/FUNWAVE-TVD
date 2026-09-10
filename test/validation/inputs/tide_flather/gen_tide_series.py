@@ -21,15 +21,15 @@ import math
 from pathlib import Path
 
 A, T, H, G = 0.5, 300.0, 8.0, 9.81
-C = math.sqrt(G / H)                       # u = eta * sqrt(g/h) for a progressive wave
-DT, NT = 5.0, 181                          # 0 .. 900 s
+C = math.sqrt(G / H)  # u = eta * sqrt(g/h) for a progressive wave
+DT, NT = 5.0, 181  # 0 .. 900 s
 
 out = Path(__file__).parent / "data"
 specs = {
-    "tide_eta":    lambda e: (e, 0.0),
-    "tide_etauv":  lambda e: (e, e * C),
+    "tide_eta": lambda e: (e, 0.0),
+    "tide_etauv": lambda e: (e, e * C),
     "tide_uvonly": lambda e: (0.0, e * C),
-    "tide_zero":   lambda e: (0.0, 0.0),
+    "tide_zero": lambda e: (0.0, 0.0),
 }
 for name, f in specs.items():
     lines = [f"tide_flather {name}: t eta u v"]

@@ -1,0 +1,3 @@
+# docs/ is gated by mkdocs --strict; prettier rewrapped the generated pages
+# and broke the API index (6bd33a8)
+docs/

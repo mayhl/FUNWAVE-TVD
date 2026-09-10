@@ -35,9 +35,9 @@ def _read_core_bin(path: Path) -> tuple[float, dict[str, np.ndarray]]:
     if sp not in (4, 8):
         raise ValueError(f"{path}: cannot infer SP precision (got {sp} bytes/word)")
     ftype = np.float32 if sp == 4 else np.float64
-    time = float(np.frombuffer(raw[12:12 + sp], ftype)[0])
-    body = np.frombuffer(raw[12 + sp:], ftype)
-    return time, {f: body[i * cells:(i + 1) * cells] for i, f in enumerate(FIELDS)}
+    time = float(np.frombuffer(raw[12 : 12 + sp], ftype)[0])
+    body = np.frombuffer(raw[12 + sp :], ftype)
+    return time, {f: body[i * cells : (i + 1) * cells] for i, f in enumerate(FIELDS)}
 
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir=None, verbose: bool = False) -> SubsectionResult:
@@ -54,16 +54,27 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir=None, verbose: bool = Fals
 
     # time must match exactly — a mismatch means the legs stopped at different
     # steps and the field comparison would be meaningless
-    sub.metrics.append(MetricResult(
-        variable="time", stat="max_abs", value=abs(t_ref - t_dev),
-        passed=(t_ref == t_dev), tolerance=0.0,
-    ))
+    sub.metrics.append(
+        MetricResult(
+            variable="time",
+            stat="max_abs",
+            value=abs(t_ref - t_dev),
+            passed=(t_ref == t_dev),
+            tolerance=0.0,
+        )
+    )
 
     default_tol = tolerances.get("default", 1.0e-5)
     for f in FIELDS:
         d = float(np.max(np.abs(a[f] - b[f]))) if a[f].size else 0.0
         tol = tolerances.get(f, default_tol)
-        sub.metrics.append(MetricResult(
-            variable=f, stat="max_abs", value=d, passed=(d <= tol), tolerance=tol,
-        ))
+        sub.metrics.append(
+            MetricResult(
+                variable=f,
+                stat="max_abs",
+                value=d,
+                passed=(d <= tol),
+                tolerance=tol,
+            )
+        )
     return sub

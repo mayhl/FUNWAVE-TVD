@@ -6,6 +6,7 @@ h0 = 0.06 m), sand beach 1:7 from the toe at x = 5.5 m.  Emits the eta IC and
 the hard-bottom z_s field (sand thickness above the flume floor; zero on the
 bare floor seaward of the toe).  Bathymetry itself is the analytic slope type.
 """
+
 import numpy as np
 
 M, N = 1100, 3

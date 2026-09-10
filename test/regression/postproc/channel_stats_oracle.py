@@ -55,8 +55,7 @@ def run(
     for var in STATS_VARS:
         snaps = fields[var]
         if not snaps:
-            metrics.append(MetricResult(variable=var, stat="snapshots", value=0.0,
-                                        passed=False, tolerance=1.0))
+            metrics.append(MetricResult(variable=var, stat="snapshots", value=0.0, passed=False, tolerance=1.0))
             continue
         # frame k sits at t = k*DT (counter base _00000 = t 0); window j
         # covers frames (j-1)*per_win+1 .. j*per_win inclusive
@@ -70,30 +69,25 @@ def run(
                 lo, hi = (w - 1) * per_win + 1, w * per_win
                 if hi >= len(data):
                     break
-                sample = data[lo:hi + 1]
+                sample = data[lo : hi + 1]
                 want = sample.mean(axis=0) if stat == "mean" else sample.std(axis=0)
                 got = meta.read_field(prod).astype(np.float64)
                 denom = max(np.abs(want).max(), 1e-12)
                 rel = float(np.abs(got - want).max() / denom)
-                metrics.append(MetricResult(variable=f"{var}_{stat}", stat=f"w{w}",
-                                            value=rel, passed=rel <= rtol,
-                                            tolerance=rtol))
+                metrics.append(MetricResult(variable=f"{var}_{stat}", stat=f"w{w}", value=rel, passed=rel <= rtol, tolerance=rtol))
 
     # hsig = 4.004 std(eta) per window
     for w, prod in enumerate(meta.output_files("hsig"), start=1):
         lo, hi = (w - 1) * per_win + 1, w * per_win
-        data = np.stack([meta.read_field(p).astype(np.float64)
-                         for p in fields["eta"]])
+        data = np.stack([meta.read_field(p).astype(np.float64) for p in fields["eta"]])
         if hi >= len(data):
             break
-        want = 4.004 * data[lo:hi + 1].std(axis=0)
+        want = 4.004 * data[lo : hi + 1].std(axis=0)
         got = meta.read_field(prod).astype(np.float64)
         denom = max(np.abs(want).max(), 1e-12)
         rel = float(np.abs(got - want).max() / denom)
-        metrics.append(MetricResult(variable="hsig", stat=f"w{w}", value=rel,
-                                    passed=rel <= rtol, tolerance=rtol))
+        metrics.append(MetricResult(variable="hsig", stat=f"w{w}", value=rel, passed=rel <= rtol, tolerance=rtol))
 
     if not metrics:
-        metrics.append(MetricResult(variable="channels", stat="found", value=0.0,
-                                    passed=False, tolerance=1.0))
+        metrics.append(MetricResult(variable="channels", stat="found", value=0.0, passed=False, tolerance=1.0))
     return SubsectionResult(kind="statistics", label="channel-stats oracle", metrics=metrics)

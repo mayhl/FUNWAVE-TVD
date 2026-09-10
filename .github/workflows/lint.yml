@@ -14,7 +14,15 @@ jobs:
 
       - name: Check registry codegen sync
         run: uv run tools/gen_registry.py --check
-      
+
+      - name: Check validation docs sync
+        run: uv run tools/gen_validation_docs.py --check
+
+      # --strict turns every broken link, missing nav page and hook failure
+      # into a red build; the docs tree is gated here, not by prettier
+      - name: Build docs
+        run: uv run mkdocs build --strict
+
       # Fortran formatting (blocking, post canonical reformat). fprettify 0.3.7 has
       # no --check, so gate on a non-empty -d diff. -d is diff-only; exclude legacy
       # old/ and the regression worktrees, matching fortitude.toml. Default indent 3.
@@ -39,15 +47,16 @@ jobs:
       # Python
       - name: Check Python formatting
         run: uv run ruff format --check
-      
-      # CMake
+
+      # CMake (tracked files only: the find it replaced bound -not -path to
+      # the .cmake term alone and walked every CMakeLists under build trees)
       - name: Check CMake formatting
-        run: uv run cmake-format --check $(find . -name "CMakeLists.txt" -o -name "*.cmake" -not -path "*/.*")
-      
+        run: uv run cmake-format --check $(git ls-files 'CMakeLists.txt' '*/CMakeLists.txt' '*.cmake')
+
       # Markdown
       - name: Check Markdown formatting
         run: npx prettier --check "**/*.md"
-      
+
       # Shell
       - name: Check Shell formatting
         run: uv run shfmt -d .

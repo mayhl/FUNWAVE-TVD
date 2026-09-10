@@ -715,8 +715,7 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         for k in ("Gamma1", "Gamma2", "Gamma3"):
             pop_val(k)  # kernels off — the preset owns the triple
     else:
-        gam = {yk: pop_val(k) for k, yk in
-               (("Gamma1", "gamma1"), ("Gamma2", "gamma2"), ("Gamma3", "gamma3"))}
+        gam = {yk: pop_val(k) for k, yk in (("Gamma1", "gamma1"), ("Gamma2", "gamma2"), ("Gamma3", "gamma3"))}
         if any(v is not None for v in gam.values()):
             disp.update({yk: (1.0 if v is None else v) for yk, v in gam.items()})
     v = pop_val("Beta_ref")
@@ -840,8 +839,7 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     mean_vars = [k for k in _MEAN_FLAGS if _bool(pop(k) or "F")]
     if mean_vars and ti is not None:
         mv = ["eta", "u", "v"]
-        chan = {"name": "means", "geometry": "field", "variables": mv,
-                "statistics": ["mean"], "interval": ti}
+        chan = {"name": "means", "geometry": "field", "variables": mv, "statistics": ["mean"], "interval": ti}
         if "WaveHeight" in mean_vars:
             chan["variables"] = mv + ["hsig"]
         if st is not None:
@@ -876,10 +874,15 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
             if new_name == "undertow_u":
                 variables.append("undertow_v")
     if variables and plot_intv is not None:
-        op.setdefault("channels", []).insert(0, {
-            "name": "fields", "geometry": "field",
-            "variables": variables, "interval": plot_intv,
-        })
+        op.setdefault("channels", []).insert(
+            0,
+            {
+                "name": "fields",
+                "geometry": "field",
+                "variables": variables,
+                "interval": plot_intv,
+            },
+        )
 
     if op:
         out["output"] = op
