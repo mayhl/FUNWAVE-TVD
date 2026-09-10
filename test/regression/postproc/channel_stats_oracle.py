@@ -25,12 +25,14 @@ from pathlib import Path
 import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
+from test.framework.tolerances import check_keys
 from test.regression.postproc.utils import read_run_metadata
 
 # deck constants (keep in lockstep with channel_stats.yaml)
 DT = 0.02
 WIN = 1.0
 STATS_VARS = ("eta", "u")
+ACCEPTED_KEYS = ("rtol",)
 
 
 def run(
@@ -41,8 +43,9 @@ def run(
     verbose: bool = False,
 ) -> SubsectionResult:
     dev_dir = Path(dev_dir)
-    tol = tolerances.get("channel_stats", {}) if tolerances else {}
-    rtol = float(tol.get("rtol", 1e-4))
+    # the runner already unwrapped the channel_stats: block
+    check_keys(tolerances, ACCEPTED_KEYS, "channel_stats")
+    rtol = float(tolerances.get("rtol", 1e-4))
 
     meta = read_run_metadata(dev_dir)
     metrics: list[MetricResult] = []

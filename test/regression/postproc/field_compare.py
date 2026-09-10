@@ -50,17 +50,19 @@ def run(
     common = sorted(ref_map.keys() & dev_map.keys())
     missing = sorted(ref_map.keys() ^ dev_map.keys())  # in one run only
 
+    metrics = []
     all_output = ref_map.keys() | dev_map.keys()
     # a tolerated variable absent from either run fails loudly: a WARN here
-    # let a variable the dev run stopped writing pass every board
+    # let a variable the dev run stopped writing pass every board, and the
+    # console line alone gates nothing -- only a finite-tolerance metric does
     for pfx in sorted(tolerances):
         if pfx != "default" and pfx not in common:
             _console.print(
                 f"[red]FAIL:[/red] tolerance specified for '{pfx}' but it is "
                 f"{'missing from one run' if pfx in all_output else 'in neither run'}"
             )
+            metrics.append(MetricResult(variable=pfx, stat="present", value=0.0, passed=False, tolerance=1.0))
 
-    metrics = []
     rows: list[_Row] = []
     series_data: list[tuple] = []  # (prefix, l2_series, idx_first, idx_last, tol, passed)
 

@@ -17,9 +17,10 @@ from pathlib import Path
 import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
+from test.framework.tolerances import check_keys
 from test.regression.postproc.utils import read_run_metadata
 from test.validation.oracles import wave_stats
-from test.validation.oracles._lab import check_keys, load_deck, new_figure, nrmse_pct, read_table, save_figure
+from test.validation.oracles._lab import load_deck, new_figure, nrmse_pct, read_table, save_figure
 
 MIN_WAVES = 5  # stations with fewer zero-crossing waves are swash/dry — excluded
 

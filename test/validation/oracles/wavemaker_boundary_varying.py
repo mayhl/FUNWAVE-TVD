@@ -43,8 +43,8 @@ from rich.console import Console
 from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
+from test.framework.tolerances import check_keys
 from test.regression.postproc.utils import read_run_metadata
-from test.validation.oracles._lab import check_keys
 
 _console = Console()
 ACCEPTED_KEYS = ("hm0_profile_err_pct",)

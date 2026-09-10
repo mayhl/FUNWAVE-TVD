@@ -333,6 +333,17 @@ def _render_field_section(sub: SubsectionResult) -> str:
         mean_m = next((v for k, v in stats.items() if k.endswith("_mean")), None)
         max_m = next((v for k, v in stats.items() if k.endswith("_max")), None)
         if mean_m is None:
+            # a tolerated variable one run never wrote carries only the
+            # failing "present" metric
+            if "present" in stats:
+                rows_html += f"""
+        <tr>
+          <td>{var}</td>
+          <td class="right"><span class="fail">missing</span></td>
+          <td class="right">—</td>
+          <td class="right dim">—</td>
+          <td class="right"><span class="fail">✗ FAIL</span></td>
+        </tr>"""
             continue
 
         tol_finite = math.isfinite(mean_m.tolerance)
