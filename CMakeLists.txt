@@ -45,6 +45,8 @@ option(USE_PNETCDF "Enable parallel PnetCDF field output when PnetCDF is found"
        ON)
 option(USE_OPENMP "Enable OpenMP threading (hybrid MPI x OpenMP)" OFF)
 option(USE_ASAN "Build with AddressSanitizer (on-demand memory diagnostic)" OFF)
+option(ENABLE_INSTRUMENTATION "Build the probe recorder instead of its stub"
+       OFF)
 
 set(MODULE_FLAGS "")
 if(USE_MPI)
@@ -81,8 +83,8 @@ find_package(Git REQUIRED)
 find_package("fortran-yaml-c" REQUIRED)
 
 # OpenMP compiles are scoped per source file (each directive-carrying CMakeLists
-# opts its files in) -- the global flag taxed every kernel ~10% under ifx (ref-cluster
-# A/B pair); only the link step is global so every exe -- tests
+# opts its files in) -- the global flag taxed every kernel ~10% under ifx
+# (ref-cluster A/B pair); only the link step is global so every exe -- tests
 # included -- pulls the runtime
 if(USE_OPENMP)
   find_package(OpenMP REQUIRED COMPONENTS Fortran)

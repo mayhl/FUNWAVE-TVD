@@ -158,7 +158,7 @@ contains
       type(type_model_bc) :: bc
 
       call open_state(this, grid, comm, fields, periodic_y=.false.)
-      call bc%init(grid, "ABS")
+      call bc%init(grid, "boundary")
 
       ! one dry interior cell
       fields%mask(grid%lp%ib + 1, grid%lp%jb + 1) = 0

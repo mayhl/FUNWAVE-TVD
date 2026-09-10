@@ -378,7 +378,7 @@ contains
    subroutine test_bnd_varying_face_axis(this)
       class(MpiTestMethod), intent(inout) :: this
       type(type_model_wavemaker) :: wm
-      integer :: unit, i, j
+      integer :: unit, i, j, jl
       real(SP) :: x, e_here, e_j1
 
       call write_spec2d_1dir('bvf_A.txt', 0.05_SP, 0.06_SP)
@@ -390,13 +390,16 @@ contains
 
       call init_bnd_varying(this, wm, 'bvf_loc.txt', face=FACE_S)
 
-      do i = 1, size(wm%Cm_eta, 1)
+      ! a Flather feed narrows Cm_/Sm_ to the fed line, so the bounds are
+      ! the window, not 1:n
+      jl = lbound(wm%Cm_eta, 2)
+      do i = lbound(wm%Cm_eta, 1), ubound(wm%Cm_eta, 1)
          x = wm%xmk_wk(i)
          ! blend runs along x (the fed S face), clamped past x = 1 and x = 4
-         e_here = sqrt(wm%Cm_eta(i, 2, 1)**2 + wm%Sm_eta(i, 2, 1)**2)
+         e_here = sqrt(wm%Cm_eta(i, jl, 1)**2 + wm%Sm_eta(i, jl, 1)**2)
          @assertEqual(expect_blend(x, 1.0_SP, 0.05_SP, 4.0_SP, 0.15_SP), e_here, TOL_SP)
          ! and it is constant down j (no y dependence in the amplitude)
-         do j = 1, size(wm%Cm_eta, 2)
+         do j = jl, ubound(wm%Cm_eta, 2)
             e_j1 = sqrt(wm%Cm_eta(i, j, 1)**2 + wm%Sm_eta(i, j, 1)**2)
             @assertEqual(e_here, e_j1, TOL_SP)
          end do

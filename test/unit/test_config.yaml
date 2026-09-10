@@ -2,9 +2,9 @@ groups:
   - name: Base
     tests: [test_path, test_memory, test_misc, test_units]
   - name: Infra
-    tests: [test_yaml_serial, test_yaml_parallel, test_comm, test_logging, test_range_parser, test_probe]
+    tests: [test_yaml_serial, test_yaml_parallel, test_comm, test_logging, test_range_parser]
   - name: Engine
-    tests: [test_time, test_time_utils]
+    tests: [test_time, test_time_utils, test_time_series]
   - name: Numerics
     tests: [test_grid, test_interpolation, test_crs, test_accumulators, test_solver_tridiag]
   - name: Output
