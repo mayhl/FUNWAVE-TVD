@@ -409,7 +409,7 @@ def _convert_wavemaker(wm_type: str, pop_val, dx):
             spec["discretization"]["method"] = "single_dir_per_freq"
         v = pop_val("alpha_c")
         if v is not None:
-            _put(spec, "discretization", "coherence_percent", v)
+            _put(spec, "discretization", "group_coherence", v)
         eq = pop_val("EqualEnergy")
         if eq is not None:
             _put(spec, "discretization", "equal_energy", eq)
