@@ -3,7 +3,7 @@ FROM intel/oneapi-hpckit:latest
 SHELL ["/bin/bash", "-c"]
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        git python3 python3-pip curl ca-certificates make m4 ccache \
+        git python3 python3-pip curl ca-certificates make m4 ccache libnetcdf-dev \
     && pip3 install cmake --break-system-packages \
     && rm -rf /var/lib/apt/lists/*
 

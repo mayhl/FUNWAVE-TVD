@@ -30,7 +30,7 @@ WORKDIR /workspace
 
 # pFUnit layer — rebuilds only when install_deps.sh changes
 COPY scripts/install_deps.sh scripts/install_deps.sh
-RUN SKIP_PFUNIT=1 bash scripts/install_deps.sh
+RUN SKIP_PFUNIT=1 SKIP_NETCDF=1 SKIP_PNETCDF=1 bash scripts/install_deps.sh
 
 # Python deps layer — rebuilds only when lockfile changes
 COPY pyproject.toml uv.lock ./

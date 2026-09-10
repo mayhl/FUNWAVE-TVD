@@ -138,6 +138,13 @@ if(USE_PNETCDF)
   find_program(PNETCDF_CONFIG_EXECUTABLE pnetcdf-config
                HINTS "${CMAKE_CURRENT_SOURCE_DIR}/extern/pnetcdf/installed/bin")
   if(PNETCDF_CONFIG_EXECUTABLE)
+    # a C-only PnetCDF (no MPIF90 at its configure) has no pnetcdf.mod to use
+    execute_process(
+      COMMAND ${PNETCDF_CONFIG_EXECUTABLE} --has-fortran
+      OUTPUT_VARIABLE _pnc_has_fortran
+      OUTPUT_STRIP_TRAILING_WHITESPACE)
+  endif()
+  if(_pnc_has_fortran STREQUAL "yes")
     execute_process(
       COMMAND ${PNETCDF_CONFIG_EXECUTABLE} --includedir
       OUTPUT_VARIABLE PNETCDF_INCLUDE_DIRS

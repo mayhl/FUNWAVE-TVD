@@ -3,7 +3,7 @@ FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        gfortran gcc g++ make m4 openmpi-bin libopenmpi-dev \
+        gfortran gcc g++ make m4 openmpi-bin libopenmpi-dev libnetcdff-dev \
         git python3 python3-pip curl ca-certificates ccache \
     && pip3 install cmake \
     && rm -rf /var/lib/apt/lists/*

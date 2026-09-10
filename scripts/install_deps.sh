@@ -125,7 +125,8 @@ else
 
 	echo "Configuring PnetCDF..."
 	(cd "${PN_SRC}" && ./configure --prefix="${PN_INSTALL}" \
-		MPIF90="${MPIF90:-mpifort}" MPICC="${MPICC:-mpicc}" --disable-shared)
+		MPIF90="${MPIF90:-${FC:-mpifort}}" MPIF77="${MPIF77:-${FC:-mpifort}}" \
+		MPICC="${MPICC:-${CC:-mpicc}}" --disable-shared)
 
 	echo "Building and installing PnetCDF..."
 	make -C "${PN_SRC}" -j"${NPROC:-$(nproc 2>/dev/null || sysctl -n hw.logicalcpu)}"
