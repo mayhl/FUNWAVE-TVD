@@ -814,6 +814,12 @@ contains
             "meteo: crest_percent cannot run with simulation: spinup"// &
             " (the envelope it reads stays zero until the spin-up gate opens)")
       end if
+      ! the sediment split solve rides the viscous breaker; under
+      ! shock_capturing the bore dissipation is numerical and the pair diverges
+      if (this%sediment%is_activated .and. trim(this%breaking%model) == "shock_capturing") &
+         call this%env%log%exit_on_error( &
+         "sediment: not compatible with breaking: model: shock_capturing"// &
+         " -- use eddy_viscosity (the default) or wavemaker_viscosity")
       ! legacy METEO_INITIAL: builds the ghost-inclusive pressure lattice and
       ! opens the storm-track file, so the grid must already be spaced
       call this%meteo%init_compute(this%grid)
