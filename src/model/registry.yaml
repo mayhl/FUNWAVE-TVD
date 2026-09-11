@@ -316,7 +316,7 @@ sections:
       spectrum.directional.spread: { legacy: Sigma_Theta, default: ~, units: deg, variant: [jonswap, tma], doc: "Directional spread (required -- the block's presence means spreading is wanted)." }
       spectrum.discretization.freq_bins: { legacy: Nfreq, default: 45, units: ~, variant: [jonswap, tma], doc: "Frequency bin count." }
       spectrum.discretization.theta_bins: { legacy: Ntheta, default: 24, units: ~, variant: [jonswap, tma], doc: "Directional bin count (requires a directional: block; 1D runs force 1)." }
-      spectrum.discretization.equal_energy: { legacy: EqualEnergy, default: false, units: ~, variant: [jonswap, tma], doc: "Equal-energy frequency binning." }
+      spectrum.discretization.equal_energy: { legacy: EqualEnergy, default: none, units: ~, values: [none, freq, dir, both], variant: [jonswap, tma], doc: "Equal-energy binning per axis; the legacy boolean spellings still read as none/freq." }
       spectrum.discretization.method:
         { legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*)." }
       spectrum.discretization.coherence_percent: { legacy: ~, default: 0.0, units: "%", variant: [jonswap, tma, spectrum_2d], doc: "Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse)." }
@@ -336,8 +336,8 @@ sections:
       source.current_cd: { legacy: WaveMakerCd, default: ~, units: ~, doc: "Current-balance drag (presence enables; nee WaveMakerCurrentBalance)." }
       source.breaking.cbrk: { legacy: WAVEMAKER_Cbrk, default: 1.0, units: ~, latex: '$C_{\mathrm{brk,wm}}$', doc: "Zone breaking-onset coefficient (Cbrk family vs sqrt(gH), not a scale on cbrk1)." }
       source.breaking.visbrk: { legacy: WAVEMAKER_visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk,wm}}$', doc: "Zone breaking-viscosity coefficient." }
-      limiter.crest: { legacy: CrestLimit, default: ~, units: m, doc: "Crest elevation limit (presence => eta limiter)." }
-      limiter.trough: { legacy: TroughLimit, default: ~, units: m, doc: "Trough elevation limit." }
+      limiter.crest: { legacy: CrestLimit, default: ~, units: m, doc: "Crest elevation limit (nee ETA_LIMITER). Read and stored; the clamp itself is not ported, so the key has no effect yet." }
+      limiter.trough: { legacy: TroughLimit, default: ~, units: m, doc: "Trough elevation limit; same standing as limiter.crest." }
 
   # ── boundaries (per-face de-dup) ───────────────────────────────────────────
   boundaries:
@@ -485,13 +485,13 @@ sections:
         default: 3.0
         units: ~
         latex: "$Fr_{\\mathrm{cap}}$"
-        doc: "Maximum Froude number (velocity limiter)."
+        doc: "Velocity cap: |U| is scaled down where |U|/sqrt(g*max(h, min_depth)) exceeds this. The floor on h means the true Froude number is unbounded as the column dries; this caps speed, not Fr."
       min_depth:
         legacy: MinDepth
         default: 0.1
         units: "m"
         latex: "$d_{\\min}$"
-        doc: "Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc)."
+        doc: "Floor on the water column wherever it divides or scales: the Froude cap, friction, the SWE gate ratio, the dispersion taper and sediment concentration (legacy folded MinDepth/MinDepthFrc). Not the wet/dry threshold, which is h > 0."
       tridiag.chunk:
         legacy: ~
         default: 48
@@ -566,13 +566,13 @@ sections:
       fields.format: {legacy: ~, default: ~, units: ~, values: [ascii, binary, netcdf], doc: Field-file format override (default from the extension).}
       fields.u: {legacy: ~, default: ~, units: ~, doc: Initial x-velocity field ref (with fields.v; absent = still).}
       fields.v: {legacy: ~, default: ~, units: ~, doc: Initial y-velocity field ref (with fields.u).}
-      hump.amplitude: {legacy: AMP, default: ~, units: m, doc: Hump amplitude.}
-      hump.radius: {legacy: ~, default: ~, units: m, doc: Gaussian hump radius.}
+      hump.amplitude: {legacy: AMP, default: ~, units: m, doc: "Hump amplitude. The hump block is pending: the engine rejects it at init rather than silently ignoring it."}
+      hump.radius: {legacy: ~, default: ~, units: m, doc: "Gaussian hump radius (legacy used WID for both shapes)."}
       hump.shape: {legacy: ~, default: ~, units: ~, values: [rect, gaussian, dipole], doc: Hump shape.}
-      hump.width: {legacy: WID, default: ~, units: m, doc: Hump width.}
+      hump.width: {legacy: WID, default: ~, units: m, doc: Hump width (rect half-width).}
       hump.x_center: {legacy: Xc, default: ~, units: m, doc: Hump center x.}
       hump.y_center: {legacy: Yc, default: ~, units: m, doc: Hump center y.}
-      n_wave.a0: {legacy: a0_Nwave, default: ~, units: m, doc: N-wave amplitude.}
+      n_wave.a0: {legacy: a0_Nwave, default: ~, units: m, doc: "N-wave amplitude. The n_wave block is pending: the engine rejects it at init rather than silently ignoring it."}
       n_wave.depth: {legacy: dep_Nwave, default: ~, units: m, doc: N-wave still-water depth.}
       n_wave.gamma: {legacy: gamma_Nwave, default: ~, units: ~, doc: N-wave shape parameter.}
       n_wave.x1: {legacy: x1_Nwave, default: ~, units: m, doc: N-wave leading position.}
@@ -634,12 +634,12 @@ sections:
       swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: "Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion."}
       swe_eta_ramp: {legacy: ~, default: 0.10, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: "eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity)."}
       wetdry_disp_ramp: {legacy: ~, default: 3.0, units: ~, latex: '$\Delta H_{\mathrm{wd}}$', doc: "Wet/dry-proximity dispersion taper: water-column multiples of numerics.min_depth over which disp_w smoothsteps up from 0 at the wet/dry threshold; 0 = off (legacy). Applies under every breaking model — the viscous path has no SWE gate, so swash-edge mask flips otherwise radiate through the dispersive terms."}
-      swe_gate: {legacy: ~, default: false, units: ~, doc: "Apply the eta/h SWE-transition gate (mask9 zeroing + swe_eta_ramp taper) under eddy_viscosity as a dispersion amplitude cap at steep bores. Default false = legacy viscous behavior: dispersion never gated, which is the open-water surf blow-up mechanism on steep crests."}
+      swe_gate: {legacy: ~, default: false, units: ~, doc: "Apply the eta/h SWE-transition gate (mask9 zeroing + swe_eta_ramp taper) under eddy_viscosity, capping the dispersion amplitude at steep bores. Default false leaves dispersion ungated, as the legacy viscous breaker did."}
       nu_cap: {legacy: ~, default: 0.0, units: ~, doc: "Clamp nu_break at this fraction of the explicit-diffusion stability bound 1/(2 dt (1/dx^2 + 1/dy^2)). The Laplacian integrates with the advective-CFL dt (no viscous term in estimate_dt, matching legacy), so an uncapped breaker viscosity can exceed the stable limit several-fold at energetic breakpoints. 0 = off (legacy, unbounded); 0.5 recommended under the explicit solver (the split solvers never read it)."}
       solver: {legacy: ~, default: split_implicit, units: ~, values: [explicit, split_implicit, stage_split], doc: "Breaker-viscosity integrator: explicit source term (legacy), a once-per-step operator-split ADI solve on Hu/Hv, or the same solve applied to each RK stage's Euler predictor before the SSP blend (stage_split, IMEX form) — both splits unconditionally stable, nu_cap not applied. Read under eddy_viscosity only; the wavemaker_viscosity zone term stays an explicit source."}
       theta: {legacy: ~, default: 1.0, units: ~, latex: "$\\theta$", doc: "Implicitness weight of the split breaker-viscosity solve: 1 = backward Euler, 0.5 = Crank-Nicolson. A-stable on [0.5, 1]. Read for the split solvers only."}
       t_brk: {legacy: ~, default: 20.0, units: s, latex: '$T_{\mathrm{brk}}$', doc: "Breaking-event age threshold (legacy hard-coded 20 s — the per-wavemaker assignments were dead code)."}
-      age_per_stage: {legacy: ~, default: true, units: ~, doc: "Accrue breaker age every RK stage (legacy behavior: age runs 3x wall-clock; the cbrk defaults were calibrated with it). false = once per time step."}
+      age_per_stage: {legacy: ~, default: true, units: ~, doc: "Accrue breaker age every RK stage, so age advances three times per step as in legacy (the cbrk defaults were calibrated with it); false = once per time step."}
 
   # ── friction ──
   friction:
@@ -729,8 +729,8 @@ sections:
       shields_cr: {legacy: Shields_cr, default: 0.055, units: ~, latex: '$\theta_{cr}$', doc: Critical Shields parameter for suspension.}
       min_depth_pickup: {legacy: MinDepthPickup, default: 0.1, units: m, doc: Minimum water depth for pickup.}
       pickup_ramp: {legacy: ~, default: 0.0, units: ~, doc: "Wet/dry-proximity source taper: multiples of min_depth_pickup over which the sand pickup, the bedload flux, and the split-diffusion faces smoothstep up from zero at the cutoff; 0 = off (legacy hard switch). The wetdry_disp_ramp idiom applied to the sediment column."}
-      pickup_reduction: {legacy: PickupReduction, default: true, units: ~, doc: Reduce pickup on steep slopes.}
-      reduction_parameter: {legacy: ReductionParameter, default: 0.65, units: ~, doc: Slope pickup-reduction coefficient (requires pickup_reduction).}
+      pickup_reduction: {legacy: PickupReduction, default: true, units: ~, doc: "Cap the bed concentration c_b at reduction_parameter (pickup scaled by min(1, reduction_parameter/c_b))."}
+      reduction_parameter: {legacy: ReductionParameter, default: 0.65, units: ~, doc: "The c_b cap (requires pickup_reduction)."}
       c_limiter: {legacy: C_limiter, default: ~, units: ~, doc: Suspended-concentration limiter (presence enables).}
       morph_interval: {legacy: Morph_interval, default: ~, units: s, doc: Morphology update interval.}
       bed_change: {legacy: Bed_Change, default: false, units: ~, doc: Enable bed-level change (morphodynamics).}
@@ -767,7 +767,7 @@ sections:
       bed_deformation: {legacy: BED_DEFORMATION, default: false, units: ~, doc: Apply bed deformation on restart.}
       eta_file: {legacy: ETA_FILE, default: ~, units: ~, doc: Surface-elevation restart field file.}
       mask_file: {legacy: MASK_FILE, default: ~, units: ~, doc: Wet/dry mask restart field file.}
-      output_start_number: {legacy: ~, default: 0, units: ~, doc: First output frame number after restart.}
+      output_start_number: {legacy: ~, default: 1, units: ~, doc: First output frame number after restart.}
       time: {legacy: HotStartTime, default: 0.0, units: s, latex: '$t_{\mathrm{hs}}$', doc: Simulation time at the restart instant.}
       u_file: {legacy: U_FILE, default: ~, units: ~, doc: x-velocity restart field file.}
       v_file: {legacy: V_FILE, default: ~, units: ~, doc: y-velocity restart field file.}
@@ -793,7 +793,7 @@ sections:
       vessel.interval: {legacy: PLOT_INTV_VESSEL, default: ~, units: s, doc: Vessel resistance-series output cadence.}
       # geometries:/channels: are lists of named entries (keys below are per entry)
       geometries.name: {legacy: ~, default: ~, units: ~, doc: Point-set name (referenced by channels.geometry).}
-      geometries.type: {legacy: ~, default: ~, units: ~, values: [station, transect], doc: "Point-set kind. Station/transect values are BILINEARLY INTERPOLATED from the four surrounding cells, which has a validity consequence worth knowing: dry cells are not neutral (they carry eta = -depth + min_depth), so a point whose stencil straddles the wet/dry line returns a contaminated value with no error. Request `mask` on the same channel to detect it -- the weights sum to 1 and mask is 0/1 per cell, so the interpolated mask is exactly the weighted wet fraction of the stencil: 1.0 means every contributing cell is wet and the value is clean, anything less means it is not. A station outside every rank's subdomain is dropped by the interpolator and reads 0.0 in every variable, mask included. Sampling `mask` at the station cadence also gives the per-station wet-step record for free."}
+      geometries.type: {legacy: ~, default: ~, units: ~, values: [station, transect], doc: "Point-set kind. Station/transect values are BILINEARLY INTERPOLATED from the four surrounding cells, which has a validity consequence worth knowing: dry cells are not neutral (at init they carry eta = -depth - min_depth, and thereafter whatever the last wet step left), so a point whose stencil straddles the wet/dry line returns a contaminated value with no error. Request `mask` on the same channel to detect it -- the weights sum to 1 and mask is 0/1 per cell, so the interpolated mask is exactly the weighted wet fraction of the stencil: 1.0 means every contributing cell is wet and the value is clean, anything less means it is not. A station outside every rank's subdomain is dropped by the interpolator and reads 0.0 in every variable, mask included. Sampling `mask` at the station cadence also gives the per-station wet-step record for free."}
       geometries.file: {legacy: ~, default: ~, units: ~, doc: "Station coordinate file, one \"x y\" pair (m) per line -- exclusive with x:/y:."}
       geometries.x: {legacy: ~, default: ~, units: m, doc: Station x-coordinates (equal length with y).}
       geometries.y: {legacy: ~, default: ~, units: m, doc: Station y-coordinates.}

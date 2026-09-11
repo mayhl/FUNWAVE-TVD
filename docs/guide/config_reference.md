@@ -51,7 +51,7 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.directional.spread` | — | `Sigma_Theta` | deg | *(jonswap/tma)* Directional spread (required -- the block's presence means spreading is wanted). |
 | `spectrum.discretization.freq_bins` | `45` | `Nfreq` | — | *(jonswap/tma)* Frequency bin count. |
 | `spectrum.discretization.theta_bins` | `24` | `Ntheta` | — | *(jonswap/tma)* Directional bin count (requires a directional: block; 1D runs force 1). |
-| `spectrum.discretization.equal_energy` | `false` | `EqualEnergy` | — | *(jonswap/tma)* Equal-energy frequency binning. |
+| `spectrum.discretization.equal_energy` | `none` | `EqualEnergy` | — | *(jonswap/tma)* Equal-energy binning per axis; the legacy boolean spellings still read as none/freq. One of `none` \| `freq` \| `dir` \| `both`. |
 | `spectrum.discretization.method` | `grid` | — | — | *(jonswap/tma)* Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*). One of `grid` \| `single_dir_per_freq`. |
 | `spectrum.discretization.coherence_percent` | `0.0` | — | % | *(jonswap/tma/spectrum_2d)* Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse). |
 | `spectrum.discretization.group_coherence` | `0.0` | `alpha_c` | % | *(jonswap/tma)* Salatin frequency-grouping coherence: percent of components sharing a frequency (single_dir_per_freq only). |
@@ -70,8 +70,8 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `source.current_cd` | — | `WaveMakerCd` | — | Current-balance drag (presence enables; nee WaveMakerCurrentBalance). |
 | `source.breaking.cbrk` | `1.0` | `WAVEMAKER_Cbrk` | — | Zone breaking-onset coefficient (Cbrk family vs sqrt(gH), not a scale on cbrk1). |
 | `source.breaking.visbrk` | `0.0` | `WAVEMAKER_visbrk` | m2 s-1 | Zone breaking-viscosity coefficient. |
-| `limiter.crest` | — | `CrestLimit` | m | Crest elevation limit (presence => eta limiter). |
-| `limiter.trough` | — | `TroughLimit` | m | Trough elevation limit. |
+| `limiter.crest` | — | `CrestLimit` | m | Crest elevation limit (nee ETA_LIMITER). Read and stored; the clamp itself is not ported, so the key has no effect yet. |
+| `limiter.trough` | — | `TroughLimit` | m | Trough elevation limit; same standing as limiter.crest. |
 
 ## `boundaries:`
 
@@ -115,8 +115,8 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `cfl` | `0.5` | `CFL` | — | CFL number for the adaptive timestep. Exclusive with dt: setting both is a config error. |
 | `dt` | — | `DT_fixed` | s | Presence selects a fixed timestep (nee simulation.time_stepping); the default cfl still caps it by halving. Absent = adaptive CFL stepping. |
 | `flux_solver` | `hllc` | `CONSTRUCTION` | — | Approximate Riemann solver. One of `hllc` \| `hll`. |
-| `froude_cap` | `3.0` | `FroudeCap` | — | Maximum Froude number (velocity limiter). |
-| `min_depth` | `0.1` | `MinDepth` | m | Single wet/dry + friction floor (legacy folded MinDepth/MinDepthFrc). |
+| `froude_cap` | `3.0` | `FroudeCap` | — | Velocity cap: \|U\| is scaled down where \|U\|/sqrt(g*max(h, min_depth)) exceeds this. The floor on h means the true Froude number is unbounded as the column dries; this caps speed, not Fr. |
+| `min_depth` | `0.1` | `MinDepth` | m | Floor on the water column wherever it divides or scales: the Froude cap, friction, the SWE gate ratio, the dispersion taper and sediment concentration (legacy folded MinDepth/MinDepthFrc). Not the wet/dry threshold, which is h > 0. |
 | `tridiag.chunk` | `48` | — | — | Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (reference sweep flat over 16-64). |
 | `tridiag.transpose_min_py` | `40` | — | — | Minimum y-rank count that switches the distributed y solve to the all-to-all transpose. System-tuned latency/bandwidth crossover; bitwise-neutral. |
 | `reconstruction` | `fourth` | `HIGH_ORDER` | — | Spatial reconstruction scheme. One of `fourth` \| `fminmod` \| `weno` \| `mlp` \| `basic`. |
@@ -173,13 +173,13 @@ Initial condition — block presence selects the type (solitary/sine_mode/fields
 | `fields.format` | — | — | — | Field-file format override (default from the extension). One of `ascii` \| `binary` \| `netcdf`. |
 | `fields.u` | — | — | — | Initial x-velocity field ref (with fields.v; absent = still). |
 | `fields.v` | — | — | — | Initial y-velocity field ref (with fields.u). |
-| `hump.amplitude` | — | `AMP` | m | Hump amplitude. |
-| `hump.radius` | — | — | m | Gaussian hump radius. |
+| `hump.amplitude` | — | `AMP` | m | Hump amplitude. The hump block is pending: the engine rejects it at init rather than silently ignoring it. |
+| `hump.radius` | — | — | m | Gaussian hump radius (legacy used WID for both shapes). |
 | `hump.shape` | — | — | — | Hump shape. One of `rect` \| `gaussian` \| `dipole`. |
-| `hump.width` | — | `WID` | m | Hump width. |
+| `hump.width` | — | `WID` | m | Hump width (rect half-width). |
 | `hump.x_center` | — | `Xc` | m | Hump center x. |
 | `hump.y_center` | — | `Yc` | m | Hump center y. |
-| `n_wave.a0` | — | `a0_Nwave` | m | N-wave amplitude. |
+| `n_wave.a0` | — | `a0_Nwave` | m | N-wave amplitude. The n_wave block is pending: the engine rejects it at init rather than silently ignoring it. |
 | `n_wave.depth` | — | `dep_Nwave` | m | N-wave still-water depth. |
 | `n_wave.gamma` | — | `gamma_Nwave` | — | N-wave shape parameter. |
 | `n_wave.x1` | — | `x1_Nwave` | m | N-wave leading position. |
@@ -224,12 +224,12 @@ Wave breaking — dissipation model, roller, and thresholds (core physics, not p
 | `swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion. |
 | `swe_eta_ramp` | `0.1` | — | — | eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity). |
 | `wetdry_disp_ramp` | `3.0` | — | — | Wet/dry-proximity dispersion taper: water-column multiples of numerics.min_depth over which disp_w smoothsteps up from 0 at the wet/dry threshold; 0 = off (legacy). Applies under every breaking model — the viscous path has no SWE gate, so swash-edge mask flips otherwise radiate through the dispersive terms. |
-| `swe_gate` | `false` | — | — | Apply the eta/h SWE-transition gate (mask9 zeroing + swe_eta_ramp taper) under eddy_viscosity as a dispersion amplitude cap at steep bores. Default false = legacy viscous behavior: dispersion never gated, which is the open-water surf blow-up mechanism on steep crests. |
+| `swe_gate` | `false` | — | — | Apply the eta/h SWE-transition gate (mask9 zeroing + swe_eta_ramp taper) under eddy_viscosity, capping the dispersion amplitude at steep bores. Default false leaves dispersion ungated, as the legacy viscous breaker did. |
 | `nu_cap` | `0.0` | — | — | Clamp nu_break at this fraction of the explicit-diffusion stability bound 1/(2 dt (1/dx^2 + 1/dy^2)). The Laplacian integrates with the advective-CFL dt (no viscous term in estimate_dt, matching legacy), so an uncapped breaker viscosity can exceed the stable limit several-fold at energetic breakpoints. 0 = off (legacy, unbounded); 0.5 recommended under the explicit solver (the split solvers never read it). |
 | `solver` | `split_implicit` | — | — | Breaker-viscosity integrator: explicit source term (legacy), a once-per-step operator-split ADI solve on Hu/Hv, or the same solve applied to each RK stage's Euler predictor before the SSP blend (stage_split, IMEX form) — both splits unconditionally stable, nu_cap not applied. Read under eddy_viscosity only; the wavemaker_viscosity zone term stays an explicit source. One of `explicit` \| `split_implicit` \| `stage_split`. |
 | `theta` | `1.0` | — | — | Implicitness weight of the split breaker-viscosity solve: 1 = backward Euler, 0.5 = Crank-Nicolson. A-stable on [0.5, 1]. Read for the split solvers only. |
 | `t_brk` | `20.0` | — | s | Breaking-event age threshold (legacy hard-coded 20 s — the per-wavemaker assignments were dead code). |
-| `age_per_stage` | `true` | — | — | Accrue breaker age every RK stage (legacy behavior: age runs 3x wall-clock; the cbrk defaults were calibrated with it). false = once per time step. |
+| `age_per_stage` | `true` | — | — | Accrue breaker age every RK stage, so age advances three times per step as in legacy (the cbrk defaults were calibrated with it); false = once per time step. |
 
 ## `friction:`
 
@@ -337,8 +337,8 @@ Sediment — single grain size, morphology, avalanching, cohesive, and flow-feed
 | `shields_cr` | `0.055` | `Shields_cr` | — | Critical Shields parameter for suspension. |
 | `min_depth_pickup` | `0.1` | `MinDepthPickup` | m | Minimum water depth for pickup. |
 | `pickup_ramp` | `0.0` | — | — | Wet/dry-proximity source taper: multiples of min_depth_pickup over which the sand pickup, the bedload flux, and the split-diffusion faces smoothstep up from zero at the cutoff; 0 = off (legacy hard switch). The wetdry_disp_ramp idiom applied to the sediment column. |
-| `pickup_reduction` | `true` | `PickupReduction` | — | Reduce pickup on steep slopes. |
-| `reduction_parameter` | `0.65` | `ReductionParameter` | — | Slope pickup-reduction coefficient (requires pickup_reduction). |
+| `pickup_reduction` | `true` | `PickupReduction` | — | Cap the bed concentration c_b at reduction_parameter (pickup scaled by min(1, reduction_parameter/c_b)). |
+| `reduction_parameter` | `0.65` | `ReductionParameter` | — | The c_b cap (requires pickup_reduction). |
 | `c_limiter` | — | `C_limiter` | — | Suspended-concentration limiter (presence enables). |
 | `morph_interval` | — | `Morph_interval` | s | Morphology update interval. |
 | `bed_change` | `false` | `Bed_Change` | — | Enable bed-level change (morphodynamics). |
@@ -379,7 +379,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `bed_deformation` | `false` | `BED_DEFORMATION` | — | Apply bed deformation on restart. |
 | `eta_file` | — | `ETA_FILE` | — | Surface-elevation restart field file. |
 | `mask_file` | — | `MASK_FILE` | — | Wet/dry mask restart field file. |
-| `output_start_number` | `0` | — | — | First output frame number after restart. |
+| `output_start_number` | `1` | — | — | First output frame number after restart. |
 | `time` | `0.0` | `HotStartTime` | s | Simulation time at the restart instant. |
 | `u_file` | — | `U_FILE` | — | x-velocity restart field file. |
 | `v_file` | — | `V_FILE` | — | y-velocity restart field file. |
@@ -400,7 +400,7 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 | `blowup_threshold` | — | `EtaBlowVal` | m | Elevation above which the run aborts (absent = 100*max\|Depth\|). |
 | `vessel.interval` | — | `PLOT_INTV_VESSEL` | s | Vessel resistance-series output cadence. |
 | `geometries.name` | — | — | — | Point-set name (referenced by channels.geometry). |
-| `geometries.type` | — | — | — | Point-set kind. Station/transect values are BILINEARLY INTERPOLATED from the four surrounding cells, which has a validity consequence worth knowing: dry cells are not neutral (they carry eta = -depth + min_depth), so a point whose stencil straddles the wet/dry line returns a contaminated value with no error. Request `mask` on the same channel to detect it -- the weights sum to 1 and mask is 0/1 per cell, so the interpolated mask is exactly the weighted wet fraction of the stencil: 1.0 means every contributing cell is wet and the value is clean, anything less means it is not. A station outside every rank's subdomain is dropped by the interpolator and reads 0.0 in every variable, mask included. Sampling `mask` at the station cadence also gives the per-station wet-step record for free. One of `station` \| `transect`. |
+| `geometries.type` | — | — | — | Point-set kind. Station/transect values are BILINEARLY INTERPOLATED from the four surrounding cells, which has a validity consequence worth knowing: dry cells are not neutral (at init they carry eta = -depth - min_depth, and thereafter whatever the last wet step left), so a point whose stencil straddles the wet/dry line returns a contaminated value with no error. Request `mask` on the same channel to detect it -- the weights sum to 1 and mask is 0/1 per cell, so the interpolated mask is exactly the weighted wet fraction of the stencil: 1.0 means every contributing cell is wet and the value is clean, anything less means it is not. A station outside every rank's subdomain is dropped by the interpolator and reads 0.0 in every variable, mask included. Sampling `mask` at the station cadence also gives the per-station wet-step record for free. One of `station` \| `transect`. |
 | `geometries.file` | — | — | — | Station coordinate file, one "x y" pair (m) per line -- exclusive with x:/y:. |
 | `geometries.x` | — | — | m | Station x-coordinates (equal length with y). |
 | `geometries.y` | — | — | m | Station y-coordinates. |

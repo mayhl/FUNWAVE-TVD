@@ -751,7 +751,7 @@ contains
          call blk%read_enum("equal_energy", [character(5) :: "none", "freq", &
                                              "dir", "both", "true", "false", "yes", "no", "NO", "YES"], &
                             val=eqe_mode, &
-                            default="NO")
+                            default="none")
          this%eqe_freq = eqe_mode == "freq" .or. eqe_mode == "both" &
                          .or. eqe_mode == "true" .or. eqe_mode == "yes" &
                          .or. eqe_mode == "YES"

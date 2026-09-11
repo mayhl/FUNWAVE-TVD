@@ -279,7 +279,7 @@ def check_reader_defaults(reg: dict) -> list[str]:
         if not path.exists():
             continue
         for stmt in _statements(path):
-            for m in re.finditer(r'%read\(\s*"([^"]+)"(.*?)$', stmt):
+            for m in re.finditer(r'%read[a-z_]*\(\s*"([^"]+)"(.*?)$', stmt):
                 leaf = m.group(1).rsplit(".", 1)[-1]
                 d = re.search(r'default\s*=\s*"([^"]*)"', m.group(2))
                 if d is None or leaf not in keys:
