@@ -30,10 +30,6 @@ module model_simulation_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_SIMULATION_SCREEN_INTERVAL, &
-                                        DEF_SIMULATION_T_START, &
-                                        DEF_SIMULATION_SPINUP
-
    implicit none
 
    private
@@ -70,10 +66,10 @@ contains
       call sub_env%yaml%read("title", silent=no_title, val=this%title)
       if (no_title) this%title = ""
       call sub_env%yaml%read_positive("total_time", val=this%total_time)
-      call sub_env%yaml%read("t_start", silent=no_tstart, val=this%t_start, default=DEF_SIMULATION_T_START)
-      call sub_env%yaml%read("spinup", silent=no_spin, val=this%spinup, default=DEF_SIMULATION_SPINUP)
+      call sub_env%yaml%read("t_start", silent=no_tstart, val=this%t_start, default="0.0")
+      call sub_env%yaml%read("spinup", silent=no_spin, val=this%spinup, default="0.0")
       call sub_env%yaml%read("screen_interval", silent=no_screen, &
-                             val=this%screen_interval, default=DEF_SIMULATION_SCREEN_INTERVAL)
+                             val=this%screen_interval, default="1.0")
 
       ! Retired cadence keys: loud rejection beats silent acceptance
       call reject_moved_key(sub_env, "output_interval", "output: interval")

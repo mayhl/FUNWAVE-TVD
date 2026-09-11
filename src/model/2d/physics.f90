@@ -40,11 +40,6 @@ module model_physics_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_DISPERSION_BETA_REF, &
-                                        DEF_DISPERSION_SCHEME, &
-                                        DEF_DISPERSION_SLOPE_DISP_MAX, &
-                                        DEF_DISPERSION_SLOPE_DISP_RAMP
-
    implicit none
 
    private
@@ -163,7 +158,7 @@ contains
          this%Gamma3 = g3_tmp
       else
          call sub_env%yaml%read_enum("scheme", DISPERSION_SCHEMES, val=scheme, &
-                                     default=DEF_DISPERSION_SCHEME)
+                                     default="fully_nonlinear")
          select case (trim(scheme))
          case ("fully_nonlinear")
             ! declaration defaults already 1, 1, 1
@@ -178,11 +173,11 @@ contains
          end select
       end if
       call sub_env%yaml%read("beta_ref", silent=no_key, val=this%Beta_ref, &
-                             default=DEF_DISPERSION_BETA_REF)
+                             default="-0.531")
       call sub_env%yaml%read("slope_disp_max", silent=no_key, val=this%slope_disp_max, &
-                             default=DEF_DISPERSION_SLOPE_DISP_MAX)
+                             default="0.0")
       call sub_env%yaml%read("slope_disp_ramp", silent=no_key, val=this%slope_disp_ramp, &
-                             default=DEF_DISPERSION_SLOPE_DISP_RAMP)
+                             default="0.0")
       ! a hard switch is the known blow-up injector (see update_disp_weight):
       ! last-bit differences become O(1) residual flips at threshold cells
       if (this%slope_disp_max > 0.0_SP .and. this%slope_disp_ramp <= 0.0_SP) &

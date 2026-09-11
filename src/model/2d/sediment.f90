@@ -257,23 +257,6 @@ module model_sediment_mod
    use model_bc_mod, only: type_model_bc
    use model_geometry_mod, only: read_field_ascii, stagger_depth
    use core_yaml_file_mod, only: type_yaml_reader
-   use model_config_defaults_mod, only: DEF_SEDIMENT_SCHEME, DEF_SEDIMENT_SOLVER, &
-                                        DEF_SEDIMENT_SPECIFIC_GRAVITY, DEF_SEDIMENT_POROSITY, &
-                                        DEF_SEDIMENT_SHIELDS_CR, &
-                                        DEF_SEDIMENT_MIN_DEPTH_PICKUP, &
-                                        DEF_SEDIMENT_PICKUP_RAMP, &
-                                        DEF_SEDIMENT_PICKUP_REDUCTION, &
-                                        DEF_SEDIMENT_REDUCTION_PARAMETER, &
-                                        DEF_SEDIMENT_BED_CHANGE, DEF_SEDIMENT_BEDLOAD, &
-                                        DEF_SEDIMENT_MORPH_FACTOR, &
-                                        DEF_SEDIMENT_COHESIVE_SOFT_BED, &
-                                        DEF_SEDIMENT_COHESIVE_TAU_CRD, &
-                                        DEF_SEDIMENT_COHESIVE_E, DEF_SEDIMENT_COHESIVE_ALPHA, &
-                                        DEF_SEDIMENT_COHESIVE_A, DEF_SEDIMENT_COHESIVE_B, &
-                                        DEF_SEDIMENT_COHESIVE_N, DEF_SEDIMENT_COHESIVE_M, &
-                                        DEF_SEDIMENT_FEEDBACK_MASS_SOURCE, &
-                                        DEF_SEDIMENT_FEEDBACK_MOMENT_DC, &
-                                        DEF_SEDIMENT_FEEDBACK_MOMENT_EXG
 
    implicit none
 
@@ -444,7 +427,7 @@ contains
       ! strict enum (the legacy 3-char prefix match let any string select the
       ! weighted upwind, header NOTE 4)
       call sub_env%yaml%read("scheme", silent=no_key, val=this%sed_scheme, &
-                             default=DEF_SEDIMENT_SCHEME)
+                             default="upwinding")
       select case (this%sed_scheme)
       case ("upwinding")
          this%upwinding = .true.
@@ -456,7 +439,7 @@ contains
       end select
 
       call sub_env%yaml%read_enum("solver", SED_SOLVERS, silent=no_key, &
-                                  val=this%solver, default=DEF_SEDIMENT_SOLVER)
+                                  val=this%solver, default="split_implicit")
       this%split_implicit = trim(this%solver) == "split_implicit"
 
       ! ---- cohesive block, read ahead of d50 because presence selects d50's
@@ -465,26 +448,26 @@ contains
       this%cohesive = .not. no_key
       if (this%cohesive) then
          call blk%read("soft_bed", silent=no_key, val=this%soft_bed, &
-                       default=DEF_SEDIMENT_COHESIVE_SOFT_BED)
+                       default="YES")
          ! tau_cr anchors the block (an empty block reads as absent)
          call blk%read("tau_cr", silent=no_key, val=tmp_r)
          if (no_key) call env%log%exit_on_error( &
             "sediment: cohesive requires tau_cr (the critical pickup stress)")
          this%tau_cr_coh = tmp_r
          call blk%read("tau_crd", silent=no_key, val=this%tau_crd_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_TAU_CRD)
+                       default="0.001")
          call blk%read("e", silent=no_key, val=this%e_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_E)
+                       default="0.0001")
          call blk%read("alpha", silent=no_key, val=this%alpha_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_ALPHA)
+                       default="1.0")
          call blk%read("a", silent=no_key, val=this%a_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_A)
+                       default="0.1")
          call blk%read("b", silent=no_key, val=this%b_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_B)
+                       default="2.0")
          call blk%read("n", silent=no_key, val=this%n_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_N)
+                       default="0.5")
          call blk%read("m", silent=no_key, val=this%m_coh, &
-                       default=DEF_SEDIMENT_COHESIVE_M)
+                       default="1.5")
       end if
 
       ! presence-tested: the fallback is mud or sand depending on the above,
@@ -499,9 +482,9 @@ contains
       end if
 
       call sub_env%yaml%read("specific_gravity", silent=no_key, val=this%sdensity, &
-                             default=DEF_SEDIMENT_SPECIFIC_GRAVITY)
+                             default="2.68")
       call sub_env%yaml%read("porosity", silent=no_key, val=this%n_porosity, &
-                             default=DEF_SEDIMENT_POROSITY)
+                             default="0.47")
 
       ! settling_velocity is presence-tested: absent means "use the settling
       ! formula", so it carries no default (see the yaml%read/silent contract)
@@ -509,20 +492,20 @@ contains
       this%ws_formula = no_key
 
       call sub_env%yaml%read("shields_cr", silent=no_key, val=this%shields_cr, &
-                             default=DEF_SEDIMENT_SHIELDS_CR)
+                             default="0.055")
       call sub_env%yaml%read("min_depth_pickup", silent=no_key, &
                              val=this%min_depth_pickup, &
-                             default=DEF_SEDIMENT_MIN_DEPTH_PICKUP)
+                             default="0.1")
       call sub_env%yaml%read("pickup_ramp", silent=no_key, val=this%pickup_ramp, &
-                             default=DEF_SEDIMENT_PICKUP_RAMP)
+                             default="0.0")
 
       call sub_env%yaml%read("pickup_reduction", silent=no_key, &
                              val=this%pickup_reduction, &
-                             default=DEF_SEDIMENT_PICKUP_REDUCTION)
+                             default="YES")
       if (this%pickup_reduction) then
          call sub_env%yaml%read("reduction_parameter", silent=no_key, &
                                 val=this%reduction_parameter, &
-                                default=DEF_SEDIMENT_REDUCTION_PARAMETER)
+                                default="0.65")
       else
          ! reduction off: legacy accepted "any number" and ignored it; a
          ! present value would be silently dead config
@@ -541,9 +524,9 @@ contains
 
       ! ---- morphology
       call sub_env%yaml%read("bed_change", silent=no_key, val=this%bed_change, &
-                             default=DEF_SEDIMENT_BED_CHANGE)
+                             default="NO")
       call sub_env%yaml%read("bedload", silent=no_key, val=this%bedload, &
-                             default=DEF_SEDIMENT_BEDLOAD)
+                             default="NO")
       if (this%bedload .and. this%cohesive) then
          call env%log%warning("sediment: bedload is ignored with cohesive on — "// &
                               "mud has no bedload; the bed moves on suspended load alone")
@@ -555,7 +538,7 @@ contains
       if (no_key) this%shields_cr_bedload = this%shields_cr
 
       call sub_env%yaml%read("morph_factor", silent=no_key, val=this%morph_factor, &
-                             default=DEF_SEDIMENT_MORPH_FACTOR)
+                             default="1")
 
       ! hard_bottom block presence = clamp on (nee the Hard_bottom bool)
       blk = sub_env%yaml%cast_dictionary("hard_bottom", no_key)
@@ -587,13 +570,13 @@ contains
       if (.not. no_key) then
          call blk%read("mass_source", silent=no_key, &
                        val=this%mass_source, &
-                       default=DEF_SEDIMENT_FEEDBACK_MASS_SOURCE)
+                       default="NO")
          call blk%read("moment_dc", silent=no_key, &
                        val=this%moment_dc, &
-                       default=DEF_SEDIMENT_FEEDBACK_MOMENT_DC)
+                       default="NO")
          call blk%read("moment_exg", silent=no_key, &
                        val=this%moment_exg, &
-                       default=DEF_SEDIMENT_FEEDBACK_MOMENT_EXG)
+                       default="NO")
       end if
 
    end subroutine sediment_read_input

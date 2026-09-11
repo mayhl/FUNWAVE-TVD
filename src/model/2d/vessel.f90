@@ -109,8 +109,6 @@ module model_vessel_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
    use model_bc_mod, only: type_model_bc
-   use model_config_defaults_mod, only: DEF_VESSEL_COUNT, DEF_VESSEL_PROPELLER, &
-                                        DEF_VESSEL_DEEP_DRAFT_MASK
    use mpi_f08
 
    implicit none
@@ -214,7 +212,7 @@ contains
          "vessel: folder is required (it holds vessel_00001, ...)")
 
       call sub_env%yaml%read("count", silent=no_key, val=this%n_vessel, &
-                             default=DEF_VESSEL_COUNT)
+                             default="1")
       ! retired keys: the series moved to output: vessel:, the fields to
       ! output: variables:
       call sub_env%yaml%read("OUT_VESSEL", silent=no_key, val=tmp_l)
@@ -226,7 +224,7 @@ contains
          "vessel: PLOT_INTV_VESSEL moved -- set output: vessel: interval")
 
       call sub_env%yaml%read("propeller", silent=no_key, val=this%propeller, &
-                             default=DEF_VESSEL_PROPELLER)
+                             default="NO")
 
       ! deep_draft block presence = near-bed hull handling (nee the DEEP_DRAFT
       ! bool + the three Method bools)
@@ -239,7 +237,7 @@ contains
             "vessel: deep_draft requires clearance (the draft-to-bed gap threshold)")
          this%clearance = tmp_r
          call blk%read("mask", silent=no_key, val=this%mask_method, &
-                       default=DEF_VESSEL_DEEP_DRAFT_MASK)
+                       default="YES")
          ! cd/nu presence derives the drag and eddy-viscosity switches
          call blk%read("cd", silent=no_key, val=tmp_r)
          this%friction_method = .not. no_key

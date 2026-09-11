@@ -24,8 +24,6 @@ module model_obstacle_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_OBSTACLE_BREAKWATER_ABSORB_COEF
-
    implicit none
 
    private
@@ -75,7 +73,7 @@ contains
             "obstacle: breakwater requires file (the width field)")
          call bw_yaml%read("absorb_coef", silent=no_key, &
                            val=this%BreakWaterAbsorbCoef, &
-                           default=DEF_OBSTACLE_BREAKWATER_ABSORB_COEF)
+                           default="10.0")
       end if
 
       if (.not. (this%obstacle .or. this%breakwater)) then

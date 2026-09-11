@@ -59,34 +59,6 @@ module model_wavemaker_mod
    use model_breaking_mod, only: type_model_breaking
    use model_tide_mod, only: type_model_tide
 
-   use model_config_defaults_mod, only: DEF_WAVEMAKER_SOURCE_DELTA, &
-                                        DEF_WAVEMAKER_SOURCE_BREAKING_CBRK, &
-                                        DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK, &
-                                        DEF_WAVEMAKER_SOURCE_DEPTH, &
-                                        DEF_WAVEMAKER_SOURCE_TIME_RAMP, &
-                                        DEF_WAVEMAKER_SOURCE_X_CENTER, &
-                                        DEF_WAVEMAKER_SOURCE_Y_CENTER, &
-                                        DEF_WAVEMAKER_SOURCE_Y_WIDTH, &
-                                        DEF_WAVEMAKER_SPECTRUM_AMPLITUDE, &
-                                        DEF_WAVEMAKER_SPECTRUM_DIRECTION, &
-                                        DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK, &
-                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT, &
-                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_GROUP_COHERENCE, &
-                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY, &
-                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS, &
-                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD, &
-                                        DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS, &
-                                        DEF_WAVEMAKER_SPECTRUM_FORMAT, &
-                                        DEF_WAVEMAKER_SPECTRUM_FREQ_MAX, &
-                                        DEF_WAVEMAKER_SPECTRUM_FREQ_MIN, &
-                                        DEF_WAVEMAKER_SPECTRUM_FREQ_PEAK, &
-                                        DEF_WAVEMAKER_SPECTRUM_GAMMA, &
-                                        DEF_WAVEMAKER_SPECTRUM_HM0, &
-                                        DEF_WAVEMAKER_SPECTRUM_NORMALIZE, &
-                                        DEF_WAVEMAKER_SPECTRUM_N, &
-                                        DEF_WAVEMAKER_SPECTRUM_PERIOD, &
-                                        DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK
-
    implicit none
 
    private
@@ -757,7 +729,7 @@ contains
       has_dir = .not. no_blk
       if (has_dir) then
          call blk%read("peak", silent=no_key, val=this%ThetaPeak, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DIRECTIONAL_PEAK)
+                       default="0.0")
          call blk%read("spread", val=this%Sigma_Theta)
          call blk%read("n_bins", silent=no_key, val=this%Ntheta)
          if (.not. no_key) call env%log%exit_on_error( &
@@ -767,11 +739,11 @@ contains
       blk = spec_yaml%cast_dictionary("discretization", no_blk)
       if (.not. no_blk) then
          call blk%read("freq_bins", silent=no_key, val=this%Nfreq, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_FREQ_BINS)
+                       default="45")
          ! theta_bins is the directional-axis resolution: defaulted only
          ! when directional: is present, meaningless without it
          call blk%read("theta_bins", silent=no_key, val=this%Ntheta, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS)
+                       default="24")
          if (.not. no_key .and. .not. has_dir) call env%log%exit_on_error( &
             "wavemaker/discretization: theta_bins requires a directional: block")
          ! per-axis enum; the bool spellings are the pre-enum decks
@@ -779,21 +751,21 @@ contains
          call blk%read_enum("equal_energy", [character(5) :: "none", "freq", &
                                              "dir", "both", "true", "false", "yes", "no", "NO", "YES"], &
                             val=eqe_mode, &
-                            default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_EQUAL_ENERGY)
+                            default="NO")
          this%eqe_freq = eqe_mode == "freq" .or. eqe_mode == "both" &
                          .or. eqe_mode == "true" .or. eqe_mode == "yes" &
                          .or. eqe_mode == "YES"
          this%eqe_dir = eqe_mode == "dir" .or. eqe_mode == "both"
          call blk%read_enum("method", [character(19) :: "grid", "single_dir_per_freq"], &
-                            val=method, default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_METHOD)
+                            val=method, default="grid")
          ! directional-phase coherence (0..100 %, stored 0..1): applies to
          ! every directional type (grid source + boundary feed)
          call blk%read("coherence_percent", silent=no_key, val=this%dir_coherence, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_COHERENCE_PERCENT)
+                       default="0.0")
          this%dir_coherence = max(0.0_SP, min(1.0_SP, this%dir_coherence/100.0_SP))
          ! Salatin frequency-grouping coherence (nee alpha_c): single-dir only
          call blk%read("group_coherence", silent=no_key, val=this%alpha_c, &
-                       default=DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_GROUP_COHERENCE)
+                       default="0.0")
          this%single_dir = method == "single_dir_per_freq"
          ! regime rules: group coherence = same-frequency hosts, meaningless
          ! on the grid whose theta rows already share a frequency per row
@@ -808,7 +780,7 @@ contains
          end if
       else if (has_dir) then
          ! no discretization: block -- directional resolution falls to default
-         def_bins = DEF_WAVEMAKER_SPECTRUM_DISCRETIZATION_THETA_BINS
+         def_bins = "24"
          read (def_bins, *) this%Ntheta
       end if
       if (.not. has_dir) this%Ntheta = 1
@@ -818,21 +790,21 @@ contains
          if (has_dir) call env%log%exit_on_error( &
             "wavemaker/spectrum: regular has no directional: block")
          call spec_yaml%read("amplitude", silent=no_key, val=this%AMP_WK, &
-                             default=DEF_WAVEMAKER_SPECTRUM_AMPLITUDE)
+                             default="0.0")
          call spec_yaml%read("period", silent=no_key, val=this%Tperiod, &
-                             default=DEF_WAVEMAKER_SPECTRUM_PERIOD)
+                             default="0.0")
          call spec_yaml%read("direction", silent=no_key, val=this%Theta_WK, &
-                             default=DEF_WAVEMAKER_SPECTRUM_DIRECTION)
+                             default="0.0")
          this%wavemaker_type = "WK_REG"
 
       case ("jonswap", "tma")
          call spec_yaml%read("hm0", silent=no_key, val=this%Hmo, &
-                             default=DEF_WAVEMAKER_SPECTRUM_HM0)
+                             default="0.0")
          call spec_yaml%read("gamma", silent=no_key, val=this%GammaTMA, &
-                             default=DEF_WAVEMAKER_SPECTRUM_GAMMA)
+                             default="3.3")
          call spec_yaml%read_enum("normalize", [character(5) :: "band", "total"], &
                                   val=normalize, &
-                                  default=DEF_WAVEMAKER_SPECTRUM_NORMALIZE)
+                                  default="band")
          this%normalize_total = normalize == "total"
          ! freq {peak,min,max} = exact legacy path; period {peak,min,max} =
          ! hand-authoring alternative (reciprocal fill — 1/(1/x) is NOT
@@ -840,11 +812,11 @@ contains
          blk = spec_yaml%cast_dictionary("freq", no_freq)
          if (.not. no_freq) then
             call blk%read("peak", silent=no_key, val=this%FreqPeak, &
-                          default=DEF_WAVEMAKER_SPECTRUM_FREQ_PEAK)
+                          default="0.0")
             call blk%read("min", silent=no_key, val=this%FreqMin, &
-                          default=DEF_WAVEMAKER_SPECTRUM_FREQ_MIN)
+                          default="0.0")
             call blk%read("max", silent=no_key, val=this%FreqMax, &
-                          default=DEF_WAVEMAKER_SPECTRUM_FREQ_MAX)
+                          default="0.0")
          end if
          blk = spec_yaml%cast_dictionary("period", no_per)
          if (.not. no_freq .and. .not. no_per) &
@@ -870,9 +842,9 @@ contains
 
       case ("components")
          call spec_yaml%read("n", silent=no_key, val=this%NumWaveComp, &
-                             default=DEF_WAVEMAKER_SPECTRUM_N)
+                             default="1")
          call spec_yaml%read("period_peak", silent=no_key, val=this%PeakPeriod, &
-                             default=DEF_WAVEMAKER_SPECTRUM_PERIOD_PEAK)
+                             default="0.0")
          call spec_yaml%read("file", silent=no_key, val=this%WaveCompFile)
          if (no_key) call env%log%exit_on_error( &
             "wavemaker/spectrum: components needs a file: (wave-component data)")
@@ -894,7 +866,7 @@ contains
                " or locations: (a spatially-varying manifest)")
          end if
          call spec_yaml%read("format", val=this%WAVE_DATA_TYPE, &
-                             default=DEF_WAVEMAKER_SPECTRUM_FORMAT)
+                             default="DATA_1D")
          this%wavemaker_type = "WK_DATA2D"
       end select
 
@@ -950,17 +922,17 @@ contains
          this%wavemaker_type = "PENDING_BOUNDARY"
       else
          call blk%read("x_center", silent=no_key, val=this%Xc_WK, &
-                       default=DEF_WAVEMAKER_SOURCE_X_CENTER)
+                       default="0.0")
          call blk%read("y_center", silent=no_key, val=this%Yc_WK, &
-                       default=DEF_WAVEMAKER_SOURCE_Y_CENTER)
+                       default="0.0")
          call blk%read("depth", silent=no_key, val=this%DEP_WK, &
-                       default=DEF_WAVEMAKER_SOURCE_DEPTH)
+                       default="0.0")
          call blk%read("delta", silent=no_key, val=this%Delta_WK, &
-                       default=DEF_WAVEMAKER_SOURCE_DELTA)
+                       default="0.5")
          call blk%read("y_width", silent=no_key, val=this%Ywidth_WK, &
-                       default=DEF_WAVEMAKER_SOURCE_Y_WIDTH)
+                       default="999999.0")
          call blk%read("time_ramp", silent=no_key, val=this%Time_ramp, &
-                       default=DEF_WAVEMAKER_SOURCE_TIME_RAMP)
+                       default="0.0")
          ! current_cd presence enables the current-balance drag
          call blk%read("current_cd", silent=no_key, val=this%WaveMakerCd)
          this%WaveMakerCurrentBalance = .not. no_key
@@ -986,11 +958,11 @@ contains
                end if
                if (cbrk_applies) then
                   call brk_yaml%read("cbrk", silent=no_key, val=this%breaking_cbrk, &
-                                     default=DEF_WAVEMAKER_SOURCE_BREAKING_CBRK)
+                                     default="1.0")
                end if
                if (visbrk_applies) then
                   call brk_yaml%read("visbrk", silent=no_key, val=this%breaking_visbrk, &
-                                     default=DEF_WAVEMAKER_SOURCE_BREAKING_VISBRK)
+                                     default="0.0")
                end if
             end block
          end if

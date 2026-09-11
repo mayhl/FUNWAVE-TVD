@@ -44,7 +44,6 @@ module model_geometry_mod
    use core_path_mod, only: type_path
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
-   use model_config_defaults_mod, only: DEF_GRID_WATER_LEVEL
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR
 
    implicit none
@@ -139,7 +138,7 @@ contains
 
       ! --- Still-water level (optional) ---
       call sub_env%yaml%read("water_level", val=this%water_level, &
-                             default=DEF_GRID_WATER_LEVEL)
+                             default="0.0")
 
       ! crs is metadata-only until the output stamp lands -- reserve it so
       ! unread-key detection stays quiet on georeferenced decks

@@ -45,16 +45,6 @@ module model_breaking_mod
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_BREAKING_CBRK1, DEF_BREAKING_CBRK2, &
-                                        DEF_BREAKING_MODEL, &
-                                        DEF_BREAKING_NU_BKG, DEF_BREAKING_ROLLER, &
-                                        DEF_BREAKING_VISBRK, &
-                                        DEF_BREAKING_SWE_ETA_DEP, DEF_BREAKING_SWE_ETA_RAMP, &
-                                        DEF_BREAKING_WETDRY_DISP_RAMP, &
-                                        DEF_BREAKING_T_BRK, DEF_BREAKING_AGE_PER_STAGE, &
-                                        DEF_BREAKING_SOLVER, DEF_BREAKING_THETA, &
-                                        DEF_BREAKING_SWE_GATE, DEF_BREAKING_NU_CAP
-
    implicit none
 
    private
@@ -147,19 +137,19 @@ contains
       if (.not. this%is_activated) return
 
       call sub_env%yaml%read_enum("model", BREAKING_MODELS, val=this%model, &
-                                  default=DEF_BREAKING_MODEL)
-      call sub_env%yaml%read("roller", val=this%roller, default=DEF_BREAKING_ROLLER)
+                                  default="eddy_viscosity")
+      call sub_env%yaml%read("roller", val=this%roller, default="NO")
       ! eddy_viscosity only: the split solve is not wired for the
       ! wavemaker_viscosity zone term (it stays an explicit source), so
       ! leaving solver unread there lets the detector flag it
       if (trim(this%model) == "eddy_viscosity") then
          call sub_env%yaml%read_enum("solver", VISC_SOLVERS, silent=no_key, &
-                                     val=this%solver, default=DEF_BREAKING_SOLVER)
+                                     val=this%solver, default="split_implicit")
          this%split_implicit = trim(this%solver) /= "explicit"
          this%per_stage = trim(this%solver) == "stage_split"
          if (this%split_implicit) then
             call sub_env%yaml%read("theta", silent=no_key, val=this%theta, &
-                                   default=DEF_BREAKING_THETA)
+                                   default="1.0")
             if (this%theta < 0.5_SP .or. this%theta > 1.0_SP) &
                call env%log%exit_on_error("breaking/theta: must be in [0.5, 1]")
          end if
@@ -176,41 +166,41 @@ contains
                                     " the AGE/ROLLER/UNDERTOW output requests")
       end if
 
-      call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default=DEF_BREAKING_NU_BKG)
+      call sub_env%yaml%read("nu_bkg", silent=no_key, val=this%nu_bkg, default="0.0")
       call sub_env%yaml%read("swe_eta_dep", silent=no_key, val=this%swe_eta_dep, &
-                             default=DEF_BREAKING_SWE_ETA_DEP)
+                             default="0.8")
       call sub_env%yaml%read("wetdry_disp_ramp", silent=no_key, val=this%wetdry_disp_ramp, &
-                             default=DEF_BREAKING_WETDRY_DISP_RAMP)
+                             default="3.0")
 
       ! variant keys — conditionally read so the unread-key detector flags
       ! knobs inapplicable to the selected model.  cbrk1/cbrk2 stay live
       ! under shock_capturing too: the display breaker may run (derived
       ! show_breaking, known only after output reads) and uses them
       if (trim(this%model) /= "wavemaker_viscosity") then
-         call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default=DEF_BREAKING_CBRK1)
-         call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default=DEF_BREAKING_CBRK2)
-         call sub_env%yaml%read("t_brk", silent=no_key, val=this%t_brk, default=DEF_BREAKING_T_BRK)
+         call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default="0.55")
+         call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default="0.35")
+         call sub_env%yaml%read("t_brk", silent=no_key, val=this%t_brk, default="20.0")
          call sub_env%yaml%read("age_per_stage", silent=no_key, val=this%age_per_stage, &
-                                default=DEF_BREAKING_AGE_PER_STAGE)
+                                default="YES")
          ! inapplicable under the implicit solve -- leaving it unread lets
          ! the unread-key detector flag a stale nu_cap in the deck
          if (.not. this%split_implicit) then
             call sub_env%yaml%read("nu_cap", silent=no_key, val=this%nu_cap, &
-                                   default=DEF_BREAKING_NU_CAP)
+                                   default="0.0")
          end if
       end if
       ! the gate is structural under the other models — the knob only means
       ! something where legacy forces mask9 to 1
       if (trim(this%model) == "eddy_viscosity") then
          call sub_env%yaml%read("swe_gate", silent=no_key, val=this%swe_gate, &
-                                default=DEF_BREAKING_SWE_GATE)
+                                default="NO")
       end if
       if (trim(this%model) /= "eddy_viscosity" .or. this%swe_gate) then
          call sub_env%yaml%read("swe_eta_ramp", silent=no_key, val=this%swe_eta_ramp, &
-                                default=DEF_BREAKING_SWE_ETA_RAMP)
+                                default="0.1")
       end if
       if (trim(this%model) == "wavemaker_viscosity") then
-         call sub_env%yaml%read("visbrk", silent=no_key, val=this%visbrk, default=DEF_BREAKING_VISBRK)
+         call sub_env%yaml%read("visbrk", silent=no_key, val=this%visbrk, default="0.0")
       end if
 
       ! the enum IS the legacy WAVEMAKER_VIS x VISCOSITY_BREAKING exclusion

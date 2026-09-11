@@ -264,12 +264,13 @@ variables:
 # the code does not carry (legacy name, default, units, latex, doc).  Two consumers:
 #   * readability / de-dup — variant + per-face structure written once;
 #   * docs + example-config generation per section and per variant.
-# gen_registry.py still emits the DEF_ default constants (config_defaults.f90,
-# unchanged) by walking this tree's `default`s.
+# Nothing is generated from this tree but docs/guide/config_reference.md: each
+# reader carries its default as the literal at the read site, and
+# gen_registry.py --check fails when a literal and this tree disagree.
 #
 # Per-key metadata (all descriptive):
 #   legacy   mod_global.F name for the input.txt converter (~ if none)
-#   default  registry default (feeds the DEF_ constant)
+#   default  what the reader falls back to (~ = presence-derived)
 #   units    null (~) if dimensionless; else a CF unit string
 #   latex    terminal/Doxygen label (~ if none)
 #   values   documented value set for docs/examples (NOT validated here — the

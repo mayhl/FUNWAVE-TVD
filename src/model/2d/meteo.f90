@@ -109,13 +109,6 @@ module model_meteo_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_METEO_WIND_CD, &
-                                        DEF_METEO_WIND_WAVE_INTERACTION, &
-                                        DEF_METEO_HOLLAND_AIR_PRESSURE, &
-                                        DEF_METEO_HOLLAND_WIND_FORCE, &
-                                        DEF_METEO_HOLLAND_CD, &
-                                        DEF_METEO_HOLLAND_WAVE_INTERACTION
-
    implicit none
 
    private
@@ -223,8 +216,8 @@ contains
          call blk%read_input_path("file", silent=no_key, val=this%constant_wind_file)
          if (no_key) call env%log%exit_on_error( &
             "meteo: wind requires file (the time series)")
-         call read_wind_knobs(this, blk, env, DEF_METEO_WIND_CD, &
-                              DEF_METEO_WIND_WAVE_INTERACTION)
+         call read_wind_knobs(this, blk, env, "0.002", &
+                              "NO")
       end if
 
       blk = sub_env%yaml%cast_dictionary("holland", no_key)
@@ -239,14 +232,14 @@ contains
          ! or-ed, not assigned: a gaussian/slide block may have forced the
          ! pressure path on already
          call blk%read("air_pressure", silent=no_key, val=tmp_l, &
-                       default=DEF_METEO_HOLLAND_AIR_PRESSURE)
+                       default="NO")
          this%air_pressure = this%air_pressure .or. tmp_l
          call blk%read("wind_force", silent=no_key, val=tmp_l, &
-                       default=DEF_METEO_HOLLAND_WIND_FORCE)
+                       default="NO")
          this%wind_force = this%wind_force .or. tmp_l
          if (tmp_l) then
-            call read_wind_knobs(this, blk, env, DEF_METEO_HOLLAND_CD, &
-                                 DEF_METEO_HOLLAND_WAVE_INTERACTION)
+            call read_wind_knobs(this, blk, env, "0.002", &
+                                 "NO")
          else
             call reject_wind_knobs(blk, env)
          end if

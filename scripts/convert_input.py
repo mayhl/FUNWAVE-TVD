@@ -17,7 +17,12 @@ import argparse
 import re
 import shutil
 import sys
+from functools import cache
 from pathlib import Path
+
+import yaml
+
+REGISTRY = Path(__file__).resolve().parent.parent / "src" / "model" / "registry.yaml"
 
 # ---------------------------------------------------------------------------
 # Parser
@@ -254,6 +259,37 @@ def _put(dst: dict, block: str, key: str, val):
         dst.setdefault(block, {})[key] = val
 
 
+@cache
+def _legacy_paths() -> dict[str, list[str]]:
+    """legacy input.txt name -> dotted deck path(s), from the registry `legacy:` column."""
+    reg = yaml.safe_load(REGISTRY.read_text())
+    out: dict[str, list[str]] = {}
+    for section, spec in (reg.get("sections") or {}).items():
+        for key, meta in (spec.get("keys") or {}).items():
+            if meta and meta.get("legacy"):
+                out.setdefault(meta["legacy"], []).append(f"{section}.{key}")
+    return out
+
+
+def _place(dst: dict, prefix: str, legacy: str, val):
+    """Put val where the registry maps `legacy`, relative to the block at `prefix`.
+
+    A 1:1 rename is never spelled here: the registry carries it, so a leaf the
+    converter and the engine disagree on cannot exist.  A key the registry maps
+    nowhere under `prefix` raises -- that is a registry gap, not a deck error.
+    """
+    if val is None:
+        return
+    paths = [q for q in _legacy_paths().get(legacy, []) if q.startswith(prefix + ".")]
+    if len(paths) != 1:
+        raise KeyError(f"{legacy}: registry maps it to {_legacy_paths().get(legacy)}, not uniquely under {prefix}")
+    *parents, leaf = paths[0][len(prefix) + 1 :].split(".")
+    node = dst
+    for part in parents:
+        node = node.setdefault(part, {})
+    node[leaf] = val
+
+
 def _convert_abs(pop_val, dx):
     """Legacy ABS -> spectrum-only wavemaker entry + west face block (config
     reorg rung 3b): the face owns the relaxation strip (nee WidthWaveMaker/
@@ -269,26 +305,22 @@ def _convert_abs(pop_val, dx):
         spec["format"] = wdt
     else:
         spec = {"type": "jonswap" if wdt.startswith("JON") else "tma"}
-        for k, yk in (("Hmo", "hm0"), ("GammaTMA", "gamma")):
-            v = pop_val(k)
-            if v is not None:
-                spec[yk] = v
-        for k, yk in (("FreqPeak", "peak"), ("FreqMin", "min"), ("FreqMax", "max")):
-            _put(spec, "freq", yk, pop_val(k))
+        for k in ("Hmo", "GammaTMA", "FreqPeak", "FreqMin", "FreqMax"):
+            _place(spec, "wavemaker.spectrum", k, pop_val(k))
         if "1D" in wdt:
             for k in ("ThetaPeak", "Sigma_Theta", "Ntheta"):
                 pop_val(k)  # legacy forces 1D (Ntheta = 1); consume silently
         else:
-            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread")):
-                _put(spec, "directional", yk, pop_val(k))
+            for k in ("ThetaPeak", "Sigma_Theta"):
+                _place(spec, "wavemaker.spectrum", k, pop_val(k))
             # legacy 2D defaults (io.F ABS block) differ from the reader's;
             # spread is a required key now, so always emit it
             d = spec.setdefault("directional", {})
             d.setdefault("peak", 0.0)
             d.setdefault("spread", 10.0)
-            _put(spec, "discretization", "theta_bins", pop_val("Ntheta"))
+            _place(spec, "wavemaker.spectrum", "Ntheta", pop_val("Ntheta"))
             spec.setdefault("discretization", {}).setdefault("theta_bins", 24)
-        _put(spec, "discretization", "freq_bins", pop_val("Nfreq"))
+        _place(spec, "wavemaker.spectrum", "Nfreq", pop_val("Nfreq"))
         spec.setdefault("discretization", {}).setdefault("freq_bins", 45)
         eq = pop_val("EqualEnergy")
         if eq is not None:
@@ -377,61 +409,43 @@ def _convert_wavemaker(wm_type: str, pop_val, dx):
     wm: dict = {}
     spec: dict = {"type": stype}
     if stype == "regular":
-        for k, yk in (("AMP_WK", "amplitude"), ("Tperiod", "period"), ("Theta_WK", "direction")):
-            v = pop_val(k)
-            if v is not None:
-                spec[yk] = v
+        for k in ("AMP_WK", "Tperiod", "Theta_WK"):
+            _place(spec, "wavemaker.spectrum", k, pop_val(k))
     elif stype == "components":
-        for k, yk in (("NumWaveComp", "n"), ("PeakPeriod", "period_peak"), ("WaveCompFile", "file")):
-            v = pop_val(k)
-            if v is not None:
-                spec[yk] = v
+        for k in ("NumWaveComp", "PeakPeriod", "WaveCompFile"):
+            _place(spec, "wavemaker.spectrum", k, pop_val(k))
     else:
-        for k, yk in (("Hmo", "hm0"), ("GammaTMA", "gamma")):
-            v = pop_val(k)
-            if v is not None:
-                spec[yk] = v
-        for k, yk in (("FreqPeak", "peak"), ("FreqMin", "min"), ("FreqMax", "max")):
-            _put(spec, "freq", yk, pop_val(k))
+        for k in ("Hmo", "GammaTMA", "FreqPeak", "FreqMin", "FreqMax"):
+            _place(spec, "wavemaker.spectrum", k, pop_val(k))
         if directional:
-            for k, yk in (("ThetaPeak", "peak"), ("Sigma_Theta", "spread")):
-                _put(spec, "directional", yk, pop_val(k))
+            for k in ("ThetaPeak", "Sigma_Theta"):
+                _place(spec, "wavemaker.spectrum", k, pop_val(k))
             # legacy directional defaults (io.F) differ from the reader;
             # spread is a required key now, so always emit it
             spec.setdefault("directional", {}).setdefault("spread", 10.0)
-            _put(spec, "discretization", "theta_bins", pop_val("Ntheta"))
+            _place(spec, "wavemaker.spectrum", "Ntheta", pop_val("Ntheta"))
             spec.setdefault("discretization", {}).setdefault("theta_bins", 24)
         else:
             pop_val("Ntheta")  # consume a stray 1D Ntheta silently, like before
-        _put(spec, "discretization", "freq_bins", pop_val("Nfreq"))
+        _place(spec, "wavemaker.spectrum", "Nfreq", pop_val("Nfreq"))
         spec.setdefault("discretization", {}).setdefault("freq_bins", 45)
         if single_dir:
             spec["discretization"]["method"] = "single_dir_per_freq"
-        v = pop_val("alpha_c")
-        if v is not None:
-            _put(spec, "discretization", "group_coherence", v)
-        eq = pop_val("EqualEnergy")
-        if eq is not None:
-            _put(spec, "discretization", "equal_energy", eq)
+        _place(spec, "wavemaker.spectrum", "alpha_c", pop_val("alpha_c"))
+        _place(spec, "wavemaker.spectrum", "EqualEnergy", pop_val("EqualEnergy"))
         if wm_type == "WK_NEW_IRR":
-            _put(spec, "discretization", "file", pop_val("WaveCompFile"))
+            # legacy names a component dump here; the engine reads spectrum.file
+            # only for components/spectrum_2d, so a key emitted for it goes unread
+            pop_val("WaveCompFile")
     wm["spectrum"] = spec
 
-    for k, yk in (
-        ("Xc_WK", "x_center"),
-        ("Yc_WK", "y_center"),
-        ("DEP_WK", "depth"),
-        ("Delta_WK", "delta"),
-        ("Ywidth_WK", "y_width"),
-        ("Time_ramp", "time_ramp"),
-        ("WaveMakerCd", "current_cd"),
-    ):
-        _put(wm, "source", yk, pop_val(k))
+    for k in ("Xc_WK", "Yc_WK", "DEP_WK", "Delta_WK", "Ywidth_WK", "Time_ramp", "WaveMakerCd"):
+        _place(wm, "wavemaker", k, pop_val(k))
     pop_val("WaveMakerCurrentBalance")  # presence of current_cd carries it
 
     if pop_val("ETA_LIMITER"):
-        for k, yk in (("CrestLimit", "crest"), ("TroughLimit", "trough")):
-            _put(wm, "limiter", yk, pop_val(k))
+        for k in ("CrestLimit", "TroughLimit"):
+            _place(wm, "wavemaker", k, pop_val(k))
 
     return wm, None
 
@@ -587,20 +601,20 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
     wm_type = pop_str("WAVEMAKER", "NONE")
     if wm_type in ("INI_SOL", "INI_SOLITARY"):
         sol: dict = {}
-        for k, yk in (("AMP", "amplitude"), ("DEP", "depth"), ("XWAVEMAKER", "x_center")):
-            v = pop_val(k)
-            if v is not None:
-                sol[yk] = v
+        for k in ("AMP", "DEP", "XWAVEMAKER"):
+            _place(sol, "initial.solitary", k, pop_val(k))
         if not pop_bool("SolitaryPositiveDirection", True):
             sol["direction"] = "-x"
         out.setdefault("initial", {})["solitary"] = sol
         wm_type = "NONE"
     elif wm_type == "INI_SINE":
         sine: dict = {}
-        for k, yk in (("AMP", "amplitude"), ("DEP", "depth"), ("mode_x", "mode_x"), ("mode_y", "mode_y")):
+        for k in ("AMP", "DEP"):
+            _place(sine, "initial.sine_mode", k, pop_val(k))
+        for k in ("mode_x", "mode_y"):  # no legacy keyword: modern-only
             v = pop_val(k)
             if v is not None:
-                sine[yk] = v
+                sine[k] = v
         out.setdefault("initial", {})["sine_mode"] = sine
         wm_type = "NONE"
     elif wm_type in ("INI_REC", "INI_Gau", "INI_GAU", "INI_DIP", "N_WAVE"):
@@ -610,23 +624,16 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         shape = {"INI_REC": "rect", "INI_DIP": "dipole"}.get(wm_type, "gaussian")
         if wm_type == "N_WAVE":
             nw: dict = {}
-            for k, yk in (
-                ("x1_Nwave", "x1"),
-                ("x2_Nwave", "x2"),
-                ("a0_Nwave", "a0"),
-                ("gamma_Nwave", "gamma"),
-                ("dep_Nwave", "depth"),
-            ):
-                v = pop_val(k)
-                if v is not None:
-                    nw[yk] = v
+            for k in ("x1_Nwave", "x2_Nwave", "a0_Nwave", "gamma_Nwave", "dep_Nwave"):
+                _place(nw, "initial.n_wave", k, pop_val(k))
             out.setdefault("initial", {})["n_wave"] = nw
         else:
             hp: dict = {"shape": shape}
-            for k, yk in (("AMP", "amplitude"), ("Xc", "x_center"), ("Yc", "y_center"), ("WID", "width"), ("GauRadius", "radius")):
-                v = pop_val(k)
-                if v is not None:
-                    hp[yk] = v
+            for k in ("AMP", "Xc", "Yc", "WID"):
+                _place(hp, "initial.hump", k, pop_val(k))
+            v = pop_val("GauRadius")  # legacy uses WID for both shapes; radius is modern-only
+            if v is not None:
+                hp["radius"] = v
             out.setdefault("initial", {})["hump"] = hp
         wm_type = "NONE"
     if wm_type.upper() not in ("NONE", "NOTHING"):
@@ -732,10 +739,8 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         v = pop_str(k)
         if v is not None:
             nu[yk] = v.lower()
-    for k, yk in (("CFL", "cfl"), ("FroudeCap", "froude_cap")):
-        v = pop_val(k)
-        if v is not None:
-            nu[yk] = v
+    for k in ("CFL", "FroudeCap"):
+        _place(nu, "numerics", k, pop_val(k))
     # DT_fixed lands here (nee simulation time_stepping): presence = fixed
     # step.  cfl and dt are exclusive in the reader, so an explicit legacy
     # CFL yields to dt; the halving cap then uses the default 0.5 -- warn
@@ -773,21 +778,13 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
         br["roller"] = True
     # SHOW_BREAKING retired — the engine derives the diagnostics pass
     pop_bool("SHOW_BREAKING", True)
-    for k, yk in (
-        ("Cbrk1", "cbrk1"),
-        ("Cbrk2", "cbrk2"),
-        ("visbrk", "visbrk"),
-        ("nu_bkg", "nu_bkg"),
-        ("SWE_ETA_DEP", "swe_eta_dep"),
-    ):
-        v = pop_val(k)
-        if v is not None:
-            br[yk] = v
+    for k in ("Cbrk1", "Cbrk2", "visbrk", "nu_bkg", "SWE_ETA_DEP"):
+        _place(br, "breaking", k, pop_val(k))
     # zone overrides live on the wavemaker source block now
-    for k, yk in (("WAVEMAKER_Cbrk", "cbrk"), ("WAVEMAKER_visbrk", "visbrk")):
+    for k in ("WAVEMAKER_Cbrk", "WAVEMAKER_visbrk"):
         v = pop_val(k)
         if v is not None and isinstance(out.get("wavemaker"), dict):
-            out["wavemaker"].setdefault("source", {}).setdefault("breaking", {})[yk] = v
+            _place(out["wavemaker"], "wavemaker", k, v)
     if br:
         out["breaking"] = br
 

@@ -1,12 +1,8 @@
-! allow(E001)
-! =================================================================
-!  GENERATED FILE — DO NOT EDIT.
-!  Source:    src/model/registry.yaml
-!  Generator: tools/gen_registry.py   (rerun after registry edits)
-!  Sync test: tools/gen_registry.py --check
-! =================================================================
 !> @file field_metadata.f90
-!> @brief Generated CF attribute catalog for output field variables.
+!> @brief CF attribute catalog for output field variables.
+!>
+!> Hand-written; the registry `variables:` block describes the same
+!> attributes and `tools/gen_registry.py --check` fails when they differ.
 module model_field_metadata_mod
    use core_output_channel_mod, only: type_var_meta
    implicit none

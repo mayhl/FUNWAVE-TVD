@@ -33,16 +33,6 @@ module model_initial_mod
    use model_base_mod, only: type_model_base
    use model_field_input_mod, only: type_file_spec, parse_file_spec
 
-   use model_config_defaults_mod, only: DEF_INITIAL_SINE_MODE_AMPLITUDE, &
-                                        DEF_INITIAL_SINE_MODE_DEPTH, &
-                                        DEF_INITIAL_SINE_MODE_MODE_X, &
-                                        DEF_INITIAL_SINE_MODE_MODE_Y, &
-                                        DEF_INITIAL_SOLITARY_AMPLITUDE, &
-                                        DEF_INITIAL_SOLITARY_DEPTH, &
-                                        DEF_INITIAL_SOLITARY_DIRECTION, &
-                                        DEF_INITIAL_SOLITARY_X_CENTER, &
-                                        DEF_INITIAL_SOLITARY_Y_CENTER
-
    implicit none
 
    private
@@ -134,13 +124,13 @@ contains
          this%is_activated = .true.
          this%ic_type = "INI_SOLITARY"
          call blk_yaml%read("amplitude", silent=no_key, val=this%AMP_SOLI, &
-                            default=DEF_INITIAL_SOLITARY_AMPLITUDE)
+                            default="0.0")
          call blk_yaml%read("depth", silent=no_key, val=this%DEP_SOLI, &
-                            default=DEF_INITIAL_SOLITARY_DEPTH)
+                            default="0.0")
          call blk_yaml%read("x_center", silent=no_key, val=this%XWAVEMAKER, &
-                            default=DEF_INITIAL_SOLITARY_X_CENTER)
+                            default="0.0")
          call blk_yaml%read("direction", silent=no_key, val=direction, &
-                            default=DEF_INITIAL_SOLITARY_DIRECTION)
+                            default="+x")
          select case (trim(direction))
          case ("+x")
             this%SolitaryPositiveDirection = .true.
@@ -162,7 +152,7 @@ contains
                this%solitary_angle = tmp_ang
                call blk_yaml%read("y_center", silent=no_key, &
                                   val=this%solitary_yc, &
-                                  default=DEF_INITIAL_SOLITARY_Y_CENTER)
+                                  default="0.0")
             end if
          end block
       end if
@@ -174,13 +164,13 @@ contains
          this%is_activated = .true.
          this%ic_type = "INI_SINE"
          call blk_yaml%read("amplitude", silent=no_key, val=this%AMP_SOLI, &
-                            default=DEF_INITIAL_SINE_MODE_AMPLITUDE)
+                            default="0.0")
          call blk_yaml%read("depth", silent=no_key, val=this%DEP_SOLI, &
-                            default=DEF_INITIAL_SINE_MODE_DEPTH)
+                            default="0.0")
          call blk_yaml%read("mode_x", silent=no_key, val=this%MODE_X, &
-                            default=DEF_INITIAL_SINE_MODE_MODE_X)
+                            default="1")
          call blk_yaml%read("mode_y", silent=no_key, val=this%MODE_Y, &
-                            default=DEF_INITIAL_SINE_MODE_MODE_Y)
+                            default="0")
       end if
 
       blk_yaml = ini_env%yaml%cast_dictionary("fields", no_blk)

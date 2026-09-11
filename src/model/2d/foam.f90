@@ -72,10 +72,6 @@ module model_foam_mod
    use model_base_mod, only: type_model_base
    use model_kernel_fluxes_mod, only: delx_fun, dely_fun, construct_x, construct_y
 
-   use model_config_defaults_mod, only: DEF_FOAM_SOURCE_COEF, DEF_FOAM_TIME_SCALE, &
-                                        DEF_FOAM_BURST_TIME_NON_BREAKING, &
-                                        DEF_FOAM_MIN_THICKNESS, DEF_FOAM_CD
-
    implicit none
 
    private
@@ -127,16 +123,16 @@ contains
          "foam: PLOT_INTV_FOAM dropped -- it drove an empty legacy stub writer")
 
       call sub_env%yaml%read("source_coef", silent=no_key, val=this%f_source, &
-                             default=DEF_FOAM_SOURCE_COEF)
+                             default="0.05")
       call sub_env%yaml%read("time_scale", silent=no_key, val=this%time_scale, &
-                             default=DEF_FOAM_TIME_SCALE)
+                             default="3.8")
       call sub_env%yaml%read("burst_time_non_breaking", silent=no_key, &
                              val=this%burst_time_nb, &
-                             default=DEF_FOAM_BURST_TIME_NON_BREAKING)
+                             default="1.0")
       call sub_env%yaml%read("min_thickness", silent=no_key, val=this%min_thick, &
-                             default=DEF_FOAM_MIN_THICKNESS)
+                             default="0.01")
       call sub_env%yaml%read("cd", silent=no_key, val=this%cd_foam, &
-                             default=DEF_FOAM_CD)
+                             default="0.5")
 
    end subroutine foam_read_input
 

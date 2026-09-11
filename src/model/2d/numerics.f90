@@ -38,12 +38,6 @@ module model_numerics_mod
    use core_env_mod, only: type_env, get_sub_env
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_NUMERICS_CFL, DEF_NUMERICS_FLUX_SOLVER, &
-                                        DEF_NUMERICS_FROUDE_CAP, DEF_NUMERICS_MIN_DEPTH, &
-                                        DEF_NUMERICS_RECONSTRUCTION, &
-                                        DEF_NUMERICS_TRIDIAG_CHUNK, &
-                                        DEF_NUMERICS_TRIDIAG_TRANSPOSE_MIN_PY
-
    implicit none
 
    private
@@ -89,13 +83,13 @@ contains
       this%is_activated = .not. no_num
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read("flux_solver", val=this%construction, default=DEF_NUMERICS_FLUX_SOLVER)
-      call sub_env%yaml%read("reconstruction", val=this%high_order, default=DEF_NUMERICS_RECONSTRUCTION)
+      call sub_env%yaml%read("flux_solver", val=this%construction, default="hllc")
+      call sub_env%yaml%read("reconstruction", val=this%high_order, default="fourth")
       ! kernel_fluxes dispatches on uppercase prefixes
       this%construction = upcase(this%construction)
       this%high_order = upcase(this%high_order)
 
-      call sub_env%yaml%read("cfl", silent=no_cfl, val=this%CFL, default=DEF_NUMERICS_CFL)
+      call sub_env%yaml%read("cfl", silent=no_cfl, val=this%CFL, default="0.5")
       ! dt presence = fixed-step mode; an EXPLICIT cfl alongside it is
       ! contradictory config (the default cfl still caps dt by halving)
       call sub_env%yaml%read("dt", silent=no_dt, val=this%dt_fixed)
@@ -107,10 +101,10 @@ contains
             "numerics: cfl and dt are exclusive -- dt fixes the step"// &
             " (the default cfl caps it); drop one")
       end if
-      call sub_env%yaml%read("froude_cap", silent=no_key, val=this%FroudeCap, default=DEF_NUMERICS_FROUDE_CAP)
+      call sub_env%yaml%read("froude_cap", silent=no_key, val=this%FroudeCap, default="3.0")
       ! single wet/dry + friction floor; legacy folded the MinDepth/
       ! MinDepthFrc pair to their minimum so they were one value in practice
-      call sub_env%yaml%read("min_depth", silent=no_key, val=this%MinDepth, default=DEF_NUMERICS_MIN_DEPTH)
+      call sub_env%yaml%read("min_depth", silent=no_key, val=this%MinDepth, default="0.1")
       this%MinDepthFrc = this%MinDepth
 
       ! tridiag: system-tuned solver knobs (bitwise-neutral); absent
@@ -118,9 +112,9 @@ contains
       tri_yaml = sub_env%yaml%cast_dictionary("tridiag", no_tri)
       if (.not. no_tri) then
          call tri_yaml%read("chunk", silent=no_key, val=tri_chunk, &
-                            default=DEF_NUMERICS_TRIDIAG_CHUNK)
+                            default="48")
          call tri_yaml%read("transpose_min_py", silent=no_key, val=tri_min_py, &
-                            default=DEF_NUMERICS_TRIDIAG_TRANSPOSE_MIN_PY)
+                            default="40")
          call trid_configure(tri_chunk, tri_min_py)
          write (msg, '(a,i0,a,i0)') "numerics/tridiag: chunk=", tri_chunk, &
             ", transpose_min_py=", tri_min_py

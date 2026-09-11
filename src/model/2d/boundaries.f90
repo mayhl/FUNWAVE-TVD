@@ -82,32 +82,23 @@ module model_boundaries_mod
    use model_tide_mod, only: type_model_tide
    use model_physics_mod, only: type_model_physics
    use model_wavemaker_mod, only: type_model_wavemaker
-   use model_config_defaults_mod, only: DEF_BOUNDARIES_WEST_SPONGE_WIDTH, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_DIRECT_R, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_DIRECT_A, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_FRICTION_CD, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_PML_R_TARGET, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_PML_H_GATE, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH, &
-                                        DEF_BOUNDARIES_WEST_SPONGE_PML_CD
 
    implicit none
 
    private
    public :: boundaries_read_input
 
-   ! the per-face DEF_BOUNDARIES_<FACE>_* generated constants are identical
-   ! across faces; west's stand in for all four
-   character(*), parameter :: D_WIDTH = DEF_BOUNDARIES_WEST_SPONGE_WIDTH
-   character(*), parameter :: D_R = DEF_BOUNDARIES_WEST_SPONGE_DIRECT_R
-   character(*), parameter :: D_A = DEF_BOUNDARIES_WEST_SPONGE_DIRECT_A
-   character(*), parameter :: D_CD = DEF_BOUNDARIES_WEST_SPONGE_FRICTION_CD
-   character(*), parameter :: D_NU = DEF_BOUNDARIES_WEST_SPONGE_DIFFUSION_NU
-   character(*), parameter :: D_PML_R = DEF_BOUNDARIES_WEST_SPONGE_PML_R_TARGET
-   character(*), parameter :: D_PML_HG = DEF_BOUNDARIES_WEST_SPONGE_PML_H_GATE
-   character(*), parameter :: D_PML_W = DEF_BOUNDARIES_WEST_SPONGE_PML_WIDTH
-   character(*), parameter :: D_PML_CD = DEF_BOUNDARIES_WEST_SPONGE_PML_CD
+   ! sponge defaults are identical across the four faces (registry per_face
+   ! block), so one literal each stands in for all
+   character(*), parameter :: D_WIDTH = "0.0"
+   character(*), parameter :: D_R = "0.85"
+   character(*), parameter :: D_A = "5.0"
+   character(*), parameter :: D_CD = "0.0"
+   character(*), parameter :: D_NU = "0.1"
+   character(*), parameter :: D_PML_R = "0.001"
+   character(*), parameter :: D_PML_HG = "2.0"
+   character(*), parameter :: D_PML_W = "0.0"
+   character(*), parameter :: D_PML_CD = "10.0"
 
    character(5), parameter :: FACE_KEY(4) = ['west ', 'east ', 'south', 'north']
 

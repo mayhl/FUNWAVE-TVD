@@ -1,24 +1,21 @@
 #!/usr/bin/env python3
-"""Generate Fortran config-defaults constants from src/model/registry.yaml.
+"""Check src/model/registry.yaml against the code it describes, and render its docs table.
 
-The registry is the single source of truth for YAML parameter defaults
-(see .private_docs/STANDARDS.md).  The generated module is COMMITTED to the
-repo so Fortran builds never depend on Python; run this script after editing
-registry.yaml and commit both files together.
+The code is the source of truth: the hand-written readers carry every default
+as the string literal at its read site, and field_metadata.f90 carries the CF
+attributes the NetCDF writer stamps.  The registry is a DESCRIPTIVE catalog of
+the same facts (plus legacy names, units and doc strings the code has no place
+for), so nothing here emits Fortran; `--check` fails when the two disagree,
+naming the key, and the only file written is docs/guide/config_reference.md.
 
-The registry is a DESCRIPTIVE metadata catalog, NOT a schema code is generated
-from: the hand-written readers are the source of truth for config structure and
-validation.  This script only reads defaults out of the registry to emit the
-DEF_ constants; it does not generate readers.
-
-Registry v2 reshapes the flat `parameters:` list into a hierarchical `sections:`
-tree (readability/de-dup + docs/example-config generation).  Both are read here;
-a section key's default emits the same DEF_ constant it did as a flat parameter.
+Registry v2 is a hierarchical `sections:` tree (flat `keys:` maps with dotted
+sub-paths, `per_face:` templating for the four boundaries); the flat
+`parameters:` list is still read for completeness.
 
 Usage:
-    uv run tools/gen_registry.py            # regenerate in place
-    uv run tools/gen_registry.py --check    # verify committed file is in sync
-                                              # (exit 1 + diff if stale)
+    uv run tools/gen_registry.py            # regenerate config_reference.md
+    uv run tools/gen_registry.py --check    # verify the readers, field_metadata.f90
+                                              # and the committed docs table agree
 """
 
 from __future__ import annotations
@@ -33,45 +30,21 @@ import yaml
 
 REPO = Path(__file__).resolve().parent.parent
 REGISTRY = REPO / "src" / "model" / "registry.yaml"
-OUTPUT = REPO / "src" / "model" / "config_defaults.f90"
+READERS = REPO / "src" / "model" / "2d"
 DOCS_OUTPUT = REPO / "docs" / "guide" / "config_reference.md"
 META_OUTPUT = REPO / "src" / "model" / "field_metadata.f90"
 
 # character component length of type_var_meta (core output_channel.f90)
 META_LEN = 64
 
-HEADER = """\
-! allow(E001)
-! =================================================================
-!  GENERATED FILE — DO NOT EDIT.
-!  Source:    src/model/registry.yaml
-!  Generator: tools/gen_registry.py   (rerun after registry edits)
-!  Sync test: tools/gen_registry.py --check
-! =================================================================
-!> @file config_defaults.f90
-!> @brief Generated YAML-parameter default constants (registry single source).
-module model_config_defaults_mod
-   implicit none
-   public
-
-"""
-
-FOOTER = "\nend module model_config_defaults_mod\n"
-
 
 def fortran_default(value) -> str | None:
-    """Render a registry default as the string the yaml readers expect."""
+    """Render a registry default as the string a read site carries."""
     if value is None:
         return None
     if isinstance(value, bool):
         return "YES" if value else "NO"
     return str(value)
-
-
-def const_name(yaml_path: str) -> str:
-    section, key = yaml_path.split(".", 1)
-    key = re.sub(r"[^A-Za-z0-9]", "_", key)
-    return f"DEF_{section.upper()}_{key.upper()}"
 
 
 def _subst(value, face: str):
@@ -143,72 +116,6 @@ def validate(reg: dict) -> list[str]:
             elif '"' in str(s):
                 errors.append(f"variable {v.get('name')}: {field} contains a double quote")
     return errors
-
-
-def generate(reg: dict) -> str:
-    lines = [HEADER]
-    params = sorted(all_params(reg), key=lambda p: p["yaml_path"])
-    section = None
-    for p in params:
-        default = fortran_default(p.get("default"))
-        if default is None:
-            continue  # no default -> reader handles absence itself
-        sec = p["yaml_path"].split(".")[0]
-        if sec != section:
-            lines.append(f"   ! ── {sec} ──\n")
-            section = sec
-        name = const_name(p["yaml_path"])
-        lines.append(f'   character(*), parameter :: {name} = "{default}"\n')
-    lines.append(FOOTER)
-    return "".join(lines)
-
-
-META_HEADER = """\
-! allow(E001)
-! =================================================================
-!  GENERATED FILE — DO NOT EDIT.
-!  Source:    src/model/registry.yaml
-!  Generator: tools/gen_registry.py   (rerun after registry edits)
-!  Sync test: tools/gen_registry.py --check
-! =================================================================
-!> @file field_metadata.f90
-!> @brief Generated CF attribute catalog for output field variables.
-module model_field_metadata_mod
-   use core_output_channel_mod, only: type_var_meta
-   implicit none
-   public
-
-contains
-
-   !> To look up CF variable attributes by registry field name; an
-   !> uncataloged name returns blank meta, which the writer renders
-   !> as no attrs.
-   pure function field_meta(name) result(m)
-      character(*), intent(in) :: name
-      type(type_var_meta) :: m
-
-      select case (trim(name))
-"""
-
-META_FOOTER = """\
-      end select
-   end function field_meta
-
-end module model_field_metadata_mod
-"""
-
-
-def generate_metadata(reg: dict) -> str:
-    """Render the variables catalog as the field_meta lookup (registry order)."""
-    lines = [META_HEADER]
-    for v in reg.get("variables", []):
-        lines.append(f'      case ("{v["name"]}")\n')
-        lines.append(f'         m%units = "{v["units"]}"\n')
-        lines.append(f'         m%long_name = "{v["long_name"]}"\n')
-        if v.get("standard_name"):
-            lines.append(f'         m%standard_name = "{v["standard_name"]}"\n')
-    lines.append(META_FOOTER)
-    return "".join(lines)
 
 
 DOCS_HEADER = """\
@@ -332,6 +239,86 @@ def _subst_meta(meta: dict) -> dict:
     return out
 
 
+# reader module per registry section; the stem is the section name except
+# where the module is named for what it holds rather than its deck block
+READER_OF = {"grid": "geometry", "dispersion": "physics", "hot_start": "hotstart"}
+# a presence-derived key (registry default ~) is read against a sentinel the
+# code then tests for absence; these are the sentinels in use
+SENTINELS = {"", "-999999.0"}
+
+
+def _statements(path: Path) -> list[str]:
+    """Source lines with Fortran continuations joined, so a read call is one string."""
+    out, buf = [], ""
+    for line in path.read_text().splitlines():
+        code = line.split("!", 1)[0] if '"' not in line else line
+        buf += code.rstrip()
+        if buf.endswith("&"):
+            buf = buf[:-1]
+            continue
+        out.append(buf)
+        buf = ""
+    return out
+
+
+def check_reader_defaults(reg: dict) -> list[str]:
+    """Every `default="..."` at a read site must equal the registry default of that key.
+
+    The key at a read site is a leaf (the sub-block objects carry no path), so
+    it is matched against every registry path in the module's section ending in
+    that leaf -- per-face keys share one default by construction.
+    """
+    by_section: dict[str, dict[str, set[str | None]]] = {}
+    for p in section_params(reg):
+        section, leaf = p["yaml_path"].split(".", 1)[0], p["yaml_path"].rsplit(".", 1)[-1]
+        by_section.setdefault(section, {}).setdefault(leaf, set()).add(fortran_default(p["default"]))
+
+    errors = []
+    for section, keys in by_section.items():
+        path = READERS / f"{READER_OF.get(section, section)}.f90"
+        if not path.exists():
+            continue
+        for stmt in _statements(path):
+            for m in re.finditer(r'%read\(\s*"([^"]+)"(.*?)$', stmt):
+                leaf = m.group(1).rsplit(".", 1)[-1]
+                d = re.search(r'default\s*=\s*"([^"]*)"', m.group(2))
+                if d is None or leaf not in keys:
+                    continue
+                if d.group(1) not in keys[leaf] and not (None in keys[leaf] and d.group(1) in SENTINELS):
+                    want = ", ".join(sorted(str(v) for v in keys[leaf]))
+                    errors.append(f'{path.relative_to(REPO)}: {section}.{leaf} reads default "{d.group(1)}", registry says {want}')
+    return errors
+
+
+def check_field_meta(reg: dict) -> list[str]:
+    """field_meta() and the registry `variables:` block must carry the same CF attributes."""
+    code: dict[str, dict[str, str]] = {}
+    name = None
+    for line in META_OUTPUT.read_text().splitlines():
+        m = re.match(r'\s*case \("([^"]+)"\)', line)
+        if m:
+            name = m.group(1)
+            code[name] = {}
+            continue
+        m = re.match(r'\s*m%(units|long_name|standard_name) = "([^"]*)"', line)
+        if m and name:
+            code[name][m.group(1)] = m.group(2)
+
+    errors = []
+    for v in reg.get("variables", []):
+        want = {k: str(v.get(k) or "") for k in ("units", "long_name", "standard_name")}
+        got = code.pop(v["name"], None)
+        if got is None:
+            errors.append(f"variable {v['name']}: in registry.yaml, not in field_metadata.f90")
+            continue
+        got = {k: got.get(k, "") for k in want}
+        if got != want:
+            errors.append(f"variable {v['name']}: field_metadata.f90 {got} vs registry {want}")
+    for name in code:
+        errors.append(f"variable {name}: in field_metadata.f90, not in registry.yaml")
+    return errors
+
+
 def _check_one(path: Path, new: str) -> bool:
     old = path.read_text() if path.exists() else ""
     if old == new:
@@ -360,21 +347,18 @@ def main() -> int:
             print(f"  - {e}", file=sys.stderr)
         return 2
 
-    new = generate(reg)
     new_docs = generate_docs(reg)
-    new_meta = generate_metadata(reg)
     if args.check:
-        ok = _check_one(OUTPUT, new)
-        ok = _check_one(DOCS_OUTPUT, new_docs) and ok
-        ok = _check_one(META_OUTPUT, new_meta) and ok
+        ok = _check_one(DOCS_OUTPUT, new_docs)
+        for problem in check_reader_defaults(reg) + check_field_meta(reg):
+            print(f"MISMATCH: {problem}", file=sys.stderr)
+            ok = False
+        if ok:
+            print("OK: readers and field_metadata.f90 agree with registry.yaml")
         return 0 if ok else 1
 
-    OUTPUT.write_text(new)
-    print(f"wrote {OUTPUT.relative_to(REPO)}")
     DOCS_OUTPUT.write_text(new_docs)
     print(f"wrote {DOCS_OUTPUT.relative_to(REPO)}")
-    META_OUTPUT.write_text(new_meta)
-    print(f"wrote {META_OUTPUT.relative_to(REPO)}")
     return 0
 
 

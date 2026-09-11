@@ -66,9 +66,6 @@ module model_subgrid_mod
    use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
 
-   use model_config_defaults_mod, only: DEF_SUBGRID_RATIO, &
-                                        DEF_SUBGRID_WRITE_POROSITY
-
    implicit none
 
    private
@@ -111,10 +108,10 @@ contains
 
       call sub_env%yaml%read("ratio", silent=no_key, &
                              val=this%ratio, &
-                             default=DEF_SUBGRID_RATIO)
+                             default="1")
       call sub_env%yaml%read("write_porosity", silent=no_key, &
                              val=this%out_porosity, &
-                             default=DEF_SUBGRID_WRITE_POROSITY)
+                             default="NO")
 
       call sub_env%yaml%read_input_path("depth_file", silent=no_key, &
                                         val=this%depth_subgrid_file)

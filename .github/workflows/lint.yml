@@ -12,7 +12,7 @@ jobs:
       - name: Install dependencies
         run: uv sync --group dev
 
-      - name: Check registry codegen sync
+      - name: Check registry against the code
         run: uv run tools/gen_registry.py --check
 
       # --strict turns every broken link, missing nav page and hook failure

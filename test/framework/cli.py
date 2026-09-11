@@ -142,8 +142,8 @@ def setup(workspace: str = typer.Argument("dev", help="Workspace name to initial
 
 
 @app.command()
-def registry(check: bool = typer.Option(True, "--check/--regen", help="verify (default) or regenerate config_defaults.f90")):
-    """Registry sync: config_defaults.f90 vs registry.yaml (tools/gen_registry.py)."""
+def registry(check: bool = typer.Option(True, "--check/--regen", help="verify (default) or regenerate config_reference.md")):
+    """Registry check: readers and field_metadata.f90 vs registry.yaml (tools/gen_registry.py)."""
     cmd = ["uv", "run", "tools/gen_registry.py"] + (["--check"] if check else [])
     raise typer.Exit(subprocess.run(cmd, cwd=PROJ_ROOT).returncode)
 

@@ -81,13 +81,6 @@ module model_output_mod
 
    use core_yaml_file_mod, only: type_yaml_reader
 
-   use model_config_defaults_mod, only: DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT, &
-                                        DEF_OUTPUT_DEPTH_OUT, &
-                                        DEF_OUTPUT_FORMAT, &
-                                        DEF_OUTPUT_LAYOUT, &
-                                        DEF_OUTPUT_MAX_FILE_SIZE, &
-                                        DEF_OUTPUT_RESULT_FOLDER
-
    implicit none
 
    private
@@ -284,27 +277,27 @@ contains
       if (allocated(this%geometries)) deallocate (this%geometries)
       if (is_empty) call env%log%exit_on_error( &
          "output: section is required -- at minimum one channels: entry")
-      call sub_env%yaml%read("result_folder", val=this%result_folder, default=DEF_OUTPUT_RESULT_FOLDER)
+      call sub_env%yaml%read("result_folder", val=this%result_folder, default="./output/")
       call sub_env%yaml%read("checkpoint", silent=no_key, val=this%checkpoint, default="")
       this%write_checkpoint = .not. no_key
-      call sub_env%yaml%read("format", val=this%format, default=DEF_OUTPUT_FORMAT)
+      call sub_env%yaml%read("format", val=this%format, default="binary")
       if (this%format /= "ascii" .and. this%format /= "binary" .and. &
           this%format /= "netcdf" .and. this%format /= "pnetcdf") &
          call env%log%exit_on_error("output: unknown format '"//this%format// &
                                     "' -- valid: ascii binary netcdf pnetcdf")
-      call sub_env%yaml%read("layout", val=this%layout, default=DEF_OUTPUT_LAYOUT)
+      call sub_env%yaml%read("layout", val=this%layout, default="chunked")
       if (this%layout /= "single" .and. this%layout /= "per_stream" .and. &
           this%layout /= "chunked") &
          call env%log%exit_on_error("output: unknown layout '"//this%layout// &
                                     "' -- valid: single per_stream chunked")
       call sub_env%yaml%read_positive("max_file_size", val=this%max_file_size, &
-                                      default=DEF_OUTPUT_MAX_FILE_SIZE)
+                                      default="50.0")
       ! no `default=` on purpose -- the fallback is not a constant: when the
       ! key is absent, resolve_blowup() computes the legacy-derived
       ! 100*max|Depth|, gated by has_blow_val
       call sub_env%yaml%read("blowup_threshold", silent=no_key, val=this%blowup_threshold)
       this%has_blow_val = .not. no_key
-      call sub_env%yaml%read("depth_out", val=this%depth_out, default=DEF_OUTPUT_DEPTH_OUT)
+      call sub_env%yaml%read("depth_out", val=this%depth_out, default="NO")
 
       ! stations: retired -- channels: supersedes it (x/y coords, not i j
       ! indices; one <name>_<var>.dat per variable instead of sta_NNNN)
@@ -335,7 +328,7 @@ contains
       if (.not. no_blk) then
          this%out_arr_time = .true.
          call blk_yaml%read("min_height", silent=no_key, val=this%arr_time_min_h, &
-                            default=DEF_OUTPUT_ARRIVAL_TIME_MIN_HEIGHT)
+                            default="0.001")
       end if
 
       ! geometries: + channels: point output streams
