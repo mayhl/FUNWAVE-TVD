@@ -22,10 +22,10 @@ simulation:
 initial:
   fields:
     eta: eta_ic.txt
-# the reservoir step is a bore from t = 0 (eta/h = 12): shock capturing
-# with its structural SWE gate, as in the source runs
+# the reservoir step is a bore from t = 0 (eta/h = 12); sediment runs on the
+# viscous breaker, which needs the SWE dispersion gate on to survive the front
 breaking:
-  model: shock_capturing
+  swe_gate: true
 friction:
   cd: 0.0025
 sediment:

@@ -20,8 +20,6 @@ numerics:
   cfl: 0.5
   froude_cap: 3.0
   min_depth: 0.01
-breaking:
-  model: shock_capturing
 output:
   format: ascii
   depth_out: true

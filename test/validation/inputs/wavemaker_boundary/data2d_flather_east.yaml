@@ -22,7 +22,6 @@ boundaries:
     sponge: {width: 160.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
   periodic: [y]
 numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
-breaking: {model: shock_capturing, Cbrk1: 0.65, Cbrk2: 0.35}
 output:
   channels:
     - name: sta

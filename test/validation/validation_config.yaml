@@ -345,30 +345,20 @@ simulations:
       synolakis:
         profiles: [profile_brk_t15.txt, profile_brk_t20.txt, profile_brk_t25.txt, profile_brk_t30.txt]
         profile_nrmse_pct: 10.0
+    # the same deck under both breaking closures; the viscous arm carries
+    # its own calibrated bounds where they differ
+    variants:
+      shock: { overrides: { breaking.model: shock_capturing } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { synolakis: { profile_nrmse_pct: 15.0 } } }
 
-  # wetdry_disp_ramp acceptance probe; anchors: worst 10.9
-  - name: lab_synolakis_brk_visc
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/synolakis
-    input_files: [synolakis_brk_visc.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, profiles, 1d, diagnostic]
-    postprocess:
-      synolakis: test.validation.oracles.synolakis
-    tolerances:
-      synolakis:
-        profiles: [profile_brk_t15.txt, profile_brk_t20.txt, profile_brk_t25.txt, profile_brk_t30.txt]
-        profile_nrmse_pct: 15.0
 
   # ── Hansen & Svendsen 1979: H(x) + setup(x), the breaking-closure rung ──
   # anchors: H 6.0-8.6; setup 18.7/31.1 spilling, 14.4/18.1 plunging
-  - name: lab_hs_spilling_shock
+  - name: lab_hs_spilling
     exe_type: validation-2d
     np: 2
     input: test/validation/inputs/hansen_svendsen
-    input_files: [hs_spilling_shock.yaml]
+    input_files: [hs_spilling.yaml]
     binary: funwave
     output_dir: output
     tags: [lab, surf, 1d]
@@ -382,31 +372,18 @@ simulations:
         window_s: [30.0, 100.0]
         height_nrmse_pct: 15.0
         setup_nrmse_pct: 30.0
+    # the same deck under both breaking closures; the viscous arm carries
+    # its own calibrated bounds where they differ
+    variants:
+      shock: { overrides: { breaking.model: shock_capturing } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_nrmse_pct: 40.0 } } }
 
-  - name: lab_hs_spilling_visc
+
+  - name: lab_hs_plunging
     exe_type: validation-2d
     np: 2
     input: test/validation/inputs/hansen_svendsen
-    input_files: [hs_spilling_visc.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, surf, 1d]
-    postprocess:
-      surf: test.validation.oracles.surf
-    tolerances:
-      surf:
-        heights: ht_setup_061071.txt
-        setup: ht_setup_061071.txt
-        channel: line
-        window_s: [30.0, 100.0]
-        height_nrmse_pct: 20.0
-        setup_nrmse_pct: 40.0
-
-  - name: lab_hs_plunging_shock
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/hansen_svendsen
-    input_files: [hs_plunging_shock.yaml]
+    input_files: [hs_plunging.yaml]
     binary: funwave
     output_dir: output
     tags: [lab, surf, 1d]
@@ -420,34 +397,21 @@ simulations:
         window_s: [30.0, 100.0]
         height_nrmse_pct: 15.0
         setup_nrmse_pct: 25.0
+    # the same deck under both breaking closures; the viscous arm carries
+    # its own calibrated bounds where they differ
+    variants:
+      shock: { overrides: { breaking.model: shock_capturing } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0 } } }
 
-  - name: lab_hs_plunging_visc
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/hansen_svendsen
-    input_files: [hs_plunging_visc.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, surf, 1d]
-    postprocess:
-      surf: test.validation.oracles.surf
-    tolerances:
-      surf:
-        heights: ht_setup_031041.txt
-        setup: ht_setup_031041.txt
-        channel: line
-        window_s: [30.0, 100.0]
-        height_nrmse_pct: 20.0
-        setup_nrmse_pct: 25.0
 
   # ── Ting & Kirby 1994: spilling/plunging cnoidal pair ───────────────────
   # 50 % gates = sinusoid-era tripwire; a cnoidal maker should reach ~20
   # anchors: spilling 21.8+49.4 / 17.4+47.4, plunging shock 22.4+36.3
-  - name: lab_tk_spilling_shock
+  - name: lab_tk_spilling
     exe_type: validation-2d
     np: 2
     input: test/validation/inputs/ting_kirby
-    input_files: [tk_spilling_shock.yaml]
+    input_files: [tk_spilling.yaml]
     binary: funwave
     output_dir: output
     tags: [lab, surf, 1d]
@@ -461,31 +425,18 @@ simulations:
         window_s: [100.0, 300.0]
         setup_nrmse_pct: 50.0
         height_nrmse_pct: 50.0
+    # the same deck under both breaking closures; the viscous arm carries
+    # its own calibrated bounds where they differ
+    variants:
+      shock: { overrides: { breaking.model: shock_capturing } }
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
 
-  - name: lab_tk_spilling_visc
+
+  - name: lab_tk_plunging
     exe_type: validation-2d
     np: 2
     input: test/validation/inputs/ting_kirby
-    input_files: [tk_spilling_visc.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, surf, 1d]
-    postprocess:
-      surf: test.validation.oracles.surf
-    tolerances:
-      surf:
-        heights: heights_spilling.txt
-        setup: setup_spilling.txt
-        channel: line
-        window_s: [100.0, 300.0]
-        setup_nrmse_pct: 50.0
-        height_nrmse_pct: 50.0
-
-  - name: lab_tk_plunging_shock
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/ting_kirby
-    input_files: [tk_plunging_shock.yaml]
+    input_files: [tk_plunging.yaml]
     binary: funwave
     output_dir: output
     tags: [lab, surf, 1d]
@@ -499,25 +450,12 @@ simulations:
         window_s: [150.0, 400.0]
         setup_nrmse_pct: 50.0
         height_nrmse_pct: 50.0
+    # the same deck under both breaking closures; the viscous arm carries
+    # its own calibrated bounds where they differ
+    variants:
+      shock: { overrides: { breaking.model: shock_capturing } }
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
 
-  - name: lab_tk_plunging_visc
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/ting_kirby
-    input_files: [tk_plunging_visc.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, surf, 1d]
-    postprocess:
-      surf: test.validation.oracles.surf
-    tolerances:
-      surf:
-        heights: heights_plunging.txt
-        setup: setup_plunging.txt
-        channel: line
-        window_s: [150.0, 400.0]
-        setup_nrmse_pct: 50.0
-        height_nrmse_pct: 50.0
 
   # ── Wavemaker fidelity: the h470 incident gauge as its own gated case ───
   # anchors: nrmse 8.6 over the 60-700 s window
@@ -566,10 +504,16 @@ simulations:
         sigma_rmse_pct: 8.5
         skew_rmse_pct: 30.0
         asym_rmse_pct: 15.0
+    # both closures: the viscous arm sharpens skewness (24 -> 12 %) and loosens
+    # the height variance (16 -> 24 %); its sigma bound follows the 09-11 board
+    variants:
+      shock: { overrides: { breaking.model: shock_capturing } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { gauges: { sigma_error_pct: 25.0 } } }
 
   # ── Kobayashi & Lawrence 2004: bed change under a breaking solitary wave ─
   # Wave 1 of the Fig 4.5 growth curves; CACR-16-02's own model matched emax
-  # and ran dmax ~half of measured, so the deposition gate stays inherited-loose
+  # and ran dmax ~half of measured, so the deposition gate stays inherited-loose.
+# Viscous breaker only: sediment is refused under shock_capturing
   - name: lab_kl_erosion
     exe_type: validation-2d
     np_pin: 4
@@ -587,14 +531,14 @@ simulations:
         wave: 1
         emax_rel_err_pct: 60.0
         dmax_rel_err_pct: 75.0
-    known_fail: 'swash erosion ~2.6x measured at the event window (deposition arm passes); chained per-wave increments track -- calibration rung open'
 
   # ── Pintado-Patino et al. 2016: dam-break swash over an erodible beach ──
   # Runs to 8.5 s — the paper's own comparison regime (before the reflected
   # bore, which the experiment's second gate blocked, reaches the beach).
   # Gates: profile NRMSE + the erosion-trough location; the deposition peak
   # reports ungated (measured settles fully, the model's suspended load is
-  # still aloft — CACR-16-02 p.69).
+  # still aloft — CACR-16-02 p.69).  Viscous breaker with swe_gate on: the
+  # front is a bore, and sediment is refused under shock_capturing.
   - name: lab_pp_dambreak
     exe_type: validation-2d
     np_pin: 2

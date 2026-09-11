@@ -74,6 +74,18 @@ class _SimTask:
     dev_stderr: str = ""
 
 
+def _merge_tolerances(base: dict, override: dict) -> dict:
+    """Per-postproc tolerance blocks merged one level deep: a variant overrides
+    single keys, inheriting the rest of its case's block."""
+    out = {k: dict(v) if isinstance(v, dict) else v for k, v in base.items()}
+    for key, block in override.items():
+        if isinstance(block, dict) and isinstance(out.get(key), dict):
+            out[key].update(block)
+        else:
+            out[key] = block
+    return out
+
+
 class RegressionRunner(BaseRunner):
     def __init__(self, reporter, provider):
         super().__init__(reporter)
@@ -232,6 +244,21 @@ class RegressionRunner(BaseRunner):
                     expanded.append(s)
             else:
                 expanded.append(dict(sim, case=sim["name"], deck=None))
+        # config variants: the same deck under a per-variant override set
+        # (e.g. both breaking closures), each with its own tolerance overrides
+        varied = []
+        for sim in expanded:
+            if "variants" not in sim:
+                varied.append(sim)
+                continue
+            for vname, spec in sim["variants"].items():
+                s = {k: v for k, v in sim.items() if k != "variants"}
+                s["name"] = f"{sim['name']}_{vname}"
+                s["variant"] = vname
+                s["overrides"] = {**(sim.get("overrides") or {}), **((spec or {}).get("overrides") or {})}
+                s["tolerances"] = _merge_tolerances(sim.get("tolerances") or {}, (spec or {}).get("tolerances") or {})
+                varied.append(s)
+        expanded = varied
         # decomp sweep: one variant per rank count; the group is aggregated
         # post-run into a spread-across-np invariance gate (_sweep_results)
         swept = []
@@ -941,6 +968,8 @@ class RegressionRunner(BaseRunner):
             # a sweep's aggregate row is named <group>_sweep
             sim = by_name.get(r.name) or by_group.get(r.name[: -len("_sweep")], {})
             parts = [sim["deck"]] if sim.get("deck") else []
+            if sim.get("variant"):
+                parts.append(sim["variant"])
             if r.name not in by_name:
                 parts.append("sweep")
             elif sim.get("sweep_group"):

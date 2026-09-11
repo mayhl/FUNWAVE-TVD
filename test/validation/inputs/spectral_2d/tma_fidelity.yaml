@@ -68,10 +68,6 @@ numerics:
   cfl: 0.5
   froude_cap: 1.0
   min_depth: 0.01
-breaking:
-  model: shock_capturing
-  Cbrk1: 0.65
-  Cbrk2: 0.35
 output:
   # 5 gauges ~2-3 lambda_p downwave of the source, spanning ~half a peak
   # wavelength (nee stations.txt i = 175..203, j = 3 at dx = dy = 2 m)

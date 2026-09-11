@@ -10,7 +10,6 @@ meteo:
   wind: {file: data/wind_ramp.txt, cd: 0.002}
 friction: {cd: 0.05}
 numerics: {cfl: 0.5, froude_cap: 3.0, min_depth: 0.01}
-breaking: {model: shock_capturing}
 output:
   format: ascii
   depth_out: true

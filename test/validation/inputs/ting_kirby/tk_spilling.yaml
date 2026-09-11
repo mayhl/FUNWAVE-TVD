@@ -1,5 +1,7 @@
-# Ting & Kirby plunging — eddy_viscosity arm; same flume/wavemaker as
-# tk_plunging_shock.
+# Ting & Kirby (1994) spilling — T = 2.0 s cnoidal, H = 0.125 m over the
+# h0 = 0.40 m flat, 1:35 slope.  Truth: setup + digitized heights here.
+# The lab paddle ran Goring cnoidal signals; a sinusoid stands in,
+# amplitude 0.0485 = 0.78 x H/2 calibrated at the reference gauge.
 
 grid:
   cell_size: [0.025, 0.2]
@@ -10,21 +12,21 @@ grid:
     slope: 0.02857142857
     x0: 20.0
 simulation:
-  title: lab_tk_plunging_visc
-  total_time: 400.0
+  title: lab_tk_spilling
+  total_time: 300.0
   screen_interval: 20.0
 wavemaker:
   spectrum:
     type: regular
-    amplitude: 0.050
-    period: 5.0
+    amplitude: 0.0485
+    period: 2.0
     direction: 0.0
   source:
-    x_center: 16.0
+    x_center: 14.0
     y_center: 0.3
     depth: 0.4
     delta: 0.5
-    time_ramp: 5.0
+    time_ramp: 2.0
 boundaries:
   west:
     sponge:
@@ -36,11 +38,6 @@ numerics:
   cfl: 0.5
   froude_cap: 10.0
   min_depth: 0.001
-breaking:
-  model: eddy_viscosity
-  # explicit diffusion source dies mid-run on ifx (nu_break over the
-  # stability bound); the split solve is unconditionally stable
-  solver: split_implicit
 output:
   result_folder: ./output/
   depth_out: true

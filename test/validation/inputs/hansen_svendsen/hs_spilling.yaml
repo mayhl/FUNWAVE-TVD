@@ -1,5 +1,7 @@
-# Hansen & Svendsen test 061071 — spilling, eddy_viscosity arm; same
-# flume/wavemaker as hs_spilling_shock.
+# Hansen & Svendsen (1979) test 061071 — spilling (T = 1.67 s, H0 = 0.067 m)
+# on the 1:34.26 slope, h0 = 0.36 m.  Truth: ht_setup_061071.txt.
+# No spilling benchmark deck shipped upstream: geometry mirrors the plunging
+# deck, amplitude 0.0317 is a first-station calibration.
 
 grid:
   cell_size: [0.025, 0.2]
@@ -10,7 +12,7 @@ grid:
     slope: 0.0292
     x0: 30.0
 simulation:
-  title: lab_hs_spilling_visc
+  title: lab_hs_spilling
   total_time: 100.0
   screen_interval: 10.0
 wavemaker:
@@ -36,8 +38,6 @@ numerics:
   cfl: 0.5
   froude_cap: 10.0
   min_depth: 0.001
-breaking:
-  model: eddy_viscosity
 output:
   result_folder: ./output/
   depth_out: true

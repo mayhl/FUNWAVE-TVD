@@ -33,8 +33,6 @@ initial:
     x_center: 5.0
 # shock-capturing as the source paper (CACR-16-02 rides Shi 2012 TVD);
 # at dx/h ~ 1/32 the viscous arms sit inside the bore-closure dx wall
-breaking:
-  model: shock_capturing
 friction:
   cd: 0.01
 sediment:

@@ -12,7 +12,7 @@ grid:
     slope: 0.02857142857
     x0: 20.0
 simulation:
-  title: lab_tk_plunging_shock
+  title: lab_tk_plunging
   total_time: 400.0
   screen_interval: 20.0
 wavemaker:
@@ -38,8 +38,6 @@ numerics:
   cfl: 0.5
   froude_cap: 10.0
   min_depth: 0.001
-breaking:
-  model: shock_capturing
 output:
   result_folder: ./output/
   depth_out: true
