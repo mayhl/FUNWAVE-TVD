@@ -1,12 +1,7 @@
-# Linear-dispersion validation — fundamental seiche in a closed flat basin.
-# One half wavelength across L = Mglob*DX = 20 m, so k = pi/L; kh is set by the
-# depth alone (kh = k*DEPTH_FLAT), swept a..f = 0.31/0.94/1.88/2.83/4.00/12.57.  Small
-# amplitude keeps it linear; no friction/breaking/sponge so only dispersion
-# sets the oscillation period (checked vs the Nwogu relation).
-# FUNWAVE-TVD input — converted from legacy input.txt
-# Source: test/validation/inputs/dispersion_2d/kh_c.txt
-#
-# No unrecognised keys.
+# Linear dispersion: the fundamental seiche of a closed flat basin, 20 m long,
+# so k = pi/L and kh follows from the depth alone.  Small amplitude keeps it
+# linear; no friction, breaking or sponge, so dispersion alone sets the period.
+# This deck: depth 12.0 m, kh = 1.88.
 
 grid:
   cell_size: [0.2, 0.2]

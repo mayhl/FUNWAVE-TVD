@@ -42,6 +42,7 @@ from rich.table import Table
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
 from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import new_figure, save_figure
 
 _console = Console()
 ACCEPTED_KEYS = ("period_error_pct",)
@@ -192,17 +193,49 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     passed = math.isfinite(err_pct) and err_pct < tol_pct
 
     metrics = [
-        MetricResult("dispersion", "kh", kh, True, math.inf),
-        MetricResult("dispersion", "T_measured_s", T_meas, True, math.inf),
-        MetricResult("dispersion", "T_nwogu_s", T_bous, True, math.inf),
-        MetricResult("dispersion", "T_airy_s", T_airy, True, math.inf),
-        MetricResult("dispersion", "period_err_pct", err_pct, passed, tol_pct),
+        MetricResult("dispersion", "kh", kh, True, math.inf, label="$kh$"),
+        MetricResult("dispersion", "T_measured_s", T_meas, True, math.inf, label=r"$T_{\mathrm{measured}}$ (s)"),
+        MetricResult("dispersion", "T_nwogu_s", T_bous, True, math.inf, label=r"$T_{\mathrm{Nwogu}}$ (s)"),
+        MetricResult("dispersion", "T_airy_s", T_airy, True, math.inf, label=r"$T_{\mathrm{Airy}}$ (s)"),
+        MetricResult("dispersion", "period_err_pct", err_pct, passed, tol_pct, label="period error (%)"),
     ]
 
     if verbose or not passed:
         _print_table(h, lx, kh, beta_ref, T_bous, T_airy, T_meas, err_pct, tol_pct, passed, scheme, T_target)
 
-    return SubsectionResult(kind="statistics", label="Linear Dispersion", metrics=metrics)
+    figure = _seiche_figure(sta, t_start, kh, T_meas, T_target, T_airy, scheme, plots_dir)
+    return SubsectionResult(kind="statistics", label="Linear Dispersion", metrics=metrics, figures=[figure])
+
+
+def _seiche_figure(sta, t_start, kh, T_meas, T_target, T_airy, scheme, plots_dir):
+    """The gauge trace the period came from, with the fit window and the theory periods.
+
+    A clean sinusoid under the shaded window is the whole point: the period is
+    only as good as the oscillation it was read off, and a start-up transient or
+    a beat would show here before it showed in the number.
+    """
+    t, eta = sta[:, 0], sta[:, 1]
+    fig, (ax,) = new_figure(nrows=1, height_per_row=2.8)
+    ax.plot(t, eta, "-", color="#2563eb", lw=1.0, label="gauge eta")
+    ax.axvspan(t_start, t[-1], color="#94a3b8", alpha=0.15, lw=0, label="fit window")
+    # one measured period, bracketed from the first upward zero crossing in the window
+    sel = t >= t_start
+    ts, es = t[sel], eta[sel] - eta[sel].mean()
+    up = np.where((es[:-1] <= 0.0) & (es[1:] > 0.0))[0]
+    if len(up) and math.isfinite(T_meas):
+        t0 = float(ts[up[0]])
+        y = 1.05 * float(np.abs(es).max())
+        ax.annotate("", xy=(t0 + T_meas, y), xytext=(t0, y), arrowprops=dict(arrowstyle="<->", color="#dc2626", lw=1.0))
+        ax.text(t0 + 0.5 * T_meas, y, f"T = {T_meas:.3f} s", color="#dc2626", ha="center", va="bottom", fontsize=8)
+        target = "NSWE c = sqrt(gh)" if scheme == "nswe" else "Nwogu"
+        ax.axvline(t0 + T_target, color="#dc2626", ls="--", lw=0.8, label=f"{target} T = {T_target:.3f} s")
+        ax.axvline(t0 + T_airy, color="#16a34a", ls=":", lw=0.8, label=f"Airy T = {T_airy:.3f} s")
+    ax.set_xlabel("t (s)")
+    ax.set_ylabel("eta (m)")
+    ax.set_title(f"seiche at the antinode gauge, kh = {kh:.2f}", fontsize=10)
+    ax.grid(alpha=0.3)
+    ax.legend(loc="upper right", fontsize=8)
+    return save_figure(fig, plots_dir, "seiche", "seiche period at the gauge")
 
 
 def _print_table(

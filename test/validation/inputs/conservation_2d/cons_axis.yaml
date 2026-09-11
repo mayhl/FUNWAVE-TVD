@@ -4,10 +4,6 @@
 # continuity or energy bookkeeping shows up as a drift difference vs the diagonal case.
 # The oracle integrates the ETA/U/V frames and checks volume + energy drift.
 # L = Mglob*DX = 20 m, h = 2 m -> kh ~ 1.57.
-# FUNWAVE-TVD input — converted from legacy input.txt
-# Source: test/validation/inputs/conservation_2d/cons_axis.txt
-#
-# No unrecognised keys.
 
 grid:
   cell_size: [0.2, 0.2]

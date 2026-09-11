@@ -12,6 +12,7 @@ class MetricResult:
     value: float
     passed: bool
     tolerance: float
+    label: str = ""  # display name for the docs (LaTeX allowed); stat when empty
 
 
 @dataclass

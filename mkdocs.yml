@@ -92,14 +92,9 @@ nav:
     - Standing Wave:
       - Walkthrough: examples/standing_wave/index.md
       - Analysis: examples/standing_wave/analysis.md
-  - Validation:
-    - Overview: validation/index.md
-    - Analytic:
-      - Overview: validation/analytic/index.md
-      - Linear dispersion: validation/analytic/dispersion_2d.md
-    - Lab:
-      - Overview: validation/lab/index.md
-      - Synolakis runup (viscous): validation/lab/lab_synolakis_brk_visc.md
+  # placeholder: docs/hooks.py replaces this entry with one row per case in
+  # test/validation/validation_config.yaml at build
+  - Validation: validation/index.md
   - Benchmarks:
     - Overview: benchmarks/index.md
   - API Reference: api/index.md

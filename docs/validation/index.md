@@ -21,6 +21,3 @@ flowchart LR
 
 - [Analytic](analytic/index.md) — closed-form, convergence and conservation oracles
 - [Lab](lab/index.md) — published laboratory experiments
-
-!!! note "Under construction"
-    Generation is not wired yet; the section pages are placeholders.

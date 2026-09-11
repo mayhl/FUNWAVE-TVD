@@ -9,6 +9,8 @@
 #   FUNWAVE_REGRESSION_CONFIG=test/validation/validation_config.yaml \
 #     uv run python -m test.framework.cli regression
 
+tier: validation
+
 executables:
   validation-2d:
     cmake_flags: [ZERO_PHASE=ON]
@@ -23,6 +25,7 @@ simulations:
     np: 4
     input: test/validation/inputs/dispersion_2d
     input_files: [kh_a.yaml, kh_b.yaml, kh_c.yaml, kh_d.yaml, kh_e.yaml, kh_f.yaml]
+    labels: { kh_a: "$kh = 0.31$", kh_b: "$kh = 0.94$", kh_c: "$kh = 1.88$", kh_d: "$kh = 2.83$", kh_e: "$kh = 4.00$", kh_f: "$kh = 12.57$" }
     binary: funwave
     output_dir: output
     tags: [validation, 2d, dispersion]

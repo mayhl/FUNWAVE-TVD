@@ -15,11 +15,9 @@ jobs:
       - name: Check registry codegen sync
         run: uv run tools/gen_registry.py --check
 
-      - name: Check validation docs sync
-        run: uv run tools/gen_validation_docs.py --check
-
       # --strict turns every broken link, missing nav page and hook failure
-      # into a red build; the docs tree is gated here, not by prettier
+      # into a red build; the docs tree is gated here, not by prettier, and
+      # the validation pages are generated inside this build, never committed
       - name: Build docs
         run: uv run mkdocs build --strict
 

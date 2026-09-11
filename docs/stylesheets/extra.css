@@ -2,3 +2,9 @@
 .md-content {
   max-width: 1000px;
 }
+
+/* Long code blocks (transcluded decks, the config reference) scroll in place
+   instead of running the page */
+.md-typeset pre > code {
+  max-height: 28rem;
+}

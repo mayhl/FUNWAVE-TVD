@@ -10,6 +10,7 @@ import importlib
 import traceback
 import copy
 from collections import deque
+from datetime import datetime
 from dataclasses import dataclass
 from pathlib import Path
 import yaml
@@ -85,6 +86,9 @@ class RegressionRunner(BaseRunner):
         self._refs = config.get("refs", {})
         self.executables = self._normalize_executables(config["executables"])
         self.simulations = config["simulations"]
+        # suite identity carried into the results record (regression = two-repo
+        # byte comparison, validation = oracle); names the report file too
+        self.tier = config.get("tier", "regression")
         # Auto rank-sizing dial (see _auto_np); config field, default debug (K=13).
         self._np_K = float(config.get("np_sizing", {}).get("K") or _DEFAULT_NP_K)
 
@@ -221,9 +225,13 @@ class RegressionRunner(BaseRunner):
                     s["input_file"] = ifile
                     s["curr_input"] = f"{stem}.yaml"
                     s["name"] = f"{sim['name']}_{stem}"
+                    # the results record keys rows by the config case, not
+                    # the expanded run name
+                    s["case"] = sim["name"]
+                    s["deck"] = stem if len(sim["input_files"]) > 1 else None
                     expanded.append(s)
             else:
-                expanded.append(sim)
+                expanded.append(dict(sim, case=sim["name"], deck=None))
         # decomp sweep: one variant per rank count; the group is aggregated
         # post-run into a spread-across-np invariance gate (_sweep_results)
         swept = []
@@ -893,6 +901,69 @@ class RegressionRunner(BaseRunner):
             self.reporter.warn(result_line)
         return result
 
+    def _results_record(self, simulations, sim_results, report_base, dev_branch, dev_hash, exe_dirs, ref_hashes) -> dict:
+        """The board's results record: tier + provenance + one row per sim.
+
+        No hostnames and no run directories -- pages generated from this are
+        tracked, and a stored path is one machine's layout.  Figure paths are
+        relative to the report file, so the record travels with the
+        workspaces/ tree it describes.
+        """
+        by_name = {s["name"]: s for s in simulations}
+        by_group = {s["sweep_group"]: s for s in simulations if s.get("sweep_group")}
+        ref_branches = sorted({exe_dirs[t][2] for t in exe_dirs if exe_dirs[t][2]})
+        ref = (
+            {"branch": ", ".join(ref_branches), "sha": ", ".join(sorted(h for h in ref_hashes.values() if h))}
+            if ref_branches
+            else None
+        )
+        rows = []
+        for r in sim_results:
+            # variant = the deck (multi-deck cases) and/or the rank pin (sweeps);
+            # a sweep's aggregate row is named <group>_sweep
+            sim = by_name.get(r.name) or by_group.get(r.name[: -len("_sweep")], {})
+            parts = [sim["deck"]] if sim.get("deck") else []
+            if r.name not in by_name:
+                parts.append("sweep")
+            elif sim.get("sweep_group"):
+                parts.append(f"np{sim['np_pin']}")
+            case, variant = sim.get("case", r.name), "_".join(parts) or None
+            rows.append(
+                {
+                    "case": case,
+                    "variant": variant,
+                    "name": r.name,
+                    "status": r.status,
+                    "notes": r.notes.strip(),
+                    "metrics": [
+                        {
+                            "section": s.label,
+                            "variable": m.variable,
+                            "stat": m.stat,
+                            "value": m.value,
+                            "passed": m.passed,
+                            "tolerance": m.tolerance,
+                            "label": m.label,
+                        }
+                        for s in r.subsections
+                        for m in s.metrics
+                    ],
+                    "figures": [
+                        {"title": f.title, "path": os.path.relpath(f.png_path, report_base.parent)}
+                        for s in r.subsections
+                        for f in s.figures
+                        if f.png_path is not None
+                    ],
+                }
+            )
+        return {
+            "tier": self.tier,
+            "engine": {"branch": dev_branch, "sha": dev_hash},
+            "ref": ref,
+            "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
+            "results": rows,
+        }
+
     def _sweep_results(self, simulations, sim_results, verbose: bool) -> list[SimResult]:
         """Aggregate np_sweep variant groups into decomp-invariance results.
 
@@ -1083,32 +1154,14 @@ class RegressionRunner(BaseRunner):
         self._print_summary(sim_results)
 
         # machine-readable twin of the report (sweep collectors rank on
-        # metric VALUES; the HTML board is presentation-only).  Base is
-        # env-overridable so concurrent boards sharing one repo checkout
-        # do not clobber each other's report files.
-        report_base = Path(os.environ.get("FUNWAVE_REPORT_BASE", str(Path(self.repo_root) / "workspaces" / "regression_report")))
+        # metric VALUES, the docs hook renders case pages from it; the HTML
+        # board is presentation-only).  Base is env-overridable so concurrent
+        # boards sharing one repo checkout do not clobber each other's files.
+        report_base = Path(os.environ.get("FUNWAVE_REPORT_BASE", str(Path(self.repo_root) / "workspaces" / f"{self.tier}_report")))
         report_base.parent.mkdir(parents=True, exist_ok=True)
         report_base.with_suffix(".json").write_text(
             json.dumps(
-                [
-                    {
-                        "name": r.name,
-                        "status": r.status,
-                        "metrics": [
-                            {
-                                "section": s.label,
-                                "variable": m.variable,
-                                "stat": m.stat,
-                                "value": m.value,
-                                "passed": m.passed,
-                                "tolerance": m.tolerance,
-                            }
-                            for s in r.subsections
-                            for m in s.metrics
-                        ],
-                    }
-                    for r in sim_results
-                ],
+                self._results_record(simulations, sim_results, report_base, current_branch, curr_hash, exe_dirs, ref_hashes),
                 indent=1,
             )
         )
