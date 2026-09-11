@@ -12,8 +12,7 @@
 tier: validation
 
 executables:
-  validation-2d:
-    cmake_flags: [ZERO_PHASE=ON]
+  validation-2d: {}
 
 simulations:
   # ── linear dispersion: fundamental seiche vs the Nwogu relation ──────────
@@ -28,7 +27,7 @@ simulations:
     labels: { kh_a: "$kh = 0.31$", kh_b: "$kh = 0.94$", kh_c: "$kh = 1.88$", kh_d: "$kh = 2.83$", kh_e: "$kh = 4.00$", kh_f: "$kh = 12.57$" }
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, dispersion]
+    tags: [2d, dispersion]
     postprocess:
       dispersion: test.validation.oracles.dispersion
     tolerances:
@@ -47,7 +46,7 @@ simulations:
     input_files: [cons_diag.yaml, cons_axis.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, conservation]
+    tags: [2d, conservation]
     postprocess:
       conservation: test.validation.oracles.conservation
     tolerances:
@@ -66,7 +65,7 @@ simulations:
     input_files: [cons_lowkh.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, conservation]
+    tags: [2d, conservation]
     postprocess:
       conservation: test.validation.oracles.conservation
     tolerances:
@@ -87,7 +86,7 @@ simulations:
     input_files: [soliton_x.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, soliton, sweep]
+    tags: [2d, soliton, sweep]
     postprocess:
       soliton: test.validation.oracles.soliton
     tolerances:
@@ -110,7 +109,7 @@ simulations:
     input_files: [soliton_oblique.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, soliton, sweep]
+    tags: [2d, soliton, sweep]
     postprocess:
       soliton: test.validation.oracles.soliton
     tolerances:
@@ -136,7 +135,7 @@ simulations:
     input_files: [synolakis_nb.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, runup, sweep]
+    tags: [2d, runup, sweep]
     postprocess:
       runup: test.validation.oracles.runup
     tolerances:
@@ -164,7 +163,7 @@ simulations:
     input_files: [cg_periodic.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, runup]
+    tags: [2d, runup]
     postprocess:
       runup_cg: test.validation.oracles.runup_cg
     tolerances:
@@ -182,7 +181,7 @@ simulations:
     input_files: [scheme_fnl.yaml, scheme_wnl.yaml, scheme_lin.yaml, scheme_nswe.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, dispersion, schemes]
+    tags: [2d, dispersion, schemes]
     postprocess:
       dispersion: test.validation.oracles.dispersion
     tolerances:
@@ -199,7 +198,7 @@ simulations:
     input_files: [iso_50.yaml, iso_43.yaml, iso_34.yaml, iso_05.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, dispersion, isotropy]
+    tags: [2d, dispersion, isotropy]
     postprocess:
       dispersion: test.validation.oracles.dispersion
     tolerances:
@@ -219,7 +218,7 @@ simulations:
     input_files: [tma_fidelity.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, spectral]
+    tags: [2d, wavemaker, spectral]
     postprocess:
       spectral_fidelity: test.validation.oracles.spectral_fidelity
     tolerances:
@@ -247,7 +246,7 @@ simulations:
     input_files: [tma_grid.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    tags: [2d, wavemaker, spectral, wavemaker_spectrum]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -261,7 +260,7 @@ simulations:
     input_files: [jonswap_grid.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    tags: [2d, wavemaker, spectral, wavemaker_spectrum]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -275,7 +274,7 @@ simulations:
     input_files: [tma_sd.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    tags: [2d, wavemaker, spectral, wavemaker_spectrum]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -289,7 +288,7 @@ simulations:
     input_files: [tma_sd_eqe.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    tags: [2d, wavemaker, spectral, wavemaker_spectrum]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -303,7 +302,7 @@ simulations:
     input_files: [data2d.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, spectral, wavemaker_spectrum]
+    tags: [2d, wavemaker, spectral, wavemaker_spectrum]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -323,7 +322,7 @@ simulations:
     input_files: [synolakis_nb.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, profiles, 1d, local]
+    tags: [lab, profiles, 1d]
     postprocess:
       synolakis: test.validation.oracles.synolakis
     tolerances:
@@ -339,7 +338,7 @@ simulations:
     input_files: [synolakis_brk.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, profiles, 1d, local]
+    tags: [lab, profiles, 1d]
     postprocess:
       synolakis: test.validation.oracles.synolakis
     tolerances:
@@ -355,7 +354,7 @@ simulations:
     input_files: [synolakis_brk_visc.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, profiles, 1d, local, diagnostic]
+    tags: [lab, profiles, 1d, diagnostic]
     postprocess:
       synolakis: test.validation.oracles.synolakis
     tolerances:
@@ -372,7 +371,7 @@ simulations:
     input_files: [hs_spilling_shock.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -391,7 +390,7 @@ simulations:
     input_files: [hs_spilling_visc.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -410,7 +409,7 @@ simulations:
     input_files: [hs_plunging_shock.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -429,7 +428,7 @@ simulations:
     input_files: [hs_plunging_visc.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -451,7 +450,7 @@ simulations:
     input_files: [tk_spilling_shock.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -470,7 +469,7 @@ simulations:
     input_files: [tk_spilling_visc.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -489,7 +488,7 @@ simulations:
     input_files: [tk_plunging_shock.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -508,7 +507,7 @@ simulations:
     input_files: [tk_plunging_visc.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, surf, 1d, local]
+    tags: [lab, surf, 1d]
     postprocess:
       surf: test.validation.oracles.surf
     tolerances:
@@ -529,7 +528,7 @@ simulations:
     input_files: [mase_kirby_run2.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, gauges, wavemaker, 1d, local]
+    tags: [lab, gauges, wavemaker, 1d]
     postprocess:
       gauges: test.validation.oracles.gauges
     tolerances:
@@ -550,7 +549,7 @@ simulations:
     input_files: [mase_kirby_run2.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, gauges, 1d, local]
+    tags: [lab, gauges, 1d]
     postprocess:
       gauges: test.validation.oracles.gauges
     tolerances:
@@ -578,7 +577,7 @@ simulations:
     input_files: [kl_erosion.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, sediment, 1d, local]
+    tags: [lab, sediment, 1d]
     postprocess:
       morphology: test.validation.oracles.morphology
     tolerances:
@@ -603,7 +602,7 @@ simulations:
     input_files: [pp_dambreak.yaml]
     binary: funwave
     output_dir: output
-    tags: [lab, sediment, 1d, local]
+    tags: [lab, sediment, 1d]
     postprocess:
       morphology: test.validation.oracles.morphology
     tolerances:
@@ -627,7 +626,7 @@ simulations:
     input_files: [wl_still.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, water_level, forcing, local]
+    tags: [2d, water_level, forcing]
     postprocess:
       still_water: test.validation.oracles.still_water
     tolerances:
@@ -648,7 +647,7 @@ simulations:
     input_files: [coosc.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, tide, flather, forcing, local]
+    tags: [2d, tide, flather, forcing]
     postprocess:
       flather_transmission: test.validation.oracles.flather_transmission
     tolerances:
@@ -662,7 +661,7 @@ simulations:
     input_files: [prog_etauv.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, tide, flather, forcing, local]
+    tags: [2d, tide, flather, forcing]
     postprocess:
       flather_transmission: test.validation.oracles.flather_transmission
     tolerances:
@@ -684,7 +683,7 @@ simulations:
     input_files: [prog_eta.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, tide, flather, forcing, sweep, local]
+    tags: [2d, tide, flather, forcing, sweep]
     postprocess:
       flather_transmission: test.validation.oracles.flather_transmission
     tolerances:
@@ -699,7 +698,7 @@ simulations:
     input_files: [prog_uvonly.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, tide, flather, forcing, local]
+    tags: [2d, tide, flather, forcing]
     postprocess:
       flather_transmission: test.validation.oracles.flather_transmission
     tolerances:
@@ -719,7 +718,7 @@ simulations:
     input_files: [wind_setup.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, meteo, wind, forcing, local]
+    tags: [2d, meteo, wind, forcing]
     postprocess:
       wind_setup: test.validation.oracles.wind_setup
     tolerances:
@@ -740,7 +739,7 @@ simulations:
     input_files: [data2d.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, forcing, local]
+    tags: [2d, wavemaker, boundary, forcing]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -763,7 +762,7 @@ simulations:
     input_files: [data2d_flather.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, flather, forcing, sweep, local]
+    tags: [2d, wavemaker, boundary, flather, forcing, sweep]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -788,7 +787,7 @@ simulations:
     input_files: [data2d_flather_east.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, flather, allbnd, forcing, local]
+    tags: [2d, wavemaker, boundary, flather, allbnd, forcing]
     postprocess:
       wavemaker_spectrum: test.validation.oracles.wavemaker_spectrum
     tolerances:
@@ -806,7 +805,7 @@ simulations:
     input_files: [data2d_genabs.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, genabs, forcing, sweep, local]
+    tags: [2d, wavemaker, boundary, genabs, forcing, sweep]
     postprocess:
       wavemaker_gen_abs: test.validation.oracles.wavemaker_gen_abs
     tolerances:
@@ -837,7 +836,7 @@ simulations:
     input_files: [data2d_varying.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, varying, forcing, local]
+    tags: [2d, wavemaker, boundary, varying, forcing]
     postprocess:
       wavemaker_boundary_varying: test.validation.oracles.wavemaker_boundary_varying
     tolerances:
@@ -858,7 +857,7 @@ simulations:
     input_files: [data2d_varying_nonper.yaml]
     binary: funwave
     output_dir: output
-    tags: [validation, 2d, wavemaker, boundary, varying, nonper, forcing, local]
+    tags: [2d, wavemaker, boundary, varying, nonper, forcing]
     postprocess:
       wavemaker_boundary_varying: test.validation.oracles.wavemaker_boundary_varying
     tolerances:

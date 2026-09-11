@@ -286,7 +286,7 @@ def render_index(group: str, sims: list[dict], by_case: dict[str, list[dict]]) -
         labels = sim.get("labels") or {}
         verdict = ", ".join(f"{run_label(r['variant'], labels)}: {r['status']}" for r in rows) if rows else "&mdash;"
         oracle = ", ".join(f"`{k}`" for k in (sim.get("postprocess") or {}))
-        tags = ", ".join(t for t in sim.get("tags", []) if t not in ("validation", group))
+        tags = ", ".join(t for t in sim.get("tags", []) if t != group)
         lines.append(f"| [{sim['name']}]({sim['name']}.md) | {oracle} | {tags} | {verdict} |")
     lines.append("")
     return "\n".join(lines) + "\n"
