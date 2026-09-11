@@ -261,6 +261,8 @@ class RegressionRunner(BaseRunner):
             if os.path.isfile(src) and item.endswith(".yaml"):
                 if item == sim.get("input_file"):
                     shutil.copy2(src, os.path.join(run_dir, item))
+                    if sim.get("overrides"):
+                        self._override_deck(os.path.join(run_dir, item), sim["overrides"])
                 continue
             if os.path.isfile(src) and item.endswith(".txt"):
                 dst = os.path.join(run_dir, item)
@@ -282,6 +284,22 @@ class RegressionRunner(BaseRunner):
             if os.path.exists(data_dst):
                 shutil.rmtree(data_dst)
             shutil.copytree(data_src, data_dst)
+
+    @staticmethod
+    def _override_deck(path, overrides):
+        """Set dotted keys on the STAGED copy of a deck (the tracked deck is the
+        real case; a suite may run it shorter or smaller, e.g. an example's
+        smoke gate).  Comments do not survive the round trip -- only the copy."""
+        with open(path) as f:
+            deck = yaml.safe_load(f) or {}
+        for dotted, value in overrides.items():
+            *parents, leaf = dotted.split(".")
+            node = deck
+            for key in parents:
+                node = node.setdefault(key, {})
+            node[leaf] = value
+        with open(path, "w") as f:
+            yaml.safe_dump(deck, f, sort_keys=False)
 
     def _preprocess(self, sim, run_dir):
         curr_input = sim.get("curr_input", sim["input_file"])

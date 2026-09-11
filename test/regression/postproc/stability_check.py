@@ -34,6 +34,14 @@ from test.regression.postproc.utils import read_run_metadata
 _DT_RE = re.compile(r"dt =\s*([0-9.Ee+-]+)")
 
 
+def _last_netcdf_frame(path: Path, variable: str) -> np.ndarray:
+    """Final record of a field variable from the single-file (layout: single) NetCDF."""
+    from netCDF4 import Dataset
+
+    with Dataset(path) as ds:
+        return np.array(ds["fields"][variable][-1, :, :], dtype=float)
+
+
 def run(
     ref_dir: str | Path | None,
     dev_dir: str | Path,
@@ -77,8 +85,9 @@ def run(
     # ---- final eta finite and bounded -------------------------------
     meta = read_run_metadata(dev_dir)
     eta_files = meta.output_files("eta")
-    if eta_files:
-        eta = meta.read_field(eta_files[-1])
+    single_nc = meta.output_dir / "output.nc"
+    if eta_files or single_nc.exists():
+        eta = meta.read_field(eta_files[-1]) if eta_files else _last_netcdf_frame(single_nc, "eta")
         finite = bool(np.isfinite(eta).all())
         max_abs = float(np.abs(eta[np.isfinite(eta)]).max()) if finite or np.isfinite(eta).any() else math.inf
         metrics.append(

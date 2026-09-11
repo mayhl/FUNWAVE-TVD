@@ -1,0 +1,33 @@
+# Examples suite -- the showcase decks, run short as a smoke gate.
+#
+# Each case is a deck users run by hand from its directory; the gate stages
+# the same deck with `overrides:` trimming the run so the whole suite stays
+# under a minute on two ranks, and stability_check asserts it stayed on the
+# stable branch (no reference: an example has no oracle, it has a duration).
+#
+# Run with:
+#   FUNWAVE_REGRESSION_CONFIG=examples/examples_config.yaml \
+#     uv run python -m test.framework.cli regression
+
+tier: examples
+
+executables:
+  examples-2d: {}
+
+simulations:
+  # one case, one deck per run: 02 is the deliberate-abort demo and has no
+  # gate; 05 previews unimplemented keys and does not run
+  - name: rip_2d
+    exe_type: examples-2d
+    np_pin: 2
+    input: examples/rip_2d
+    input_files: [01_basic.yaml, 03_channels_binary.yaml, 04_channels_netcdf.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [example, 2d, channels]
+    overrides: { simulation.total_time: 2.0 }
+    postprocess:
+      stability: test.regression.postproc.stability_check
+    # min_dt sits under the CFL-settled ~0.044; the rip is a few cm at 2 s
+    tolerances:
+      stability: { min_dt: 0.02, max_abs_eta: 5.0 }

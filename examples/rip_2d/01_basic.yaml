@@ -1,0 +1,70 @@
+# rip_2d — 1/5: bare-bones deck (ascii output)
+#
+# The minimum to run the rip-current case: a section is present only when the
+# run needs it (presence is the switch), and every omitted key falls to its
+# documented default (docs/guide/config_reference.md).  Omitted here and
+# defaulted: numerics: (cfl 0.5, adaptive dt), dispersion: (fully nonlinear),
+# friction:, initial: (cold start from still water).
+#
+# Run:  mpirun -n 4 <funwave> 01_basic.yaml
+# Output: ascii frames under output_01/ (eta_00001 ...), one file per variable
+# per frame; time_dt.out records the frame times.
+
+grid:
+  cell_size: [1.0, 2.0] # dx, dy (m) -> domain 512 x 500 m
+  bathymetry:
+    type: file
+    file: data/depth_a15.txt # barred beach, 5 rip channels (y period 100 m)
+    # no n_cells: the 512 x 250 domain is inferred from the file itself
+
+simulation:
+  title: rip_2d_basic
+  total_time: 200.0
+  screen_interval: 20.0 # console log cadence
+
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 1.0
+    gamma: 5.0
+    freq:
+      peak: 0.1 # Tp = 10 s
+      min: 0.03
+      max: 0.5
+    directional:
+      peak: 0.0
+      spread: 10.0
+    discretization:
+      freq_bins: 45
+      theta_bins: 24
+  source: # internal source line on the flat
+    x_center: 425.0
+    y_center: 0.0
+    depth: 13.0
+
+boundaries:
+  east:
+    sponge: # absorb behind the source
+      width: 60.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y] # bathy is y-periodic (100 m channel spacing)
+
+breaking:
+  model:
+    shock_capturing # NOTE: the default eddy_viscosity model dissipates
+    # through cbrk1/cbrk2 with the implicit solver; surf-zone
+    # demo cases pin shock_capturing for the sharper bores
+
+output:
+  result_folder: output_01/ # one folder per deck so the four runs coexist
+  depth_out: true # write the static bathymetry once
+  format: ascii # default is binary; ascii kept for human-readable demo output
+  channels:
+    - name: fields # channels own every stream; registry-name variables
+      geometry: field
+      variables: [eta, u, v]
+      interval: 20.0 # field frame cadence (s)

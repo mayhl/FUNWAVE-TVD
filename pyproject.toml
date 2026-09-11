@@ -84,6 +84,7 @@ line-ending = "auto"
 dev = [
     "cmake-format>=0.6.13",
     "fprettify>=0.3.7",
+    "netcdf4>=1.7",
 ]
 
 [tool.ruff.lint.isort]

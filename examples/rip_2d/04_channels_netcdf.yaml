@@ -1,0 +1,108 @@
+# rip_2d — 4/5: same as 03, netcdf output (one output.nc for everything)
+#
+# Identical physics and channel set to 03, with three differences:
+#   - layout: single puts the WHOLE run in one CF NetCDF file -- the field
+#     stream as a group plus one group per point channel, each with its own
+#     time dimension; windowed statistics carry CF cell_methods and a
+#     time_bnds window per record.  Inspect with: ncdump -h output_04/output.nc
+#   - the wg_rip gauges load from a coordinate file (wg_rip.xy, one "x y"
+#     pair per line in metres) -- the third geometry form beside inline
+#     x:/y: and named geometries:.  Point channels inherit netcdf from
+#     the deck format; add `format: ascii` on a channel to keep .dat files.
+#   - the bar_line transect omits n_points: -- absent, the line is sampled
+#     at the finest grid spacing, min(dx, dy).
+#
+# Gauge placement (from depth_a15.txt): shoreline x ~ 12 m, bar with rip
+# channels centred alongshore at y = 49/149/249/349/449 m; the strongest
+# alongshore variation (bar/channel contrast) sits at x ~ 111 m.
+#
+# Run:  mpirun -n 4 <funwave> 04_channels_netcdf.yaml
+
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [512, 250]
+  bathymetry:
+    type: file
+    file: data/depth_a15.txt
+
+simulation:
+  title: rip_2d_netcdf
+  total_time: 200.0
+  screen_interval: 20.0
+
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 1.0
+    gamma: 5.0
+    freq:
+      peak: 0.1
+      min: 0.03
+      max: 0.5
+    directional:
+      peak: 0.0
+      spread: 10.0
+    discretization:
+      freq_bins: 45
+      theta_bins: 24
+  source:
+    x_center: 425.0
+    y_center: 0.0
+    depth: 13.0
+
+boundaries:
+  east:
+    sponge:
+      width: 60.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0 # rip-jet limiter (default 3.0)
+  min_depth: 0.01
+
+breaking:
+  model: shock_capturing
+
+output:
+  result_folder: output_04/ # one folder per deck so the four runs coexist
+  format: netcdf
+  layout:
+    single # one output.nc: field group + a group per
+    # point channel (cell_methods + time_bnds
+    # annotate the windowed statistics)
+  depth_out: true
+
+  geometries:
+    - name: bar_line # cross-shore line over the BAR crest
+      type: transect # (y = 199 m, midway between rip channels)
+      start: [16.0, 199.0]
+      end:
+        [196.0, 199.0] # n_points omitted -> sampled at min(dx, dy)
+        # = 1 m here -> 181 points
+
+  channels:
+    - name: fields # the field stream as a group in output.nc
+      geometry: field
+      variables: [eta]
+      interval: 0.5 # video cadence -- see size note above
+
+    - name: wg_rip # same gauges as 03, but the coords come
+      type: station # from a file: one "x y" pair (m) per
+      file: data/wg_rip.xy # line -- exclusive with inline x:/y:
+      variables: [eta, u, v] # registry names (lowercase)
+      interval: 0.1 # snapshot channel: instantaneous rows
+
+    - name: bar_line # references the geometry above by name
+      geometry: bar_line
+      variables: [eta]
+      statistics: [mean, rms, max] # windowed channel: one row per 25 s
+      interval:
+        25.0 # window (mean -> setup, rms -> Hrms/2sqrt2,
+        # max -> crest envelope); the first window
+        # is dropped (spin-up sits inside it)

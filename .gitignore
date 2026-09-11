@@ -69,3 +69,11 @@ LOG.txt
 
 # generated docs artifacts: figures and clips pulled from a board bundle
 docs/_generated/
+
+# example run artifacts: decks and data are tracked, what a run writes is not
+examples/**/output_*/
+examples/**/run_*/
+examples/**/*.log
+examples/**/dump.bin
+examples/**/time_dt.out
+examples/funwave

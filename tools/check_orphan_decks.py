@@ -22,7 +22,11 @@ REPO = Path(__file__).resolve().parent.parent
 CONFIGS = (
     REPO / "test" / "regression" / "regression_config.yaml",
     REPO / "test" / "validation" / "validation_config.yaml",
+    REPO / "examples" / "examples_config.yaml",
 )
+# decks a suite cannot run by design: the deliberate-abort demo and the
+# preview of unimplemented keys
+EXEMPT = {"examples/rip_2d/02_error.yaml", "examples/rip_2d/05_future_preview.yaml"}
 
 
 def main() -> int:
@@ -33,9 +37,13 @@ def main() -> int:
                 referenced.add((REPO / sim["input"] / name).resolve())
     run_dirs = {p.parent for p in referenced}
 
-    tracked = subprocess.run(["git", "ls-files", "test/*/inputs/*.yaml"], cwd=REPO, capture_output=True, text=True, check=True)
+    tracked = subprocess.run(
+        ["git", "ls-files", "test/*/inputs/*.yaml", "examples/*.yaml"], cwd=REPO, capture_output=True, text=True, check=True
+    )
     orphans = sorted(
-        p for line in tracked.stdout.splitlines() if (p := (REPO / line).resolve()).parent in run_dirs and p not in referenced
+        p
+        for line in tracked.stdout.splitlines()
+        if line not in EXEMPT and (p := (REPO / line).resolve()).parent in run_dirs and p not in referenced
     )
     for p in orphans:
         print(f"ORPHAN: {p.relative_to(REPO)} -- its directory is run by a suite, this deck is not")

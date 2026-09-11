@@ -1,0 +1,102 @@
+# rip_2d — 3/5: point channels + statistics + high-cadence field (binary)
+#
+# Adds the two channel forms on top of 01_basic:
+#   - a named geometry (geometries:) referenced by a channel, and
+#   - a channel with its geometry inlined.
+# Field output is BINARY at video cadence: raw float64 frames, one file per
+# variable per frame (~1.0 MB/frame for eta at 512x250; 0.5 s over 200 s
+# -> 400 frames ~ 410 MB -- raise interval: to shrink).
+# Point channels are ascii .dat regardless of the field format (binary has
+# no point form): rows of t, v(1..n) in point order.
+#
+# Gauge placement (from depth_a15.txt): shoreline x ~ 12 m, bar with rip
+# channels centred alongshore at y = 49/149/249/349/449 m; the strongest
+# alongshore variation (bar/channel contrast) sits at x ~ 111 m.
+#
+# Run:  mpirun -n 4 <funwave> 03_channels_binary.yaml
+# Point files: output_03/wg_rip_eta.dat, wg_rip_u.dat, wg_rip_v.dat,
+#              bar_line_eta_mean.dat / _rms.dat / _max.dat
+
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [512, 250]
+  bathymetry:
+    type: file
+    file: data/depth_a15.txt
+
+simulation:
+  title: rip_2d_channels
+  total_time: 200.0
+  screen_interval: 20.0
+
+wavemaker:
+  spectrum:
+    type: tma
+    hm0: 1.0
+    gamma: 5.0
+    freq:
+      peak: 0.1
+      min: 0.03
+      max: 0.5
+    directional:
+      peak: 0.0
+      spread: 10.0
+    discretization:
+      freq_bins: 45
+      theta_bins: 24
+  source:
+    x_center: 425.0
+    y_center: 0.0
+    depth: 13.0
+
+boundaries:
+  east:
+    sponge:
+      width: 60.0
+      direct:
+        r: 0.85
+        a: 5.0
+      friction:
+        cd: 1.0
+  periodic: [y]
+
+numerics:
+  cfl: 0.5
+  froude_cap: 1.0 # rip-jet limiter (default 3.0)
+  min_depth: 0.01
+
+breaking:
+  model: shock_capturing
+
+output:
+  result_folder: output_03/ # one folder per deck so the four runs coexist
+  format: binary
+  depth_out: true
+  geometries:
+    - name: bar_line # cross-shore line over the BAR crest
+      type: transect # (y = 199 m, midway between rip channels)
+      start: [16.0, 199.0]
+      end: [196.0, 199.0]
+      n_points: 46 # every ~4 m across the surf zone
+
+  channels:
+    - name: fields # the field stream is a channel too
+      geometry: field
+      variables: [eta]
+      interval: 0.5 # video cadence -- see size note above
+
+    - name: wg_rip # inline geometry: gauges down the centre
+      type: station # rip channel (y = 249 m), surf zone ->
+      x: [60.0, 90.0, 111.0, 140.0, 180.0] # neck -> offshore jet
+      y: [249.0, 249.0, 249.0, 249.0, 249.0]
+      variables: [eta, u, v] # registry names (lowercase)
+      interval: 0.1 # snapshot channel: instantaneous rows
+
+    - name: bar_line # references the geometry above by name
+      geometry: bar_line
+      variables: [eta]
+      statistics: [mean, rms, max] # windowed channel: one row per 25 s
+      interval:
+        25.0 # window (mean -> setup, rms -> Hrms/2sqrt2,
+        # max -> crest envelope); the first window
+        # is dropped (spin-up sits inside it)

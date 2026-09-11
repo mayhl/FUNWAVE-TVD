@@ -1,0 +1,82 @@
+# rip_2d — 5/5: FUTURE OUTPUT PREVIEW — DOES NOT RUN
+#
+# Syntax preview of designed-but-not-implemented output features; the reader
+# will reject these keys today.  Kept as the target shape so decks written
+# now age into it.  Everything below composes with the existing geometries:/
+# channels: machinery.
+#
+# Status per block: [G] geometry generators, [A] analysis dispatch key,
+# [Z] diagnostics-zoo channel features.
+
+output:
+  channels:
+    - {name: fields, geometry: field, variables: [eta], interval: 20.0}
+  format: netcdf
+  layout: single
+
+  geometries:
+    # [G] wavelength-aware generators: layouts computed at init from the
+    # wave climate -- lambda from the dispersion relation at the anchor's
+    # LOCAL depth, heading/period/band inherited from the wavemaker
+    # (from_wavemaker) or given explicitly (period/wavelength/direction).
+    - name: wg_reflect
+      type: reflection_array       # [G] incident/reflected separation line
+      method: mansard_funke        #     (goda | multigauge_lsq for broadband)
+      anchor: [300.0, 250.0]
+      direction: 180.0             # gauge line lies ALONG the wave heading
+      from_wavemaker: true         # Tp -> lambda at local h -> spacings
+                                   # (0, lambda/10, lambda/4)
+
+    - name: wg_dir
+      type: direction_array        # [G] 2D patch for directional estimation
+      method: star                 #     multi-theta climates force isotropic
+      center: [256.0, 250.0]       #     layouts (cross/grid alias off-axis)
+      from_wavemaker: true         # spacing < lambda_min/2, aperture >= lambda_max
+
+    - name: harmonics_line
+      type: wavelength_line        # [G] spatial-FFT / harmonic separation
+      anchor: [350.0, 249.0]
+      direction: 180.0
+      n_lambdas: 3                 # span from lambda_MAX of the band,
+      points_per_lambda: 12        # density from lambda_MIN
+
+    - name: rip_neck_ring
+      type: circle                 # [Z] circular stencil (zoo)
+      center: [100.0, 249.0]
+      radius: 30.0
+      n_points: 24
+
+  channels:
+    - name: rip_cam
+      type: rect                   # [Z] 2D subsection ("subfield") window:
+      origin: [40.0, 190.0]        #     high-cadence frames over just the
+      size: [160.0, 120.0]         #     interesting region -- video output
+      variables: [eta]             #     without full-domain cost (rotated
+      interval: 0.1                #     rect and polygon follow)
+
+    - name: wg_reflect
+      geometry: wg_reflect
+      variables: [eta]
+      interval: 0.05
+      analysis: reflection         # [A] dispatch tag: validated at init
+                                   # (>= 3 collinear eta gauges), written as
+                                   # a group attr so funtools auto-dispatches
+
+    - name: runup
+      geometry: shoreline_line     # [Z] R2% runup: percentile statistics
+      variables: [eta]             #     via the in-model P^2 estimator
+      statistics: [max, p98]
+      interval: 50.0
+
+    - name: cv_flux
+      geometry: rip_neck_ring
+      variables: [p, q]
+      accumulate: flux             # [Z] conservative face-flux accumulator:
+      interval: 25.0               #     every-step line integral, not
+                                   #     point-sampled snapshots
+
+    - name: vlf
+      geometry: wg_rip
+      variables: [eta, u]
+      bandpass: [0.0005, 0.01]     # [Z] IIR bandpass channel (VLF rip
+      interval: 1.0                #     pulsation band, Hz)
