@@ -389,6 +389,9 @@ module model_sediment_mod
       ! between relaxations, so the output holds the last one); aval_accum is
       ! its running total
       real(SP), allocatable :: zb_aval(:, :), aval_accum(:, :)
+      ! restart stash: the stepper's face depths as sediment.bin carried them
+      ! (west/east x-faces, south/north y-faces), applied by restart_sync
+      real(SP), allocatable :: chk_face(:, :, :)
       real(SP) :: t_aval = ZERO
 
    contains

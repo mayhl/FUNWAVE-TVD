@@ -58,6 +58,7 @@ module model_stepper_2d_mod
    use model_tracer_mod, only: type_model_tracer
    use model_vessel_mod, only: type_model_vessel
    use model_sediment_mod, only: type_model_sediment
+   use model_geometry_mod, only: stagger_depth
    use model_meteo_mod, only: type_model_meteo
 
    use model_kernel_dispersion_mod, only: type_disp_workspace, &
@@ -1205,6 +1206,26 @@ contains
       call this%bc%exchange_state(this%grid, this%fields)
 
       associate (f => this%fields, phy => this%physics)
+         ! an evolved bed came back from sediment.bin interior-only; give it
+         ! the ghosts the morphology step leaves (the BC exchange, not a
+         ! replicate) before anything is derived from it
+         if (this%sediment%is_activated) call this%bc%exchange_scalar(this%grid, this%sediment%chh)
+         if (this%sediment%is_activated .and. this%sediment%bed_change) then
+            call this%bc%exchange_scalar(this%grid, f%depth)
+            call stagger_depth(this%grid%lp, f%depth, f%depth_x, f%depth_y)
+         end if
+         ! the face depths the kernels read are NOT restaggered from an
+         ! evolved bed (legacy parity: init.F sets DepthX/Y once); the
+         ! checkpoint carries them and they go back in place here
+         if (allocated(this%sediment%chk_face)) then
+            associate (lp => this%grid%lp, cf => this%sediment%chk_face)
+               this%depth_fx(lp%ib:lp%ie, lp%jb:lp%je) = cf(lp%ib:lp%ie, lp%jb:lp%je, 1)
+               this%depth_fx(lp%ie + 1, lp%jb:lp%je) = cf(lp%ie, lp%jb:lp%je, 2)
+               this%depth_fy(lp%ib:lp%ie, lp%jb:lp%je) = cf(lp%ib:lp%ie, lp%jb:lp%je, 3)
+               this%depth_fy(lp%ib:lp%ie, lp%je + 1) = cf(lp%ib:lp%ie, lp%je, 4)
+            end associate
+            deallocate (this%sediment%chk_face)
+         end if
          f%h = phy%Gamma3*f%eta + f%depth
          if (this%subgrid%is_activated) then
             call this%subgrid%update(f%eta)

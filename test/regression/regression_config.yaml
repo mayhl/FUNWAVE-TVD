@@ -212,9 +212,10 @@ simulations:
     tags: [hotstart, sediment]
     postprocess:
       field: test.regression.postproc.checkpoint_compare
+    # the sediment state round-trips to roundoff; the 1e-12 flow residual is
+    # the slope deck's own (present with sediment off), not the checkpoint's
     tolerances:
-      field: { default: 0.0, mask: 0.0, mask9: 0.0 }
-    known_fail: 'restart with sediment on drifts ~1e-6 in eta/p/q and 5e-7 in depth (board 367253); the bouss round-trip is bitwise'
+      field: { default: 1.0e-9, mask: 0.0, mask9: 0.0 }
 
   - name: hotstart_nswe
     test_type: self_consistency

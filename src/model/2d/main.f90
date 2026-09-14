@@ -650,19 +650,27 @@ contains
       if (dir(len(dir):len(dir)) /= "/") dir = dir//"/"
 
       associate (f => this%fields, sed => this%sediment, lp => this%grid%lp)
-         call read_checkpoint_sediment(this%env, this%grid, f%depth, sed%chh, &
-                                       sed%susp_load, sed%bed_load, dir, found)
+         call read_checkpoint_sediment(this%env, this%grid, f%depth, sed, dir, found)
          if (.not. found) return
 
          call ghost_fill_replicate(this, f%depth)
-         call ghost_fill_replicate(this, sed%chh)
+         ! chh ghosts come from the BC exchange in restart_sync, as every step leaves them
          call ghost_fill_replicate(this, sed%susp_load)
          call ghost_fill_replicate(this, sed%bed_load)
+         call ghost_fill_replicate(this, sed%c_sum)
+         call ghost_fill_replicate(this, sed%p_sum)
+         call ghost_fill_replicate(this, sed%d_sum)
+         call ghost_fill_replicate(this, sed%c_ave)
+         call ghost_fill_replicate(this, sed%p_ave)
+         call ghost_fill_replicate(this, sed%d_ave)
+         call ghost_fill_replicate(this, sed%aval_accum)
 
-         sed%zb = (f%depth - sed%depth_ini)/real(sed%morph_factor, SP)
+         ! zb as the morphology forms it (loads over 1-n, capped by the hard
+         ! bottom), not back out of depth -- the divide is not bitwise
+         sed%zb = min(-(sed%susp_load + sed%bed_load)/(1.0_SP - sed%n_porosity), sed%zs)
          sed%dchg_s = sed%susp_load/(1.0_SP - sed%n_porosity)
          sed%dchg_b = sed%bed_load/(1.0_SP - sed%n_porosity)
-         sed%ch = sed%chh/max(f%eta + f%depth, this%numerics%MinDepth)
+         call ghost_fill_replicate(this, sed%ch)
 
          call stagger_depth(lp, f%depth, f%depth_x, f%depth_y)
       end associate
@@ -671,9 +679,10 @@ contains
 
    ! Write the checkpoint set to output%checkpoint (mkdir + core.bin now; later
    ! per-module bins appended behind this dispatcher).
-   subroutine write_checkpoint_set(this, time)
+   subroutine write_checkpoint_set(this, time, depth_fx, depth_fy)
       class(type_model_main), intent(inout) :: this
       real(SP), intent(in) :: time
+      real(SP), intent(in) :: depth_fx(:, :), depth_fy(:, :)
 
       type(type_path) :: cdir
       character(:), allocatable :: dir
@@ -695,9 +704,8 @@ contains
 
       if (this%sediment%is_activated) &
          call write_checkpoint_sediment(this%env, this%env%comm, this%grid, &
-                                        this%fields%depth, this%sediment%chh, &
-                                        this%sediment%susp_load, &
-                                        this%sediment%bed_load, dir)
+                                        this%fields%depth, this%sediment, &
+                                        depth_fx, depth_fy, dir)
 
    end subroutine write_checkpoint_set
 
@@ -878,7 +886,8 @@ contains
 
          ! checkpoint the final state (this slice: end-of-run only)
          if (this%output%write_checkpoint) &
-            call write_checkpoint_set(this, engine%clock%current_time)
+            call write_checkpoint_set(this, engine%clock%current_time, &
+                                      stepper%depth_fx, stepper%depth_fy)
 
          call output_mgr%finalize()
       end if

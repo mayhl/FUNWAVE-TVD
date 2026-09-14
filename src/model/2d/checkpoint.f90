@@ -44,6 +44,7 @@ module model_checkpoint_mod
    use core_grid_mod, only: type_grid_2d
    use core_output_gatherer_mod, only: type_output_gatherer
    use model_fields_2d_mod, only: type_fields_2d
+   use model_sediment_mod, only: type_model_sediment
 
    implicit none
 
@@ -53,9 +54,14 @@ module model_checkpoint_mod
 
    ! Bump when the core.bin layout changes; read rejects an unknown version.
    integer, parameter :: CORE_VERSION = 3
-   ! sediment.bin: depth + the suspended/bed accumulators the morphology
-   ! cannot rebuild (zb, dchg, ch all derive from these + depth_ini)
-   integer, parameter :: SED_VERSION = 1
+   ! sediment.bin: depth, the suspended/bed accumulators the morphology
+   ! cannot rebuild (zb, dchg, ch all derive from these + depth_ini), and the
+   ! Morph_interval running window -- the partial sums, the last means the
+   ! morphology and the feedback terms read every step, and the avalanche
+   ! accumulator.  Without the window a restart integrates zero pickup until
+   ! the first window closes (measured 5e-7 in depth, 1e-6 in eta).
+   integer, parameter :: SED_VERSION = 2
+   integer, parameter :: SED_NFIELD = 18
 
 contains
 
@@ -115,66 +121,81 @@ contains
    end subroutine write_checkpoint_core
 
    ! Gather the sediment state interiors to the IO rank and write
-   ! <dir>sediment.bin: the evolved depth plus the two load accumulators
-   ! and the suspended mass -- everything zb/dchg/ch derive from.
-   subroutine write_checkpoint_sediment(env, comm, grid, depth, chh, susp_load, &
-                                        bed_load, dir)
+   ! <dir>sediment.bin: the evolved depth, the two load accumulators, the
+   ! suspended mass, and the Morph_interval window state.
+   subroutine write_checkpoint_sediment(env, comm, grid, depth, sed, depth_fx, depth_fy, dir)
       type(type_env), intent(inout) :: env
       type(type_comm), intent(inout) :: comm
       type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(in) :: depth(:, :), chh(:, :)
-      real(SP), intent(in) :: susp_load(:, :), bed_load(:, :)
+      real(SP), intent(in) :: depth(:, :)
+      type(type_model_sediment), intent(in) :: sed
+      ! the kernels' face depths: legacy never refreshes them after a bed
+      ! change, so they are state the restored bed cannot rebuild
+      real(SP), intent(in) :: depth_fx(:, :), depth_fy(:, :)
       character(*), intent(in) :: dir
 
       type(type_output_gatherer) :: g
-      real(SP), allocatable :: gd(:, :), gc(:, :), gs(:, :), gb(:, :)
-      integer :: unit
+      real(SP), allocatable :: gf(:, :, :)
+      integer :: unit, k, mloc, nloc
 
       call g%init_field(grid, comm)
-      call alloc_global(comm, grid, gd)
-      call alloc_global(comm, grid, gc)
-      call alloc_global(comm, grid, gs)
-      call alloc_global(comm, grid, gb)
-
-      call gather_interior(g, comm, grid, depth, gd)
-      call gather_interior(g, comm, grid, chh, gc)
-      call gather_interior(g, comm, grid, susp_load, gs)
-      call gather_interior(g, comm, grid, bed_load, gb)
+      call alloc_global_set(comm, grid, gf)
+      call gather_interior(g, comm, grid, depth, gf(:, :, 1))
+      call gather_interior(g, comm, grid, sed%chh, gf(:, :, 2))
+      call gather_interior(g, comm, grid, sed%susp_load, gf(:, :, 3))
+      call gather_interior(g, comm, grid, sed%bed_load, gf(:, :, 4))
+      call gather_interior(g, comm, grid, sed%c_sum, gf(:, :, 5))
+      call gather_interior(g, comm, grid, sed%p_sum, gf(:, :, 6))
+      call gather_interior(g, comm, grid, sed%d_sum, gf(:, :, 7))
+      call gather_interior(g, comm, grid, sed%c_ave, gf(:, :, 8))
+      call gather_interior(g, comm, grid, sed%p_ave, gf(:, :, 9))
+      call gather_interior(g, comm, grid, sed%d_ave, gf(:, :, 10))
+      call gather_interior(g, comm, grid, sed%aval_accum, gf(:, :, 11))
+      call gather_interior(g, comm, grid, sed%ch, gf(:, :, 12))
+      ! the stage-lagged source rates: the next stage's solve reads the
+      ! previous stage's pickup and deposition
+      call gather_interior(g, comm, grid, sed%pickup, gf(:, :, 17))
+      call gather_interior(g, comm, grid, sed%depo, gf(:, :, 18))
+      mloc = grid%lp%mloc
+      nloc = grid%lp%nloc
+      call gather_interior(g, comm, grid, depth_fx(1:mloc, :), gf(:, :, 13))
+      call gather_interior(g, comm, grid, depth_fx(2:mloc + 1, :), gf(:, :, 14))
+      call gather_interior(g, comm, grid, depth_fy(:, 1:nloc), gf(:, :, 15))
+      call gather_interior(g, comm, grid, depth_fy(:, 2:nloc + 1), gf(:, :, 16))
 
       if (comm%is_io_node()) then
          open (newunit=unit, file=trim(dir)//"sediment.bin", access="stream", &
                form="unformatted", status="replace", action="write")
-         write (unit) SED_VERSION, grid%M, grid%N
-         write (unit) gd, gc, gs, gb
+         write (unit) SED_VERSION, grid%M, grid%N, sed%t_sum
+         do k = 1, SED_NFIELD
+            write (unit) gf(:, :, k)
+         end do
          close (unit)
          call env%log%info("checkpoint: wrote "//trim(dir)//"sediment.bin")
       end if
-
       call g%finalize()
    end subroutine write_checkpoint_sediment
 
    ! Read <dir>sediment.bin and slice this subdomain's interior; absent bin
    ! => found = .false. and the module cold-inits (the mode-3 chaining
    ! policy).  Ghosts are the caller's job.
-   subroutine read_checkpoint_sediment(env, grid, depth, chh, susp_load, &
-                                       bed_load, dir, found)
+   subroutine read_checkpoint_sediment(env, grid, depth, sed, dir, found)
       type(type_env), intent(inout) :: env
       type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(inout) :: depth(:, :), chh(:, :)
-      real(SP), intent(inout) :: susp_load(:, :), bed_load(:, :)
+      real(SP), intent(inout) :: depth(:, :)
+      type(type_model_sediment), intent(inout) :: sed
       character(*), intent(in) :: dir
       logical, intent(out) :: found
 
-      real(SP), allocatable :: gd(:, :), gc(:, :), gs(:, :), gb(:, :)
+      real(SP), allocatable :: gf(:, :, :)
       character(:), allocatable :: fname
-      integer :: unit, ver, mm, nn
+      integer :: unit, ver, mm, nn, k
 
       fname = trim(dir)//"sediment.bin"
       inquire (file=fname, exist=found)
       if (.not. found) return
 
-      allocate (gd(grid%M, grid%N), gc(grid%M, grid%N), &
-                gs(grid%M, grid%N), gb(grid%M, grid%N))
+      allocate (gf(grid%M, grid%N, SED_NFIELD))
       open (newunit=unit, file=fname, access="stream", &
             form="unformatted", status="old", action="read")
       read (unit) ver, mm, nn
@@ -182,17 +203,34 @@ contains
          call env%log%exit_on_error("read_checkpoint_sediment: unknown version")
       if (mm /= grid%M .or. nn /= grid%N) &
          call env%log%exit_on_error("read_checkpoint_sediment: grid size mismatch")
-      read (unit) gd, gc, gs, gb
+      read (unit) sed%t_sum
+      do k = 1, SED_NFIELD
+         read (unit) gf(:, :, k)
+      end do
       close (unit)
 
       associate (lp => grid%lp, ib => grid%ibegin, ie => grid%istop, &
                  jb => grid%jbegin, je => grid%jstop)
-         depth(lp%ib:lp%ie, lp%jb:lp%je) = gd(ib:ie, jb:je)
-         chh(lp%ib:lp%ie, lp%jb:lp%je) = gc(ib:ie, jb:je)
-         susp_load(lp%ib:lp%ie, lp%jb:lp%je) = gs(ib:ie, jb:je)
-         bed_load(lp%ib:lp%ie, lp%jb:lp%je) = gb(ib:ie, jb:je)
+         depth(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 1)
+         sed%chh(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 2)
+         sed%susp_load(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 3)
+         sed%bed_load(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 4)
+         sed%c_sum(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 5)
+         sed%p_sum(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 6)
+         sed%d_sum(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 7)
+         sed%c_ave(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 8)
+         sed%p_ave(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 9)
+         sed%d_ave(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 10)
+         sed%aval_accum(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 11)
+         sed%ch(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 12)
+         sed%pickup(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 17)
+         sed%depo(lp%ib:lp%ie, lp%jb:lp%je) = gf(ib:ie, jb:je, 18)
+         if (allocated(sed%chk_face)) deallocate (sed%chk_face)
+         allocate (sed%chk_face(lp%mloc, lp%nloc, 4), source=0.0_SP)
+         do k = 1, 4
+            sed%chk_face(lp%ib:lp%ie, lp%jb:lp%je, k) = gf(ib:ie, jb:je, 12 + k)
+         end do
       end associate
-
    end subroutine read_checkpoint_sediment
 
    ! Read <dir>core.bin on every rank and slice this subdomain's interior into
@@ -259,6 +297,17 @@ contains
          allocate (glob(1, 1))
       end if
    end subroutine alloc_global
+
+   subroutine alloc_global_set(comm, grid, glob)
+      type(type_comm), intent(inout) :: comm
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), allocatable, intent(out) :: glob(:, :, :)
+      if (comm%is_io_node()) then
+         allocate (glob(grid%M, grid%N, SED_NFIELD))
+      else
+         allocate (glob(1, 1, SED_NFIELD))
+      end if
+   end subroutine alloc_global_set
 
    ! Slice the interior (drop the ghost frame) and gather to the IO rank.
    subroutine gather_interior(g, comm, grid, arr, glob)

@@ -40,19 +40,29 @@ def _read_core_bin(path: Path) -> tuple[float, dict[str, np.ndarray]]:
     return time, {f: body[i * cells : (i + 1) * cells] for i, f in enumerate(FIELDS)}
 
 
-SED_FIELDS = ["depth", "chh", "susp_load", "bed_load"]
+SED_FIELDS_V1 = ["depth", "chh", "susp_load", "bed_load"]
+SED_FIELDS_V2 = SED_FIELDS_V1 + ["c_sum", "p_sum", "d_sum", "c_ave", "p_ave", "d_ave", "aval_accum", "ch", "fx_w", "fx_e", "fy_s", "fy_n", "pickup", "depo"]
 
 
 def _read_sediment_bin(path: Path) -> dict[str, np.ndarray]:
-    """sediment.bin: ver(int32) M(int32) N(int32) then depth chh susp_load bed_load (each M*N, SP)."""
+    """sediment.bin: ver M N (int32) [t_sum (SP, v2)] then the fields (each M*N, SP).
+
+    v1 carried depth chh susp_load bed_load; v2 adds the Morph_interval window
+    (partial sums, last means, the avalanche accumulator) and its clock.
+    """
     raw = path.read_bytes()
     ver, m, n = np.frombuffer(raw[:12], np.int32)
     cells = int(m) * int(n)
-    sp = (len(raw) - 12) // (len(SED_FIELDS) * cells)
+    fields = SED_FIELDS_V1 if ver == 1 else SED_FIELDS_V2
+    nscalar = 0 if ver == 1 else 1
+    sp = (len(raw) - 12) // (nscalar + len(fields) * cells)
     if sp not in (4, 8):
         raise ValueError(f"{path}: cannot infer SP precision (got {sp} bytes/word)")
     body = np.frombuffer(raw[12:], np.float32 if sp == 4 else np.float64)
-    return {f: body[i * cells : (i + 1) * cells] for i, f in enumerate(SED_FIELDS)}
+    out = {"t_sum": body[:nscalar]} if nscalar else {}
+    body = body[nscalar:]
+    out.update({f: body[i * cells : (i + 1) * cells] for i, f in enumerate(fields)})
+    return out
 
 
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir=None, verbose: bool = False) -> SubsectionResult:
@@ -100,7 +110,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir=None, verbose: bool = Fals
             sub.metrics.append(MetricResult(variable="sediment.bin", stat="present", value=0.0, passed=False, tolerance=1.0))
             return sub
         a, b = _read_sediment_bin(ref_sed), _read_sediment_bin(dev_sed)
-        for f in SED_FIELDS:
+        for f in a:
             d = float(np.max(np.abs(a[f] - b[f]))) if a[f].size else 0.0
             tol = tolerances.get(f, default_tol)
             sub.metrics.append(MetricResult(variable=f, stat="max_abs", value=d, passed=(d <= tol), tolerance=tol))
