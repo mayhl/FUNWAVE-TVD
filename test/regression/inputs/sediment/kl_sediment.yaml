@@ -1,0 +1,41 @@
+# Sediment regression base: the Kobayashi & Lawrence erosion setup, first swash only.
+
+grid:
+  cell_size: [0.05, 0.05]
+  n_cells: [800, 3]
+  bathymetry:
+    type: slope
+    depth: 0.8
+    slope: 0.0833333333
+    x0: 20.0
+simulation:
+  title: sediment
+  total_time: 5.0
+  screen_interval: 5.0
+initial:
+  solitary:
+    amplitude: 0.216
+    depth: 0.8
+    x_center: 5.0
+friction:
+  cd: 0.01
+sediment:
+  solver: explicit
+  d50: 0.00018
+  specific_gravity: 2.6
+  porosity: 0.4
+  settling_velocity: 0.02
+  bed_change: true
+  morph_interval: 0.05
+  min_depth_pickup: 0.01
+numerics:
+  cfl: 0.5
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: fields
+      geometry: field
+      variables: [eta, u, sediment_c, sediment_pickup, sediment_depo, sediment_dchgs, sediment_dchgb]
+      interval: 2.5

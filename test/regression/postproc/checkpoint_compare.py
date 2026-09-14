@@ -40,6 +40,21 @@ def _read_core_bin(path: Path) -> tuple[float, dict[str, np.ndarray]]:
     return time, {f: body[i * cells : (i + 1) * cells] for i, f in enumerate(FIELDS)}
 
 
+SED_FIELDS = ["depth", "chh", "susp_load", "bed_load"]
+
+
+def _read_sediment_bin(path: Path) -> dict[str, np.ndarray]:
+    """sediment.bin: ver(int32) M(int32) N(int32) then depth chh susp_load bed_load (each M*N, SP)."""
+    raw = path.read_bytes()
+    ver, m, n = np.frombuffer(raw[:12], np.int32)
+    cells = int(m) * int(n)
+    sp = (len(raw) - 12) // (len(SED_FIELDS) * cells)
+    if sp not in (4, 8):
+        raise ValueError(f"{path}: cannot infer SP precision (got {sp} bytes/word)")
+    body = np.frombuffer(raw[12:], np.float32 if sp == 4 else np.float64)
+    return {f: body[i * cells : (i + 1) * cells] for i, f in enumerate(SED_FIELDS)}
+
+
 def run(ref_dir, dev_dir, tolerances: dict, plots_dir=None, verbose: bool = False) -> SubsectionResult:
     # `chk` is the harness convention for the checkpoint dir inside each leg's
     # run dir; a `checkpoint_subdir` tolerance key overrides it.
@@ -77,4 +92,16 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir=None, verbose: bool = Fals
                 tolerance=tol,
             )
         )
+
+    # a sediment run also leaves sediment.bin; the round-trip must restore it
+    ref_sed, dev_sed = ref_bin.with_name("sediment.bin"), dev_bin.with_name("sediment.bin")
+    if ref_sed.exists() or dev_sed.exists():
+        if not (ref_sed.exists() and dev_sed.exists()):
+            sub.metrics.append(MetricResult(variable="sediment.bin", stat="present", value=0.0, passed=False, tolerance=1.0))
+            return sub
+        a, b = _read_sediment_bin(ref_sed), _read_sediment_bin(dev_sed)
+        for f in SED_FIELDS:
+            d = float(np.max(np.abs(a[f] - b[f]))) if a[f].size else 0.0
+            tol = tolerances.get(f, default_tol)
+            sub.metrics.append(MetricResult(variable=f, stat="max_abs", value=d, passed=(d <= tol), tolerance=tol))
     return sub

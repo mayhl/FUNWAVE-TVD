@@ -202,6 +202,20 @@ simulations:
     tolerances:
       field: { default: 0.0, mask: 0.0, mask9: 0.0 }
 
+  - name: hotstart_sediment
+    test_type: self_consistency
+    exe_type: central
+    input: test/regression/inputs/hotstart
+    input_file: sediment.yaml
+    decomp: [1, 1]
+    binary: funwave
+    tags: [hotstart, sediment]
+    postprocess:
+      field: test.regression.postproc.checkpoint_compare
+    tolerances:
+      field: { default: 0.0, mask: 0.0, mask9: 0.0 }
+    known_fail: 'restart with sediment on drifts ~1e-6 in eta/p/q and 5e-7 in depth (board 367253); the bouss round-trip is bitwise'
+
   - name: hotstart_nswe
     test_type: self_consistency
     exe_type: central
@@ -327,6 +341,47 @@ simulations:
   # (float64) and asserts the engine's shifted-moment float32 products at
   # roundoff-level tolerance -- the durable replacement for the retired
   # means.f90 comparison target.
+  # sediment: one base deck, one variant per code branch in sediment.f90.
+  # The base pins the explicit solver until the 2D ref is re-pinned past the
+  # split ADI; sediment_split is the default solver's sentinel meanwhile.
+  - name: sediment
+    exe_type: central
+    input: test/regression/inputs/sediment
+    input_files: [kl_sediment.yaml]
+    decomp: [2, 1]
+    binary: funwave
+    output_dir: output
+    tags: [sediment, 1d]
+    postprocess:
+      field: test.regression.postproc.field_compare
+    tolerances:
+      field: { eta: 1.0e-4, u: 1.0e-3, sediment_c: 1.0e-4, sediment_pickup: 1.0e-4, sediment_depo: 1.0e-4, sediment_dchgs: 1.0e-4, sediment_dchgb: 1.0e-4 }
+    variants:
+      base: {}
+      tvd: { overrides: { sediment.scheme: tvd } }
+      bedload: { overrides: { sediment.bedload: true, sediment.shields_cr_bedload: 0.04 } }
+      fixed_bed: { overrides: { sediment.bed_change: false } }
+      cohesive: { overrides: { sediment.cohesive: { tau_cr: 0.1, tau_crd: 0.001, e: 0.0001 } } }
+      cohesive_nosoft: { overrides: { sediment.cohesive: { tau_cr: 0.1, tau_crd: 0.001, e: 0.0001, soft_bed: false } } }
+      avalanche: { overrides: { sediment.avalanche: { tan_phi: 0.6 } } }
+      pickup_caps: { overrides: { sediment.pickup_reduction: false, sediment.c_limiter: 0.5, sediment.pickup_ramp: 2.0 } }
+      hard_bottom: { overrides: { sediment.hard_bottom: { file: data/hard_bottom_2cm.txt } } }
+      feedback: { overrides: { sediment.feedback: { mass_source: true, moment_dc: true, moment_exg: true } } }
+
+  - name: sediment_split
+    exe_type: central-random
+    input: test/regression/inputs/sediment
+    input_files: [kl_sediment.yaml]
+    decomp: [2, 1]
+    binary: funwave
+    output_dir: output
+    tags: [sediment, 1d, stability]
+    overrides: { sediment.solver: split_implicit }
+    postprocess:
+      stability: test.regression.postproc.stability_check
+    tolerances:
+      stability: { min_dt: 0.002, max_abs_eta: 2.0 }
+
   - name: channel_stats
     exe_type: central-random
     input: test/regression/inputs/channel_stats
