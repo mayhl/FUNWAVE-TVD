@@ -395,18 +395,9 @@ contains
          end do
       end do
 
-      ! face-staggered depth: interior faces from geometry, high edge
-      ! extrapolated (legacy init.F):
-      !   $$ d_{M+1/2} = \tfrac{1}{2}(3 d_M - d_{M-1}) $$
       allocate (this%depth_fx(mloc + 1, nloc), this%depth_fy(mloc, nloc + 1))
+      call set_face_depth(this)
       associate (f => this%fields)
-         this%depth_fx(1:mloc, :) = f%depth_x
-         this%depth_fx(mloc + 1, :) = 0.5_SP*(3.0_SP*f%depth(mloc, :) &
-                                              - f%depth(mloc - 1, :))
-         this%depth_fy(:, 1:nloc) = f%depth_y
-         this%depth_fy(:, nloc + 1) = 0.5_SP*(3.0_SP*f%depth(:, nloc) &
-                                              - f%depth(:, nloc - 1))
-
          ! bathymetry-slope dispersion gate: |grad h| by central differences
          ! on the still-water depth, smoothstepped DOWN to 0 at slope_disp_max.
          ! Static, so this is the only place it is evaluated.
@@ -1191,6 +1182,27 @@ contains
 
    end subroutine stepper_sync_from_flux
 
+   ! Face-staggered depth the kernels read (legacy DepthX/DepthY): interior
+   ! faces from fields%depth_x/y, high edge extrapolated (legacy init.F):
+   !   $$ d_{M+1/2} = \tfrac{1}{2}(3 d_M - d_{M-1}) $$
+   ! Rebuilt after every bed change, as MORPHOLOGICAL_CHANGE does; the
+   ! dry-cell flattening stays with init and the mask transitions.
+   subroutine set_face_depth(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+      integer :: mloc, nloc
+
+      mloc = this%grid%lp%mloc
+      nloc = this%grid%lp%nloc
+      associate (f => this%fields)
+         this%depth_fx(1:mloc, :) = f%depth_x
+         this%depth_fx(mloc + 1, :) = 0.5_SP*(3.0_SP*f%depth(mloc, :) &
+                                              - f%depth(mloc - 1, :))
+         this%depth_fy(:, 1:nloc) = f%depth_y
+         this%depth_fy(:, nloc + 1) = 0.5_SP*(3.0_SP*f%depth(:, nloc) &
+                                              - f%depth(:, nloc - 1))
+      end associate
+   end subroutine set_face_depth
+
    ! ----------------------------------------------------------------
    ! Checkpoint restart: the checkpoint carries the full live core state
    ! (eta,p,q,u,v,hu,hv,mask,mask9), so we do NOT re-invert the dispersion
@@ -1213,10 +1225,10 @@ contains
          if (this%sediment%is_activated .and. this%sediment%bed_change) then
             call this%bc%exchange_scalar(this%grid, f%depth)
             call stagger_depth(this%grid%lp, f%depth, f%depth_x, f%depth_y)
+            call set_face_depth(this)
          end if
-         ! the face depths the kernels read are NOT restaggered from an
-         ! evolved bed (legacy parity: init.F sets DepthX/Y once); the
-         ! checkpoint carries them and they go back in place here
+         ! sediment.bin v2 still carries the face depths; now derivable
+         ! above, so this is a no-op until the format drops them
          if (allocated(this%sediment%chk_face)) then
             associate (lp => this%grid%lp, cf => this%sediment%chk_face)
                this%depth_fx(lp%ib:lp%ie, lp%jb:lp%je) = cf(lp%ib:lp%ie, lp%jb:lp%je, 1)
@@ -1381,13 +1393,14 @@ contains
 
       ! legacy MORPHOLOGICAL_CHANGE: outside the RK loop and ahead of
       ! MIXING_STUFF, so it evolves the bed on the last stage's bedload flux
-      ! and the completed step's dt.  It REWRITES fields%depth (and restaggers
-      ! depth_x/depth_y), which every kernel of the next step then reads
+      ! and the completed step's dt.  It REWRITES fields%depth and restaggers
+      ! the face depths every kernel of the next step reads
       if (this%sediment%is_activated) then
          call this%sediment%morphology(this%bc, this%grid, this%dt_step, &
                                        this%dx, this%dy, this%inv_dx, this%inv_dy, &
                                        this%fields%depth, this%fields%depth_x, &
                                        this%fields%depth_y)
+         if (this%sediment%bed_change) call set_face_depth(this)
       end if
 
       ! Legacy MIXING_STUFF: means accumulate on the completed step
