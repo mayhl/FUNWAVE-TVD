@@ -61,6 +61,9 @@ module model_wavemaker_mod
 
    implicit none
 
+   ! Hedges (1995) boundary where Stokes theory hands over to cnoidal
+   real(SP), parameter :: URSELL_WARN = 26.0_SP
+
    private
    public :: type_model_wavemaker
    public :: read_wavemakers
@@ -1018,6 +1021,8 @@ contains
       real(SP), intent(in) :: beta_ref
 
       integer :: i, j, mloc, nloc
+      real(SP) :: wave_length, ursell
+      character(len=256) :: msg
 
       ! spectrum-only entry nobody claimed (boundaries reader resolves the
       ! reference to boundary) — a silent no-op here would drop the wavemaker
@@ -1091,6 +1096,21 @@ contains
          call wk_regular_coefficients(this%Tperiod, this%AMP_WK, this%Theta_WK, &
                                       this%DEP_WK, this%Delta_WK, this%D_gen, &
                                       this%rlamda, this%Beta_gen, this%Width_WK)
+         ! Ursell number at the source, wavelength back out of beta:
+         !   $$ U_r = \frac{H L^2}{h^3}, \qquad L = \frac{1}{\delta}\sqrt{80/\beta} $$
+         ! Above Hedges' 26 the sinusoid is a poor stand-in for the cnoidal
+         ! profile the wave reshapes into; warn and run, never switch type
+         wave_length = sqrt(80.0_SP/this%Beta_gen)/this%Delta_WK
+         ursell = 2.0_SP*this%AMP_WK*wave_length**2/this%DEP_WK**3
+         if (ursell > URSELL_WARN) then
+            write (msg, '(A,F8.1,A,F7.3,A,F7.2,A,F8.1,A,I0,A)') &
+               "wavemaker/spectrum: regular wave has Ursell number ", ursell, &
+               " (H ", 2.0_SP*this%AMP_WK, " m, h ", this%DEP_WK, " m, L ", &
+               wave_length, " m); above ", nint(URSELL_WARN), &
+               " a sinusoid is a poor stand-in for the cnoidal profile" &
+               //" -- expect bound harmonics and a shifted first-gauge height"
+            call env%log%warning(trim(msg))
+         end if
       end if
 
       ! interior bounding box of the source region (legacy ilo/ihi/jlo/jhi)
