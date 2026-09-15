@@ -6,6 +6,8 @@ module model_kernel_dispersion_mod
    private
 
    public :: cal_dispersion_derivs, cal_dispersion_assemble
+   ! the masked central differences, for the divergence mirrors (stepper)
+   public :: pt_dx, pt_dy
 
    ! ----------------------------------------------------------------
    ! Workspace for intermediate arrays in cal_dispersion.  Allocated

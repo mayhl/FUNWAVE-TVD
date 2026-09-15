@@ -61,7 +61,7 @@ module model_stepper_2d_mod
    use model_geometry_mod, only: stagger_depth
    use model_meteo_mod, only: type_model_meteo
 
-   use model_kernel_dispersion_mod, only: type_disp_workspace, &
+   use model_kernel_dispersion_mod, only: type_disp_workspace, pt_dx, pt_dy, &
                                           cal_dispersion_derivs, &
                                           cal_dispersion_assemble
    use model_kernel_fluxes_mod, only: type_flux_workspace, fluxes, &
@@ -231,6 +231,12 @@ module model_stepper_2d_mod
       ! instantaneous vorticity (registry name vorticity): the dispersion
       ! kernel's write target, 1x1 stand-in when off
       real(SP), allocatable :: vort_out(:, :)
+      ! vertical-structure gradients (registry names a_x a_y b_x b_y, nee the
+      ! legacy AB_OUTPUT files): grad A, A = div(h u), and grad B, B = div u,
+      ! read off the dispersion workspace after the last stage
+      real(SP), allocatable :: ax_out(:, :), ay_out(:, :), bx_out(:, :), by_out(:, :)
+      ! and the divergences themselves (registry names a b): w(z) = -A - z B
+      real(SP), allocatable :: a_out(:, :), b_out(:, :)
 
    contains
       procedure :: init => stepper_init
@@ -1416,6 +1422,21 @@ contains
          if (this%output%OUT_FROUDE_SCALE) &
             call registry%register("froude_scale", this%froude_out)
          if (this%output%OUT_VORT) call registry%register("vorticity", this%vort_out)
+         ! the profile gradients exist only with the dispersion workspace
+         if (this%output%OUT_AB .and. allocated(this%dws%duxx)) then
+            allocate (this%ax_out(lp%mloc, lp%nloc), source=0.0_SP)
+            allocate (this%ay_out(lp%mloc, lp%nloc), source=0.0_SP)
+            allocate (this%bx_out(lp%mloc, lp%nloc), source=0.0_SP)
+            allocate (this%by_out(lp%mloc, lp%nloc), source=0.0_SP)
+            call registry%register("a_x", this%ax_out)
+            call registry%register("a_y", this%ay_out)
+            call registry%register("b_x", this%bx_out)
+            call registry%register("b_y", this%by_out)
+            allocate (this%a_out(lp%mloc, lp%nloc), source=0.0_SP)
+            allocate (this%b_out(lp%mloc, lp%nloc), source=0.0_SP)
+            call registry%register("a", this%a_out)
+            call registry%register("b", this%b_out)
+         end if
       end associate
    end subroutine stepper_register_output
 
@@ -1483,6 +1504,15 @@ contains
          this%brk_active_out = merge(1.0_SP, 0.0_SP, &
                                      this%fields%nu_break > this%breaking%nu_bkg)
       if (allocated(this%nu_capped_out)) call mark_nu_capped(this)
+      ! vertical-structure gradients off the last stage's derivative
+      ! workspace: u(z) = u + (z_a - z) grad A + (z_a^2 - z^2)/2 grad B
+      if (allocated(this%ax_out)) then
+         this%ax_out = this%dws%duxx + this%dws%dvxy
+         this%ay_out = this%dws%duxy + this%dws%dvyy
+         this%bx_out = this%dws%uxx + this%dws%vxy
+         this%by_out = this%dws%uxy + this%dws%vyy
+         call divergence_mirrors(this)
+      end if
 
       associate (f => this%fields, lp => this%grid%lp)
          max_abs_eta = maxval(abs(f%eta(lp%ib:lp%ie, lp%jb:lp%je)))
@@ -1502,6 +1532,34 @@ contains
       if (blowup) call log_blowup_site(this, max_abs_eta)
 
    end subroutine stepper_post_step
+
+   ! ----------------------------------------------------------------
+   ! Private: A = div(h u) and B = div u on the interior with the
+   ! kernel's own masked central differences, off the completed step
+   ! (the workspace first derivatives are stage inputs, gamma2 path only)
+   ! ----------------------------------------------------------------
+   subroutine divergence_mirrors(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      integer :: i, j
+
+      associate (f => this%fields, lp => this%grid%lp)
+         do j = lp%jb, lp%je
+            do i = lp%ib, lp%ie
+               ! div(h u) on the completed step (the workspace du is the last
+               ! stage's input), the same masked central difference as pt_dx
+               this%a_out(i, j) = 0.5_SP*f%disp_w(i, j) &
+                                  *(this%inv_dx(i, j)*(f%depth(i + 1, j)*f%u(i + 1, j) &
+                                                       - f%depth(i - 1, j)*f%u(i - 1, j)) &
+                                    + this%inv_dy(i, j)*(f%depth(i, j + 1)*f%v(i, j + 1) &
+                                                         - f%depth(i, j - 1)*f%v(i, j - 1)))
+               this%b_out(i, j) = pt_dx(f%u, i, j, this%inv_dx(i, j), f%disp_w(i, j)) &
+                                  + pt_dy(f%v, i, j, this%inv_dy(i, j), f%disp_w(i, j))
+            end do
+         end do
+      end associate
+
+   end subroutine divergence_mirrors
 
    ! ----------------------------------------------------------------
    ! Private: the nu_capped mirror -- 1 where nu_break sits at the
@@ -2015,6 +2073,9 @@ contains
       if (allocated(this%nu_capped_out)) deallocate (this%nu_capped_out)
       if (allocated(this%froude_out)) deallocate (this%froude_out)
       if (allocated(this%vort_out)) deallocate (this%vort_out)
+      if (allocated(this%ax_out)) deallocate (this%ax_out, this%ay_out, &
+                                              this%bx_out, this%by_out, &
+                                              this%a_out, this%b_out)
 
       this%env => null()
       this%grid => null()

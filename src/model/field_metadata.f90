@@ -81,6 +81,36 @@ contains
          m%units = "s-1"
          m%long_name = "relative vorticity of the depth-averaged flow"
          m%standard_name = "ocean_relative_vorticity"
+      case ("a")
+         m%units = "m s-1"
+         m%long_name = "divergence of the depth-integrated velocity"
+         m%funwave_name = "divergence_of_depth_integrated_velocity"
+         m%comment = "A = div(h u), h the still-water depth; w(z) = -A - z B to leading order"
+      case ("b")
+         m%units = "s-1"
+         m%long_name = "divergence of the depth-averaged velocity"
+         m%funwave_name = "divergence_of_depth_averaged_velocity"
+         m%comment = "B = div u; see a for the vertical velocity"
+      case ("a_x")
+         m%units = "s-1"
+         m%long_name = "x-gradient of the depth-integrated velocity divergence"
+         m%funwave_name = "x_derivative_of_divergence_of_depth_integrated_velocity"
+         m%comment = "A = div(h u); u(z) = u + (z_a - z) a_x + (z_a^2 - z^2)/2 b_x, z_a = (1 + beta_ref) eta + beta_ref h"
+      case ("a_y")
+         m%units = "s-1"
+         m%long_name = "y-gradient of the depth-integrated velocity divergence"
+         m%funwave_name = "y_derivative_of_divergence_of_depth_integrated_velocity"
+         m%comment = "A = div(h u); v(z) = v + (z_a - z) a_y + (z_a^2 - z^2)/2 b_y, z_a = (1 + beta_ref) eta + beta_ref h"
+      case ("b_x")
+         m%units = "m-1 s-1"
+         m%long_name = "x-gradient of the velocity divergence"
+         m%funwave_name = "x_derivative_of_divergence_of_depth_averaged_velocity"
+         m%comment = "B = div u; see a_x for the profile"
+      case ("b_y")
+         m%units = "m-1 s-1"
+         m%long_name = "y-gradient of the velocity divergence"
+         m%funwave_name = "y_derivative_of_divergence_of_depth_averaged_velocity"
+         m%comment = "B = div u; see a_y for the profile"
       case ("momentum_flux")
          m%units = "m3 s-2"
          m%long_name = "depth-integrated momentum flux magnitude"

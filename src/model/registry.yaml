@@ -116,6 +116,69 @@ variables:
     fill_value:     -9999.0
     latex:          "$\\omega$"
 
+  # vertical structure (nee the legacy AB_OUTPUT files Ax/Ay/Bx/By): the
+  # velocity profile u(z) = u + (z_a - z) grad A + (z_a^2 - z^2)/2 grad B with
+  # A = div(h u), B = div u, z_a = (1 + beta_ref) eta + beta_ref h
+  - name:           a
+    legacy_name:    ~
+    long_name:      "divergence of the depth-integrated velocity"
+    standard_name:  ""
+    funwave_name:   "divergence_of_depth_integrated_velocity"
+    units:          "m s-1"
+    fill_value:     -9999.0
+    comment:        "A = div(h u), h the still-water depth; w(z) = -A - z B to leading order"
+    latex:          "$A$"
+
+  - name:           b
+    legacy_name:    ~
+    long_name:      "divergence of the depth-averaged velocity"
+    standard_name:  ""
+    funwave_name:   "divergence_of_depth_averaged_velocity"
+    units:          "s-1"
+    fill_value:     -9999.0
+    comment:        "B = div u; see a for the vertical velocity"
+    latex:          "$B$"
+
+  - name:           a_x
+    legacy_name:    ~
+    long_name:      "x-gradient of the depth-integrated velocity divergence"
+    standard_name:  ""
+    funwave_name:   "x_derivative_of_divergence_of_depth_integrated_velocity"
+    units:          "s-1"
+    fill_value:     -9999.0
+    comment:        "A = div(h u); u(z) = u + (z_a - z) a_x + (z_a^2 - z^2)/2 b_x, z_a = (1 + beta_ref) eta + beta_ref h"
+    latex:          "$A_x$"
+
+  - name:           a_y
+    legacy_name:    ~
+    long_name:      "y-gradient of the depth-integrated velocity divergence"
+    standard_name:  ""
+    funwave_name:   "y_derivative_of_divergence_of_depth_integrated_velocity"
+    units:          "s-1"
+    fill_value:     -9999.0
+    comment:        "A = div(h u); v(z) = v + (z_a - z) a_y + (z_a^2 - z^2)/2 b_y, z_a = (1 + beta_ref) eta + beta_ref h"
+    latex:          "$A_y$"
+
+  - name:           b_x
+    legacy_name:    ~
+    long_name:      "x-gradient of the velocity divergence"
+    standard_name:  ""
+    funwave_name:   "x_derivative_of_divergence_of_depth_averaged_velocity"
+    units:          "m-1 s-1"
+    fill_value:     -9999.0
+    comment:        "B = div u; see a_x for the profile"
+    latex:          "$B_x$"
+
+  - name:           b_y
+    legacy_name:    ~
+    long_name:      "y-gradient of the velocity divergence"
+    standard_name:  ""
+    funwave_name:   "y_derivative_of_divergence_of_depth_averaged_velocity"
+    units:          "m-1 s-1"
+    fill_value:     -9999.0
+    comment:        "B = div u; see a_y for the profile"
+    latex:          "$B_y$"
+
   - name:           momentum_flux
     legacy_name:    ~
     long_name:      "depth-integrated momentum flux magnitude"

@@ -217,6 +217,8 @@ module model_output_mod
       logical :: OUT_Hmax = .false.
       ! instantaneous vorticity mirror (registry name vorticity)
       logical :: OUT_VORT = .false.
+      ! the vertical-structure gradients a_x/a_y/b_x/b_y (nee legacy AB_OUTPUT)
+      logical :: OUT_AB = .false.
       ! gate-field mirrors (breaking_active / nu_capped / froude_scale)
       logical :: OUT_BRK_ACTIVE = .false.
       logical :: OUT_NU_CAPPED = .false.
@@ -407,6 +409,7 @@ contains
       select case (trim(name))
       case ("h_max"); this%OUT_Hmax = .true.
       case ("vorticity"); this%OUT_VORT = .true.
+      case ("a", "b", "a_x", "a_y", "b_x", "b_y"); this%OUT_AB = .true.
       case ("breaking_active"); this%OUT_BRK_ACTIVE = .true.
       case ("nu_capped"); this%OUT_NU_CAPPED = .true.
       case ("froude_scale"); this%OUT_FROUDE_SCALE = .true.
