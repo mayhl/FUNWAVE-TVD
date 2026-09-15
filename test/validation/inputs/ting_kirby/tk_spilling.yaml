@@ -53,6 +53,20 @@ output:
       geometry: field
       variables: [xi_0, xi_b, gamma_b, front_steepness]
       interval: 1.0e6
+    - name: brk_events  # end-of-run event counts: one breaking event per wave per cell
+      geometry: field
+      variables: [breaking_active]
+      statistics: [count, duration]
+      threshold: {above: 0.5}
+      accumulate: total
+      interval: 1.0e6
+    - name: crest_events  # the unfiltered reference: one crest per wave per wet cell
+      geometry: field
+      variables: [eta]
+      statistics: [count]
+      threshold: {above: 0.0}
+      accumulate: total
+      interval: 1.0e6
   geometries:
     - name: gauges
       type: transect

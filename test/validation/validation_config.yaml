@@ -426,53 +426,76 @@ simulations:
   # height shock 21.3 / 14.7, viscous 16.0 / 14.6; setup rms over H0
   # shock 5.3 / 4.2, viscous 4.3 / 2.4 (spilling / plunging)
   - name: lab_tk_spilling
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/ting_kirby
-    input_files: [tk_spilling.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, surf, 1d]
-    postprocess:
-      surf: test.validation.oracles.surf
-    tolerances:
-      surf:
-        heights: heights_spilling.txt
-        setup: setup_spilling.txt
-        channel: line
-        window_s: [100.0, 300.0]
-        setup_rms_pct: 7.0
-        height_nrmse_pct: 25.0
-    # the same deck under both breaking closures; the viscous arm carries
-    # its own calibrated bounds where they differ
-    variants:
-      shock: { overrides: { breaking.model: shock_capturing } }
-      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 6.0 } } }
+    <<: &tk_spilling
+      exe_type: validation-2d
+      np: 2
+      input: test/validation/inputs/ting_kirby
+      input_files: [tk_spilling.yaml]
+      binary: funwave
+      output_dir: output
+      tags: [lab, surf, 1d]
+      postprocess:
+        surf: test.validation.oracles.surf
+      tolerances:
+        surf:
+          heights: heights_spilling.txt
+          setup: setup_spilling.txt
+          channel: line
+          window_s: [100.0, 300.0]
+          setup_rms_pct: 7.0
+          height_nrmse_pct: 25.0
+      # the same deck under both breaking closures; the viscous arm carries
+      # its own calibrated bounds where they differ
+      variants:
+        shock: { overrides: { breaking.model: shock_capturing } }
+        viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 6.0 } } }
 
 
   - name: lab_tk_plunging
-    exe_type: validation-2d
-    np: 2
-    input: test/validation/inputs/ting_kirby
-    input_files: [tk_plunging.yaml]
-    binary: funwave
-    output_dir: output
-    tags: [lab, surf, 1d]
-    postprocess:
-      surf: test.validation.oracles.surf
-    tolerances:
-      surf:
-        heights: heights_plunging.txt
-        setup: setup_plunging.txt
-        channel: line
-        window_s: [150.0, 400.0]
-        setup_rms_pct: 6.0
-        height_nrmse_pct: 20.0
-    # the same deck under both breaking closures; the viscous arm carries
-    # its own calibrated bounds where they differ
+    <<: &tk_plunging
+      exe_type: validation-2d
+      np: 2
+      input: test/validation/inputs/ting_kirby
+      input_files: [tk_plunging.yaml]
+      binary: funwave
+      output_dir: output
+      tags: [lab, surf, 1d]
+      postprocess:
+        surf: test.validation.oracles.surf
+      tolerances:
+        surf:
+          heights: heights_plunging.txt
+          setup: setup_plunging.txt
+          channel: line
+          window_s: [150.0, 400.0]
+          setup_rms_pct: 6.0
+          height_nrmse_pct: 20.0
+      # the same deck under both breaking closures; the viscous arm carries
+      # its own calibrated bounds where they differ
+      variants:
+        shock: { overrides: { breaking.model: shock_capturing } }
+        viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 3.5 } } }
+
+
+  # Event-filter study, report-only (tag study): gap and min_duration on the
+  # breaking-event channel, viscous arm; read as counts per wave per cell.
+  - name: study_tk_events_spilling
+    <<: *tk_spilling
+    tags: [study]
     variants:
-      shock: { overrides: { breaking.model: shock_capturing } }
-      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 3.5 } } }
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      output.channels.2.gap: [0.0, 0.2, 0.5]
+      output.channels.2.min_duration: [0.0, 0.1, 0.3]
+
+  - name: study_tk_events_plunging
+    <<: *tk_plunging
+    tags: [study]
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      output.channels.2.gap: [0.0, 0.2, 0.5]
+      output.channels.2.min_duration: [0.0, 0.1, 0.3]
 
 
   # ── Wavemaker fidelity: the h470 incident gauge as its own gated case ───
