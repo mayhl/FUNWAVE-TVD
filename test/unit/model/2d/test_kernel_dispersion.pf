@@ -38,6 +38,7 @@ contains
                              u4, v4, u1p, v1p, u1pp, v1pp, u2, v2, u3, v3)
       type(type_loop_bounds), intent(in)    :: lp
       type(type_disp_workspace), intent(inout) :: ws
+      real(SP) :: vort_off(1, 1)
       real(SP), intent(in)    :: eta(:, :), depth(:, :)
       real(SP), intent(in)    :: u(:, :), v(:, :), u0(:, :), v0(:, :)
       real(SP), intent(in)    :: p(:, :), q(:, :)
@@ -57,7 +58,7 @@ contains
       call cal_dispersion_assemble(lp, ws, eta, depth, u, v, mask9, &
                                    inv_dx, inv_dy, beta1, beta2, gamma2, &
                                    etat, etax, etay, u4, v4, u1p, v1p, &
-                                   u1pp, v1pp, u2, v2, u3, v3)
+                                   u1pp, v1pp, u2, v2, u3, v3, vort_off, .false.)
    end subroutine cal_dispersion
 
    ! ----------------------------------------------------------------

@@ -61,18 +61,6 @@ contains
          m%n_flags = 2
          m%flag_values(1:2) = [0.0_SP, 1.0_SP]
          m%flag_meanings = "dry wet"
-      case ("h_max")
-         m%units = "m"
-         m%long_name = "maximum sea surface elevation above mean sea level"
-         m%funwave_name = "maximum_sea_surface_height_above_mean_sea_level"
-      case ("h_min")
-         m%units = "m"
-         m%long_name = "minimum sea surface elevation above mean sea level"
-         m%funwave_name = "minimum_sea_surface_height_above_mean_sea_level"
-      case ("u_max")
-         m%units = "m s-1"
-         m%long_name = "maximum depth-averaged sea water speed"
-         m%funwave_name = "maximum_depth_averaged_sea_water_speed"
       case ("p")
          m%units = "m2 s-1"
          m%long_name = "x depth-integrated volume flux"
@@ -89,14 +77,14 @@ contains
          m%units = "degree"
          m%long_name = "current direction, CCW from +x axis"
          m%funwave_name = "depth_averaged_current_direction_from_x_axis"
-      case ("mf_max")
-         m%units = "m3 s-2"
-         m%long_name = "maximum depth-integrated momentum flux"
-         m%funwave_name = "maximum_depth_integrated_momentum_flux"
-      case ("vort_max")
+      case ("vorticity")
          m%units = "s-1"
-         m%long_name = "maximum relative vorticity"
-         m%funwave_name = "maximum_ocean_relative_vorticity"
+         m%long_name = "relative vorticity of the depth-averaged flow"
+         m%standard_name = "ocean_relative_vorticity"
+      case ("momentum_flux")
+         m%units = "m3 s-2"
+         m%long_name = "depth-integrated momentum flux magnitude"
+         m%funwave_name = "depth_integrated_momentum_flux_magnitude"
       case ("nu_break")
          m%units = "m2 s-1"
          m%long_name = "breaking eddy viscosity"
@@ -117,14 +105,6 @@ contains
          m%units = "m2 s-1"
          m%long_name = "y-component of the roller-driven return flux per unit width"
          m%funwave_name = "northward_roller_return_volume_flux_per_unit_width"
-      case ("arr_time")
-         m%units = "s"
-         m%long_name = "wave front arrival time"
-         m%funwave_name = "sea_water_wave_front_arrival_time"
-      case ("nu_cap_time")
-         m%units = "s"
-         m%long_name = "time with the breaker viscosity cap engaged"
-         m%funwave_name = "breaker_viscosity_cap_engaged_time"
       case ("breaking_active")
          m%units = "1"
          m%long_name = "breaker viscosity active flag"

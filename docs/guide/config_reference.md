@@ -159,7 +159,7 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 |---|---|---|---|---|
 | `screen_interval` | `1.0` | `SCREEN_INTV` | s | Screen-log / monitor cadence. |
 | `t_start` | `0.0` | `PLOT_START_TIME` | s | Simulation time at which output begins. |
-| `spinup` | `0.0` | — | s | Spin-up duration. The running-maximum envelopes (h_max, h_min, u_max, mf_max, vort_max) and the first-arrival map do not accumulate before it, so a wavemaker ramp cannot set a maximum that is then reported as a storm peak. Channels may also write t_start: spinup to inherit it rather than restating the offset per channel. 0 = accumulate from t=0 (legacy). |
+| `spinup` | `0.0` | — | s | Spin-up duration. The meteo crest envelope does not accumulate before it, and channels may write t_start: spinup to inherit it rather than restating the offset per channel -- so a wavemaker ramp cannot set a maximum that is then reported as a storm peak. 0 = from t=0 (legacy). |
 | `title` | — | `TITLE` | — | Run title (reserved for NetCDF global attrs). |
 | `total_time` | — | `TOTAL_TIME` | s | Total simulated duration. |
 
@@ -392,7 +392,6 @@ Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `arrival_time.min_height` | `0.001` | `ArrTimeMinH` | m | Elevation threshold defining first wave arrival. |
 | `checkpoint` | — | — | — | Directory to write the hot-start checkpoint set (core.bin) at run end. |
 | `depth_out` | `false` | `DEPTH_OUT` | — | Write the still-water depth field. |
 | `format` | `binary` | `FIELD_IO_TYPE` | — | Field output format (nee field_io_type; netcdf needs a netcdf-fortran build One of `ascii` \| `binary` \| `netcdf` \| `pnetcdf`. |

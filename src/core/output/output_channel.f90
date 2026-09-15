@@ -624,7 +624,7 @@ contains
       integer  :: iv, it, tunit
       real(SP), pointer :: fld(:, :), mask(:, :), h(:, :)
       real(SP), allocatable :: interp_vals(:), interp_2d(:, :), mask_i(:), h_i(:)
-      logical, allocatable :: wet(:, :)
+      logical, allocatable :: wet(:, :), wet_ev(:, :)
       logical :: do_flush
 
       this%fired = .false.
@@ -684,28 +684,38 @@ contains
       end if
 
       ! --- Accumulate for statistics (derived sources included) ---
-      ! Events sample wet cells only: the instantaneous mask (the model
-      ! raised its need) above the swash-edge depth floor; a point is wet
-      ! when its whole stencil is (interpolated mask exactly 1)
+      ! Extremes and events sample wet cells only: the instantaneous mask
+      ! (the model raised its need); events additionally sit above the
+      ! swash-edge depth floor.  A point is wet when its whole stencil is
+      ! (interpolated mask exactly 1).  Moments take every sample.
       if (this%n_stats > 0 .or. this%n_derived > 0) then
          select case (trim(this%geom_type))
          case ('station', 'transect')
             allocate (interp_vals(this%n_local), interp_2d(this%n_local, 1))
-            if (this%has_events) then
-               allocate (mask_i(this%n_local), h_i(this%n_local), wet(this%n_local, 1))
-               mask => registry%get('mask')
-               h => registry%get('h')
-               call this%interp%gather(mask, mask_i)
-               call this%interp%gather(h, h_i)
-               wet(:, 1) = mask_i == 1.0_SP .and. h_i > this%wet_floor
+            if (this%n_stats > 0) then
+               allocate (mask_i(this%n_local), h_i(this%n_local), &
+                         wet(this%n_local, 1), wet_ev(this%n_local, 1))
+               if (registry%has('mask') .and. registry%has('h')) then
+                  mask => registry%get('mask')
+                  h => registry%get('h')
+                  call this%interp%gather(mask, mask_i)
+                  call this%interp%gather(h, h_i)
+                  wet(:, 1) = mask_i == 1.0_SP
+                  wet_ev(:, 1) = wet(:, 1) .and. h_i > this%wet_floor
+               else
+                  ! no model behind the registry (unit tests): every sample wet
+                  wet = .true.
+                  wet_ev = .true.
+               end if
             end if
             do iv = 1, this%n_vars
                fld => registry%get(trim(this%variables(iv)))
                call this%interp%gather(fld, interp_vals)
                interp_2d(:, 1) = interp_vals
                do it = 1, max(1, this%n_thr)
-                  if (this%has_events) then
-                     call this%accum(iv, it)%accumulate(interp_2d, dt, t=t, wet=wet)
+                  if (this%n_stats > 0) then
+                     call this%accum(iv, it)%accumulate(interp_2d, dt, t=t, wet=wet, &
+                                                        wet_event=wet_ev)
                   else
                      call this%accum(iv, it)%accumulate(interp_2d, dt, t=t)
                   end if
@@ -715,19 +725,26 @@ contains
 
          case ('field')
             associate (ng => N_GHOST, nx => this%local_nx, ny => this%local_ny)
-               if (this%has_events) then
-                  mask => registry%get('mask')
-                  h => registry%get('h')
-                  wet = mask(ng + 1:ng + nx, ng + 1:ng + ny) > 0.5_SP .and. &
-                        h(ng + 1:ng + nx, ng + 1:ng + ny) > this%wet_floor
+               if (this%n_stats > 0) then
+                  if (registry%has('mask') .and. registry%has('h')) then
+                     mask => registry%get('mask')
+                     h => registry%get('h')
+                     wet = mask(ng + 1:ng + nx, ng + 1:ng + ny) > 0.5_SP
+                     wet_ev = wet .and. h(ng + 1:ng + nx, ng + 1:ng + ny) > this%wet_floor
+                  else
+                     allocate (wet(nx, ny), wet_ev(nx, ny))
+                     wet = .true.
+                     wet_ev = .true.
+                  end if
                end if
                do iv = 1, this%n_vars
                   fld => registry%get(trim(this%variables(iv)))
                   ! Slice interior (ghost-inclusive field → interior only)
                   do it = 1, max(1, this%n_thr)
-                     if (this%has_events) then
+                     if (this%n_stats > 0) then
                         call this%accum(iv, it)%accumulate( &
-                           fld(ng + 1:ng + nx, ng + 1:ng + ny), dt, t=t, wet=wet)
+                           fld(ng + 1:ng + nx, ng + 1:ng + ny), dt, t=t, wet=wet, &
+                           wet_event=wet_ev)
                      else
                         call this%accum(iv, it)%accumulate( &
                            fld(ng + 1:ng + nx, ng + 1:ng + ny), dt, t=t)
@@ -853,8 +870,7 @@ contains
             scalars(n)%meta%units = this%meta(iv)%units
             scalars(n)%meta%standard_name = this%meta(iv)%standard_name
             scalars(n)%meta%long_name = base//' threshold'
-            scalars(n)%meta%comment = 'event condition: '// &
-                                      merge('above', 'below', this%thr_dir >= 0)// &
+            scalars(n)%meta%comment = 'event condition: '//dir_text(this%thr_dir)// &
                                       ' this value on wet samples'
          end do
       end do
@@ -893,7 +909,7 @@ contains
          m%long_name = 'time of the maximum of '//base
          m%comment = 'time the running maximum was last raised; fill where no sample'
       case ('first_time', 'last_time', 'duration', 'duration_max', 'count')
-         cond = ' '//merge('above', 'below', this%thr_dir >= 0)//' '// &
+         cond = ' '//dir_text(this%thr_dir)//' '// &
                 threshold_text(this%thr(it))//' '//trim(this%meta(iv)%units)
          m = type_var_meta()
          m%units = 's'
@@ -1314,6 +1330,20 @@ contains
       p => node
       call parent%set(key, p)
    end subroutine yaml_set_node
+
+   ! The event direction in words (THR_ABOVE / THR_BELOW / THR_ABS)
+   pure function dir_text(dir) result(txt)
+      integer, intent(in) :: dir
+      character(:), allocatable :: txt
+      select case (dir)
+      case (1)
+         txt = 'above'
+      case (-1)
+         txt = 'below'
+      case default
+         txt = 'in magnitude above'
+      end select
+   end function dir_text
 
    ! Scalars dump verbatim, so a string value carries its own quotes
    pure function yaml_quoted(s) result(q)

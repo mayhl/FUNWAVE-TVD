@@ -149,7 +149,7 @@ contains
 
       @assertTrue(reg%has('eta'))
       @assertTrue(reg%has('depth'))
-      @assertTrue(reg%has('arr_time'))
+      @assertTrue(reg%has('disp_gate'))
       ! integer fields not registered; breaking not allocated yet
       @assertFalse(reg%has('mask'))
       @assertFalse(reg%has('nu_break'))

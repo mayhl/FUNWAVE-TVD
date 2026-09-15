@@ -67,6 +67,7 @@ module model_main_mod
       type(type_fields_2d), pointer :: fields => null()
       real(SP), pointer :: vec_mag(:, :) => null()
       real(SP), pointer :: vec_dir(:, :) => null()
+      real(SP), pointer :: mflux(:, :) => null()
    contains
       procedure :: step => output_monitor_step
    end type type_output_monitor
@@ -109,7 +110,8 @@ module model_main_mod
       ! a channel requests them, refreshed before every manager step
       logical                   :: need_vec_mag = .false.
       logical                   :: need_vec_dir = .false.
-      real(SP), allocatable     :: vec_mag(:, :), vec_dir(:, :)
+      logical                   :: need_mflux = .false.
+      real(SP), allocatable     :: vec_mag(:, :), vec_dir(:, :), mflux(:, :)
       ! Time-averaged statistics (legacy MIXING_STUFF port) — engine
       ! path only, initialised in run()
       type(type_model_means)    :: means
@@ -808,11 +810,11 @@ contains
       call this%sediment%init_compute(this%grid, this%env, this%fields%depth)
       if (this%hot_start%use_checkpoint .and. this%sediment%is_activated) &
          call load_checkpoint_sediment(this)
-      ! The crest mask rides the h_max running envelope, which update_max_min
+      ! The crest mask rides the h_max running envelope, which update_crest_max
       ! maintains only on demand AND past the spin-up gate.  Missing either,
       ! the mask reads an all-zero envelope and cuts on eta < etamean --
       ! roughly half the domain, not the crests -- silently.  Register the
-      ! need (writing stays on the channel request); refuse spinup, which
+      ! need (h_max is no output name any more); refuse spinup, which
       ! deliberately withholds the envelope.
       if (this%meteo%wind_crest_percent /= LARGE) then
          call this%output%need("h_max")
@@ -874,6 +876,7 @@ contains
          monitor%fields => this%fields
          if (this%need_vec_mag) monitor%vec_mag => this%vec_mag
          if (this%need_vec_dir) monitor%vec_dir => this%vec_dir
+         if (this%need_mflux) monitor%mflux => this%mflux
 
          call engine%init(merge(this%hot_start%time, 0.0_SP, &
                                 this%hot_start%is_activated), &
@@ -921,6 +924,9 @@ contains
          this%vec_mag = sqrt(this%fields%u**2 + this%fields%v**2)
       if (associated(this%vec_dir)) &
          this%vec_dir = atan2(this%fields%v, this%fields%u)/DEG2RAD
+      ! depth-integrated momentum flux magnitude h |u|^2 (nee MFmax)
+      if (associated(this%mflux)) &
+         this%mflux = this%fields%h*(this%fields%u**2 + this%fields%v**2)
 
       call this%mgr%step(t, dt, this%registry, this%comm, force=forced)
       ! the forced final flush covers field frames only: tracer/vessel
@@ -1042,9 +1048,16 @@ contains
                this%need_vec_mag = .true.
             case ("velocity.dir")
                this%need_vec_dir = .true.
+            case ("momentum_flux")
+               this%need_mflux = .true.
             end select
          end do
       end do
+      if (this%need_mflux) then
+         allocate (this%mflux, mold=this%fields%u)
+         this%mflux = 0.0_SP
+         call this%registry%register("momentum_flux", this%mflux)
+      end if
       if (this%need_vec_mag) then
          allocate (this%vec_mag, mold=this%fields%u)
          this%vec_mag = 0.0_SP
@@ -1238,6 +1251,10 @@ contains
       case ("velocity.dir")
          m%units = "degree"
          m%long_name = "depth-averaged velocity direction"
+      case ("momentum_flux")
+         m%units = "m3 s-2"
+         m%long_name = "depth-integrated momentum flux magnitude"
+         m%funwave_name = "depth_integrated_momentum_flux_magnitude"
       case default
          m = field_meta(name)
       end select

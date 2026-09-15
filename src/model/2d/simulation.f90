@@ -41,9 +41,9 @@ module model_simulation_mod
       real(SP) :: total_time = 0.0_SP
       real(SP) :: t_start = 0.0_SP
       real(SP) :: screen_interval = 0.0_SP
-      !> Spin-up: the running-maximum envelopes and the arrival map do not
-      !! accumulate before this time, so a wavemaker ramp cannot set a
-      !! maximum later reported as a storm peak.  0 = from t=0 (legacy).
+      !> Spin-up: the crest envelope does not accumulate before this time,
+      !! and channels may start at it (t_start: spinup), so a wavemaker ramp
+      !! cannot set a maximum later reported as a storm peak.  0 = from t=0.
       real(SP) :: spinup = 0.0_SP
 
    contains

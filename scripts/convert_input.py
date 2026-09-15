@@ -90,11 +90,6 @@ _VAR_FLAGS: dict[str, str | None] = {
     "V": "v",
     "ETA": "eta",
     "ETAscreen": None,
-    "Hmax": "h_max",
-    "Hmin": "h_min",
-    "Umax": "u_max",
-    "MFmax": "mf_max",
-    "VORmax": "vort_max",
     "MASK": "mask",
     "MASK9": "mask9",
     "SXL": None,
@@ -847,11 +842,30 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
 
     # first-arrival map (nee numerics OUT_Time/ArrTimeMin); min_height is
     # always written so the block never serialises as a bare null key
+    arrival_min = None
     if _bool(pop("OUT_Time") or "F"):
         atm = pop_val("ArrTimeMin")
-        op["arrival_time"] = {"min_height": atm if atm is not None else 0.001}
+        arrival_min = atm if atm is not None else 0.001
     else:
         pop("ArrTimeMin")
+
+    # running envelopes (nee Hmax/Hmin/Umax/MFmax/VORmax): one max/min
+    # channel over the run, written at the field cadence
+    env_vars: list[str] = []
+    env_stats: list[str] = []
+    for old_key, var, stat in (
+        ("Hmax", "eta", "max"),
+        ("Hmin", "eta", "min"),
+        ("Umax", "velocity.mag", "max"),
+        ("MFmax", "momentum_flux", "max"),
+        ("VORmax", "vorticity", "max"),
+    ):
+        v = pop(old_key)
+        if v is not None and _bool(v):
+            if var not in env_vars:
+                env_vars.append(var)
+            if stat not in env_stats:
+                env_stats.append(stat)
 
     # depth_out — static field, separate from variables list
     depth_out = pop_bool("DEPTH_OUT")
@@ -880,6 +894,37 @@ def convert(params: dict[str, str], deck_dir: Path | None = None) -> tuple[dict,
                 "interval": plot_intv,
             },
         )
+    if env_vars:
+        if plot_intv is None:
+            unknown.append("Hmax/Hmin/Umax/MFmax/VORmax without PLOT_INTV -- dropped")
+        else:
+            op.setdefault("channels", []).append(
+                {
+                    "name": "envelope",
+                    "geometry": "field",
+                    "variables": env_vars,
+                    "statistics": env_stats,
+                    "accumulate": "running",
+                    "interval": plot_intv,
+                }
+            )
+    # first-arrival map (nee OUT_Time/ArrTimeMin): |eta| above the height,
+    # one write at the end; never-triggered cells hold the fill, not 0
+    if arrival_min is not None:
+        if plot_intv is None:
+            unknown.append("OUT_Time without PLOT_INTV -- dropped")
+        else:
+            op.setdefault("channels", []).append(
+                {
+                    "name": "arrival",
+                    "geometry": "field",
+                    "variables": ["eta"],
+                    "statistics": ["first_time"],
+                    "threshold": {"magnitude": arrival_min},
+                    "accumulate": "total",
+                    "interval": plot_intv,
+                }
+            )
 
     if op:
         out["output"] = op

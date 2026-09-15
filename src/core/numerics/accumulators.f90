@@ -41,11 +41,13 @@
 !! is requested, so channels without it keep the historical bit pattern.
 !!
 !! **Extremes with time** — `max_time` rides `max`: the sample time at
-!! which the running maximum was last raised.
+!! which the running maximum was last raised.  With a wet mask the
+!! extremes sample wet cells only (a dry cell's surface is its bed).
 !!
 !! **Events** — a per-cell state machine on a threshold condition
-!! (`set_threshold`: value and direction, `above` or `below`), tested on
-!! wet samples only when a wet mask is given.  An event opens at the
+!! (`set_threshold`: value and direction, `above`, `below` or `abs` =
+!! |sample| above), tested on wet samples only when a wet mask is given
+!! (`wet_event` when the event test carries its own, stricter mask).  An event opens at the
 !! first sample meeting the condition and closes at the first sample
 !! failing it; it is COMMITTED at close (never while open), so a window
 !! flush never sees a partial event and a discarded one leaves no trace:
@@ -57,7 +59,8 @@
 !! discards a shorter event at close.  `reset` clears only the committed
 !! values, so an event straddling a window boundary lands whole in the
 !! window it closes in and adjacent windows sum exactly.  Time-valued
-!! results hold FILL_VALUE where nothing ever triggered; counts and
+!! results, and the extremes of a cell never sampled, hold FILL_VALUE;
+!! counts and
 !! durations hold 0.
 module core_accumulators_mod
    use core_constants_mod, only: SP
@@ -66,7 +69,7 @@ module core_accumulators_mod
    !> Never-triggered marker of the time-valued statistics (the registry
    !! fill value, so a writer needs no translation).
    real(SP), parameter, public :: FILL_VALUE = -9999.0_SP
-   integer, parameter, public :: THR_NONE = 0, THR_ABOVE = 1, THR_BELOW = -1
+   integer, parameter, public :: THR_NONE = 0, THR_ABOVE = 1, THR_BELOW = -1, THR_ABS = 2
 
    !> Accumulates time-weighted statistics for a 2-D field array.
    !!
@@ -216,7 +219,8 @@ contains
    end subroutine allocate_stat
 
    !> Set the event condition: value and direction (THR_ABOVE: sample >
-   !! value; THR_BELOW: sample < value) and the two filters in seconds.
+   !! value; THR_BELOW: sample < value; THR_ABS: |sample| > value) and the
+   !! two filters in seconds.
    subroutine set_threshold(this, value, direction, gap, min_duration)
       class(type_accumulator), intent(inout) :: this
       real(SP), intent(in) :: value
@@ -240,23 +244,39 @@ contains
    !! @param[in]  value  Field snapshot at the current time step,
    !!                    shape `(dim1, dim2)`.
    !! @param[in]  dt     Time-step size \f$\Delta t > 0\f$.
-   !! @param[in]  t      Sample time; required by max_time and the events.
-   !! @param[in]  wet    Wet mask; events sample only where true (absent =
-   !!                    every cell).
-   subroutine accumulate(this, value, dt, t, wet)
+   !! @param[in]  t          Sample time; required by max_time and the events.
+   !! @param[in]  wet        Wet mask; extremes and events sample only where
+   !!                        true (absent = every cell).
+   !! @param[in]  wet_event  Stricter mask for the event test alone (the
+   !!                        swash-edge depth floor); absent = wet.
+   subroutine accumulate(this, value, dt, t, wet, wet_event)
       class(type_accumulator), intent(inout) :: this
       real(SP), intent(in) :: value(:, :)
       real(SP), intent(in) :: dt
       real(SP), intent(in), optional :: t
-      logical, intent(in), optional :: wet(:, :)
+      logical, intent(in), optional :: wet(:, :), wet_event(:, :)
 
       this%total_dt = this%total_dt + dt
-      if (allocated(this%val_min)) this%val_min = min(this%val_min, value)
-      if (allocated(this%t_max) .and. present(t)) &
-         where (value > this%val_max) this%t_max = t
-      if (allocated(this%val_max)) this%val_max = max(this%val_max, value)
-      if (allocated(this%in_event) .and. present(t)) &
-         call step_events(this, value, dt, t, wet)
+      if (present(wet)) then
+         if (allocated(this%val_min)) &
+            where (wet) this%val_min = min(this%val_min, value)
+         if (allocated(this%t_max) .and. present(t)) &
+            where (wet .and. value > this%val_max) this%t_max = t
+         if (allocated(this%val_max)) &
+            where (wet) this%val_max = max(this%val_max, value)
+      else
+         if (allocated(this%val_min)) this%val_min = min(this%val_min, value)
+         if (allocated(this%t_max) .and. present(t)) &
+            where (value > this%val_max) this%t_max = t
+         if (allocated(this%val_max)) this%val_max = max(this%val_max, value)
+      end if
+      if (allocated(this%in_event) .and. present(t)) then
+         if (present(wet_event)) then
+            call step_events(this, value, dt, t, wet_event)
+         else
+            call step_events(this, value, dt, t, wet)
+         end if
+      end if
       if (this%shifted) then
          if (.not. this%have_shift) then
             this%shift = value
@@ -282,11 +302,14 @@ contains
 
       do j = 1, this%dim2
          do i = 1, this%dim1
-            if (this%thr_dir == THR_ABOVE) then
+            select case (this%thr_dir)
+            case (THR_ABOVE)
                met = value(i, j) > this%thr
-            else
+            case (THR_BELOW)
                met = value(i, j) < this%thr
-            end if
+            case default
+               met = abs(value(i, j)) > this%thr
+            end select
             if (present(wet)) met = met .and. wet(i, j)
 
             if (met) then
@@ -359,9 +382,16 @@ contains
 
       select case (trim(op))
       case ("min")
-         if (allocated(this%val_min)) stat = this%val_min
+         ! a cell never sampled (dry throughout, under a wet mask) holds the fill
+         if (allocated(this%val_min)) then
+            stat = this%val_min
+            where (stat == huge(1.0_SP)) stat = FILL_VALUE
+         end if
       case ("max")
-         if (allocated(this%val_max)) stat = this%val_max
+         if (allocated(this%val_max)) then
+            stat = this%val_max
+            where (stat == -huge(1.0_SP)) stat = FILL_VALUE
+         end if
       case ("mean")
          if (allocated(this%val_sum) .and. this%total_dt > 0.0_SP) then
             stat = this%val_sum/this%total_dt

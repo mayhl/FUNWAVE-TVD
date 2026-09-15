@@ -143,11 +143,8 @@ module model_stepper_2d_mod
       logical :: flather_owned(4) = .false.
 
       ! true once the run is past simulation.spinup.  Set per step where
-      ! `time` is in scope; consulted by the two envelope-accumulation sites
-      ! (update_max_min here, vort_max inside run_dispersion) so a wavemaker
-      ! ramp cannot set a maximum later reported as a storm peak.  False
-      ! during init, which also stops the stepper_init warm-up dispersion
-      ! call from seeding vort_max before t = 0.
+      ! `time` is in scope; gates the crest envelope (update_crest_max) so a
+      ! wavemaker ramp cannot set a maximum the crest mask then cuts on.
       logical :: past_spinup = .false.
 
       ! static bathymetry-slope dispersion gate (breaking.slope_disp_max):
@@ -231,6 +228,9 @@ module model_stepper_2d_mod
       ! 1x1 stand-in when off (cal_etauv_update).
       real(SP), allocatable :: brk_active_out(:, :), nu_capped_out(:, :)
       real(SP), allocatable :: froude_out(:, :)
+      ! instantaneous vorticity (registry name vorticity): the dispersion
+      ! kernel's write target, 1x1 stand-in when off
+      real(SP), allocatable :: vort_out(:, :)
 
    contains
       procedure :: init => stepper_init
@@ -500,6 +500,11 @@ contains
          allocate (this%froude_out(mloc, nloc), source=1.0_SP)
       else
          allocate (this%froude_out(1, 1), source=1.0_SP)
+      end if
+      if (this%output%OUT_VORT) then
+         allocate (this%vort_out(mloc, nloc), source=0.0_SP)
+      else
+         allocate (this%vort_out(1, 1), source=0.0_SP)
       end if
 
       ! per-cell f slot — the future CRS metric provider takes ownership
@@ -833,8 +838,7 @@ contains
                                this%vis_scheme, this%breaking%nu_scale, &
                                this%breaking%swe_eta_dep, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
-                               this%undertow_u, this%undertow_v, &
-                               cap_time=f%cap_time, cap_w=dt/3.0_SP, n_capped=ncap)
+                               this%undertow_u, this%undertow_v, n_capped=ncap)
             call stepper_note_cap(this, istage, time, ncap)
          elseif (this%breaking%wavemaker_vis) then
             ! legacy WAVE_BREAKING second branch: zone-only viscosity,
@@ -1038,7 +1042,7 @@ contains
             this%cap_warned = .true.
             write (msg, '(A,I0,A,ES10.3,A)') &
                "breaking.nu_cap engaged (", gcap, " cells, t = ", time, &
-               " s): nu saturated at the dx-scale bound; nu_cap_time maps it"
+               " s): nu saturated at the dx-scale bound; a nu_capped channel maps it"
             call this%env%log%warning(trim(msg))
          end if
       end if
@@ -1064,7 +1068,7 @@ contains
       if (sums(1) == 0) return
       write (msg, '(A,I0,A,I0,A,I0,A)') &
          "breaking.nu_cap engaged on ", sums(1), " of ", this%n_steps, &
-         " steps (peak ", peak, " cells/rank); nu_cap_time maps where"
+         " steps (peak ", peak, " cells/rank); a nu_capped channel maps where"
       call this%env%log%warning(trim(msg))
 
    end subroutine stepper_report_cap
@@ -1411,6 +1415,7 @@ contains
          end if
          if (this%output%OUT_FROUDE_SCALE) &
             call registry%register("froude_scale", this%froude_out)
+         if (this%output%OUT_VORT) call registry%register("vorticity", this%vort_out)
       end associate
    end subroutine stepper_register_output
 
@@ -1465,7 +1470,7 @@ contains
                                this%fields%nu_break, this%fields%age_break)
       end if
 
-      call update_max_min(this, time)
+      call update_crest_max(this)
 
       ! Refresh integer-mask output mirrors for the loop-top flush
       if (allocated(this%mask_out)) this%mask_out = real(this%fields%mask, SP)
@@ -1580,58 +1585,27 @@ contains
    end subroutine log_blowup_site
 
    ! ----------------------------------------------------------------
-   ! Private: legacy MAX_MIN_PROPERTY (old/misc.F) — envelope fields
-   ! over the whole (ghost-inclusive) array, wet cells only.  VORmax
-   ! lives in cal_dispersion_assemble (legacy dispersion.F, Cartesian).
+   ! Private: the running crest envelope the meteo crest mask reads (nee
+   ! the legacy MAX_MIN_PROPERTY h_max, whose output moved to a running
+   ! max channel).  Wet cells, past spin-up, only on demand.
    ! ----------------------------------------------------------------
-   subroutine update_max_min(this, time)
+   subroutine update_crest_max(this)
       class(type_model_stepper_2d), intent(inout) :: this
-      real(SP), intent(in) :: time
 
-      real(SP) :: maxv
       integer :: i, j
 
-      associate (f => this%fields, lp => this%grid%lp, &
-                 out => this%output, num => this%numerics)
-
-         if (.not. (out%OUT_Hmax .or. out%OUT_Hmin .or. out%OUT_Umax &
-                    .or. out%OUT_MFmax .or. out%out_arr_time)) return
-
-         ! spin-up gate: these are running envelopes with no reset, so
-         ! without it a ramp transient is baked into every maximum for the
-         ! rest of the run and nothing in the output says so
+      associate (f => this%fields, lp => this%grid%lp)
+         if (.not. this%output%OUT_Hmax) return
          if (.not. this%past_spinup) return
-
          do j = 1, lp%nloc
             do i = 1, lp%mloc
                if (f%mask(i, j) < 1) cycle
-
-               if (out%OUT_Hmax) then
-                  if (f%eta(i, j) > f%h_max(i, j)) f%h_max(i, j) = f%eta(i, j)
-               end if
-               if (out%OUT_Hmin) then
-                  if (f%eta(i, j) < f%h_min(i, j)) f%h_min(i, j) = f%eta(i, j)
-               end if
-               if (out%OUT_Umax) then
-                  maxv = sqrt(f%u(i, j)**2 + f%v(i, j)**2)
-                  if (maxv > f%u_max(i, j)) f%u_max(i, j) = maxv
-               end if
-               if (out%OUT_MFmax) then
-                  maxv = (f%u(i, j)**2 + f%v(i, j)**2)*f%h(i, j)
-                  if (maxv > f%mf_max(i, j)) f%mf_max(i, j) = maxv
-               end if
-               if (out%out_arr_time) then
-                  if (f%arr_time(i, j) == 0.0_SP .and. &
-                      abs(f%eta(i, j)) > out%arr_time_min_h) then
-                     f%arr_time(i, j) = time
-                  end if
-               end if
+               if (f%eta(i, j) > f%h_max(i, j)) f%h_max(i, j) = f%eta(i, j)
             end do
          end do
-
       end associate
 
-   end subroutine update_max_min
+   end subroutine update_crest_max
 
    ! ----------------------------------------------------------------
    ! Private: dispersion pass with the stepper's array wiring, in the
@@ -1671,8 +1645,7 @@ contains
                                       this%u4, this%v4, this%u1p, this%v1p, &
                                       this%u1pp, this%v1pp, this%u2, this%v2, &
                                       this%u3, this%v3, &
-                                      out_vormax=this%output%OUT_VORmax .and. this%past_spinup, &
-                                      vort_max=f%vort_max)
+                                      this%vort_out, this%output%OUT_VORT)
       end associate
 
    end subroutine run_dispersion
@@ -2041,6 +2014,7 @@ contains
       if (allocated(this%brk_active_out)) deallocate (this%brk_active_out)
       if (allocated(this%nu_capped_out)) deallocate (this%nu_capped_out)
       if (allocated(this%froude_out)) deallocate (this%froude_out)
+      if (allocated(this%vort_out)) deallocate (this%vort_out)
 
       this%env => null()
       this%grid => null()

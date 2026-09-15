@@ -29,8 +29,9 @@
 !    vessel:                     presence = resistance time series
 !      interval: <real>          series cadence (s), 0 = every step; REQUIRED
 !                                (nee OUT_VESSEL + PLOT_INTV_VESSEL)
-!    arrival_time:               presence = first-arrival map
-!      min_height: <real>        arrival threshold (m),        default 0.001
+!    (arrival_time: retired -- a first_time channel on eta, threshold
+!     magnitude:, accumulate: total; the envelopes Hmax/Hmin/Umax/MFmax/
+!     VORmax are max/min channels with accumulate: running)
 !    variables: [U, V, ETA, Hmax, Hmin, Umax, MFmax, VORmax,
 !                MASK, MASK9, Umean, Vmean, ETAmean, WaveHeight,
 !                SXL, SXR, SYL, SYR, SourceX, SourceY,
@@ -207,21 +208,15 @@ module model_output_mod
       logical  :: vessel_series_on = .false.
       real(SP) :: vessel_interval = SMALL
 
-      ! First-arrival map (nee numerics OUT_Time/ArrTimeMin): block presence
-      ! enables the time-of-first-exceedance accumulator; no cadence
-      logical  :: out_arr_time = .false.
-      real(SP) :: arr_time_min_h = 0.001_SP
-
       ! Per-variable output flags; derived from variables: list
       logical :: OUT_U = .false.
       logical :: OUT_V = .false.
       logical :: OUT_ETA = .false.
       logical :: OUT_EtaScreen = .false.
+      ! the running crest envelope the meteo crest mask reads (not an output)
       logical :: OUT_Hmax = .false.
-      logical :: OUT_Hmin = .false.
-      logical :: OUT_Umax = .false.
-      logical :: OUT_MFmax = .false.
-      logical :: OUT_VORmax = .false.
+      ! instantaneous vorticity mirror (registry name vorticity)
+      logical :: OUT_VORT = .false.
       ! gate-field mirrors (breaking_active / nu_capped / froude_scale)
       logical :: OUT_BRK_ACTIVE = .false.
       logical :: OUT_NU_CAPPED = .false.
@@ -345,13 +340,13 @@ contains
          if (this%vessel_interval <= ZERO) this%vessel_interval = SMALL
       end if
 
-      ! arrival_time: block presence enables the first-arrival map
+      ! arrival_time: retired -- a total-mode first_time channel supersedes it
       blk_yaml = sub_env%yaml%cast_dictionary("arrival_time", no_blk)
-      if (.not. no_blk) then
-         this%out_arr_time = .true.
-         call blk_yaml%read("min_height", silent=no_key, val=this%arr_time_min_h, &
-                            default="0.001")
-      end if
+      if (.not. no_blk) call env%log%exit_on_error( &
+         "output: arrival_time retired -- use a field channel: channels: [{name: arrival,"// &
+         " geometry: field, variables: [eta], statistics: [first_time],"// &
+         " threshold: {magnitude: <min_height>}, accumulate: total, interval: <any>}]"// &
+         " (never-triggered cells hold the fill, not 0)")
 
       ! geometries: + channels: point output streams
       call read_geometries(this, sub_env, this%min_spacing)
@@ -362,7 +357,8 @@ contains
                             "it on your field channel (channels: - {name: fields,"// &
                             " geometry: field, variables: [...], interval: ...})")
       call reject_string_list_key(sub_env, "variables", &
-                                  "registry names on a channel (ETA -> eta, Hmax -> h_max,"// &
+                                  "registry names on a channel (ETA -> eta, Hmax -> a"// &
+                                  " statistics: [max] channel with accumulate: running,"// &
                                   " Umean -> a statistics: [mean] channel, WaveHeight -> hsig)")
       call reject_moved_key(sub_env, "field_io_type", &
                             "format: (lowercase ascii | binary | netcdf | pnetcdf)")
@@ -379,8 +375,8 @@ contains
       ! staging).  Derived from the registry names the channels reference.
       do iv = 1, this%n_channels
          call derive_demand_flags(this, this%channels(iv))
-         ! event statistics sample wet cells only: the mask mirror
-         if (size(this%channels(iv)%thresholds) > 0) call this%need("mask")
+         ! extremes and events sample wet cells only: the mask mirror
+         if (this%channels(iv)%n_stats > 0) call this%need("mask")
       end do
 
    end subroutine output_read_input
@@ -410,10 +406,7 @@ contains
 
       select case (trim(name))
       case ("h_max"); this%OUT_Hmax = .true.
-      case ("h_min"); this%OUT_Hmin = .true.
-      case ("u_max"); this%OUT_Umax = .true.
-      case ("mf_max"); this%OUT_MFmax = .true.
-      case ("vort_max"); this%OUT_VORmax = .true.
+      case ("vorticity"); this%OUT_VORT = .true.
       case ("breaking_active"); this%OUT_BRK_ACTIVE = .true.
       case ("nu_capped"); this%OUT_NU_CAPPED = .true.
       case ("froude_scale"); this%OUT_FROUDE_SCALE = .true.
@@ -429,7 +422,6 @@ contains
       case ("vessel_pressure"); this%OUT_Pves = .true.
       case ("vessel_up"); this%OUT_VesUp = .true.
       case ("vessel_vp"); this%OUT_VesVp = .true.
-      case ("arr_time"); this%out_arr_time = .true.
       end select
 
    end subroutine output_need
@@ -877,15 +869,9 @@ contains
       if (blk%has_key("below")) then
          n_keys = n_keys + 1; key = "below"; cfg%thr_dir = -1
       end if
+      ! magnitude: |sample| above the value (a speed is its own magnitude)
       if (blk%has_key("magnitude")) then
-         n_keys = n_keys + 1; key = "magnitude"; cfg%thr_dir = 1
-         do iv = 1, size(cfg%variables)
-            if (index(cfg%variables(iv), ".mag") == 0) &
-               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
-                                              "': threshold: magnitude: applies to a .mag"// &
-                                              " speed variable (velocity.mag), not '"// &
-                                              trim(cfg%variables(iv))//"'")
-         end do
+         n_keys = n_keys + 1; key = "magnitude"; cfg%thr_dir = 2
       end if
       if (n_keys /= 1) call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
                                                       "': threshold: takes exactly one of"// &
@@ -920,6 +906,40 @@ contains
       logical :: hid(size(names) + size(PROD_DERIVED))
       character(8) :: der(size(PROD_DERIVED))
       integer :: iv, k, ip, nv, nd
+      integer :: ir
+
+      ! the legacy envelope and arrival fields are channel statistics now
+      do ir = 1, size(names)
+         select case (trim(names(ir)%s))
+         case ("h_max", "h_min")
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name//"': '"// &
+                                           trim(names(ir)%s)//"' retired -- a running"// &
+                                           " envelope channel: {variables: [eta], statistics:"// &
+                                           " [max, min, max_time], accumulate: running}")
+         case ("u_max")
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name//"': 'u_max'"// &
+                                           " retired -- {variables: [velocity.mag],"// &
+                                           " statistics: [max], accumulate: running}")
+         case ("mf_max")
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name//"': 'mf_max'"// &
+                                           " retired -- {variables: [momentum_flux],"// &
+                                           " statistics: [max], accumulate: running}")
+         case ("vort_max")
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name//"': 'vort_max'"// &
+                                           " retired -- {variables: [vorticity],"// &
+                                           " statistics: [max], accumulate: running}")
+         case ("arr_time")
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name//"': 'arr_time'"// &
+                                           " retired -- {variables: [eta], statistics:"// &
+                                           " [first_time], threshold: {magnitude: <min_height>},"// &
+                                           " accumulate: total}")
+         case ("nu_cap_time")
+            call sub_env%log%exit_on_error("output: channels: '"//cfg%name//"': 'nu_cap_time'"// &
+                                           " retired -- {variables: [nu_capped], statistics:"// &
+                                           " [duration], threshold: {above: 0.5},"// &
+                                           " accumulate: total}")
+         end select
+      end do
 
       nv = 0
       nd = 0

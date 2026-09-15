@@ -51,7 +51,7 @@ contains
                             cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap, &
                             vis_scheme, nu_scale, swe_eta_dep, in_wm_zone, &
                             nu_break, age, roller_flux, undertow_u, undertow_v, &
-                            cap_time, cap_w, n_capped)
+                            n_capped)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: etax(:, :), etay(:, :), etat(:, :)
       real(SP), intent(in)  :: eta(:, :), depth(:, :), h(:, :)
@@ -66,17 +66,12 @@ contains
       logical, intent(in)  :: in_wm_zone(:, :)
       real(SP), intent(inout) :: nu_break(:, :), age(:, :)
       real(SP), intent(inout) :: roller_flux(:, :), undertow_u(:, :), undertow_v(:, :)
-      ! cap-engagement diagnostics: per-cell engaged time (accrues cap_w
-      ! seconds per stage evaluation the clamp fires -- the caller passes
-      ! dt/3 so a fully-capped step accrues dt) + interior count this call
-      real(SP), intent(inout), optional :: cap_time(:, :)
-      real(SP), intent(in), optional :: cap_w
+      ! cap-engagement diagnostic: interior cells clamped this call (the
+      ! per-cell picture is the nu_capped output field)
       integer, intent(out), optional :: n_capped
 
       integer  :: i, j, ncap
-      real(SP) :: c_shallow, thr1, thr2, cap1, capw
-      ! stand-in for an absent cap_time; never indexed (accrue = .false.)
-      real(SP) :: cap_time_absent(1, 1)
+      real(SP) :: c_shallow, thr1, thr2, cap1
       real(SP) :: angle, c, c1, r, b
       real(SP) :: age1, age2, age3
       real(SP) :: propx, propy, propxy
@@ -220,40 +215,20 @@ contains
       ! several-fold over the stable bound — the open-water viscous
       ! blow-up mechanism.  Applies to the wavemaker zone too.
       ncap = 0
-      capw = 1.0_SP
-      if (present(cap_w)) capw = cap_w
-      ! apply_nu_cap takes cap_time NON-optionally: naming an absent OPTIONAL
-      ! inside its default(shared) region makes ifx/ifort copy a null
-      ! descriptor when it outlines the region, faulting at the loop head
-      ! even though present() guards every use (see kernel_masks.f90).  The
-      ! absent path passes a 1x1 stand-in the loop never indexes.
-      if (nu_cap > 0.0_SP) then
-         if (present(cap_time)) then
-            call apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, capw, &
-                              .true., cap_time, ncap)
-         else
-            call apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, capw, &
-                              .false., cap_time_absent, ncap)
-         end if
-      end if
+      if (nu_cap > 0.0_SP) call apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, ncap)
       if (present(n_capped)) n_capped = ncap
 
    end subroutine wave_breaking
 
    ! ----------------------------------------------------------------
-   ! Explicit-diffusion stability clamp, split out of wave_breaking so
-   ! the cap_time accumulator crosses the OpenMP boundary as a plain
-   ! non-optional array.  accrue = .false. leaves cap_time untouched and
-   ! the caller may pass any valid array.
+   ! Explicit-diffusion stability clamp, split out of wave_breaking as
+   ! its own OpenMP region; ncap counts the interior cells clamped
    ! ----------------------------------------------------------------
-   subroutine apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, capw, &
-                           accrue, cap_time, ncap)
+   subroutine apply_nu_cap(lp, nu_break, dx, dy, dt, nu_cap, ncap)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(inout) :: nu_break(:, :)
       real(SP), intent(in)  :: dx(:, :), dy(:, :)
-      real(SP), intent(in)  :: dt, nu_cap, capw
-      logical, intent(in)  :: accrue
-      real(SP), intent(inout) :: cap_time(:, :)
+      real(SP), intent(in)  :: dt, nu_cap
       integer, intent(out) :: ncap
 
       integer  :: i, j
@@ -269,10 +244,7 @@ contains
             if (nu_break(i, j) > cap1) then
                nu_break(i, j) = cap1
                if (i >= lp%ib .and. i <= lp%ie .and. &
-                   j >= lp%jb .and. j <= lp%je) then
-                  ncap = ncap + 1
-                  if (accrue) cap_time(i, j) = cap_time(i, j) + capw
-               end if
+                   j >= lp%jb .and. j <= lp%je) ncap = ncap + 1
             end if
          end do
       end do

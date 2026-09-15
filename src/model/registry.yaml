@@ -107,34 +107,23 @@ variables:
     flag_meanings:  "dry wet"
     latex:          "$m_9$"
 
-  # ── Diagnostics / envelope fields ─────────────────────────────────────────
-  - name:           h_max
-    legacy_name:    HeightMax
-    long_name:      "maximum sea surface elevation above mean sea level"
-    standard_name:  ""
-    funwave_name:   "maximum_sea_surface_height_above_mean_sea_level"
-    units:          "m"
+  # ── Instantaneous diagnostics (their envelopes are running-max channels) ──
+  - name:           vorticity
+    legacy_name:    ~
+    long_name:      "relative vorticity of the depth-averaged flow"
+    standard_name:  "ocean_relative_vorticity"
+    units:          "s-1"
     fill_value:     -9999.0
-    latex:          "$\\eta_{\\max}$"
+    latex:          "$\\omega$"
 
-  - name:           h_min
-    legacy_name:    HeightMin
-    long_name:      "minimum sea surface elevation above mean sea level"
+  - name:           momentum_flux
+    legacy_name:    ~
+    long_name:      "depth-integrated momentum flux magnitude"
     standard_name:  ""
-    funwave_name:   "minimum_sea_surface_height_above_mean_sea_level"
-    units:          "m"
+    funwave_name:   "depth_integrated_momentum_flux_magnitude"
+    units:          "m3 s-2"
     fill_value:     -9999.0
-    latex:          "$\\eta_{\\min}$"
-
-  - name:           u_max
-    legacy_name:    VelocityMax
-    long_name:      "maximum depth-averaged sea water speed"
-    standard_name:  ""
-    funwave_name:   "maximum_depth_averaged_sea_water_speed"
-    units:          "m s-1"
-    fill_value:     -9999.0
-    latex:          "$|\\mathbf{u}|_{\\max}$"
-
+    latex:          "$h |\\mathbf{u}|^2$"
   # ── prognostic fluxes and the vector-derived output names ───────────────
   # p/q are always registered (never demand-gated) and velocity.mag/.dir are
   # synthesised per step, but none was declared, so all four wrote with no CF
@@ -182,24 +171,6 @@ variables:
   # until now, so they wrote with NO CF attributes.  Units taken from the
   # definitions, not from the names: roller_flux and undertow_* are
   # depth-integrated fluxes (m2 s-1), NOT velocities, despite "undertow".
-  - name:           mf_max
-    legacy_name:    MFmax
-    long_name:      "maximum depth-integrated momentum flux"
-    standard_name:  ""
-    funwave_name:   "maximum_depth_integrated_momentum_flux"
-    units:          "m3 s-2"
-    fill_value:     -9999.0
-    latex:          "$(|\\mathbf{u}|^2 H)_{\\max}$"
-
-  - name:           vort_max
-    legacy_name:    VORmax
-    long_name:      "maximum relative vorticity"
-    standard_name:  ""
-    funwave_name:   "maximum_ocean_relative_vorticity"
-    units:          "s-1"
-    fill_value:     -9999.0
-    latex:          "$\\omega_{\\max}$"
-
   - name:           nu_break
     legacy_name:    nu_break
     long_name:      "breaking eddy viscosity"
@@ -244,24 +215,6 @@ variables:
     units:          "m2 s-1"
     fill_value:     -9999.0
     latex:          "$q_{v,\\mathrm{under}}$"
-
-  - name:           arr_time
-    legacy_name:    ARRTIME
-    long_name:      "wave front arrival time"
-    standard_name:  ""
-    funwave_name:   "sea_water_wave_front_arrival_time"
-    units:          "s"
-    fill_value:     -9999.0
-    latex:          "$t_{\\mathrm{arr}}$"
-
-  - name:           nu_cap_time
-    legacy_name:    ~
-    long_name:      "time with the breaker viscosity cap engaged"
-    standard_name:  ""
-    funwave_name:   "breaker_viscosity_cap_engaged_time"
-    units:          "s"
-    fill_value:     -9999.0
-    latex:          "$T_{\\nu,\\mathrm{cap}}$"
 
   # ── Gate fields ──────────────────────────────────────────────────────────
   # 0/1 flags or the applied weight, sampled from the last RK stage of the
@@ -612,7 +565,7 @@ sections:
     keys:
       screen_interval: {legacy: SCREEN_INTV, default: 1.0, units: s, latex: '$\Delta t_{\mathrm{screen}}$', doc: Screen-log / monitor cadence.}
       t_start: {legacy: PLOT_START_TIME, default: 0.0, units: s, latex: $t_0$, doc: Simulation time at which output begins.}
-      spinup: {legacy: ~, default: 0.0, units: s, latex: '$t_{\\mathrm{spin}}$', doc: "Spin-up duration. The running-maximum envelopes (h_max, h_min, u_max, mf_max, vort_max) and the first-arrival map do not accumulate before it, so a wavemaker ramp cannot set a maximum that is then reported as a storm peak. Channels may also write t_start: spinup to inherit it rather than restating the offset per channel. 0 = accumulate from t=0 (legacy)."}
+      spinup: {legacy: ~, default: 0.0, units: s, latex: '$t_{\\mathrm{spin}}$', doc: "Spin-up duration. The meteo crest envelope does not accumulate before it, and channels may write t_start: spinup to inherit it rather than restating the offset per channel -- so a wavemaker ramp cannot set a maximum that is then reported as a storm peak. 0 = from t=0 (legacy)."}
       title: {legacy: TITLE, default: ~, units: ~, doc: Run title (reserved for NetCDF global attrs).}
       total_time: {legacy: TOTAL_TIME, default: ~, units: s, latex: $T$, doc: Total simulated duration.}
 
@@ -837,7 +790,6 @@ sections:
     required: true
     doc: "Output control — cadence, format, folder, plus means/vessel/arrival-time sub-blocks."
     keys:
-      arrival_time.min_height: {legacy: ArrTimeMinH, default: 0.001, units: m, latex: '$H_{\mathrm{arr}}$', doc: Elevation threshold defining first wave arrival.}
       checkpoint: {legacy: ~, default: ~, units: ~, doc: Directory to write the hot-start checkpoint set (core.bin) at run end.}
       depth_out: {legacy: DEPTH_OUT, default: false, units: ~, doc: Write the still-water depth field.}
       format: {legacy: FIELD_IO_TYPE, default: binary, units: ~, values: [ascii, binary, netcdf, pnetcdf], doc: Field output format (nee field_io_type; netcdf needs a netcdf-fortran build, pnetcdf writes classic CDF-5 collectively and needs a PnetCDF build).}
