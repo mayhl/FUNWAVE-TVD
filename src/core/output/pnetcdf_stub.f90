@@ -34,6 +34,11 @@ module pnetcdf
       module procedure put_var_all_1d, put_var_all_2d
    end interface nf90mpi_put_var_all
 
+   ! character and real-array attributes, the two shapes the writer emits
+   interface nf90mpi_put_att
+      module procedure put_att_char, put_att_r4, put_att_r8
+   end interface nf90mpi_put_att
+
 contains
 
    integer function nf90mpi_create(comm, path, cmode, info, ncid) result(status)
@@ -68,13 +73,31 @@ contains
       status = STUB_ERR
    end function nf90mpi_def_var
 
-   integer function nf90mpi_put_att(ncid, varid, name, values) result(status)
+   integer function put_att_char(ncid, varid, name, values) result(status)
       integer, intent(in) :: ncid, varid
       character(*), intent(in) :: name, values
       associate (i => ncid, v => varid, n => name, s => values)
       end associate
       status = STUB_ERR
-   end function nf90mpi_put_att
+   end function put_att_char
+
+   integer function put_att_r4(ncid, varid, name, values) result(status)
+      integer, intent(in) :: ncid, varid
+      character(*), intent(in) :: name
+      real(4), intent(in) :: values(:)
+      associate (i => ncid, v => varid, n => name, s => values)
+      end associate
+      status = STUB_ERR
+   end function put_att_r4
+
+   integer function put_att_r8(ncid, varid, name, values) result(status)
+      integer, intent(in) :: ncid, varid
+      character(*), intent(in) :: name
+      real(8), intent(in) :: values(:)
+      associate (i => ncid, v => varid, n => name, s => values)
+      end associate
+      status = STUB_ERR
+   end function put_att_r8
 
    integer function nf90mpi_enddef(ncid) result(status)
       integer, intent(in) :: ncid

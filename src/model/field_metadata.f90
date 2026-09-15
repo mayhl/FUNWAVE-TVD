@@ -4,6 +4,7 @@
 !> Hand-written; the registry `variables:` block describes the same
 !> attributes and `tools/gen_registry.py --check` fails when they differ.
 module model_field_metadata_mod
+   use core_constants_mod, only: SP
    use core_output_channel_mod, only: type_var_meta
    implicit none
    public
@@ -33,9 +34,11 @@ contains
       case ("p_flux")
          m%units = "m2 s-1"
          m%long_name = "x-component of depth-integrated volume flux"
+         m%funwave_name = "sea_water_x_volume_flux"
       case ("q_flux")
          m%units = "m2 s-1"
          m%long_name = "y-component of depth-integrated volume flux"
+         m%funwave_name = "sea_water_y_volume_flux"
       case ("depth")
          m%units = "m"
          m%long_name = "still-water depth"
@@ -46,25 +49,38 @@ contains
          m%standard_name = "sea_floor_depth_below_sea_surface"
       case ("mask")
          m%units = "1"
-         m%long_name = "wet/dry mask (1=wet, 0=dry)"
+         m%long_name = "wet/dry mask"
+         m%funwave_name = "sea_water_wet_binary_mask"
+         m%n_flags = 2
+         m%flag_values(1:2) = [0.0_SP, 1.0_SP]
+         m%flag_meanings = "dry wet"
       case ("mask9")
          m%units = "1"
-         m%long_name = "wet/dry mask on 3x3 stencil (1=wet, 0=dry)"
+         m%long_name = "wet/dry mask on the 3x3 stencil"
+         m%funwave_name = "sea_water_3x3_wet_binary_mask"
+         m%n_flags = 2
+         m%flag_values(1:2) = [0.0_SP, 1.0_SP]
+         m%flag_meanings = "dry wet"
       case ("h_max")
          m%units = "m"
          m%long_name = "maximum sea surface elevation above mean sea level"
+         m%funwave_name = "maximum_sea_surface_height_above_mean_sea_level"
       case ("h_min")
          m%units = "m"
          m%long_name = "minimum sea surface elevation above mean sea level"
+         m%funwave_name = "minimum_sea_surface_height_above_mean_sea_level"
       case ("u_max")
          m%units = "m s-1"
          m%long_name = "maximum depth-averaged sea water speed"
+         m%funwave_name = "maximum_depth_averaged_sea_water_speed"
       case ("p")
          m%units = "m2 s-1"
          m%long_name = "x depth-integrated volume flux"
+         m%funwave_name = "eastward_depth_integrated_volume_flux_per_unit_width"
       case ("q")
          m%units = "m2 s-1"
          m%long_name = "y depth-integrated volume flux"
+         m%funwave_name = "northward_depth_integrated_volume_flux_per_unit_width"
       case ("velocity.mag")
          m%units = "m s-1"
          m%long_name = "depth-averaged sea water speed"
@@ -72,45 +88,69 @@ contains
       case ("velocity.dir")
          m%units = "degree"
          m%long_name = "current direction, CCW from +x axis"
+         m%funwave_name = "depth_averaged_current_direction_from_x_axis"
       case ("mf_max")
          m%units = "m3 s-2"
          m%long_name = "maximum depth-integrated momentum flux"
+         m%funwave_name = "maximum_depth_integrated_momentum_flux"
       case ("vort_max")
          m%units = "s-1"
          m%long_name = "maximum relative vorticity"
+         m%funwave_name = "maximum_ocean_relative_vorticity"
       case ("nu_break")
          m%units = "m2 s-1"
          m%long_name = "breaking eddy viscosity"
+         m%funwave_name = "breaking_eddy_viscosity"
       case ("age_break")
          m%units = "s"
          m%long_name = "age of the local breaking event"
+         m%funwave_name = "breaking_event_age"
       case ("roller_flux")
          m%units = "m2 s-1"
          m%long_name = "surface roller volume flux per unit width"
+         m%funwave_name = "surface_roller_volume_flux_per_unit_width"
       case ("undertow_u")
          m%units = "m2 s-1"
          m%long_name = "x-component of the roller-driven return flux per unit width"
+         m%funwave_name = "eastward_roller_return_volume_flux_per_unit_width"
       case ("undertow_v")
          m%units = "m2 s-1"
          m%long_name = "y-component of the roller-driven return flux per unit width"
+         m%funwave_name = "northward_roller_return_volume_flux_per_unit_width"
       case ("arr_time")
          m%units = "s"
          m%long_name = "wave front arrival time"
+         m%funwave_name = "sea_water_wave_front_arrival_time"
       case ("nu_cap_time")
          m%units = "s"
          m%long_name = "time with the breaker viscosity cap engaged"
+         m%funwave_name = "breaker_viscosity_cap_engaged_time"
       case ("breaking_active")
          m%units = "1"
-         m%long_name = "breaker viscosity active (1 = above the background floor)"
+         m%long_name = "breaker viscosity active flag"
+         m%funwave_name = "breaking_eddy_viscosity_active_flag"
+         m%n_flags = 2
+         m%flag_values(1:2) = [0.0_SP, 1.0_SP]
+         m%flag_meanings = "inactive active"
+         m%comment = "nu_break above breaking.nu_bkg at the last stage, the wavemaker-zone term included"
       case ("nu_capped")
          m%units = "1"
-         m%long_name = "breaker viscosity cap engaged (1 = at the clamp)"
+         m%long_name = "breaker viscosity cap engaged flag"
+         m%funwave_name = "breaking_eddy_viscosity_cap_engaged_flag"
+         m%n_flags = 2
+         m%flag_values(1:2) = [0.0_SP, 1.0_SP]
+         m%flag_meanings = "uncapped capped"
+         m%comment = "nu_break sitting at the breaking.nu_cap explicit-diffusion clamp at the last stage"
       case ("froude_scale")
          m%units = "1"
-         m%long_name = "Froude cap velocity factor applied (1 = untouched)"
+         m%long_name = "Froude cap velocity scale factor"
+         m%funwave_name = "froude_cap_velocity_scale_factor"
+         m%comment = "factor applied to the velocity by numerics.froude_cap at the last stage; 1 = untouched"
       case ("disp_gate")
          m%units = "1"
-         m%long_name = "dispersion gate weight (1 = dispersive, 0 = shallow-water)"
+         m%long_name = "dispersion gate weight"
+         m%funwave_name = "dispersion_gate_weight"
+         m%comment = "dispersive-term multiplier: 1 = fully dispersive, 0 = shallow-water; SWE, wet/dry and slope tapers"
       end select
    end function field_meta
 

@@ -88,13 +88,26 @@ module core_output_channel_mod
    integer, parameter :: VARS_MAX = 32
    integer, parameter :: STATS_MAX = 5
    integer, parameter :: META_LEN = 64
+   integer, parameter :: FLAGS_MAX = 4
+   integer, parameter :: COMMENT_LEN = 160
 
    ! CF attributes for one variable; a blank component writes no attr.
-   ! Filled by the model from the registry catalog (field_metadata.f90)
+   ! Filled by the model from the registry catalog (field_metadata.f90).
+   ! funwave_name is the in-house CF-style name of a variable with no
+   ! standard_name (its own attribute, never standard_name -- checkers
+   ! validate that against the CF table); flag_values/flag_meanings are
+   ! the CF 3.5 coded-value pair, n_flags = 0 for a plain quantity.  A
+   ! statistic of a flag is not a flag: the writers drop the pair there.
+   ! comment is CF 2.6.2 free text (semantics, method, caveats).
    type :: type_var_meta
       character(META_LEN) :: units = ''
       character(META_LEN) :: long_name = ''
       character(META_LEN) :: standard_name = ''
+      character(META_LEN) :: funwave_name = ''
+      character(COMMENT_LEN) :: comment = ''
+      character(META_LEN) :: flag_meanings = ''
+      integer :: n_flags = 0
+      real(SP) :: flag_values(FLAGS_MAX) = 0.0_SP
    end type type_var_meta
 
    ! Serial NetCDF backend state: one data.nc per channel, every channel
@@ -381,7 +394,10 @@ contains
             end if
          else
             ! Point files append per flush; start each run from empty files.
-            if (comm%is_io_node()) call truncate_point_files(this)
+            if (comm%is_io_node()) then
+               call truncate_point_files(this)
+               call write_metadata_yaml(this)
+            end if
          end if
 
          ! Accumulators: (n_local, 1)
@@ -431,6 +447,10 @@ contains
          end if
          if (trim(format) == 'netcdf') then
             if (comm%is_io_node()) call init_netcdf_backend(this, grid, diag_ncid)
+         else if (trim(format) == 'ascii' .or. trim(format) == 'binary') then
+            ! no attributes in the frames: the netcdf header rides beside them
+            call build_nc_varlist(this)
+            if (comm%is_io_node()) call write_metadata_yaml(this, grid%M, grid%N)
          else if (trim(format) == 'pnetcdf') then
             call build_nc_varlist(this)
             if (this%chunk_window > 0.0_SP) then
@@ -708,12 +728,14 @@ contains
             n = n + 1
             this%nc_names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
             this%nc_meta(n) = this%meta(iv)
+            this%nc_meta(n)%n_flags = 0
          end do
       end do
       do is = 1, this%n_derived
          n = n + 1
          this%nc_names(n) = trim(this%derived(is)%name)
          this%nc_meta(n) = this%meta(this%derived(is)%iv)
+         this%nc_meta(n)%n_flags = 0
       end do
       this%nc_n = n
    end subroutine build_nc_varlist
@@ -792,9 +814,25 @@ contains
       character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
       character(32), allocatable :: methods(:)
       type(type_var_meta), allocatable :: vmeta(:)
-      integer :: iv, is, n
+      integer :: n
 
-      ! statistic variables inherit the base variable's attrs
+      call build_point_varlist(this, names, methods, vmeta, n)
+      call this%ncp%create_group(diag_ncid, trim(this%id), x, y, &
+                                 names, vmeta, methods, n, this%n_stats > 0)
+   end subroutine init_netcdf_points
+
+   ! Point-channel variable list: snapshot variables plus every
+   ! <prefix>_<stat> with its CF cell_methods; statistic variables inherit
+   ! the base variable's attrs minus the flag pair
+   subroutine build_point_varlist(this, names, methods, vmeta, n)
+      class(type_output_channel), intent(in) :: this
+      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable, intent(out) :: names(:)
+      character(32), allocatable, intent(out) :: methods(:)
+      type(type_var_meta), allocatable, intent(out) :: vmeta(:)
+      integer, intent(out) :: n
+
+      integer :: iv, is
+
       allocate (names(this%n_vars*(1 + this%n_stats)))
       allocate (methods(this%n_vars*(1 + this%n_stats)))
       allocate (vmeta(this%n_vars*(1 + this%n_stats)))
@@ -811,12 +849,178 @@ contains
             names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
             methods(n) = stat_cell_method(trim(this%statistics(is)))
             vmeta(n) = this%meta(iv)
+            vmeta(n)%n_flags = 0
          end do
       end do
+   end subroutine build_point_varlist
 
-      call this%ncp%create_group(diag_ncid, trim(this%id), x, y, &
-                                 names, vmeta, methods, n, this%n_stats > 0)
-   end subroutine init_netcdf_points
+   ! ----------------------------------------------------------------
+   ! metadata.yaml for an ascii/binary channel: the header the netcdf
+   ! backend would write (globals, dimensions, every variable with its
+   ! CF attrs), key for key, so a reader sees the same metadata from
+   ! either source, plus a frames: block (file pattern, element type,
+   ! byte order, layout) so the folder reads standalone without the
+   ! deck.  Built as a fortran-yaml-c node tree and dumped by the
+   ! library, the same emitter the reader round-trips.  Static, written
+   ! once at init on the IO rank.  netcdf/pnetcdf channels carry it
+   ! in-file and write none.
+   ! ----------------------------------------------------------------
+   subroutine write_metadata_yaml(this, m, n)
+      use, intrinsic :: iso_fortran_env, only: int8, int32
+      use fortran_yaml_c, only: type_dictionary
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in), optional :: m, n   ! field: global grid size
+
+      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(32), allocatable :: methods(:)
+      type(type_var_meta), allocatable :: vmeta(:)
+      type(type_dictionary), pointer :: root, blk, vars, var
+      integer(int8) :: probe(4)
+      character(8) :: bits
+      integer :: unit, i, nv
+      logical :: field
+
+      field = present(m)
+      allocate (root)
+
+      blk => yaml_child(root, 'frames')
+      if (field) then
+         call blk%set_string('pattern', yaml_quoted('<variable>_NNNNN'))
+         call blk%set_string('counter_digits', '5')
+         if (trim(this%format) == 'binary') then
+            write (bits, '(I0)') storage_size(0.0_SP)
+            probe = transfer(1_int32, probe)
+            call blk%set_string('dtype', yaml_quoted('float'//trim(bits)))
+            call blk%set_string('byte_order', &
+                                yaml_quoted(trim(merge('little', 'big   ', probe(1) == 1_int8))))
+            call blk%set_string('layout', &
+                                yaml_quoted('raw stream of the (x, y) array, x fastest, no header'))
+         else
+            call blk%set_string('dtype', yaml_quoted('text'))
+            call blk%set_string('layout', yaml_quoted('one line per y, x values across'))
+         end if
+      else
+         call blk%set_string('pattern', yaml_quoted(trim(this%id)//'_<variable>.dat'))
+         call blk%set_string('dtype', yaml_quoted('text'))
+         call blk%set_string('layout', &
+                             yaml_quoted('one line per flush: time, then the point values in order'))
+      end if
+
+      call root%set_string('Conventions', yaml_quoted('CF-1.8'))
+      call root%set_string('source', yaml_quoted('FUNWAVE-TVD'))
+
+      blk => yaml_child(root, 'dimensions')
+      if (field) then
+         write (bits, '(I0)') m
+         call blk%set_string('x', trim(bits))
+         write (bits, '(I0)') n
+         call blk%set_string('y', trim(bits))
+      else
+         write (bits, '(I0)') this%n_global
+         call blk%set_string('point', trim(bits))
+         if (this%n_stats > 0) call blk%set_string('bnds', '2')
+      end if
+      call blk%set_string('time', 'unlimited')
+
+      vars => yaml_child(root, 'variables')
+      var => yaml_child(vars, 'x')
+      call var%set_string('units', yaml_quoted('m'))
+      var => yaml_child(vars, 'y')
+      call var%set_string('units', yaml_quoted('m'))
+      var => yaml_child(vars, 'time')
+      call var%set_string('units', yaml_quoted('seconds since start'))
+      if (.not. field .and. this%n_stats > 0) then
+         call var%set_string('bounds', yaml_quoted('time_bnds'))
+         var => yaml_child(vars, 'time_bnds')
+      end if
+      if (field) then
+         do i = 1, this%nc_n
+            var => yaml_child(vars, trim(this%nc_names(i)))
+            call yaml_var_atts(var, this%nc_meta(i))
+         end do
+      else
+         call build_point_varlist(this, names, methods, vmeta, nv)
+         do i = 1, nv
+            var => yaml_child(vars, trim(names(i)))
+            call var%set_string('cell_methods', yaml_quoted(trim(methods(i))))
+            call yaml_var_atts(var, vmeta(i))
+         end do
+      end if
+
+      open (newunit=unit, file=this%result_folder//'metadata.yaml', &
+            status='replace', action='write')
+      write (unit, '(A)') '# netcdf header of this channel (CF attributes for the '// &
+         trim(this%format)//' frames) and how the frames are laid out'
+      call root%dump(unit, 0)
+      close (unit)
+      call root%finalize()
+      deallocate (root)
+   end subroutine write_metadata_yaml
+
+   ! One variable's attrs onto its node, the nc_put_var_atts set in its order
+   subroutine yaml_var_atts(var, meta)
+      use fortran_yaml_c, only: type_dictionary, type_list, type_scalar
+      type(type_dictionary), intent(inout) :: var
+      type(type_var_meta), intent(in) :: meta
+
+      type(type_list), pointer :: vals
+      type(type_scalar), pointer :: val
+      character(24) :: buf
+      integer :: k
+
+      if (len_trim(meta%units) > 0) &
+         call var%set_string('units', yaml_quoted(trim(meta%units)))
+      if (len_trim(meta%long_name) > 0) &
+         call var%set_string('long_name', yaml_quoted(trim(meta%long_name)))
+      if (len_trim(meta%standard_name) > 0) &
+         call var%set_string('standard_name', yaml_quoted(trim(meta%standard_name)))
+      if (len_trim(meta%funwave_name) > 0) &
+         call var%set_string('funwave_name', yaml_quoted(trim(meta%funwave_name)))
+      if (len_trim(meta%comment) > 0) &
+         call var%set_string('comment', yaml_quoted(trim(meta%comment)))
+      if (meta%n_flags > 0) then
+         allocate (vals)
+         do k = 1, meta%n_flags
+            allocate (val)
+            write (buf, '(G0.6)') meta%flag_values(k)
+            val%string = trim(adjustl(buf))
+            call vals%append(val)
+         end do
+         call yaml_set_node(var, 'flag_values', vals)
+         call var%set_string('flag_meanings', yaml_quoted(trim(meta%flag_meanings)))
+      end if
+   end subroutine yaml_var_atts
+
+   ! New empty dictionary under parent%key, returned for filling
+   function yaml_child(parent, key) result(child)
+      use fortran_yaml_c, only: type_dictionary
+      type(type_dictionary), intent(inout) :: parent
+      character(*), intent(in) :: key
+      type(type_dictionary), pointer :: child
+
+      allocate (child)
+      call yaml_set_node(parent, key, child)
+   end function yaml_child
+
+   ! dictionary%set takes a class(type_node) pointer; this does the upcast
+   subroutine yaml_set_node(parent, key, node)
+      use fortran_yaml_c, only: type_dictionary, type_node
+      type(type_dictionary), intent(inout) :: parent
+      character(*), intent(in) :: key
+      class(type_node), target, intent(in) :: node
+
+      class(type_node), pointer :: p
+
+      p => node
+      call parent%set(key, p)
+   end subroutine yaml_set_node
+
+   ! Scalars dump verbatim, so a string value carries its own quotes
+   pure function yaml_quoted(s) result(q)
+      character(*), intent(in) :: s
+      character(:), allocatable :: q
+      q = '"'//s//'"'
+   end function yaml_quoted
 
    ! CF cell_methods label for one accumulator statistic
    pure function stat_cell_method(stat) result(cm)
@@ -991,6 +1195,47 @@ contains
 
    ! ---- NetCDF backend (serial: caller gathers, IO rank writes) ----
 
+   ! Per-variable CF attributes; a blank component writes nothing.  The
+   ! flag_values kind follows the variable's own type, as CF requires
+   subroutine nc_put_var_atts(ncid, varid, name, meta, single)
+      integer, intent(in) :: ncid, varid
+      character(*), intent(in) :: name
+      type(type_var_meta), intent(in) :: meta
+      logical, intent(in) :: single
+
+      if (len_trim(meta%units) > 0) &
+         call nc_check(nf90_put_att(ncid, varid, 'units', trim(meta%units)), &
+                       'att units '//trim(name))
+      if (len_trim(meta%long_name) > 0) &
+         call nc_check(nf90_put_att(ncid, varid, 'long_name', trim(meta%long_name)), &
+                       'att long_name '//trim(name))
+      if (len_trim(meta%standard_name) > 0) &
+         call nc_check(nf90_put_att(ncid, varid, 'standard_name', &
+                                    trim(meta%standard_name)), &
+                       'att standard_name '//trim(name))
+      if (len_trim(meta%funwave_name) > 0) &
+         call nc_check(nf90_put_att(ncid, varid, 'funwave_name', &
+                                    trim(meta%funwave_name)), &
+                       'att funwave_name '//trim(name))
+      if (len_trim(meta%comment) > 0) &
+         call nc_check(nf90_put_att(ncid, varid, 'comment', trim(meta%comment)), &
+                       'att comment '//trim(name))
+      if (meta%n_flags > 0) then
+         if (single) then
+            call nc_check(nf90_put_att(ncid, varid, 'flag_values', &
+                                       real(meta%flag_values(1:meta%n_flags), 4)), &
+                          'att flag_values '//trim(name))
+         else
+            call nc_check(nf90_put_att(ncid, varid, 'flag_values', &
+                                       real(meta%flag_values(1:meta%n_flags), 8)), &
+                          'att flag_values '//trim(name))
+         end if
+         call nc_check(nf90_put_att(ncid, varid, 'flag_meanings', &
+                                    trim(meta%flag_meanings)), &
+                       'att flag_meanings '//trim(name))
+      end if
+   end subroutine nc_put_var_atts
+
    subroutine nc_check(status, what)
       integer, intent(in) :: status
       character(*), intent(in) :: what
@@ -1054,18 +1299,7 @@ contains
                                     merge(NF90_FLOAT, NF90_DOUBLE, this%single), &
                                     [x_dim, y_dim, t_dim], this%varids(i)), &
                        'def var '//trim(names(i)))
-         if (len_trim(meta(i)%units) > 0) &
-            call nc_check(nf90_put_att(this%ncid, this%varids(i), 'units', &
-                                       trim(meta(i)%units)), &
-                          'att units '//trim(names(i)))
-         if (len_trim(meta(i)%long_name) > 0) &
-            call nc_check(nf90_put_att(this%ncid, this%varids(i), 'long_name', &
-                                       trim(meta(i)%long_name)), &
-                          'att long_name '//trim(names(i)))
-         if (len_trim(meta(i)%standard_name) > 0) &
-            call nc_check(nf90_put_att(this%ncid, this%varids(i), 'standard_name', &
-                                       trim(meta(i)%standard_name)), &
-                          'att standard_name '//trim(names(i)))
+         call nc_put_var_atts(this%ncid, this%varids(i), names(i), meta(i), this%single)
       end do
 
       ! group mode: the root already carries the global attrs, and a
@@ -1215,18 +1449,7 @@ contains
          call nc_check(nf90_put_att(this%grpid, this%varids(i), &
                                     'cell_methods', trim(methods(i))), &
                        'att cell_methods '//trim(names(i)))
-         if (len_trim(meta(i)%units) > 0) &
-            call nc_check(nf90_put_att(this%grpid, this%varids(i), 'units', &
-                                       trim(meta(i)%units)), &
-                          'att units '//trim(names(i)))
-         if (len_trim(meta(i)%long_name) > 0) &
-            call nc_check(nf90_put_att(this%grpid, this%varids(i), 'long_name', &
-                                       trim(meta(i)%long_name)), &
-                          'att long_name '//trim(names(i)))
-         if (len_trim(meta(i)%standard_name) > 0) &
-            call nc_check(nf90_put_att(this%grpid, this%varids(i), 'standard_name', &
-                                       trim(meta(i)%standard_name)), &
-                          'att standard_name '//trim(names(i)))
+         call nc_put_var_atts(this%grpid, this%varids(i), names(i), meta(i), .false.)
       end do
 
       call nc_check(nf90_put_var(this%grpid, x_var, x), 'put x '//id)
@@ -1287,6 +1510,47 @@ contains
    end subroutine ncp_reset
 
    ! ---- PnetCDF backend (parallel CDF-5; every method collective) ----
+
+   ! pnetcdf twin of nc_put_var_atts
+   subroutine pnc_put_var_atts(ncid, varid, name, meta, single)
+      integer, intent(in) :: ncid, varid
+      character(*), intent(in) :: name
+      type(type_var_meta), intent(in) :: meta
+      logical, intent(in) :: single
+
+      if (len_trim(meta%units) > 0) &
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'units', trim(meta%units)), &
+                        'att units '//trim(name))
+      if (len_trim(meta%long_name) > 0) &
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'long_name', &
+                                        trim(meta%long_name)), &
+                        'att long_name '//trim(name))
+      if (len_trim(meta%standard_name) > 0) &
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'standard_name', &
+                                        trim(meta%standard_name)), &
+                        'att standard_name '//trim(name))
+      if (len_trim(meta%funwave_name) > 0) &
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'funwave_name', &
+                                        trim(meta%funwave_name)), &
+                        'att funwave_name '//trim(name))
+      if (len_trim(meta%comment) > 0) &
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'comment', trim(meta%comment)), &
+                        'att comment '//trim(name))
+      if (meta%n_flags > 0) then
+         if (single) then
+            call pnc_check(nf90mpi_put_att(ncid, varid, 'flag_values', &
+                                           real(meta%flag_values(1:meta%n_flags), 4)), &
+                           'att flag_values '//trim(name))
+         else
+            call pnc_check(nf90mpi_put_att(ncid, varid, 'flag_values', &
+                                           real(meta%flag_values(1:meta%n_flags), 8)), &
+                           'att flag_values '//trim(name))
+         end if
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'flag_meanings', &
+                                        trim(meta%flag_meanings)), &
+                        'att flag_meanings '//trim(name))
+      end if
+   end subroutine pnc_put_var_atts
 
    subroutine pnc_check(status, what)
       integer, intent(in) :: status
@@ -1352,19 +1616,7 @@ contains
                                         [x_dim, y_dim, t_dim], &
                                         this%varids(i)), &
                         'def var '//trim(names(i)))
-         if (len_trim(meta(i)%units) > 0) &
-            call pnc_check(nf90mpi_put_att(this%ncid, this%varids(i), &
-                                           'units', trim(meta(i)%units)), &
-                           'att units '//trim(names(i)))
-         if (len_trim(meta(i)%long_name) > 0) &
-            call pnc_check(nf90mpi_put_att(this%ncid, this%varids(i), &
-                                           'long_name', trim(meta(i)%long_name)), &
-                           'att long_name '//trim(names(i)))
-         if (len_trim(meta(i)%standard_name) > 0) &
-            call pnc_check(nf90mpi_put_att(this%ncid, this%varids(i), &
-                                           'standard_name', &
-                                           trim(meta(i)%standard_name)), &
-                           'att standard_name '//trim(names(i)))
+         call pnc_put_var_atts(this%ncid, this%varids(i), names(i), meta(i), this%single)
       end do
 
       call pnc_check(nf90mpi_put_att(this%ncid, NF90_GLOBAL, 'Conventions', &

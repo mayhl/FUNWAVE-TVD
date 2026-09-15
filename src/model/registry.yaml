@@ -6,6 +6,12 @@
 #   funwave_name:  required when standard_name is ""; follows CF naming style
 #                  (lowercase, underscores, physical description) so future CF
 #                  migration is obvious. Omit when standard_name is non-empty.
+#                  Written as its own attribute, never as standard_name.
+#   flag_values / flag_meanings: optional CF 3.5 coded-value pair for a flag
+#                  variable (values as reals, meanings space-separated, same
+#                  count); long_name stays a plain phrase.
+#   comment:       optional CF 2.6.2 free text (semantics, method, caveats),
+#                  written as the variable's comment attribute.
 #
 # sections: hierarchical metadata catalog for config keys (legacy name, default,
 #   units, latex, values, doc).  See the sections: header below.
@@ -81,20 +87,24 @@ variables:
   # ── Masks ──────────────────────────────────────────────────────────────────
   - name:           mask
     legacy_name:    MASK
-    long_name:      "wet/dry mask (1=wet, 0=dry)"
+    long_name:      "wet/dry mask"
     standard_name:  ""
     funwave_name:   "sea_water_wet_binary_mask"
     units:          "1"
     fill_value:     -9999.0
+    flag_values:    [0, 1]
+    flag_meanings:  "dry wet"
     latex:          "$m$"
 
   - name:           mask9
     legacy_name:    MASK9
-    long_name:      "wet/dry mask on 3x3 stencil (1=wet, 0=dry)"
+    long_name:      "wet/dry mask on the 3x3 stencil"
     standard_name:  ""
     funwave_name:   "sea_water_3x3_wet_binary_mask"
     units:          "1"
     fill_value:     -9999.0
+    flag_values:    [0, 1]
+    flag_meanings:  "dry wet"
     latex:          "$m_9$"
 
   # ── Diagnostics / envelope fields ─────────────────────────────────────────
@@ -259,38 +269,46 @@ variables:
   # ever-tripped (max) per interval.  wet_fraction = mean of mask.
   - name:           breaking_active
     legacy_name:    ~
-    long_name:      "breaker viscosity active (1 = above the background floor)"
+    long_name:      "breaker viscosity active flag"
     standard_name:  ""
     funwave_name:   "breaking_eddy_viscosity_active_flag"
     units:          "1"
     fill_value:     -9999.0
+    flag_values:    [0, 1]
+    flag_meanings:  "inactive active"
+    comment:        "nu_break above breaking.nu_bkg at the last stage, the wavemaker-zone term included"
     latex:          "$\\chi_{\\mathrm{brk}}$"
 
   - name:           nu_capped
     legacy_name:    ~
-    long_name:      "breaker viscosity cap engaged (1 = at the clamp)"
+    long_name:      "breaker viscosity cap engaged flag"
     standard_name:  ""
     funwave_name:   "breaking_eddy_viscosity_cap_engaged_flag"
     units:          "1"
     fill_value:     -9999.0
+    flag_values:    [0, 1]
+    flag_meanings:  "uncapped capped"
+    comment:        "nu_break sitting at the breaking.nu_cap explicit-diffusion clamp at the last stage"
     latex:          "$\\chi_{\\nu,\\mathrm{cap}}$"
 
   - name:           froude_scale
     legacy_name:    ~
-    long_name:      "Froude cap velocity factor applied (1 = untouched)"
+    long_name:      "Froude cap velocity scale factor"
     standard_name:  ""
     funwave_name:   "froude_cap_velocity_scale_factor"
     units:          "1"
     fill_value:     -9999.0
+    comment:        "factor applied to the velocity by numerics.froude_cap at the last stage; 1 = untouched"
     latex:          "$s_{\\mathrm{Fr}}$"
 
   - name:           disp_gate
     legacy_name:    ~
-    long_name:      "dispersion gate weight (1 = dispersive, 0 = shallow-water)"
+    long_name:      "dispersion gate weight"
     standard_name:  ""
     funwave_name:   "dispersion_gate_weight"
     units:          "1"
     fill_value:     -9999.0
+    comment:        "dispersive-term multiplier: 1 = fully dispersive, 0 = shallow-water; SWE, wet/dry and slope tapers"
     latex:          "$w_{\\mathrm{disp}}$"
 
 

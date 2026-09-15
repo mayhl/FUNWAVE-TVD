@@ -34,8 +34,10 @@ READERS = REPO / "src" / "model" / "2d"
 DOCS_OUTPUT = REPO / "docs" / "guide" / "config_reference.md"
 META_OUTPUT = REPO / "src" / "model" / "field_metadata.f90"
 
-# character component length of type_var_meta (core output_channel.f90)
+# character component length and flag capacity of type_var_meta (core output_channel.f90)
 META_LEN = 64
+FLAGS_MAX = 4
+COMMENT_LEN = 160
 
 
 def fortran_default(value) -> str | None:
@@ -115,6 +117,25 @@ def validate(reg: dict) -> list[str]:
                 errors.append(f"variable {v.get('name')}: {field} exceeds META_LEN ({META_LEN})")
             elif '"' in str(s):
                 errors.append(f"variable {v.get('name')}: {field} contains a double quote")
+        for field in ("funwave_name", "flag_meanings"):
+            s = v.get(field)
+            if s is not None and len(str(s)) > META_LEN:
+                errors.append(f"variable {v.get('name')}: {field} exceeds META_LEN ({META_LEN})")
+        s = v.get("comment")
+        if s is not None and len(str(s)) > COMMENT_LEN:
+            errors.append(f"variable {v.get('name')}: comment exceeds COMMENT_LEN ({COMMENT_LEN})")
+        if s is not None and '"' in str(s):
+            errors.append(f"variable {v.get('name')}: comment contains a double quote")
+        vals, meanings = v.get("flag_values"), v.get("flag_meanings")
+        if (vals is None) != (meanings is None):
+            errors.append(f"variable {v.get('name')}: flag_values and flag_meanings go together")
+        elif vals is not None:
+            if not isinstance(vals, list) or not all(isinstance(x, (int, float)) for x in vals):
+                errors.append(f"variable {v.get('name')}: flag_values must be a list of numbers")
+            elif len(vals) > FLAGS_MAX:
+                errors.append(f"variable {v.get('name')}: flag_values exceeds FLAGS_MAX ({FLAGS_MAX})")
+            elif len(vals) != len(str(meanings).split()):
+                errors.append(f"variable {v.get('name')}: flag_meanings count differs from flag_values")
     return errors
 
 
@@ -300,13 +321,19 @@ def check_field_meta(reg: dict) -> list[str]:
             name = m.group(1)
             code[name] = {}
             continue
-        m = re.match(r'\s*m%(units|long_name|standard_name) = "([^"]*)"', line)
+        m = re.match(r'\s*m%(units|long_name|standard_name|funwave_name|flag_meanings|comment) = "([^"]*)"', line)
         if m and name:
             code[name][m.group(1)] = m.group(2)
+        m = re.match(r'\s*m%flag_values\(1:\d+\) = \[([^\]]*)\]', line)
+        if m and name:
+            code[name]["flag_values"] = " ".join(str(float(x.replace("_SP", ""))) for x in m.group(1).split(","))
 
     errors = []
     for v in reg.get("variables", []):
-        want = {k: str(v.get(k) or "") for k in ("units", "long_name", "standard_name")}
+        want = {k: str(v.get(k) or "") for k in ("units", "long_name", "standard_name", "funwave_name", "flag_meanings", "comment")}
+        if v.get("standard_name"):
+            want["funwave_name"] = ""
+        want["flag_values"] = " ".join(str(float(x)) for x in v.get("flag_values") or [])
         got = code.pop(v["name"], None)
         if got is None:
             errors.append(f"variable {v['name']}: in registry.yaml, not in field_metadata.f90")
