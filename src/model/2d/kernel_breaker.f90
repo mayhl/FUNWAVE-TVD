@@ -51,7 +51,8 @@ contains
                             cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap, &
                             vis_scheme, nu_scale, swe_eta_dep, in_wm_zone, &
                             nu_break, age, roller_flux, undertow_u, undertow_v, &
-                            n_capped)
+                            n_capped, h_max, h_min, was_active, cap_hb, cap_mid, &
+                            cap_steep)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)  :: etax(:, :), etay(:, :), etat(:, :)
       real(SP), intent(in)  :: eta(:, :), depth(:, :), h(:, :)
@@ -69,14 +70,27 @@ contains
       ! cap-engagement diagnostic: interior cells clamped this call (the
       ! per-cell picture is the nu_capped output field)
       integer, intent(out), optional :: n_capped
+      ! breaker-type capture at the rising edge of the active-dissipation
+      ! flag (the interior branch below, not the wavemaker-zone term): the
+      ! envelope height h_max - h_min, its mid-level and the front steepness
+      ! eta_t / sqrt(g h), peak over the event; the host assembles xi_b /
+      ! gamma_b from them.
+      ! Optional is safe here: this loop is not an OpenMP region.
+      real(SP), intent(in), optional :: h_max(:, :), h_min(:, :)
+      logical, intent(inout), optional :: was_active(:, :)
+      real(SP), intent(inout), optional :: cap_hb(:, :), cap_mid(:, :), cap_steep(:, :)
 
       integer  :: i, j, ncap
       real(SP) :: c_shallow, thr1, thr2, cap1
+      logical  :: capture, active
       real(SP) :: angle, c, c1, r, b
       real(SP) :: age1, age2, age3
       real(SP) :: propx, propy, propxy
       real(SP) :: etat_star, t_star
       real(SP) :: dxg, dyg, slope_mag
+
+      capture = present(cap_hb) .and. present(was_active) .and. present(h_max) &
+                .and. present(h_min) .and. present(cap_mid) .and. present(cap_steep)
 
       do j = lp%jb - 1, lp%je + 1
          do i = lp%ib - 1, lp%ie + 1
@@ -156,8 +170,21 @@ contains
                   nu_break(i, j) = nu_bkg
                end if
             else
-               if (age(i, j) > 0.0_SP .and. age(i, j) < t_brk .and. &
-                   etat(i, j) > thr2) then
+               active = age(i, j) > 0.0_SP .and. age(i, j) < t_brk .and. &
+                        etat(i, j) > thr2
+               if (capture) then
+                  if (active .and. .not. was_active(i, j)) then
+                     cap_hb(i, j) = h_max(i, j) - h_min(i, j)
+                     cap_mid(i, j) = 0.5_SP*(h_max(i, j) + h_min(i, j))
+                     cap_steep(i, j) = etat(i, j)/c_shallow
+                  else if (active) then
+                     ! the front steepness peaks after the onset (which is
+                     ! mostly the propagated cbrk2 crossing): keep the event max
+                     cap_steep(i, j) = max(cap_steep(i, j), etat(i, j)/c_shallow)
+                  end if
+                  was_active(i, j) = active
+               end if
+               if (active) then
                   cap1 = nu_scale*(max(depth(i, j), min_depth_frc) + eta(i, j))
 
                   select case (vis_scheme)

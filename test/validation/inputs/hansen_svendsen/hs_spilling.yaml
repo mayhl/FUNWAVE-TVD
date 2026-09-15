@@ -46,6 +46,10 @@ output:
       geometry: gauges
       variables: [eta]
       interval: 0.05
+    - name: breaker  # end-of-run snapshot: the oracle reads the class at the breakpoint
+      geometry: field
+      variables: [xi_0, xi_b, gamma_b, front_steepness]
+      interval: 1.0e6
   geometries:
     - name: gauges
       type: transect

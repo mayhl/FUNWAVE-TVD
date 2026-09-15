@@ -51,10 +51,12 @@ module model_fields_2d_mod
       real(SP), allocatable :: p0(:, :)    !< p   at previous time level       (Ubar0)
       real(SP), allocatable :: q0(:, :)    !< q   at previous time level       (Vbar0)
 
-      ! ── Running crest envelope ───────────────────────────────────────────
-      ! Not an output: the meteo crest mask reads it (output%need("h_max")).
-      ! Envelope outputs are channel statistics (max/min/max_time, running).
+      ! ── Running surface envelopes ────────────────────────────────────────
+      ! Not outputs: the meteo crest mask reads h_max (output%need("h_max"))
+      ! and the breaker-type capture reads both.  Envelope outputs are
+      ! channel statistics (max/min/max_time, running).
       real(SP), allocatable :: h_max(:, :)    !< maximum surface elevation     (HeightMax)
+      real(SP), allocatable :: h_min(:, :)    !< minimum surface elevation     (HeightMin)
 
       ! ── Breaking physics (optional) ───────────────────────────────────────
       ! Allocated by alloc_breaking(); unallocated = breaking disabled.
@@ -115,6 +117,7 @@ contains
       allocate (this%q0(mloc, nloc), source=0.0_SP)
 
       allocate (this%h_max(mloc, nloc), source=0.0_SP)
+      allocate (this%h_min(mloc, nloc), source=0.0_SP)
    end subroutine fields_alloc
 
    !> Allocate breaking-physics arrays.  Call after alloc() when any breaker
@@ -199,6 +202,7 @@ contains
       if (allocated(this%q0)) deallocate (this%q0)
 
       if (allocated(this%h_max)) deallocate (this%h_max)
+      if (allocated(this%h_min)) deallocate (this%h_min)
 
       if (allocated(this%nu_break)) deallocate (this%nu_break)
       if (allocated(this%age_break)) deallocate (this%age_break)

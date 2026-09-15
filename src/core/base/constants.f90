@@ -88,6 +88,10 @@ module core_constants_mod
 
    !> Gravitational acceleration \f$g\f$ (m s\f$^{-2}\f$).
    real(SP), parameter :: GRAV = 9.81_SP
+   !> The one output fill: every registry variable's fill_value, the
+   !! accumulators' never-triggered marker and the mirrors' not-yet-captured
+   !! sentinel (written as _FillValue by the netcdf writers)
+   real(SP), parameter :: FILL_VALUE = -9999.0_SP
 
    !> Air-to-water density ratio \f$\rho_{\rm air}/\rho_{\rm water}\f$ (dimensionless).
    real(SP), parameter :: RHO_AW = 0.0012041_SP

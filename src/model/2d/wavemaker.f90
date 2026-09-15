@@ -76,6 +76,7 @@ module model_wavemaker_mod
    public :: wk_regular_coefficients
    public :: cnoidal_harmonics
    public :: wavemaker_lambda_low
+   public :: wavemakers_offshore
    ! reader-agnostic boundary spectrum interchange + its periodic-y seam
    ! metric — public for unit tests and the future NetCDF reader
    public :: type_bnd_spectrum
@@ -138,6 +139,13 @@ module model_wavemaker_mod
       ! Multi-component time series — WK_TIME
       integer  :: NumWaveComp = 1
       real(SP) :: PeakPeriod = 0.0_SP
+
+      ! Offshore wave for the surf-similarity outputs (xi_0, xi_b): regular
+      ! and cnoidal = the deck H = 2a and T (a component sum is wrong for
+      ! bound harmonics); spectral and file types = Hm0 and the energy
+      ! period T_m-1,0 of the realised components.  0 = none.
+      real(SP) :: offshore_h0 = 0.0_SP
+      real(SP) :: offshore_t = 0.0_SP
 
       ! Spectral — WK_IRR, TMA_1D, JON_1D, JON_2D, WK_NEW_IRR, WK_NEW_DATA2D
       real(SP) :: FreqPeak = 0.0_SP
@@ -1198,7 +1206,56 @@ contains
          end do
       end if
 
+      ! the surf-similarity offshore wave: regular and cnoidal from the deck
+      if (this%wavemaker_type == "WK_REG" .or. this%cnoidal) then
+         this%offshore_h0 = 2.0_SP*this%AMP_WK
+         this%offshore_t = this%Tperiod
+      end if
+
    end subroutine wavemaker_init_compute
+
+   ! Hm0 and the energy period T_m-1,0 of a realised component set
+   ! (m0 = sum a^2/2; T_m-1,0 = sum(a^2/f) / sum(a^2))
+   subroutine note_offshore(this, cs)
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_component_set), intent(in) :: cs
+
+      real(SP) :: m0, m_1
+
+      if (cs%n == 0) return
+      m0 = sum(cs%amp(1:cs%n)**2)
+      if (m0 <= 0.0_SP .or. any(cs%freq(1:cs%n) <= 0.0_SP)) return
+      m_1 = sum(cs%amp(1:cs%n)**2/cs%freq(1:cs%n))
+      this%offshore_h0 = 4.0_SP*sqrt(0.5_SP*m0)
+      this%offshore_t = m_1/m0
+   end subroutine note_offshore
+
+   ! The offshore wave over every wavemaker: energy-summed height, energy-
+   ! weighted period; ok = at least one wavemaker carries a wave
+   subroutine wavemakers_offshore(wms, h0, t, ok)
+      type(type_model_wavemaker), intent(in) :: wms(:)
+      real(SP), intent(out) :: h0, t
+      logical, intent(out) :: ok
+
+      real(SP) :: e, esum, tsum
+      integer :: i
+
+      esum = 0.0_SP
+      tsum = 0.0_SP
+      do i = 1, size(wms)
+         if (wms(i)%offshore_h0 <= 0.0_SP .or. wms(i)%offshore_t <= 0.0_SP) cycle
+         e = wms(i)%offshore_h0**2
+         esum = esum + e
+         tsum = tsum + e*wms(i)%offshore_t
+      end do
+      ok = esum > 0.0_SP
+      h0 = 0.0_SP
+      t = 0.0_SP
+      if (ok) then
+         h0 = sqrt(esum)
+         t = tsum/esum
+      end if
+   end subroutine wavemakers_offshore
 
    ! ----------------------------------------------------------------
    ! Private: generation depth read off the bed.  A first pass on the
@@ -1827,6 +1884,7 @@ contains
       call wk_build_component_set(this, spec, spread, disc, env, cs)
 
       allocate (D_gen(cs%n), rlamda(cs%n), beta_gen(cs%n))
+      call note_offshore(this, cs)
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                this%FreqPeak, .true., D_gen, rlamda, beta_gen, &
                                snap_mode=disc%snap_mode, &
@@ -2105,6 +2163,7 @@ contains
          cs%amp(kf) = this%wave_comp(kf, 2)
       end do
 
+      call note_offshore(this, cs)
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                0.0_SP, .false., this%D_genS, rlamda, &
                                this%Beta_genS)
@@ -2263,6 +2322,7 @@ contains
       end do
 
       allocate (D_gen(cs%n), rlamda(cs%n), beta_gen(cs%n))
+      call note_offshore(this, cs)
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                0.0_SP, .false., D_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &
@@ -2399,6 +2459,7 @@ contains
       end do
 
       allocate (d_gen(nfreq), rlamda(nfreq), beta_gen(nfreq))
+      call note_offshore(this, cs)
       call wk_solve_components(cs, this%DEP_WK, this%Delta_WK, &
                                0.0_SP, .false., d_gen, rlamda, beta_gen)
       call wk_peak_width(this%PeakPeriod, this%DEP_WK, this%Delta_WK, &

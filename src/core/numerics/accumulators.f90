@@ -63,12 +63,12 @@
 !! counts and
 !! durations hold 0.
 module core_accumulators_mod
-   use core_constants_mod, only: SP
+   use core_constants_mod, only: SP, FILL_VALUE
    implicit none
 
-   !> Never-triggered marker of the time-valued statistics (the registry
-   !! fill value, so a writer needs no translation).
-   real(SP), parameter, public :: FILL_VALUE = -9999.0_SP
+   !> Never-triggered marker of the time-valued statistics: the one output
+   !! fill (core_constants_mod), re-exported for the tests
+   public :: FILL_VALUE
    integer, parameter, public :: THR_NONE = 0, THR_ABOVE = 1, THR_BELOW = -1, THR_ABS = 2
 
    !> Accumulates time-weighted statistics for a 2-D field array.

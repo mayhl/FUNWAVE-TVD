@@ -327,6 +327,9 @@ def check_field_meta(reg: dict) -> list[str]:
         m = re.match(r'\s*m%flag_values\(1:\d+\) = \[([^\]]*)\]', line)
         if m and name:
             code[name]["flag_values"] = " ".join(str(float(x.replace("_SP", ""))) for x in m.group(1).split(","))
+        m = re.match(r'\s*m%fill_value = ([-0-9.eE+]+)_SP', line)
+        if m and name:
+            code[name]["fill_value"] = str(float(m.group(1)))
 
     errors = []
     for v in reg.get("variables", []):
@@ -334,6 +337,7 @@ def check_field_meta(reg: dict) -> list[str]:
         if v.get("standard_name"):
             want["funwave_name"] = ""
         want["flag_values"] = " ".join(str(float(x)) for x in v.get("flag_values") or [])
+        want["fill_value"] = str(float(v["fill_value"])) if v.get("fill_value") is not None else ""
         got = code.pop(v["name"], None)
         if got is None:
             errors.append(f"variable {v['name']}: in registry.yaml, not in field_metadata.f90")

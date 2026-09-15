@@ -11,7 +11,10 @@ the seaward-most measured height H0 -- setup scales with H, and a range
 norm turns a few mm into tens of percent).  Report-only:
 breakpoint_offset_m, mean_level_offset_m, setup_slope_error_pct (linear
 setup gradient shoreward of the measured breakpoint, model vs measured --
-the radiation-stress balance, blind to the datum).
+the radiation-stress balance, blind to the datum), and the breaker class
+at the measured breakpoint when the deck writes the breaker fields
+(xi_0/xi_b/gamma_b medians over the 2 m shoreward of it; Battjes 1974:
+xi_b < 0.4 spilling, 0.4 to 2 plunging, above surging).
 """
 
 from __future__ import annotations
@@ -29,6 +32,8 @@ from test.validation.oracles._lab import load_deck, new_figure, nrmse_pct, read_
 
 MIN_WAVES = 5  # stations with fewer zero-crossing waves are swash/dry — excluded
 MIN_SLOPE_POINTS = 3  # setup stations shoreward of the breakpoint needed for a gradient
+BREAKER_SPAN_M = 2.0  # breaker-field median window shoreward of the measured breakpoint
+FILL = -9999.0
 
 _LABEL = "Surf profiles"
 ACCEPTED_KEYS = ("heights", "setup", "window_s", "channel", "height_stat", "height_nrmse_pct", "setup_rms_pct")
@@ -37,6 +42,30 @@ ACCEPTED_KEYS = ("heights", "setup", "window_s", "channel", "height_stat", "heig
 def _skip(msg: str) -> SubsectionResult:
     print(f"surf: {msg} — skipping")
     return SubsectionResult(kind="statistics", label=_LABEL, metrics=[])
+
+
+def _breaker_class(meta, deck: dict, x_bp: float) -> tuple[dict[str, float], str] | None:
+    """Breaker-field medians over the span shoreward of x_bp, and the class.
+
+    Reads the last breaker frame; None when the deck writes no breaker fields.
+    """
+    files = meta.output_files("xi_b")
+    if not files:
+        return None
+    dx = float(deck["grid"]["cell_size"][0])
+    out: dict[str, float] = {}
+    for name in ("xi_0", "xi_b", "gamma_b"):
+        frames = meta.output_files(name)
+        if not frames:
+            return None
+        fld = meta.read_field(frames[-1])
+        row = fld[fld.shape[0] // 2]
+        x = np.arange(len(row)) * dx
+        sel = (x >= x_bp) & (x <= x_bp + BREAKER_SPAN_M) & (row > FILL + 1.0)
+        out[name] = float(np.median(row[sel])) if sel.any() else float("nan")
+    xb = out["xi_b"]
+    label = "unknown" if not np.isfinite(xb) else "spilling" if xb < 0.4 else "plunging" if xb < 2.0 else "surging"
+    return out, label
 
 
 def _station_x(deck: dict, channel: str | None) -> np.ndarray:
@@ -125,6 +154,14 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         if np.isfinite(h_fit).any():
             bp_off = float(xm_h[int(np.nanargmax(h_fit))] - xm_h[int(np.argmax(h_meas))])
             metrics.append(MetricResult("surf", "breakpoint_offset_m", bp_off, True, math.inf))
+        breaker = _breaker_class(meta, deck, float(xm_h[int(np.argmax(h_meas))]) + x_off)
+        if breaker is not None:
+            vals, label = breaker
+            for name, v in vals.items():
+                metrics.append(MetricResult("surf", f"{name}_breakpoint", v, True, math.inf))
+            print(
+                f"surf: breaker class at the measured breakpoint: {label} (xi_b {vals['xi_b']:.2f}, gamma_b {vals['gamma_b']:.2f}, xi_0 {vals['xi_0']:.2f})"
+            )
         metrics.append(MetricResult("surf", "height_nrmse_pct", h_err, h_ok, h_tol))
 
     s_fit = None

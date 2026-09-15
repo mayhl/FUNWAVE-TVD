@@ -31,7 +31,7 @@
 
 module model_stepper_2d_mod
 
-   use core_constants_mod, only: SP, N_GHOST, MPI_SP
+   use core_constants_mod, only: SP, N_GHOST, MPI_SP, GRAV, PI, FILL_VALUE
    use core_grid_mod, only: type_grid_2d
    use core_env_mod, only: type_env
    use core_stepper_engine_mod, only: type_stepper_model
@@ -47,7 +47,7 @@ module model_stepper_2d_mod
    use model_friction_mod, only: type_model_friction
    use model_simulation_mod, only: type_model_simulation
    use model_output_mod, only: type_model_output
-   use model_wavemaker_mod, only: type_model_wavemaker
+   use model_wavemaker_mod, only: type_model_wavemaker, wavemakers_offshore
    use model_sponge_mod, only: type_model_sponge
    use model_obstacle_mod, only: type_model_obstacle
    use model_means_mod, only: type_model_means
@@ -237,6 +237,15 @@ module model_stepper_2d_mod
       real(SP), allocatable :: ax_out(:, :), ay_out(:, :), bx_out(:, :), by_out(:, :)
       ! and the divergences themselves (registry names a b): w(z) = -A - z B
       real(SP), allocatable :: a_out(:, :), b_out(:, :)
+      ! breaker type (registry names xi_0 xi_b gamma_b front_steepness): the
+      ! offshore wave from the wavemakers, |grad depth| (refreshed after a
+      ! bed change), the static xi_0 map, the kernel's onset capture (raw
+      ! ingredients, sentinel-filled) and the host-assembled mirrors
+      real(SP) :: brk_h0 = 0.0_SP, brk_t = 0.0_SP, brk_l0 = 0.0_SP
+      real(SP), allocatable :: bed_slope(:, :), xi0_out(:, :)
+      logical, allocatable :: was_active(:, :)
+      real(SP), allocatable :: cap_hb(:, :), cap_mid(:, :), cap_steep(:, :)
+      real(SP), allocatable :: xib_out(:, :), gammab_out(:, :), steep_out(:, :)
 
    contains
       procedure :: init => stepper_init
@@ -844,7 +853,10 @@ contains
                                this%vis_scheme, this%breaking%nu_scale, &
                                this%breaking%swe_eta_dep, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
-                               this%undertow_u, this%undertow_v, n_capped=ncap)
+                               this%undertow_u, this%undertow_v, n_capped=ncap, &
+                               h_max=f%h_max, h_min=f%h_min, was_active=this%was_active, &
+                               cap_hb=this%cap_hb, cap_mid=this%cap_mid, &
+                               cap_steep=this%cap_steep)
             call stepper_note_cap(this, istage, time, ncap)
          elseif (this%breaking%wavemaker_vis) then
             ! legacy WAVE_BREAKING second branch: zone-only viscosity,
@@ -1437,6 +1449,38 @@ contains
             call registry%register("a", this%a_out)
             call registry%register("b", this%b_out)
          end if
+         ! breaker type: needs an offshore wave (a wavemaker); the onset
+         ! fields also need the viscous breaker's active flag
+         if (this%output%OUT_XI0 .or. this%output%OUT_BRK_TYPE) then
+            block
+               logical :: ok
+               call wavemakers_offshore(this%wavemakers, this%brk_h0, this%brk_t, ok)
+               if (ok) then
+                  this%brk_l0 = GRAV*this%brk_t**2/(2.0_SP*PI)
+                  allocate (this%bed_slope(lp%mloc, lp%nloc), source=0.0_SP)
+                  allocate (this%xi0_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                  call compute_xi0(this)
+                  call registry%register("xi_0", this%xi0_out)
+                  ! the captured three exist whenever xi_0 does, so a deck
+                  ! stays valid across breaker models; without the viscous
+                  ! breaker's active flag they hold the fill throughout
+                  if (this%output%OUT_BRK_TYPE) then
+                     if (this%run_breaker) then
+                        allocate (this%was_active(lp%mloc, lp%nloc), source=.false.)
+                        allocate (this%cap_hb(lp%mloc, lp%nloc), source=FILL_VALUE)
+                        allocate (this%cap_mid(lp%mloc, lp%nloc), source=FILL_VALUE)
+                        allocate (this%cap_steep(lp%mloc, lp%nloc), source=FILL_VALUE)
+                     end if
+                     allocate (this%xib_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                     allocate (this%gammab_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                     allocate (this%steep_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                     call registry%register("xi_b", this%xib_out)
+                     call registry%register("gamma_b", this%gammab_out)
+                     call registry%register("front_steepness", this%steep_out)
+                  end if
+               end if
+            end block
+         end if
       end associate
    end subroutine stepper_register_output
 
@@ -1464,7 +1508,10 @@ contains
                                        this%dx, this%dy, this%inv_dx, this%inv_dy, &
                                        this%fields%depth, this%fields%depth_x, &
                                        this%fields%depth_y)
-         if (this%sediment%bed_change) call set_face_depth(this)
+         if (this%sediment%bed_change) then
+            call set_face_depth(this)
+            if (allocated(this%xi0_out)) call compute_xi0(this)
+         end if
       end if
 
       ! Legacy MIXING_STUFF: means accumulate on the completed step
@@ -1491,7 +1538,7 @@ contains
                                this%fields%nu_break, this%fields%age_break)
       end if
 
-      call update_crest_max(this)
+      call update_envelopes(this)
 
       ! Refresh integer-mask output mirrors for the loop-top flush
       if (allocated(this%mask_out)) this%mask_out = real(this%fields%mask, SP)
@@ -1513,6 +1560,7 @@ contains
          this%by_out = this%dws%uxy + this%dws%vyy
          call divergence_mirrors(this)
       end if
+      if (allocated(this%cap_hb)) call assemble_breaker_type(this)
 
       associate (f => this%fields, lp => this%grid%lp)
          max_abs_eta = maxval(abs(f%eta(lp%ib:lp%ie, lp%jb:lp%je)))
@@ -1643,27 +1691,87 @@ contains
    end subroutine log_blowup_site
 
    ! ----------------------------------------------------------------
-   ! Private: the running crest envelope the meteo crest mask reads (nee
-   ! the legacy MAX_MIN_PROPERTY h_max, whose output moved to a running
-   ! max channel).  Wet cells, past spin-up, only on demand.
+   ! Private: the running surface envelopes the meteo crest mask (h_max)
+   ! and the breaker-type capture (both) read -- nee the legacy
+   ! MAX_MIN_PROPERTY, whose outputs moved to running max/min channels.
+   ! Wet cells, past spin-up, only on demand.
    ! ----------------------------------------------------------------
-   subroutine update_crest_max(this)
+   subroutine update_envelopes(this)
       class(type_model_stepper_2d), intent(inout) :: this
 
       integer :: i, j
+      logical :: do_max, do_min
 
+      do_min = allocated(this%cap_hb)
+      do_max = this%output%OUT_Hmax .or. do_min
+      if (.not. do_max) return
+      if (.not. this%past_spinup) return
       associate (f => this%fields, lp => this%grid%lp)
-         if (.not. this%output%OUT_Hmax) return
-         if (.not. this%past_spinup) return
          do j = 1, lp%nloc
             do i = 1, lp%mloc
                if (f%mask(i, j) < 1) cycle
                if (f%eta(i, j) > f%h_max(i, j)) f%h_max(i, j) = f%eta(i, j)
+               if (do_min) then
+                  if (f%eta(i, j) < f%h_min(i, j)) f%h_min(i, j) = f%eta(i, j)
+               end if
             end do
          end do
       end associate
 
-   end subroutine update_crest_max
+   end subroutine update_envelopes
+
+   ! ----------------------------------------------------------------
+   ! Private: |grad depth| by central differences on the still-water
+   ! depth (the slope-gate stencil), then xi_0 = slope / sqrt(H0 / L0)
+   ! with the wavemakers' offshore wave.  Called at registration and
+   ! after every bed change.
+   ! ----------------------------------------------------------------
+   subroutine compute_xi0(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      real(SP) :: gx, gy, s0
+      integer :: i, j
+
+      associate (f => this%fields, lp => this%grid%lp)
+         do j = 2, lp%nloc - 1
+            do i = 2, lp%mloc - 1
+               gx = 0.5_SP*(f%depth(i + 1, j) - f%depth(i - 1, j))/this%dx(i, j)
+               gy = 0.5_SP*(f%depth(i, j + 1) - f%depth(i, j - 1))/this%dy(i, j)
+               this%bed_slope(i, j) = sqrt(gx*gx + gy*gy)
+            end do
+         end do
+      end associate
+      call this%grid%halo_exchange(this%bed_slope)
+      s0 = sqrt(this%brk_h0/this%brk_l0)
+      this%xi0_out = this%bed_slope/s0
+
+   end subroutine compute_xi0
+
+   ! ----------------------------------------------------------------
+   ! Private: host assembly of the breaker-type mirrors from the
+   ! kernel's onset capture -- xi_b = slope / sqrt(H_b / L0), gamma_b =
+   ! H_b / (still depth + envelope mid-level); fill until the first onset
+   ! ----------------------------------------------------------------
+   subroutine assemble_breaker_type(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      real(SP) :: hb, d
+      integer :: i, j
+
+      associate (f => this%fields, lp => this%grid%lp)
+         do j = 1, lp%nloc
+            do i = 1, lp%mloc
+               hb = this%cap_hb(i, j)
+               if (hb <= 0.0_SP) cycle
+               this%xib_out(i, j) = this%bed_slope(i, j)/sqrt(hb/this%brk_l0)
+               d = f%depth(i, j) + this%cap_mid(i, j)
+               if (d > 0.0_SP) this%gammab_out(i, j) = hb/d
+               this%steep_out(i, j) = this%cap_steep(i, j)
+            end do
+         end do
+      end associate
+
+   end subroutine assemble_breaker_type
 
    ! ----------------------------------------------------------------
    ! Private: dispersion pass with the stepper's array wiring, in the
@@ -2076,6 +2184,10 @@ contains
       if (allocated(this%ax_out)) deallocate (this%ax_out, this%ay_out, &
                                               this%bx_out, this%by_out, &
                                               this%a_out, this%b_out)
+      if (allocated(this%bed_slope)) deallocate (this%bed_slope, this%xi0_out)
+      if (allocated(this%cap_hb)) deallocate (this%was_active, this%cap_hb, this%cap_mid, &
+                                              this%cap_steep)
+      if (allocated(this%xib_out)) deallocate (this%xib_out, this%gammab_out, this%steep_out)
 
       this%env => null()
       this%grid => null()

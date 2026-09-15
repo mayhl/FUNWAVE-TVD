@@ -113,6 +113,10 @@ module core_output_channel_mod
       ! CF `coordinates`: the scalar coordinate variable(s) of a statistic
       ! (the event threshold), space separated
       character(META_LEN) :: coordinates = ''
+      ! `_FillValue` (the registry fill): written when has_fill, in the
+      ! variable's own type, before enddef
+      logical :: has_fill = .false.
+      real(SP) :: fill_value = 0.0_SP
       character(META_LEN) :: flag_meanings = ''
       integer :: n_flags = 0
       real(SP) :: flag_values(FLAGS_MAX) = 0.0_SP
@@ -905,6 +909,8 @@ contains
       select case (trim(this%statistics(is)))
       case ('max_time')
          m = type_var_meta()
+         m%has_fill = this%meta(iv)%has_fill
+         m%fill_value = this%meta(iv)%fill_value
          m%units = 's'
          m%long_name = 'time of the maximum of '//base
          m%comment = 'time the running maximum was last raised; fill where no sample'
@@ -912,6 +918,8 @@ contains
          cond = ' '//dir_text(this%thr_dir)//' '// &
                 threshold_text(this%thr(it))//' '//trim(this%meta(iv)%units)
          m = type_var_meta()
+         m%has_fill = this%meta(iv)%has_fill
+         m%fill_value = this%meta(iv)%fill_value
          m%units = 's'
          select case (trim(this%statistics(is)))
          case ('first_time')
@@ -1294,6 +1302,10 @@ contains
          call var%set_string('comment', yaml_quoted(trim(meta%comment)))
       if (len_trim(meta%coordinates) > 0) &
          call var%set_string('coordinates', yaml_quoted(trim(meta%coordinates)))
+      if (meta%has_fill) then
+         write (buf, '(G0.6)') meta%fill_value
+         call var%set_string('_FillValue', trim(adjustl(buf)))
+      end if
       if (meta%n_flags > 0) then
          allocate (vals)
          do k = 1, meta%n_flags
@@ -1562,6 +1574,15 @@ contains
       if (len_trim(meta%coordinates) > 0) &
          call nc_check(nf90_put_att(ncid, varid, 'coordinates', trim(meta%coordinates)), &
                        'att coordinates '//trim(name))
+      if (meta%has_fill) then
+         if (single) then
+            call nc_check(nf90_put_att(ncid, varid, '_FillValue', [real(meta%fill_value, 4)]), &
+                          'att _FillValue '//trim(name))
+         else
+            call nc_check(nf90_put_att(ncid, varid, '_FillValue', [real(meta%fill_value, 8)]), &
+                          'att _FillValue '//trim(name))
+         end if
+      end if
       if (meta%n_flags > 0) then
          if (single) then
             call nc_check(nf90_put_att(ncid, varid, 'flag_values', &
@@ -1926,6 +1947,15 @@ contains
       if (len_trim(meta%coordinates) > 0) &
          call pnc_check(nf90mpi_put_att(ncid, varid, 'coordinates', trim(meta%coordinates)), &
                         'att coordinates '//trim(name))
+      if (meta%has_fill) then
+         if (single) then
+            call pnc_check(nf90mpi_put_att(ncid, varid, '_FillValue', [real(meta%fill_value, 4)]), &
+                           'att _FillValue '//trim(name))
+         else
+            call pnc_check(nf90mpi_put_att(ncid, varid, '_FillValue', [real(meta%fill_value, 8)]), &
+                           'att _FillValue '//trim(name))
+         end if
+      end if
       if (meta%n_flags > 0) then
          if (single) then
             call pnc_check(nf90mpi_put_att(ncid, varid, 'flag_values', &

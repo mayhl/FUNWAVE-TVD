@@ -116,6 +116,50 @@ variables:
     fill_value:     -9999.0
     latex:          "$\\omega$"
 
+  # breaker type: surf-similarity numbers, thresholds left to postprocessing.
+  # xi_0 is static (bed slope, the wavemakers' offshore wave, refreshed after
+  # a bed change); the other three capture at each breaking onset (the
+  # rising edge of the active-dissipation flag) and hold the last event.
+  - name:           xi_0
+    legacy_name:    ~
+    long_name:      "offshore surf similarity parameter"
+    standard_name:  ""
+    funwave_name:   "surf_similarity_parameter_offshore"
+    units:          "1"
+    fill_value:     -9999.0
+    comment:        "bed slope / sqrt(H0 / L0); H0, T from the wavemakers (2a and T, or Hm0 and T_m-1,0), L0 = g T^2 / 2 pi"
+    latex:          "$\\xi_0$"
+
+  - name:           xi_b
+    legacy_name:    ~
+    long_name:      "breaker surf similarity parameter"
+    standard_name:  ""
+    funwave_name:   "surf_similarity_parameter_at_breaking"
+    units:          "1"
+    fill_value:     -9999.0
+    comment:        "slope / sqrt(H_b / L0) at the last onset, H_b = envelope height; fill before the first (always under shock)"
+    latex:          "$\\xi_b$"
+
+  - name:           gamma_b
+    legacy_name:    ~
+    long_name:      "breaker index"
+    standard_name:  ""
+    funwave_name:   "breaker_height_to_depth_ratio"
+    units:          "1"
+    fill_value:     -9999.0
+    comment:        "H_b over (still depth + envelope mid-level) at the last breaking onset; fill until the first onset"
+    latex:          "$\\gamma_b$"
+
+  - name:           front_steepness
+    legacy_name:    ~
+    long_name:      "peak surface rise rate over the shallow-water celerity"
+    standard_name:  ""
+    funwave_name:   "peak_breaking_front_rise_rate_over_shallow_water_celerity"
+    units:          "1"
+    fill_value:     -9999.0
+    comment:        "max of eta_t / sqrt(g h) over the last breaking event (breaking.cbrk1/cbrk2 gate this); fill until the first"
+    latex:          "$\\max \\eta_t / \\sqrt{gh}$"
+
   # vertical structure (nee the legacy AB_OUTPUT files Ax/Ay/Bx/By): the
   # velocity profile u(z) = u + (z_a - z) grad A + (z_a^2 - z^2)/2 grad B with
   # A = div(h u), B = div u, z_a = (1 + beta_ref) eta + beta_ref h
