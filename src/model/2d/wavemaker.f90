@@ -66,11 +66,15 @@ module model_wavemaker_mod
    ! bed under a source box / along a fed face may deviate this fraction of
    ! its mean before the one-depth assumption of the series is refused
    real(SP), parameter :: DEPTH_FLAT_TOL = 0.01_SP
+   ! cnoidal expansion: harmonics kept while a_n > tol*H, at most nmax
+   integer, parameter :: CNOIDAL_NMAX = 64
+   real(SP), parameter :: CNOIDAL_AMP_TOL = 1.0e-4_SP
 
    private
    public :: type_model_wavemaker
    public :: read_wavemakers
    public :: wk_regular_coefficients
+   public :: cnoidal_harmonics
    public :: wavemaker_lambda_low
    ! reader-agnostic boundary spectrum interchange + its periodic-y seam
    ! metric — public for unit tests and the future NetCDF reader
@@ -128,6 +132,8 @@ module model_wavemaker_mod
       real(SP) :: Tperiod = 0.0_SP
       real(SP) :: AMP_WK = 0.0_SP
       real(SP) :: Theta_WK = 0.0_SP
+      ! Cnoidal wave — the regular keys, expanded into WK_TIME harmonics
+      logical  :: cnoidal = .false.
 
       ! Multi-component time series — WK_TIME
       integer  :: NumWaveComp = 1
@@ -727,8 +733,9 @@ contains
       ! ── spectrum ──────────────────────────────────────────────────
       spec_yaml = wm%cast_dictionary("spectrum", no_spec)
       if (no_spec) call env%log%exit_on_error("wavemaker: needs a spectrum: block")
-      call spec_yaml%read_enum("type", [character(11) :: "regular", "jonswap", &
-                                        "tma", "spectrum_2d", "components"], val=stype)
+      call spec_yaml%read_enum("type", [character(11) :: "regular", "cnoidal", &
+                                        "jonswap", "tma", "spectrum_2d", &
+                                        "components"], val=stype)
 
       ! directional: presence = 2D spreading (kills Ntheta/Sigma_Theta
       ! leaking into 1D configs).  spread is required -- the block's presence
@@ -848,6 +855,24 @@ contains
          else
             this%wavemaker_type = merge("JON_2D", "JON_1D", has_dir)
          end if
+
+      case ("cnoidal")
+         ! the regular keys, amplitude = H/2; expanded into its harmonics
+         ! at init and run through the multi-component source
+         if (has_dir) call env%log%exit_on_error( &
+            "wavemaker/spectrum: cnoidal has no directional: block")
+         call spec_yaml%read("amplitude", silent=no_key, val=this%AMP_WK, &
+                             default="0.0")
+         call spec_yaml%read("period", silent=no_key, val=this%Tperiod, &
+                             default="0.0")
+         call spec_yaml%read("direction", silent=no_key, val=this%Theta_WK, &
+                             default="0.0")
+         if (this%Theta_WK /= 0.0_SP) call env%log%exit_on_error( &
+            "wavemaker/spectrum: cnoidal is shore-normal only"// &
+            " (the multi-component source carries no direction)")
+         this%cnoidal = .true.
+         this%PeakPeriod = this%Tperiod
+         this%wavemaker_type = "WK_TIME"
 
       case ("components")
          call spec_yaml%read("n", silent=no_key, val=this%NumWaveComp, &
@@ -1112,7 +1137,7 @@ contains
             call parametric_init_compute(this, grid, periodic, env)
          end select
       else if (this%time_series_source) then
-         call time_series_init_compute(this)
+         call time_series_init_compute(this, env)
       else
          if (periodic .and. this%Theta_WK /= 0.0_SP) &
             call periodic_theta_snap(this, grid, env)
@@ -2023,26 +2048,48 @@ contains
    ! solves the per-component Wei & Kirby source magnitude, and takes
    ! the shared width from PeakPeriod.
    ! ----------------------------------------------------------------
-   subroutine time_series_init_compute(this)
+   subroutine time_series_init_compute(this, env)
       class(type_model_wavemaker), intent(inout) :: this
+      type(type_env), intent(inout) :: env
 
       type(type_component_set) :: cs
-      real(SP), allocatable :: rlamda(:)
+      real(SP), allocatable :: rlamda(:), amps(:)
+      real(SP) :: wave_length, celerity, modulus
+      character(len=256) :: msg
       integer :: kf, i, unit, ios
 
-      allocate (this%wave_comp(this%NumWaveComp, 3), &
-                this%D_genS(this%NumWaveComp), &
-                this%Beta_genS(this%NumWaveComp), &
+      if (this%cnoidal) then
+         if (this%DEP_WK <= 0.0_SP) &
+            error stop "wavemaker: cnoidal needs source.depth (or a bed to read it from)"
+         call cnoidal_harmonics(2.0_SP*this%AMP_WK, this%DEP_WK, this%Tperiod, &
+                                CNOIDAL_NMAX, CNOIDAL_AMP_TOL, this%NumWaveComp, &
+                                amps, wave_length, celerity, modulus)
+         if (this%NumWaveComp == 0) &
+            error stop "wavemaker: no cnoidal solution for this H, h, T"// &
+            " (Ursell number below the cnoidal range -- use regular)"
+         allocate (this%wave_comp(this%NumWaveComp, 3))
+         do kf = 1, this%NumWaveComp
+            this%wave_comp(kf, 1) = this%Tperiod/real(kf, SP)
+            this%wave_comp(kf, 2) = amps(kf)
+            this%wave_comp(kf, 3) = 0.0_SP
+         end do
+         write (msg, '(A,F8.5,A,F8.2,A,F7.3,A,I0,A)') "wavemaker: cnoidal m = ", &
+            modulus, ", L = ", wave_length, " m, c = ", celerity, " m/s, ", &
+            this%NumWaveComp, " harmonics"
+         call env%log%info(trim(msg))
+      else
+         allocate (this%wave_comp(this%NumWaveComp, 3))
+         open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
+               action="read", iostat=ios)
+         if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+         do kf = 1, this%NumWaveComp
+            read (unit, *, iostat=ios) (this%wave_comp(kf, i), i=1, 3)
+            if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+         end do
+         close (unit)
+      end if
+      allocate (this%D_genS(this%NumWaveComp), this%Beta_genS(this%NumWaveComp), &
                 rlamda(this%NumWaveComp))
-
-      open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
-            action="read", iostat=ios)
-      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
-      do kf = 1, this%NumWaveComp
-         read (unit, *, iostat=ios) (this%wave_comp(kf, i), i=1, 3)
-         if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
-      end do
-      close (unit)
 
       if (this%PeakPeriod == 0.0_SP) &
          error stop "wavemaker: re-set PeakPeriod for wavemaker"
@@ -3283,6 +3330,121 @@ contains
       end if
 
    end subroutine calc_periodic_theta
+
+   ! ----------------------------------------------------------------
+   ! Cnoidal wave of height H, depth h, period T -- first order (Wiegel
+   ! 1960, the vendored NHWAVE solve).  The modulus m solves
+   !   $$ m h + 2H - mH - 3H\,\frac{E}{K} = \frac{16 h^3 m^2 K^2}{3 g H T^2} $$
+   ! (the L = cT closure of L = 4Kh\sqrt{mh/3H} and Mei's celerity); the
+   ! small-m root has c^2 < 0, so the bracket runs from the residual's
+   ! peak to m -> 1.  The profile
+   !   $$ \eta = y_t + H\,\mathrm{cn}^2\!\big(2K(x-ct)/L\,\big|\,m\big) $$
+   ! expands with the nome q = e^{-\pi K'/K} into phase-locked harmonics
+   !   $$ a_n = H\,\frac{2\pi^2}{mK^2}\,\frac{n q^n}{1-q^{2n}}, \qquad
+   !      \eta = \sum_n a_n \cos n(kx-\omega t) $$
+   ! whose constant term cancels y_t (zero mean).  Kept while a_n > tol*H,
+   ! at most nmax; n = 0 reports no solution.  The source launches each
+   ! harmonic with its own linear wavenumber, so the lock holds only where
+   ! the dispersion across n*omega is weak (shallow water).
+   ! ----------------------------------------------------------------
+   subroutine cnoidal_harmonics(height, depth, period, nmax, tol, n, amps, &
+                                wave_length, celerity, modulus)
+      real(SP), intent(in) :: height, depth, period, tol
+      integer, intent(in) :: nmax
+      integer, intent(out) :: n
+      real(SP), allocatable, intent(out) :: amps(:)
+      real(SP), intent(out) :: wave_length, celerity, modulus
+
+      integer, parameter :: NSCAN = 600
+      real(SP) :: m, m_peak, f, f_peak, lo, hi, ek, ee, ekp, q, a_n
+      integer :: it
+
+      ! coarse scan in s = -ln(1 - m), where the solitary end is resolved
+      f_peak = -huge(1.0_SP)
+      m_peak = 0.5_SP
+      do it = 1, NSCAN
+         m = 1.0_SP - exp(-30.0_SP*real(it, SP)/real(NSCAN, SP))
+         f = residual(m)
+         if (f > f_peak) then
+            f_peak = f
+            m_peak = m
+         end if
+      end do
+      n = 0
+      wave_length = 0.0_SP
+      celerity = 0.0_SP
+      modulus = 0.0_SP
+      allocate (amps(0))
+      if (f_peak <= 0.0_SP) return
+
+      ! bisection on [m_peak, 1): f > 0 at the peak, -> -inf at m = 1
+      lo = m_peak
+      hi = 1.0_SP - 1.0e-12_SP
+      do it = 1, 200
+         m = 0.5_SP*(lo + hi)
+         if (residual(m) > 0.0_SP) then
+            lo = m
+         else
+            hi = m
+         end if
+         if (hi - lo < 1.0e-13_SP) exit
+      end do
+      modulus = 0.5_SP*(lo + hi)
+
+      call elliptic_ke(modulus, ek, ee)
+      wave_length = 4.0_SP*ek*depth*sqrt(modulus*depth/(3.0_SP*height))
+      celerity = wave_length/period
+      call elliptic_ke(1.0_SP - modulus, ekp, ee)
+      q = exp(-PI*ekp/ek)
+      deallocate (amps)
+      allocate (amps(nmax))
+      do it = 1, nmax
+         a_n = height*2.0_SP*PI**2/(modulus*ek**2)*real(it, SP)*q**it/(1.0_SP - q**(2*it))
+         if (a_n <= tol*height) exit
+         n = it
+         amps(it) = a_n
+      end do
+      amps = amps(1:n)
+
+   contains
+
+      real(SP) function residual(m)
+         use core_constants_mod, only: GRAV
+         real(SP), intent(in) :: m
+         real(SP) :: k, e
+         call elliptic_ke(m, k, e)
+         residual = m*depth + 2.0_SP*height - m*height - 3.0_SP*height*e/k &
+                    - 16.0_SP*depth**3*m**2*k**2/(3.0_SP*GRAV*height*period**2)
+      end function residual
+
+   end subroutine cnoidal_harmonics
+
+   ! complete elliptic integrals K(m), E(m) by the arithmetic-geometric mean
+   subroutine elliptic_ke(m, k, e)
+      real(SP), intent(in) :: m
+      real(SP), intent(out) :: k, e
+
+      real(SP) :: a, b, c, a1, series, pow2
+      integer :: it
+
+      a = 1.0_SP
+      b = sqrt(1.0_SP - m)
+      c = sqrt(m)
+      series = 0.5_SP*c*c
+      pow2 = 1.0_SP
+      do it = 1, 60
+         a1 = 0.5_SP*(a + b)
+         c = 0.5_SP*(a - b)
+         b = sqrt(a*b)
+         a = a1
+         series = series + pow2*c*c
+         pow2 = 2.0_SP*pow2
+         if (abs(c) < 1.0e-15_SP) exit
+      end do
+      k = 0.5_SP*PI/a
+      e = k*(1.0_SP - series)
+
+   end subroutine elliptic_ke
 
    ! ----------------------------------------------------------------
    ! Wei & Kirby internal-source coefficients for a regular wave

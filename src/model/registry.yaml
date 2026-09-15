@@ -298,10 +298,10 @@ sections:
       seed: { legacy: ~, default: 66, units: ~, doc: "Phase-RNG seed for the random spectral realization (reproducible + restart-coherent; entries offset by index)." }
       zero_phase: { legacy: ~, default: false, units: ~, doc: "Zero every component phase instead of the seeded draw (parity/regression builds)." }
       spectrum.type:
-        { legacy: WAVEMAKER, default: ~, units: ~, values: [regular, jonswap, tma, spectrum_2d, components], doc: "Spectrum shape discriminant." }
-      spectrum.amplitude: { legacy: AMP_WK, default: 0.0, units: m, latex: "$a$", variant: [regular], doc: "Monochromatic wave amplitude." }
-      spectrum.period: { legacy: Tperiod, default: 0.0, units: s, latex: "$T$", variant: [regular], doc: "Monochromatic wave period." }
-      spectrum.direction: { legacy: Theta_WK, default: 0.0, units: deg, latex: "$\\theta$", variant: [regular], doc: "Monochromatic wave direction." }
+        { legacy: WAVEMAKER, default: ~, units: ~, values: [regular, cnoidal, jonswap, tma, spectrum_2d, components], doc: "Spectrum shape discriminant." }
+      spectrum.amplitude: { legacy: AMP_WK, default: 0.0, units: m, latex: "$a$", variant: [regular, cnoidal], doc: "Monochromatic wave amplitude (cnoidal: H/2; the profile is expanded into its harmonics)." }
+      spectrum.period: { legacy: Tperiod, default: 0.0, units: s, latex: "$T$", variant: [regular, cnoidal], doc: "Monochromatic wave period." }
+      spectrum.direction: { legacy: Theta_WK, default: 0.0, units: deg, latex: "$\\theta$", variant: [regular, cnoidal], doc: "Monochromatic wave direction (cnoidal: 0 only)." }
       spectrum.hm0: { legacy: Hmo, default: 0.0, units: m, latex: "$H_{m0}$", variant: [jonswap, tma], doc: "Significant wave height (total eta)." }
       spectrum.gamma: { legacy: GammaTMA, default: 3.3, units: ~, latex: "$\\gamma$", variant: [jonswap, tma], doc: "Peak enhancement factor." }
       spectrum.normalize:

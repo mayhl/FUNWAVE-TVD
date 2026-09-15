@@ -12,7 +12,7 @@ module test_wavemaker
    use model_breaking_mod, only: type_model_breaking
    use model_wavemaker_mod, only: type_model_wavemaker, read_wavemakers, &
                                   type_bnd_spectrum, bnd_seam_fraction, &
-                                  DIR_CARTESIAN
+                                  DIR_CARTESIAN, cnoidal_harmonics
    use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
 
    implicit none
@@ -484,5 +484,73 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_bnd_seam_fraction
+
+   ! ----------------------------------------------------------------
+   ! Cnoidal expansion: cn^2 runs 1 at the crest (phase 0) to 0 at the
+   ! trough (phase pi), so the harmonic sum and its alternating sum differ
+   ! by exactly H; the closure gives c = L/T.  The TK plunging paddle
+   ! (H 0.1, h 0.4, T 5) sits deep in the cnoidal range.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_cnoidal_harmonics_identities(this)
+      class(MpiTestMethod), intent(inout) :: this
+      real(SP), allocatable :: amps(:)
+      real(SP) :: wl, c, m, crest, trough
+      integer :: n, k
+
+      call cnoidal_harmonics(0.1_SP, 0.4_SP, 5.0_SP, 64, 1.0e-6_SP, n, amps, wl, c, m)
+      @assertTrue(n > 3)
+      crest = sum(amps)
+      trough = 0.0_SP
+      do k = 1, n
+         trough = trough + amps(k)*real((-1)**k, SP)
+      end do
+      @assertEqual(0.1_SP, crest - trough, tolerance=1.0e-4_SP)
+      @assertTrue(m > 0.99_SP)
+      @assertEqual(wl/5.0_SP, c, tolerance=1.0e-6_SP)
+      ! longer than the linear 9.8 m, shorter than the solitary limit
+      @assertTrue(wl > 9.8_SP .and. wl < 12.0_SP)
+   end subroutine test_cnoidal_harmonics_identities
+
+   ! no cnoidal solution in the Stokes range: a small short wave in deep water
+   @test(npes=[1])
+   subroutine test_cnoidal_harmonics_no_solution(this)
+      class(MpiTestMethod), intent(inout) :: this
+      real(SP), allocatable :: amps(:)
+      real(SP) :: wl, c, m
+      integer :: n
+
+      call cnoidal_harmonics(0.01_SP, 10.0_SP, 1.0_SP, 64, 1.0e-6_SP, n, amps, wl, c, m)
+      @assertEqual(0, n)
+   end subroutine test_cnoidal_harmonics_no_solution
+
+   ! ----------------------------------------------------------------
+   ! source.depth absent: the generation depth is the bed mean under the
+   ! box when the bed is flat there
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_source_depth_from_flat_bed(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_model_wavemaker) :: wm
+      type(type_grid_2d) :: grid
+      type(type_comm)    :: comm
+      type(type_env)     :: env
+      real(SP), allocatable :: depth(:, :)
+
+      call open_env(this, env, comm)
+      grid%M = TEST_M; grid%N = TEST_N
+      grid%nx_proc = 1; grid%ny_proc = 1
+      call grid%setup(comm, create_partition=.false.)
+      call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
+      allocate (depth(grid%lp%mloc, grid%lp%nloc), source=DEP_SP)
+      wm%wavemaker_type = 'WK_REG'
+      wm%Tperiod = 5.0_SP
+      wm%AMP_WK = 0.05_SP
+      wm%Xc_WK = XWM_SP
+      wm%DEP_WK = 0.0_SP
+      wm%depth_auto = .true.
+      call wm%init_compute(grid, .false., env, -0.531_SP, depth)
+      @assertEqual(DEP_SP, wm%DEP_WK, tolerance=TOL_SP)
+   end subroutine test_source_depth_from_flat_bed
 
 end module test_wavemaker

@@ -34,10 +34,10 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `name` | — | — | — | Name (referenced by boundaries.\<face>.forcing.wavemaker). |
 | `seed` | `66` | — | — | Phase-RNG seed for the random spectral realization (reproducible + restart-coherent; entries offset by index). |
 | `zero_phase` | `false` | — | — | Zero every component phase instead of the seeded draw (parity/regression builds). |
-| `spectrum.type` | — | `WAVEMAKER` | — | Spectrum shape discriminant. One of `regular` \| `jonswap` \| `tma` \| `spectrum_2d` \| `components`. |
-| `spectrum.amplitude` | `0.0` | `AMP_WK` | m | *(regular)* Monochromatic wave amplitude. |
-| `spectrum.period` | `0.0` | `Tperiod` | s | *(regular)* Monochromatic wave period. |
-| `spectrum.direction` | `0.0` | `Theta_WK` | deg | *(regular)* Monochromatic wave direction. |
+| `spectrum.type` | — | `WAVEMAKER` | — | Spectrum shape discriminant. One of `regular` \| `cnoidal` \| `jonswap` \| `tma` \| `spectrum_2d` \| `components`. |
+| `spectrum.amplitude` | `0.0` | `AMP_WK` | m | *(regular/cnoidal)* Monochromatic wave amplitude (cnoidal: H/2; the profile is expanded into its harmonics). |
+| `spectrum.period` | `0.0` | `Tperiod` | s | *(regular/cnoidal)* Monochromatic wave period. |
+| `spectrum.direction` | `0.0` | `Theta_WK` | deg | *(regular/cnoidal)* Monochromatic wave direction (cnoidal: 0 only). |
 | `spectrum.hm0` | `0.0` | `Hmo` | m | *(jonswap/tma)* Significant wave height (total eta). |
 | `spectrum.gamma` | `3.3` | `GammaTMA` | — | *(jonswap/tma)* Peak enhancement factor. |
 | `spectrum.normalize` | `band` | — | — | *(jonswap/tma)* Hm0 normalization: band renormalizes the truncated [min, max] band to carry the full Hm0 (legacy); total keeps the band's natural share of the full-spectrum integral. One of `band` \| `total`. |
