@@ -253,6 +253,46 @@ variables:
     fill_value:     -9999.0
     latex:          "$T_{\\nu,\\mathrm{cap}}$"
 
+  # ── Gate fields ──────────────────────────────────────────────────────────
+  # 0/1 flags or the applied weight, sampled from the last RK stage of the
+  # step; a statistics channel gives the duty fraction (mean) and
+  # ever-tripped (max) per interval.  wet_fraction = mean of mask.
+  - name:           breaking_active
+    legacy_name:    ~
+    long_name:      "breaker viscosity active (1 = above the background floor)"
+    standard_name:  ""
+    funwave_name:   "breaking_eddy_viscosity_active_flag"
+    units:          "1"
+    fill_value:     -9999.0
+    latex:          "$\\chi_{\\mathrm{brk}}$"
+
+  - name:           nu_capped
+    legacy_name:    ~
+    long_name:      "breaker viscosity cap engaged (1 = at the clamp)"
+    standard_name:  ""
+    funwave_name:   "breaking_eddy_viscosity_cap_engaged_flag"
+    units:          "1"
+    fill_value:     -9999.0
+    latex:          "$\\chi_{\\nu,\\mathrm{cap}}$"
+
+  - name:           froude_scale
+    legacy_name:    ~
+    long_name:      "Froude cap velocity factor applied (1 = untouched)"
+    standard_name:  ""
+    funwave_name:   "froude_cap_velocity_scale_factor"
+    units:          "1"
+    fill_value:     -9999.0
+    latex:          "$s_{\\mathrm{Fr}}$"
+
+  - name:           disp_gate
+    legacy_name:    ~
+    long_name:      "dispersion gate weight (1 = dispersive, 0 = shallow-water)"
+    standard_name:  ""
+    funwave_name:   "dispersion_gate_weight"
+    units:          "1"
+    fill_value:     -9999.0
+    latex:          "$w_{\\mathrm{disp}}$"
+
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # sections — hierarchical metadata tree (registry v2)

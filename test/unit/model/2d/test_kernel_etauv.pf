@@ -94,6 +94,7 @@ contains
       real(SP), intent(out)   :: hu(:, :), hv(:, :)
 
       type(type_trid_workspace) :: tws
+      real(SP) :: fs_off(1, 1)
 
       if (dispersion) then
          call cal_etauv_assemble_x(lp, gamma1, min_depth, b1, b2, inv_dx, &
@@ -118,7 +119,7 @@ contains
       end if
 
       call cal_etauv_update(lp, froude_cap, min_depth, mask, h, u, v, hu, hv, &
-                            ubar, vbar)
+                            ubar, vbar, fs_off, .false.)
 
    end subroutine drive_etauv
 
@@ -382,6 +383,47 @@ contains
       call ws%free()
       call MPI_Comm_free(grid%cart_comm)
    end subroutine test_froude_cap
+
+   ! ----------------------------------------------------------------
+   ! froude_scale mirror: the applied factor cap/utotal on a capped cell,
+   ! 1 on an uncapped wet cell and on a dry cell; untouched when off.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_froude_scale()
+      type(type_loop_bounds) :: lp
+      real(SP) :: h(MLOC, NLOC), ubar(MLOC, NLOC), vbar(MLOC, NLOC)
+      real(SP) :: u(MLOC, NLOC), v(MLOC, NLOC), hu(MLOC, NLOC), hv(MLOC, NLOC)
+      real(SP) :: fs(MLOC, NLOC)
+      integer  :: mask(MLOC, NLOC)
+      integer  :: ic, jc, id, jd
+
+      real(SP), parameter :: H0 = 2.5_SP
+      real(SP), parameter :: UBIG = 1000.0_SP
+
+      call make_lp(lp)
+      h = H0; mask = 1; ubar = 0.0_SP; vbar = 0.0_SP
+      u = 0.1_SP; v = 0.0_SP
+      ic = lp%ib + 1; jc = lp%jb + 1
+      id = lp%ib + 2; jd = lp%jb + 2
+      u(ic, jc) = UBIG
+      mask(id, jd) = 0
+      u(id, jd) = UBIG
+      fs = -1.0_SP
+
+      call cal_etauv_update(lp, FCAP, MIN_DEPTH, mask, h, u, v, hu, hv, &
+                            ubar, vbar, fs, .true.)
+
+      @assertEqual(FCAP*sqrt(GRAV*H0)/UBIG, fs(ic, jc), TOL)
+      @assertEqual(1.0_SP, fs(id, jd), TOL)
+      @assertEqual(1.0_SP, fs(lp%ib, lp%jb), TOL)
+      @assertEqual(-1.0_SP, fs(lp%ib - 1, lp%jb), TOL)
+
+      fs = -1.0_SP
+      u = 0.1_SP; u(ic, jc) = UBIG
+      call cal_etauv_update(lp, FCAP, MIN_DEPTH, mask, h, u, v, hu, hv, &
+                            ubar, vbar, fs, .false.)
+      @assertEqual(-1.0_SP, fs(ic, jc), TOL)
+   end subroutine test_froude_scale
 
    ! ----------------------------------------------------------------
    ! Gamma1=0, dispersion=.true.: tridiagonal is diagonal -- gives

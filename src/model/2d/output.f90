@@ -205,6 +205,10 @@ module model_output_mod
       logical :: OUT_Umax = .false.
       logical :: OUT_MFmax = .false.
       logical :: OUT_VORmax = .false.
+      ! gate-field mirrors (breaking_active / nu_capped / froude_scale)
+      logical :: OUT_BRK_ACTIVE = .false.
+      logical :: OUT_NU_CAPPED = .false.
+      logical :: OUT_FROUDE_SCALE = .false.
       logical :: OUT_MASK = .false.
       logical :: OUT_MASK9 = .false.
       logical :: OUT_Umean = .false.
@@ -391,6 +395,9 @@ contains
       case ("u_max"); this%OUT_Umax = .true.
       case ("mf_max"); this%OUT_MFmax = .true.
       case ("vort_max"); this%OUT_VORmax = .true.
+      case ("breaking_active"); this%OUT_BRK_ACTIVE = .true.
+      case ("nu_capped"); this%OUT_NU_CAPPED = .true.
+      case ("froude_scale"); this%OUT_FROUDE_SCALE = .true.
       case ("mask"); this%OUT_MASK = .true.
       case ("mask9"); this%OUT_MASK9 = .true.
       case ("nu_break"); this%OUT_NU = .true.

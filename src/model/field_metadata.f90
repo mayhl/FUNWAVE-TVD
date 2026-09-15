@@ -99,6 +99,18 @@ contains
       case ("nu_cap_time")
          m%units = "s"
          m%long_name = "time with the breaker viscosity cap engaged"
+      case ("breaking_active")
+         m%units = "1"
+         m%long_name = "breaker viscosity active (1 = above the background floor)"
+      case ("nu_capped")
+         m%units = "1"
+         m%long_name = "breaker viscosity cap engaged (1 = at the clamp)"
+      case ("froude_scale")
+         m%units = "1"
+         m%long_name = "Froude cap velocity factor applied (1 = untouched)"
+      case ("disp_gate")
+         m%units = "1"
+         m%long_name = "dispersion gate weight (1 = dispersive, 0 = shallow-water)"
       end select
    end function field_meta
 

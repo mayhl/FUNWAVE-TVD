@@ -224,6 +224,13 @@ module model_stepper_2d_mod
       ! casts of mask/mask9, refreshed at post_step; allocated only
       ! under their OUT_ flags.
       real(SP), allocatable :: mask_out(:, :), mask9_out(:, :)
+      ! Gate-field mirrors (registry names breaking_active / nu_capped /
+      ! froude_scale): 0/1 flags or the applied weight from the last stage's
+      ! state, refreshed at post_step; allocated full-size only under their
+      ! OUT_ flags.  froude_out is the kernel's write target, so it is a
+      ! 1x1 stand-in when off (cal_etauv_update).
+      real(SP), allocatable :: brk_active_out(:, :), nu_capped_out(:, :)
+      real(SP), allocatable :: froude_out(:, :)
 
    contains
       procedure :: init => stepper_init
@@ -489,6 +496,11 @@ contains
       allocate (this%src_x(mloc, nloc), source=0.0_SP)
       allocate (this%src_y(mloc, nloc), source=0.0_SP)
       allocate (this%zeros(mloc, nloc), source=0.0_SP)
+      if (this%output%OUT_FROUDE_SCALE) then
+         allocate (this%froude_out(mloc, nloc), source=1.0_SP)
+      else
+         allocate (this%froude_out(1, 1), source=1.0_SP)
+      end if
 
       ! per-cell f slot — the future CRS metric provider takes ownership
       ! of filling this ([[design-grid-crs]]); constant f-plane today
@@ -1130,7 +1142,8 @@ contains
          end if
 
          call cal_etauv_update(lp, num%FroudeCap, num%MinDepthFrc, f%mask, &
-                               f%h, f%u, f%v, f%hu, f%hv, f%p, f%q)
+                               f%h, f%u, f%v, f%hu, f%hv, f%p, f%q, &
+                               this%froude_out, this%output%OUT_FROUDE_SCALE)
          if (.not. phy%dispersion) then
             ! legacy: without dispersion the conserved flux IS the
             ! (Froude-capped, mask-zeroed) cell flux
@@ -1386,6 +1399,18 @@ contains
             this%mask9_out = real(f%mask9, SP)
             call registry%register("mask9", this%mask9_out)
          end if
+         ! breaker gate flags exist only with a breaker (nu_break allocated);
+         ! an unregistered name fails at the channel like nu_break does
+         if (this%output%OUT_BRK_ACTIVE .and. allocated(f%nu_break)) then
+            allocate (this%brk_active_out(lp%mloc, lp%nloc), source=0.0_SP)
+            call registry%register("breaking_active", this%brk_active_out)
+         end if
+         if (this%output%OUT_NU_CAPPED .and. allocated(f%nu_break)) then
+            allocate (this%nu_capped_out(lp%mloc, lp%nloc), source=0.0_SP)
+            call registry%register("nu_capped", this%nu_capped_out)
+         end if
+         if (this%output%OUT_FROUDE_SCALE) &
+            call registry%register("froude_scale", this%froude_out)
       end associate
    end subroutine stepper_register_output
 
@@ -1446,6 +1471,14 @@ contains
       if (allocated(this%mask_out)) this%mask_out = real(this%fields%mask, SP)
       if (allocated(this%mask9_out)) this%mask9_out = real(this%fields%mask9, SP)
 
+      ! Gate-field mirrors off the last stage's nu_break: active = above the
+      ! background floor (the wavemaker-zone term included), capped = sitting
+      ! at the explicit-diffusion clamp
+      if (allocated(this%brk_active_out)) &
+         this%brk_active_out = merge(1.0_SP, 0.0_SP, &
+                                     this%fields%nu_break > this%breaking%nu_bkg)
+      if (allocated(this%nu_capped_out)) call mark_nu_capped(this)
+
       associate (f => this%fields, lp => this%grid%lp)
          max_abs_eta = maxval(abs(f%eta(lp%ib:lp%ie, lp%jb:lp%je)))
          ! NaN compares false against any threshold, so a NaN'd run cruises
@@ -1464,6 +1497,35 @@ contains
       if (blowup) call log_blowup_site(this, max_abs_eta)
 
    end subroutine stepper_post_step
+
+   ! ----------------------------------------------------------------
+   ! Private: the nu_capped mirror -- 1 where nu_break sits at the
+   ! explicit-diffusion clamp.  apply_nu_cap's own cap expression on the
+   ! completed step's dt, so the compare is exact; nu_cap = 0 (clamp off)
+   ! marks nothing.
+   ! ----------------------------------------------------------------
+   subroutine mark_nu_capped(this)
+      class(type_model_stepper_2d), intent(inout) :: this
+
+      real(SP) :: cap1
+      integer :: i, j
+
+      associate (f => this%fields, lp => this%grid%lp, &
+                 nu_cap => this%breaking%nu_cap, dt => this%dt_step)
+         if (nu_cap <= 0.0_SP .or. dt <= 0.0_SP) then
+            this%nu_capped_out = 0.0_SP
+            return
+         end if
+         do j = 1, lp%nloc
+            do i = 1, lp%mloc
+               cap1 = nu_cap/(2.0_SP*dt*(1.0_SP/(this%dx(i, j)*this%dx(i, j)) &
+                                         + 1.0_SP/(this%dy(i, j)*this%dy(i, j))))
+               this%nu_capped_out(i, j) = merge(1.0_SP, 0.0_SP, f%nu_break(i, j) >= cap1)
+            end do
+         end do
+      end associate
+
+   end subroutine mark_nu_capped
 
    ! ----------------------------------------------------------------
    ! Private: locate and log the blow-up cell (global coordinates and
@@ -1976,6 +2038,9 @@ contains
       if (allocated(this%coriolis)) deallocate (this%coriolis)
       if (allocated(this%mask_out)) deallocate (this%mask_out)
       if (allocated(this%mask9_out)) deallocate (this%mask9_out)
+      if (allocated(this%brk_active_out)) deallocate (this%brk_active_out)
+      if (allocated(this%nu_capped_out)) deallocate (this%nu_capped_out)
+      if (allocated(this%froude_out)) deallocate (this%froude_out)
 
       this%env => null()
       this%grid => null()

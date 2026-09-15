@@ -371,7 +371,7 @@ contains
    ! Runs after U and V are final for the stage (either path).
    ! ----------------------------------------------------------------
    subroutine cal_etauv_update(lp, froude_cap, min_depth, mask, h, &
-                               u, v, hu, hv, ubar, vbar)
+                               u, v, hu, hv, ubar, vbar, froude_scale, mark_froude)
       type(type_loop_bounds), intent(in) :: lp
       real(SP), intent(in)    :: froude_cap, min_depth
       integer, intent(in)    :: mask(:, :)
@@ -379,6 +379,13 @@ contains
       real(SP), intent(inout) :: u(:, :), v(:, :)
       real(SP), intent(out)   :: hu(:, :), hv(:, :)
       real(SP), intent(inout) :: ubar(:, :), vbar(:, :)
+      ! applied Froude factor per cell (1 = untouched, dry included), an
+      ! output mirror written only under mark_froude.  Non-optional so the
+      ! OpenMP region never names an absent optional (the ifx null-descriptor
+      ! fault, kernel_breaker.f90 apply_nu_cap); the caller passes a 1x1
+      ! stand-in when off
+      real(SP), intent(inout) :: froude_scale(:, :)
+      logical, intent(in)     :: mark_froude
 
       real(SP) :: heff, utotal, fr_speed, utheta
       integer  :: i, j
@@ -393,15 +400,18 @@ contains
                ubar(i, j) = 0.0_SP; vbar(i, j) = 0.0_SP
                u(i, j) = 0.0_SP; v(i, j) = 0.0_SP
                hu(i, j) = 0.0_SP; hv(i, j) = 0.0_SP
+               if (mark_froude) froude_scale(i, j) = 1.0_SP
             else
                heff = max(h(i, j), min_depth)
                hu(i, j) = heff*u(i, j)
                hv(i, j) = heff*v(i, j)
                utotal = sqrt(u(i, j)**2 + v(i, j)**2)
                fr_speed = sqrt(GRAV*heff)
+               if (mark_froude) froude_scale(i, j) = 1.0_SP
                ! legacy comparison form Utotal/Fr > FroudeCap kept —
                ! runup jets sit at the cap and the forms differ by ULPs
                if (utotal/fr_speed > froude_cap) then
+                  if (mark_froude) froude_scale(i, j) = froude_cap*fr_speed/utotal
                   utheta = atan2(v(i, j), u(i, j))
                   u(i, j) = froude_cap*fr_speed*cos(utheta)
                   v(i, j) = froude_cap*fr_speed*sin(utheta)

@@ -179,6 +179,8 @@ contains
       call registry%register("mf_max", this%mf_max)
       call registry%register("vort_max", this%vort_max)
       call registry%register("arr_time", this%arr_time)
+      ! the SWE dispersion gate weight, always maintained (1 under viscosity mode)
+      call registry%register("disp_gate", this%disp_w)
 
       ! Optional breaking-physics fields: present only after alloc_breaking().
       if (allocated(this%nu_break)) call registry%register("nu_break", this%nu_break)
