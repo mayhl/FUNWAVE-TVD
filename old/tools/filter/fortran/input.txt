@@ -1,6 +1,0 @@
-test.txt
-301 201
-3  ---3 or 5, e.g. 3point (7 points window) in each direction
-filtered.txt
-
-
