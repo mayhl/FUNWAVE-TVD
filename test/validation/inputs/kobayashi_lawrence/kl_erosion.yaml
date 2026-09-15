@@ -43,8 +43,10 @@ sediment:
   bed_change: true
   bedload: true
   morph_interval: 0.05
-  # swash erosion lives inside the default 0.1 m cutoff
-  min_depth_pickup: 0.01
+  # swash erosion lives inside the default 0.1 m cutoff; 0.03 is the
+  # calibrated crossover for this flume (1 cm: emax 5x, 5 cm: dmax lost;
+  # grid-independent), not a default
+  min_depth_pickup: 0.03
 numerics:
   cfl: 0.5
   # 0.001 dies in the supercritical backwash film at t~16 (Fr 4.3,

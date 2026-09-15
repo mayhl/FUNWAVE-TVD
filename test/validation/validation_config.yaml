@@ -531,6 +531,7 @@ simulations:
   # ── Kobayashi & Lawrence 2004: bed change under a breaking solitary wave ─
   # Wave 1 of the Fig 4.5 growth curves; CACR-16-02's own model matched emax
   # and ran dmax ~half of measured, so the deposition gate stays inherited-loose.
+  # min_depth_pickup 0.03 is the calibrated pickup cutoff (see the study below).
 # Viscous breaker only: sediment is refused under shock_capturing
   - name: lab_kl_erosion
     <<: &kl_erosion
@@ -543,7 +544,6 @@ simulations:
       tags: [lab, sediment, 1d]
       postprocess:
         morphology: test.validation.oracles.morphology
-      known_fail: "emax 5.5x the lab since the face depths follow the bed; scour limiter rung open"
       tolerances:
         morphology:
           growth: erosion_growth.txt
@@ -558,7 +558,6 @@ simulations:
   - name: study_kl_sediment
     <<: *kl_erosion
     tags: [study]
-    known_fail: ~
     variants:
       dx_0p10: { overrides: { grid.cell_size: [0.10, 0.10], grid.n_cells: [400, 3] } }
       dx_0p05: {}
