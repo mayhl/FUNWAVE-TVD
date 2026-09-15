@@ -624,6 +624,50 @@ simulations:
       numerics.min_depth: [0.01, 0.02, 0.03]
       numerics.froude_cap: [2.0, 3.0]
 
+  # Movable-bed channel = the morphology gate over the dune reach (30-50 m):
+  # profile NRMSE + the erosion trough as PP16 gates.  First light 09-15:
+  # NRMSE 34, trough 0.6 m landward of the measured crest, gauges 28 -- the
+  # model keeps the crest and scours the landward toe where the lab flattened
+  # the dune (Yoshii saw liquefaction there); the amplitude gate stays loose.
+  - name: lab_yoshii_c2_movable
+    <<: &yoshii_c2_movable
+      exe_type: validation-2d
+      np: 2
+      input: test/validation/inputs/yoshii_tanaka
+      input_files: [c2_movable.yaml]
+      binary: funwave
+      output_dir: output
+      tags: [lab, sediment, 1d]
+      postprocess:
+        morphology: test.validation.oracles.morphology
+        gauges: test.validation.oracles.gauges
+      tolerances:
+        morphology:
+          bedchange: bedchange_c2.txt
+          gate_x: -0.5
+          bedchange_nrmse_pct: 45.0
+          trough_offset_m: 1.0
+        gauges:
+          file: gauges_c2.txt
+          variable: h
+          align: none
+          channel: gauges
+          window_s: [20.0, 130.0]
+          gauge_nrmse_pct: 35.0
+
+  # Runaway study, report-only (tag study + c2sed): every cutoff from 1 to
+  # 5 cm blows up at t 95-108 s (09-15) once the drainage film digs the
+  # seaward dune face past 0.7 m -- the scour runaway; which closure holds it.
+  - name: study_c2_runaway
+    <<: *yoshii_c2_movable
+    tags: [study, c2sed]
+    variants:
+      avalanche: { overrides: { sediment.avalanche.tan_phi: 0.5 } }
+      avalanche_nobedload: { overrides: { sediment.avalanche.tan_phi: 0.5, sediment.bedload: false } }
+      nobedload: { overrides: { sediment.bedload: false } }
+      avalanche_climiter: { overrides: { sediment.avalanche.tan_phi: 0.5, sediment.c_limiter: 0.3 } }
+      pickup_0p05_avalanche: { overrides: { sediment.avalanche.tan_phi: 0.5, sediment.min_depth_pickup: 0.05 } }
+
   # ── Pintado-Patino et al. 2016: dam-break swash over an erodible beach ──
   # Runs to 8.5 s — the paper's own comparison regime (before the reflected
   # bore, which the experiment's second gate blocked, reaches the beach).

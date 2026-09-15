@@ -1,5 +1,6 @@
-# Yoshii, Tanaka & Matsuyama (2017): TSTLE case C2, fixed-bed channel = the
-# hydrodynamic gate of NTHMP sediment benchmark 3.  A bore over a 1/50 slope
+# Yoshii, Tanaka & Matsuyama (2017): TSTLE case C2, movable-bed channel =
+# the morphology gate of NTHMP sediment benchmark 3: the same flow over the
+# same initial bed, now erodible sand (Malone: d50 0.217 mm, n 0.41).  A bore over a 1/50 slope
 # with a 0.2 m dune at x = 40.9 (still-water shoreline x = 40).  The measured
 # eta and u at the x = 0.5 m gauge drive the west face through the Flather
 # characteristic (the benchmark supplies no wavemaker); cell 1 sits at that
@@ -16,7 +17,7 @@ grid:
     type: file
     file: depth_c2.txt
 simulation:
-  title: lab_yoshii_c2_fixed
+  title: lab_yoshii_c2_movable
   total_time: 130.0
   screen_interval: 10.0
 boundaries:
@@ -27,6 +28,22 @@ breaking:
   swe_gate: true
 friction:
   cd: 0.003
+sediment:
+  d50: 0.000217
+  specific_gravity: 2.65
+  porosity: 0.41
+  bed_change: true
+  # suspended load only, as Tehranirad et al. (2021) run tsunami cases: the
+  # bedload flux on the scour wall the drainage film digs is what runs away
+  # (every bedload-on run without avalanching blew up at t 95-108 s)
+  bedload: false
+  morph_interval: 0.05
+  # pickup cutoff: a per-case calibration (KL 0.03; Malone's C7 optimum 0.04)
+  min_depth_pickup: 0.03
+  # Larson-Kraus relaxation past the repose angle, tan(phi) 0.5 as in the
+  # Crescent City application; the second guard against the scour runaway
+  avalanche:
+    tan_phi: 0.5
 numerics:
   cfl: 0.1
   froude_cap: 2.0
@@ -35,6 +52,10 @@ output:
   result_folder: ./output/
   depth_out: true
   channels:
+    - name: bed
+      geometry: field
+      variables: [sediment_dchgs, sediment_dchgb]
+      interval: 10.0
     - name: gauges  # h, not eta: the lab gauges on land read the water column
       geometry: stations
       variables: [h, u]
