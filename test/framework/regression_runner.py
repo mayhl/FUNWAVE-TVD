@@ -9,6 +9,7 @@ import subprocess
 import importlib
 import traceback
 import copy
+import itertools
 from collections import deque
 from datetime import datetime
 from dataclasses import dataclass
@@ -72,6 +73,28 @@ class _SimTask:
     dev_elapsed: float = 0.0
     ref_stderr: str = ""
     dev_stderr: str = ""
+
+
+def _value_tag(v) -> str:
+    """A sweep value as a name fragment: 0.45 -> 0p45, -1 -> m1, True -> on."""
+    if isinstance(v, bool):
+        return "on" if v else "off"
+    if isinstance(v, (int, float)):
+        return f"{v:g}".replace(".", "p").replace("-", "m").replace("+", "")
+    return str(v).replace(".", "p").replace("/", "_")
+
+
+def _run_steps(run_dir: str | None) -> int | None:
+    """Steps the run took, from the last "step N" line of its funwave.log."""
+    if not run_dir:
+        return None
+    log = Path(run_dir) / "funwave.log"
+    if not log.exists():
+        return None
+    last = None
+    for m in re.finditer(r"step (\d+)", log.read_text(errors="replace")):
+        last = int(m.group(1))
+    return last
 
 
 def _merge_tolerances(base: dict, override: dict) -> dict:
@@ -244,6 +267,32 @@ class RegressionRunner(BaseRunner):
                     expanded.append(s)
             else:
                 expanded.append(dict(sim, case=sim["name"], deck=None))
+        # sweep: {dotted.key: [v, ...], ...} -> the cartesian product as
+        # variants named from the values (cbrk1_0p45_nu_scale_2), multiplied
+        # into any explicit variants; the breaking-sweep generator used to
+        # write these points out by hand
+        gridded = []
+        for sim in expanded:
+            if "sweep" not in sim:
+                gridded.append(sim)
+                continue
+            s = {k: v for k, v in sim.items() if k != "sweep"}
+            keys = list(sim["sweep"])
+            points = {}
+            for combo in itertools.product(*(sim["sweep"][k] for k in keys)):
+                pname = "_".join(f"{k.rsplit('.', 1)[-1]}_{_value_tag(v)}" for k, v in zip(keys, combo))
+                points[pname] = dict(zip(keys, combo))
+            base = sim.get("variants") or {None: {}}
+            s["variants"] = {}
+            for vname, spec in base.items():
+                for pname, pover in points.items():
+                    name = pname if vname is None else f"{vname}_{pname}"
+                    s["variants"][name] = {
+                        "overrides": {**((spec or {}).get("overrides") or {}), **pover},
+                        "tolerances": (spec or {}).get("tolerances") or {},
+                    }
+            gridded.append(s)
+        expanded = gridded
         # config variants: the same deck under a per-variant override set
         # (e.g. both breaking closures), each with its own tolerance overrides
         varied = []
@@ -903,6 +952,18 @@ class RegressionRunner(BaseRunner):
         """Postprocess a completed task and print its run + result lines."""
         sim = task.sim
         result = self._run_postprocess(sim, task.ref_run_dir, task.curr_run_dir, task.ref_status, task.dev_status, verbose=verbose)
+        # the run's cost and shape, for the results record (scaling and
+        # convergence sweeps read these; the console line alone was lost)
+        steps = _run_steps(task.curr_run_dir)
+        result.run = {
+            "np": task.eff_np,
+            "decomp": list(task.decomp),
+            "ref_elapsed_s": round(task.ref_elapsed, 1) if task.ref_status == "COMPLETED" else None,
+            "dev_elapsed_s": round(task.dev_elapsed, 1) if task.dev_status == "COMPLETED" else None,
+            "steps": steps,
+            "dev_ms_per_step": round(1000.0 * task.dev_elapsed / steps, 3) if steps and task.dev_status == "COMPLETED" else None,
+            "overrides": sim.get("overrides") or {},
+        }
 
         def _fmt_run(s, elapsed=0.0):
             if s == "cached":
@@ -989,6 +1050,7 @@ class RegressionRunner(BaseRunner):
                     "name": r.name,
                     "status": r.status,
                     "notes": r.notes.strip(),
+                    "run": r.run,
                     "metrics": [
                         {
                             "section": s.label,

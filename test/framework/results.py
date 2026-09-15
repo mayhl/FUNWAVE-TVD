@@ -65,6 +65,9 @@ class SimResult:
     notes: str = ""
     ref_dir: str = ""
     dev_dir: str = ""
+    # the run's cost and shape (np, decomp, elapsed, steps, overrides), filled
+    # by the runner after the postprocess; empty for an aggregate row
+    run: dict = field(default_factory=dict)
 
     def subsection(self, kind: str) -> SubsectionResult | None:
         return next((s for s in self.subsections if s.kind == kind), None)
