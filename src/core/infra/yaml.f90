@@ -44,6 +44,7 @@ module core_yaml_file_mod
 
       procedure, public :: init
       procedure, public :: has_key
+      procedure, public :: is_list
       procedure, public :: finalize
       procedure, public :: transfer_ownership
       procedure, public :: clone
@@ -228,6 +229,22 @@ contains
       call this%mark_read(key)
       val = associated(this%root%get(key))
    end function has_key
+
+   ! true when key holds a YAML sequence (a reader choosing between a
+   ! scalar and a list form of the same key)
+   function is_list(this, key) result(val)
+      class(type_yaml_reader), intent(in) :: this
+      character(*), intent(in) :: key
+      logical :: val
+      class(type_node), pointer :: node
+      val = .false.
+      node => this%root%get(key)
+      if (.not. associated(node)) return
+      select type (node)
+      class is (type_list)
+         val = .true.
+      end select
+   end function is_list
 
    function cast_dictionary(this, key, is_empty) result(child)
       class(type_yaml_reader), intent(in) :: this

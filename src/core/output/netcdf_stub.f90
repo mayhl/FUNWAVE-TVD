@@ -38,7 +38,7 @@ module netcdf
    integer, parameter :: STUB_ERR = -1
 
    interface nf90_put_var
-      module procedure put_var_1d, put_var_2d
+      module procedure put_var_0d, put_var_1d, put_var_2d
    end interface nf90_put_var
 
    ! character and real-array attributes, the two shapes the writer emits
@@ -121,6 +121,14 @@ contains
       end associate
       status = STUB_ERR
    end function nf90_enddef
+
+   integer function put_var_0d(ncid, varid, values) result(status)
+      integer, intent(in) :: ncid, varid
+      real(8), intent(in) :: values
+      associate (i => ncid, v => varid, x => values)
+      end associate
+      status = STUB_ERR
+   end function put_var_0d
 
    integer function put_var_1d(ncid, varid, values, start) result(status)
       integer, intent(in) :: ncid, varid

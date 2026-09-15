@@ -1148,7 +1148,12 @@ contains
                                        chunk_window=cwin, &
                                        hidden=cfg%hidden, &
                                        derived=dspecs, n_derived=cfg%n_derived, &
-                                       single_prec=cfg%single_prec)
+                                       single_prec=cfg%single_prec, &
+                                       thresholds=cfg%thresholds, thr_dir=cfg%thr_dir, &
+                                       gap=cfg%gap, min_duration=cfg%min_duration, &
+                                       wet_floor=this%numerics%MinDepth &
+                                       *(1.0_SP + this%breaking%wetdry_disp_ramp), &
+                                       accum_mode=cfg%accum_mode)
             mgr%n_channels = kc
             deallocate (vmeta, dspecs)
 

@@ -269,6 +269,7 @@ contains
       vmeta(1)%flag_values(1:2) = [0.0_SP, 1.0_SP]
       vmeta(1)%flag_meanings = 'low high'
       vmeta(1)%comment = 'test comment'
+      vmeta(1)%coordinates = 'test_coord'
       cx = 0.0_SP; cy = 0.0_SP
       call ch%init(id='snap_nc', geom_type='field', variables=vars, n_vars=1, &
                    statistics=stats, n_stats=0, snapshot=.true., &
@@ -316,6 +317,9 @@ contains
          att = ''
          @assertEqual(NF90_NOERR, nf90_get_att(ncid, varid, 'comment', att))
          @assertEqual('test comment', trim(att))
+         att = ''
+         @assertEqual(NF90_NOERR, nf90_get_att(ncid, varid, 'coordinates', att))
+         @assertEqual('test_coord', trim(att))
          @assertEqual(1.0_SP, fvals(2), tolerance=1e-12_SP)
          @assertEqual(NF90_NOERR, nf90_get_var(ncid, varid, glob, &
                                                start=[1, 1, 2], &

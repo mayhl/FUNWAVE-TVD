@@ -89,8 +89,17 @@ module model_output_mod
 
    character(len=10), parameter :: GEOM_TYPES(3) = &
                                    [character(len=10) :: "station", "transect", "field"]
-   character(len=8), parameter :: STAT_TYPES(5) = &
-                                  [character(len=8) :: "min", "max", "mean", "rms", "std"]
+   character(len=12), parameter :: STAT_TYPES(11) = &
+                                   [character(len=12) :: "min", "max", "mean", "rms", "std", &
+                                                          "max_time", "first_time", "last_time", "duration", &
+                                                          "duration_max", "count"]
+   ! the event class needs a threshold:
+   character(len=12), parameter :: EVENT_STATS(5) = &
+                                   [character(len=12) :: "first_time", "last_time", "duration", &
+                                                          "duration_max", "count"]
+   ! statistics: presets, expanded in place
+   character(len=12), parameter :: PRESET_NAMES(3) = &
+                                   [character(len=12) :: "envelope", "arrival", "inundation"]
 
    ! Vector-derived instantaneous variables (registry vectors: velocity =
    ! [u, v]): the builder registers per-step scratch fields under these
@@ -126,8 +135,16 @@ module model_output_mod
       ! product-derived requests (catalogue names, e.g. hsig)
       character(8), allocatable :: derived(:)
       integer :: n_derived = 0
-      character(8), allocatable :: statistics(:)
+      character(12), allocatable :: statistics(:)
       integer :: n_stats = 0
+      ! threshold: {above | below | magnitude: v | [v, ...]} for the event
+      ! statistics; direction +1 above / -1 below; filters (s, 0 = off)
+      real(SP), allocatable :: thresholds(:)
+      integer :: thr_dir = 0
+      real(SP) :: gap = 0.0_SP
+      real(SP) :: min_duration = 0.0_SP
+      ! accumulate: window (default) | running | total
+      character(8) :: accum_mode = "window"
       ! statistics presence derives the channel kind: windowed channels
       ! never write snapshots (uniform time meaning per file)
       logical :: snapshot = .true.
@@ -362,6 +379,8 @@ contains
       ! staging).  Derived from the registry names the channels reference.
       do iv = 1, this%n_channels
          call derive_demand_flags(this, this%channels(iv))
+         ! event statistics sample wet cells only: the mask mirror
+         if (size(this%channels(iv)%thresholds) > 0) call this%need("mask")
       end do
 
    end subroutine output_read_input
@@ -734,15 +753,7 @@ contains
             else
                if (size(names) == 0) call sub_env%log%exit_on_error( &
                   "output: channels: '"//cfg%name//"': statistics: must not be empty")
-               allocate (cfg%statistics(size(names)))
-               do iv = 1, size(names)
-                  if (.not. any(STAT_TYPES == trim(names(iv)%s))) &
-                     call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
-                                                    "': unknown statistic '"//trim(names(iv)%s)// &
-                                                    "' -- valid: min max mean rms std")
-                  cfg%statistics(iv) = trim(names(iv)%s)
-               end do
-               cfg%n_stats = size(names)
+               call expand_statistics(sub_env, cfg, names)
                cfg%snapshot = .false.
                ! direction is circular: the mean of angles is meaningless --
                ! take the direction OF the mean components instead
@@ -758,6 +769,15 @@ contains
             ! nothing visible remains to snapshot
             if (cfg%n_derived > 0 .and. .not. any(.not. cfg%hidden)) &
                cfg%snapshot = .false.
+
+            call read_threshold(sub_env, entries(k), cfg)
+            call entries(k)%read_enum("accumulate", &
+                                      [character(7) :: "window", "running", "total"], &
+                                      silent=no_key, val=fmt)
+            if (.not. no_key) cfg%accum_mode = fmt
+            if (cfg%accum_mode /= "window" .and. cfg%n_stats == 0) &
+               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                              "': accumulate: needs statistics:")
          end associate
       end do
 
@@ -776,6 +796,121 @@ contains
    ! set); product-derived names (the catalogue: hsig) move to
    ! cfg%derived, with each source auto-added HIDDEN when not already
    ! requested — accumulated for the product, never written itself.
+   ! statistics: names plus presets (envelope = max min max_time, arrival =
+   ! first_time, inundation = first_time duration duration_max count),
+   ! expanded in order without repeats
+   subroutine expand_statistics(sub_env, cfg, names)
+      type(type_env), intent(inout) :: sub_env
+      type(type_channel_config), intent(inout) :: cfg
+      type(type_string), intent(in) :: names(:)
+
+      character(12) :: buf(size(names)*4)
+      character(12), allocatable :: expanded(:)
+      integer :: iv, n, j
+
+      n = 0
+      do iv = 1, size(names)
+         select case (trim(names(iv)%s))
+         case ("envelope")
+            expanded = [character(12) :: "max", "min", "max_time"]
+         case ("arrival")
+            expanded = [character(12) :: "first_time"]
+         case ("inundation")
+            expanded = [character(12) :: "first_time", "duration", "duration_max", "count"]
+         case default
+            if (.not. any(STAT_TYPES == trim(names(iv)%s))) &
+               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                              "': unknown statistic '"//trim(names(iv)%s)// &
+                                              "' -- valid: min max mean rms std max_time"// &
+                                              " first_time last_time duration duration_max"// &
+                                              " count, presets envelope arrival inundation")
+            expanded = [character(12) :: trim(names(iv)%s)]
+         end select
+         do j = 1, size(expanded)
+            if (any(buf(1:n) == expanded(j))) cycle
+            n = n + 1
+            buf(n) = expanded(j)
+         end do
+      end do
+      allocate (cfg%statistics(n))
+      cfg%statistics = buf(1:n)
+      cfg%n_stats = n
+   end subroutine expand_statistics
+
+   ! threshold: {above: v | below: v | magnitude: v}, v a real or a list;
+   ! magnitude is above on a .mag speed variable.  gap: and min_duration:
+   ! ride beside it.  Required by the event statistics, pointless without
+   subroutine read_threshold(sub_env, entry, cfg)
+      type(type_env), intent(inout) :: sub_env
+      type(type_yaml_reader), intent(inout) :: entry
+      type(type_channel_config), intent(inout) :: cfg
+
+      type(type_yaml_reader) :: blk
+      character(:), allocatable :: key
+      logical :: no_blk, no_key, has_events
+      real(SP) :: v
+      integer :: iv, j, n_keys
+
+      has_events = .false.
+      do iv = 1, cfg%n_stats
+         if (any(EVENT_STATS == cfg%statistics(iv))) has_events = .true.
+      end do
+
+      blk = entry%cast_dictionary("threshold", no_blk)
+      if (no_blk) then
+         if (has_events) call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                        "': first_time/last_time/duration/"// &
+                                                        "duration_max/count need threshold:"// &
+                                                        " {above | below | magnitude: <value>}")
+         allocate (cfg%thresholds(0))
+         return
+      end if
+      if (.not. has_events) call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                           "': threshold: needs an event statistic"// &
+                                                           " (first_time last_time duration"// &
+                                                           " duration_max count)")
+
+      n_keys = 0
+      if (blk%has_key("above")) then
+         n_keys = n_keys + 1; key = "above"; cfg%thr_dir = 1
+      end if
+      if (blk%has_key("below")) then
+         n_keys = n_keys + 1; key = "below"; cfg%thr_dir = -1
+      end if
+      if (blk%has_key("magnitude")) then
+         n_keys = n_keys + 1; key = "magnitude"; cfg%thr_dir = 1
+         do iv = 1, size(cfg%variables)
+            if (index(cfg%variables(iv), ".mag") == 0) &
+               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                              "': threshold: magnitude: applies to a .mag"// &
+                                              " speed variable (velocity.mag), not '"// &
+                                              trim(cfg%variables(iv))//"'")
+         end do
+      end if
+      if (n_keys /= 1) call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                                      "': threshold: takes exactly one of"// &
+                                                      " above: below: magnitude:")
+
+      if (blk%is_list(key)) then
+         call blk%read_real_array(key, val=cfg%thresholds)
+      else
+         call blk%read(key, val=v)
+         cfg%thresholds = [v]
+      end if
+      if (size(cfg%thresholds) == 0) call sub_env%log%exit_on_error( &
+         "output: channels: '"//cfg%name//"': threshold: "//key//": must not be empty")
+      do iv = 2, size(cfg%thresholds)
+         do j = 1, iv - 1
+            if (cfg%thresholds(iv) == cfg%thresholds(j)) call sub_env%log%exit_on_error( &
+               "output: channels: '"//cfg%name//"': threshold: "//key//": repeated value")
+         end do
+      end do
+
+      call entry%read_nonnegative("gap", silent=no_key, val=cfg%gap, default="0.0")
+      call entry%read_nonnegative("min_duration", silent=no_key, val=cfg%min_duration, &
+                                  default="0.0")
+   end subroutine read_threshold
+
    subroutine split_channel_variables(sub_env, cfg, names)
       type(type_env), intent(inout) :: sub_env
       type(type_channel_config), intent(inout) :: cfg

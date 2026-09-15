@@ -83,7 +83,12 @@ module core_output_channel_mod
    public :: open_diagnostics_file, close_diagnostics_file
 
    integer, parameter :: VARNAME_LEN = 32
-   integer, parameter :: STATNAME_LEN = 8
+   integer, parameter :: STATNAME_LEN = 12
+   integer, parameter :: THRTAG_LEN = 16
+   ! the event class: per-threshold accumulators, wet samples only
+   character(len=STATNAME_LEN), parameter :: EVENT_STATS(5) = &
+                                             [character(len=STATNAME_LEN) :: "first_time", "last_time", &
+                                                                              "duration", "duration_max", "count"]
    integer, parameter :: ID_LEN = 64
    integer, parameter :: VARS_MAX = 32
    integer, parameter :: STATS_MAX = 5
@@ -105,10 +110,23 @@ module core_output_channel_mod
       character(META_LEN) :: standard_name = ''
       character(META_LEN) :: funwave_name = ''
       character(COMMENT_LEN) :: comment = ''
+      ! CF `coordinates`: the scalar coordinate variable(s) of a statistic
+      ! (the event threshold), space separated
+      character(META_LEN) :: coordinates = ''
       character(META_LEN) :: flag_meanings = ''
       integer :: n_flags = 0
       real(SP) :: flag_values(FLAGS_MAX) = 0.0_SP
    end type type_var_meta
+
+   ! A scalar coordinate variable (CF 5.7): the event threshold beside
+   ! the statistics that name it in `coordinates`; defined once per file
+   ! with the base variable's units and standard_name, value written at
+   ! create
+   type, public :: type_scalar_coord
+      character(VARNAME_LEN + THRTAG_LEN + 12) :: name = ''
+      real(SP) :: value = 0.0_SP
+      type(type_var_meta) :: meta
+   end type type_scalar_coord
 
    ! Serial NetCDF backend state: one data.nc per channel, every channel
    ! variable as <var>(x, y, time) — C order (time, y, x) per the CF
@@ -118,7 +136,7 @@ module core_output_channel_mod
       integer :: time_varid = -1
       integer :: nrec = 0
       integer :: n_vars = 0
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable :: names(:)
       integer, allocatable :: varids(:)
       logical :: is_open = .false.
       ! data vars defined NF90_FLOAT when the channel saves single
@@ -143,7 +161,7 @@ module core_output_channel_mod
       integer :: nrec = 0
       integer :: n_vars = 0
       logical :: windowed = .false.
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable :: names(:)
       integer, allocatable :: varids(:)
       logical :: is_open = .false.
    contains
@@ -163,7 +181,7 @@ module core_output_channel_mod
       integer :: time_varid = -1
       integer :: nrec = 0
       integer :: n_vars = 0
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable :: names(:)
       integer, allocatable :: varids(:)
       logical :: is_open = .false.
       ! data vars defined NF90_FLOAT when the channel saves single
@@ -197,6 +215,20 @@ module core_output_channel_mod
       ! writes legacy hmax_NNNNN); default to the registry names.
       character(VARNAME_LEN)         :: prefixes(VARS_MAX) = ''
       character(STATNAME_LEN)        :: statistics(STATS_MAX) = ''
+      ! event thresholds (one accumulator column per value), direction
+      ! (THR_ABOVE/THR_BELOW), filters, the wet-sample depth floor and the
+      ! per-value name suffix ('' for a single value)
+      integer :: n_thr = 0
+      real(SP), allocatable :: thr(:)
+      integer :: thr_dir = 0
+      real(SP) :: gap = 0.0_SP
+      real(SP) :: min_duration = 0.0_SP
+      real(SP) :: wet_floor = 0.0_SP
+      character(THRTAG_LEN), allocatable :: thr_tag(:)
+      logical :: has_events = .false.
+      ! accumulate: window (reset per interval) | running (since t_start,
+      ! written each interval) | total (one write at the end)
+      character(8) :: accum_mode = 'window'
       type(type_var_meta)            :: meta(VARS_MAX)
       integer                        :: n_vars = 0
       integer                        :: n_stats = 0
@@ -234,7 +266,7 @@ module core_output_channel_mod
       type(type_interpolator)   :: interp
 
       ! Accumulators: one per variable; each holds all requested stats
-      type(type_accumulator), allocatable :: accum(:)
+      type(type_accumulator), allocatable :: accum(:, :)
 
       ! MPI gather helper
       type(type_output_gatherer) :: gatherer
@@ -257,7 +289,9 @@ module core_output_channel_mod
       real(SP) :: chunk_window = 0.0_SP
       real(SP) :: t_chunk0 = 0.0_SP, t_chunk1 = 0.0_SP
       real(SP) :: dx0 = 0.0_SP, dy0 = 0.0_SP
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: nc_names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable :: nc_names(:)
+      type(type_scalar_coord), allocatable :: nc_scalars(:)
+      integer :: nc_nsc = 0
       type(type_var_meta), allocatable :: nc_meta(:)
       integer :: nc_n = 0
 
@@ -281,7 +315,8 @@ contains
                            result_folder, format, &
                            coords_x, coords_y, n_coords, grid, comm, &
                            file_prefixes, icount_start, var_meta, diag_ncid, &
-                           chunk_window, hidden, derived, n_derived, single_prec)
+                           chunk_window, hidden, derived, n_derived, single_prec, &
+                           thresholds, thr_dir, gap, min_duration, wet_floor, accum_mode)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -310,10 +345,16 @@ contains
       type(type_channel_derived), intent(in), optional :: derived(*)
       integer, intent(in), optional :: n_derived
       logical, intent(in), optional :: single_prec
+      ! event thresholds (values, direction THR_ABOVE/THR_BELOW), the
+      ! filters, the wet-sample depth floor and the accumulate mode
+      real(SP), intent(in), optional :: thresholds(:)
+      integer, intent(in), optional :: thr_dir
+      real(SP), intent(in), optional :: gap, min_duration, wet_floor
+      character(*), intent(in), optional :: accum_mode
 
       type(type_path) :: chan_dir
       logical :: dir_ok
-      integer :: iv, is, id_, gunit
+      integer :: iv, is, it, id_, gunit
       integer, allocatable :: pids(:)
 
       this%id = id
@@ -364,10 +405,34 @@ contains
       this%statistics(1:n_stats) = statistics(1:n_stats)
       if (present(var_meta)) this%meta(1:n_vars) = var_meta(1:n_vars)
 
+      ! events: one accumulator column per threshold value
+      this%has_events = .false.
+      do is = 1, n_stats
+         if (any(EVENT_STATS == statistics(is))) this%has_events = .true.
+      end do
+      if (present(thresholds)) then
+         this%n_thr = size(thresholds)
+         this%thr = thresholds
+         if (present(thr_dir)) this%thr_dir = thr_dir
+         allocate (this%thr_tag(this%n_thr))
+         do it = 1, this%n_thr
+            this%thr_tag(it) = ''
+            if (this%n_thr > 1) this%thr_tag(it) = '_'//threshold_tag(thresholds(it))
+         end do
+      end if
+      if (this%has_events .and. this%n_thr == 0) &
+         error stop 'output_channel: event statistics need a threshold:'
+      if (present(gap)) this%gap = gap
+      if (present(min_duration)) this%min_duration = min_duration
+      if (present(wet_floor)) this%wet_floor = wet_floor
+      if (present(accum_mode)) this%accum_mode = accum_mode
+
       ! Timing control
       this%trigger%t_start = t_start
       if (present(t_end)) this%t_end = t_end
       this%trigger%interval = interval
+      ! total: the end-of-run forced flush is the only write
+      if (this%accum_mode == 'total') this%trigger%interval = huge(1.0_SP)
       this%trigger%last_triggered = -1.0_SP
 
       ! Geometry-specific setup
@@ -401,13 +466,7 @@ contains
          end if
 
          ! Accumulators: (n_local, 1)
-         allocate (this%accum(n_vars))
-         do iv = 1, n_vars
-            call this%accum(iv)%init(this%n_local, 1, trim(variables(iv)))
-            do is = 1, n_stats
-               call this%accum(iv)%allocate_stat(trim(statistics(is)))
-            end do
-         end do
+         call init_accumulators(this, this%n_local, 1)
 
       case ('field')
          this%n_local = grid%local_nx*grid%local_ny
@@ -425,13 +484,7 @@ contains
          end if
 
          ! Accumulators: (local_nx, local_ny)
-         allocate (this%accum(n_vars))
-         do iv = 1, n_vars
-            call this%accum(iv)%init(grid%local_nx, grid%local_ny, trim(variables(iv)))
-            do is = 1, n_stats
-               call this%accum(iv)%allocate_stat(trim(statistics(is)))
-            end do
-         end do
+         call init_accumulators(this, grid%local_nx, grid%local_ny)
 
          ! NetCDF backends: every snapshot + statistic variable defined
          ! up front (names fixed at init).  Layout: a shared-root group
@@ -458,7 +511,8 @@ contains
             else
                call this%pnc%create(this%result_folder//trim(this%id)//'.nc', &
                                     grid%M, grid%N, grid%dx0, grid%dy0, &
-                                    this%nc_names, this%nc_meta, this%nc_n, comm)
+                                    this%nc_names, this%nc_meta, this%nc_n, comm, &
+                                    scalars=this%nc_scalars(1:this%nc_nsc))
             end if
          end if
 
@@ -469,10 +523,93 @@ contains
       ! product-derived sources: ensure the required statistic storage
       ! exists on the source accumulator (its variable may be hidden)
       do id_ = 1, this%n_derived
-         call this%accum(this%derived(id_)%iv)%allocate_stat(trim(this%derived(id_)%stat))
+         call this%accum(this%derived(id_)%iv, 1)%allocate_stat(trim(this%derived(id_)%stat))
       end do
 
    end subroutine channel_init
+
+   ! accum(iv, it): column 1 carries every statistic, further columns
+   ! (one per extra threshold) the event class only
+   subroutine init_accumulators(this, d1, d2)
+      class(type_output_channel), intent(inout) :: this
+      integer, intent(in) :: d1, d2
+
+      integer :: iv, is, it
+
+      allocate (this%accum(this%n_vars, max(1, this%n_thr)))
+      do iv = 1, this%n_vars
+         do it = 1, max(1, this%n_thr)
+            call this%accum(iv, it)%init(d1, d2, trim(this%variables(iv)))
+            do is = 1, this%n_stats
+               if (it > 1 .and. .not. any(EVENT_STATS == this%statistics(is))) cycle
+               call this%accum(iv, it)%allocate_stat(trim(this%statistics(is)))
+            end do
+            if (this%n_thr > 0) call this%accum(iv, it)%set_threshold( &
+               this%thr(it), this%thr_dir, gap=this%gap, min_duration=this%min_duration)
+         end do
+      end do
+   end subroutine init_accumulators
+
+   ! One threshold value as the shortest plain decimal (0.05, 2, -0.5,
+   ! 1.25); outside [1e-3, 1e6) the exponent form (2.5e-4)
+   function threshold_text(v) result(txt)
+      real(SP), intent(in) :: v
+      character(:), allocatable :: txt
+
+      character(24) :: buf
+      character(:), allocatable :: mant, expo
+      integer :: i, e
+
+      if (v == 0.0_SP) then
+         txt = '0'
+         return
+      end if
+      if (abs(v) >= 1.0e-3_SP .and. abs(v) < 1.0e6_SP) then
+         write (buf, '(F0.6)') v
+         mant = trim(adjustl(buf))
+         expo = ''
+      else
+         write (buf, '(ES12.5E2)') v
+         mant = trim(adjustl(buf))
+         e = index(mant, 'E')
+         ! e-004 -> e-4
+         i = e + 2
+         do while (i < len(mant) .and. mant(i:i) == '0')
+            i = i + 1
+         end do
+         expo = 'e'//merge('-', '+', mant(e + 1:e + 1) == '-')//mant(i:)
+         if (expo(2:2) == '+') expo = 'e'//expo(3:)
+         mant = mant(1:e - 1)
+      end if
+      if (mant(1:1) == '.') mant = '0'//mant
+      if (mant(1:2) == '-.') mant = '-0'//mant(2:)
+      ! strip trailing zeros of the mantissa, then a bare point
+      i = len(mant)
+      if (index(mant, '.') > 0) then
+         do while (i > 1 .and. mant(i:i) == '0')
+            i = i - 1
+         end do
+         if (mant(i:i) == '.') i = i - 1
+      end if
+      txt = mant(1:i)//expo
+   end function threshold_text
+
+   ! Name suffix of one threshold value: the plain text with 'p' for the
+   ! point and 'm' for a minus (0.1 -> 0p1, 2 -> 2, -0.5 -> m0p5, 2.5e-4 -> 2p5em4)
+   function threshold_tag(v) result(tag)
+      real(SP), intent(in) :: v
+      character(:), allocatable :: tag
+
+      integer :: i
+
+      tag = threshold_text(v)
+      do i = 1, len(tag)
+         select case (tag(i:i))
+         case ('.'); tag(i:i) = 'p'
+         case ('-'); tag(i:i) = 'm'
+         end select
+      end do
+   end function threshold_tag
 
    ! Called every timestep. Accumulates from registry; flushes when triggered.
    ! force=.true. (after-loop final flush) fires unconditionally once the
@@ -484,9 +621,10 @@ contains
       type(type_comm), intent(inout) :: comm
       logical, intent(in), optional :: force
 
-      integer  :: iv, tunit
-      real(SP), pointer :: fld(:, :)
-      real(SP), allocatable :: interp_vals(:), interp_2d(:, :)
+      integer  :: iv, it, tunit
+      real(SP), pointer :: fld(:, :), mask(:, :), h(:, :)
+      real(SP), allocatable :: interp_vals(:), interp_2d(:, :), mask_i(:), h_i(:)
+      logical, allocatable :: wet(:, :)
       logical :: do_flush
 
       this%fired = .false.
@@ -546,27 +684,57 @@ contains
       end if
 
       ! --- Accumulate for statistics (derived sources included) ---
+      ! Events sample wet cells only: the instantaneous mask (the model
+      ! raised its need) above the swash-edge depth floor; a point is wet
+      ! when its whole stencil is (interpolated mask exactly 1)
       if (this%n_stats > 0 .or. this%n_derived > 0) then
          select case (trim(this%geom_type))
          case ('station', 'transect')
             allocate (interp_vals(this%n_local), interp_2d(this%n_local, 1))
+            if (this%has_events) then
+               allocate (mask_i(this%n_local), h_i(this%n_local), wet(this%n_local, 1))
+               mask => registry%get('mask')
+               h => registry%get('h')
+               call this%interp%gather(mask, mask_i)
+               call this%interp%gather(h, h_i)
+               wet(:, 1) = mask_i == 1.0_SP .and. h_i > this%wet_floor
+            end if
             do iv = 1, this%n_vars
                fld => registry%get(trim(this%variables(iv)))
                call this%interp%gather(fld, interp_vals)
                interp_2d(:, 1) = interp_vals
-               call this%accum(iv)%accumulate(interp_2d, dt)
+               do it = 1, max(1, this%n_thr)
+                  if (this%has_events) then
+                     call this%accum(iv, it)%accumulate(interp_2d, dt, t=t, wet=wet)
+                  else
+                     call this%accum(iv, it)%accumulate(interp_2d, dt, t=t)
+                  end if
+               end do
             end do
             deallocate (interp_vals, interp_2d)
 
          case ('field')
-            do iv = 1, this%n_vars
-               fld => registry%get(trim(this%variables(iv)))
-               ! Slice interior (ghost-inclusive field → interior only)
-               associate (ng => N_GHOST, nx => this%local_nx, ny => this%local_ny)
-                  call this%accum(iv)%accumulate( &
-                     fld(ng + 1:ng + nx, ng + 1:ng + ny), dt)
-               end associate
-            end do
+            associate (ng => N_GHOST, nx => this%local_nx, ny => this%local_ny)
+               if (this%has_events) then
+                  mask => registry%get('mask')
+                  h => registry%get('h')
+                  wet = mask(ng + 1:ng + nx, ng + 1:ng + ny) > 0.5_SP .and. &
+                        h(ng + 1:ng + nx, ng + 1:ng + ny) > this%wet_floor
+               end if
+               do iv = 1, this%n_vars
+                  fld => registry%get(trim(this%variables(iv)))
+                  ! Slice interior (ghost-inclusive field → interior only)
+                  do it = 1, max(1, this%n_thr)
+                     if (this%has_events) then
+                        call this%accum(iv, it)%accumulate( &
+                           fld(ng + 1:ng + nx, ng + 1:ng + ny), dt, t=t, wet=wet)
+                     else
+                        call this%accum(iv, it)%accumulate( &
+                           fld(ng + 1:ng + nx, ng + 1:ng + ny), dt, t=t)
+                     end if
+                  end do
+               end do
+            end associate
          end select
       end if
 
@@ -583,9 +751,14 @@ contains
                call channel_write_derived(this, iv, t, comm)
             end do
          end if
-         do iv = 1, this%n_vars
-            call this%accum(iv)%reset()
-         end do
+         ! running/total never reset: statistics since t_start
+         if (this%accum_mode == 'window') then
+            do iv = 1, this%n_vars
+               do it = 1, max(1, this%n_thr)
+                  call this%accum(iv, it)%reset()
+               end do
+            end do
+         end if
       end if
       if (do_flush) this%stats_primed = .true.
       if (do_flush) this%t_last_flush = t
@@ -623,21 +796,125 @@ contains
       real(SP), intent(in)    :: t
       type(type_comm), intent(inout) :: comm
 
-      integer :: is
+      integer :: is, it, n_it
       character(:), allocatable :: name
       real(SP), allocatable :: stat_vals(:, :)
 
       do is = 1, this%n_stats
-         stat_vals = this%accum(iv)%get_stat(trim(this%statistics(is)))
-         name = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
-         select case (trim(this%geom_type))
-         case ('field')
-            call channel_flush_field(this, stat_vals, name, comm)
-         case ('station', 'transect')
-            call channel_flush_points(this, stat_vals(:, 1), name, t, comm)
-         end select
+         ! event statistics write once per threshold, the rest once
+         n_it = 1
+         if (any(EVENT_STATS == this%statistics(is))) n_it = max(1, this%n_thr)
+         do it = 1, n_it
+            stat_vals = this%accum(iv, it)%get_stat(trim(this%statistics(is)))
+            name = stat_name(this, iv, is, it)
+            select case (trim(this%geom_type))
+            case ('field')
+               call channel_flush_field(this, stat_vals, name, comm)
+            case ('station', 'transect')
+               call channel_flush_points(this, stat_vals(:, 1), name, t, comm)
+            end select
+         end do
       end do
    end subroutine channel_write_stats
+
+   ! <prefix>_threshold[_<threshold tag>]: the scalar coordinate of
+   ! variable iv at threshold it
+   function scalar_name(this, iv, it) result(name)
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in) :: iv, it
+      character(:), allocatable :: name
+      name = trim(this%prefixes(iv))//'_threshold'//trim(this%thr_tag(it))
+   end function scalar_name
+
+   ! The scalar coordinates of a channel with events: one per variable
+   ! and threshold, shared by every statistic on that pair
+   subroutine build_scalar_coords(this, scalars, n)
+      class(type_output_channel), intent(in) :: this
+      type(type_scalar_coord), allocatable, intent(out) :: scalars(:)
+      integer, intent(out) :: n
+
+      integer :: iv, it
+      character(:), allocatable :: base
+
+      n = 0
+      if (.not. this%has_events) then
+         allocate (scalars(0))
+         return
+      end if
+      allocate (scalars(this%n_vars*this%n_thr))
+      do iv = 1, this%n_vars
+         if (this%hidden(iv)) cycle
+         base = trim(this%meta(iv)%long_name)
+         if (len(base) == 0) base = trim(this%variables(iv))
+         do it = 1, this%n_thr
+            n = n + 1
+            scalars(n)%name = scalar_name(this, iv, it)
+            scalars(n)%value = this%thr(it)
+            scalars(n)%meta%units = this%meta(iv)%units
+            scalars(n)%meta%standard_name = this%meta(iv)%standard_name
+            scalars(n)%meta%long_name = base//' threshold'
+            scalars(n)%meta%comment = 'event condition: '// &
+                                      merge('above', 'below', this%thr_dir >= 0)// &
+                                      ' this value on wet samples'
+         end do
+      end do
+   end subroutine build_scalar_coords
+
+   ! <prefix>_<stat>[_<threshold tag>]: the tag only on the event class
+   ! with more than one threshold
+   function stat_name(this, iv, is, it) result(name)
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in) :: iv, is, it
+      character(:), allocatable :: name
+      name = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
+      if (any(EVENT_STATS == this%statistics(is)) .and. this%n_thr > 0) &
+         name = name//trim(this%thr_tag(it))
+   end function stat_name
+
+   ! Attributes of one statistic variable: moments and extremes inherit
+   ! the base variable's (flag pair dropped); the time-valued and event
+   ! statistics are new quantities in seconds or counts, described from
+   ! the base long_name and the threshold
+   function stat_meta(this, iv, is, it) result(m)
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in) :: iv, is, it
+      type(type_var_meta) :: m
+
+      character(:), allocatable :: cond, base
+
+      m = this%meta(iv)
+      m%n_flags = 0
+      base = trim(m%long_name)
+      if (len(base) == 0) base = trim(this%variables(iv))
+      select case (trim(this%statistics(is)))
+      case ('max_time')
+         m = type_var_meta()
+         m%units = 's'
+         m%long_name = 'time of the maximum of '//base
+         m%comment = 'time the running maximum was last raised; fill where no sample'
+      case ('first_time', 'last_time', 'duration', 'duration_max', 'count')
+         cond = ' '//merge('above', 'below', this%thr_dir >= 0)//' '// &
+                threshold_text(this%thr(it))//' '//trim(this%meta(iv)%units)
+         m = type_var_meta()
+         m%units = 's'
+         select case (trim(this%statistics(is)))
+         case ('first_time')
+            m%long_name = 'onset of the first event of '//base//cond
+         case ('last_time')
+            m%long_name = 'onset of the last event of '//base//cond
+         case ('duration')
+            m%long_name = 'duration of '//base//cond
+         case ('duration_max')
+            m%long_name = 'longest event of '//base//cond
+         case ('count')
+            m%units = '1'
+            m%long_name = 'number of events of '//base//cond
+         end select
+         m%comment = 'events on wet samples'//cond//', committed at close;'// &
+                     ' time values fill where none triggered'
+         m%coordinates = scalar_name(this, iv, it)
+      end select
+   end function stat_meta
 
    ! Write one product-derived output: scale * get_stat(stat) of the
    ! source accumulator, under the derived name (e.g. hsig_NNNNN).
@@ -650,7 +927,7 @@ contains
       real(SP), allocatable :: stat_vals(:, :)
 
       associate (d => this%derived(id))
-         stat_vals = d%scale*this%accum(d%iv)%get_stat(trim(d%stat))
+         stat_vals = d%scale*this%accum(d%iv, 1)%get_stat(trim(d%stat))
          select case (trim(this%geom_type))
          case ('field')
             call channel_flush_field(this, stat_vals, trim(d%name), comm)
@@ -709,13 +986,13 @@ contains
    subroutine build_nc_varlist(this)
       class(type_output_channel), intent(inout) :: this
 
-      integer :: iv, is, n
+      integer :: iv, is, it, n, n_it
 
       ! statistic variables inherit the base variable's attrs; hidden
       ! variables (derived sources) define nothing; derived outputs
       ! define under their own name with the source variable's attrs
-      allocate (this%nc_names(this%n_vars*(1 + this%n_stats) + this%n_derived))
-      allocate (this%nc_meta(this%n_vars*(1 + this%n_stats) + this%n_derived))
+      allocate (this%nc_names(this%n_vars*(1 + this%n_stats*max(1, this%n_thr)) + this%n_derived))
+      allocate (this%nc_meta(this%n_vars*(1 + this%n_stats*max(1, this%n_thr)) + this%n_derived))
       n = 0
       do iv = 1, this%n_vars
          if (this%hidden(iv)) cycle
@@ -725,10 +1002,13 @@ contains
             this%nc_meta(n) = this%meta(iv)
          end if
          do is = 1, this%n_stats
-            n = n + 1
-            this%nc_names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
-            this%nc_meta(n) = this%meta(iv)
-            this%nc_meta(n)%n_flags = 0
+            n_it = 1
+            if (any(EVENT_STATS == this%statistics(is))) n_it = max(1, this%n_thr)
+            do it = 1, n_it
+               n = n + 1
+               this%nc_names(n) = stat_name(this, iv, is, it)
+               this%nc_meta(n) = stat_meta(this, iv, is, it)
+            end do
          end do
       end do
       do is = 1, this%n_derived
@@ -738,6 +1018,7 @@ contains
          this%nc_meta(n)%n_flags = 0
       end do
       this%nc_n = n
+      call build_scalar_coords(this, this%nc_scalars, this%nc_nsc)
    end subroutine build_nc_varlist
 
    ! Define the serial field stream (IO rank only): a shared-root
@@ -758,13 +1039,15 @@ contains
          ! layout 'single': the stream is a group in the shared root
          call this%nc%create(trim(this%id), grid%M, grid%N, &
                              grid%dx0, grid%dy0, this%nc_names, &
-                             this%nc_meta, this%nc_n, root=root)
+                             this%nc_meta, this%nc_n, root=root, &
+                             scalars=this%nc_scalars(1:this%nc_nsc))
       else if (this%chunk_window > 0.0_SP) then
          call create_chunk_file(this)
       else
          call this%nc%create(this%result_folder//trim(this%id)//'.nc', grid%M, grid%N, &
                              grid%dx0, grid%dy0, this%nc_names, this%nc_meta, &
-                             this%nc_n)
+                             this%nc_n, &
+                             scalars=this%nc_scalars(1:this%nc_nsc))
       end if
    end subroutine init_netcdf_backend
 
@@ -784,11 +1067,13 @@ contains
       if (trim(this%format) == 'pnetcdf') then
          call this%pnc%create(fname, this%gatherer%M, this%gatherer%N, &
                               this%dx0, this%dy0, this%nc_names, &
-                              this%nc_meta, this%nc_n, comm)
+                              this%nc_meta, this%nc_n, comm, &
+                              scalars=this%nc_scalars(1:this%nc_nsc))
       else
          call this%nc%create(fname, this%gatherer%M, this%gatherer%N, &
                              this%dx0, this%dy0, this%nc_names, &
-                             this%nc_meta, this%nc_n)
+                             this%nc_meta, this%nc_n, &
+                             scalars=this%nc_scalars(1:this%nc_nsc))
       end if
    end subroutine create_chunk_file
 
@@ -811,14 +1096,17 @@ contains
       integer, intent(in) :: diag_ncid
       real(SP), intent(in) :: x(:), y(:)
 
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable :: names(:)
       character(32), allocatable :: methods(:)
       type(type_var_meta), allocatable :: vmeta(:)
-      integer :: n
+      type(type_scalar_coord), allocatable :: scalars(:)
+      integer :: n, nsc
 
       call build_point_varlist(this, names, methods, vmeta, n)
+      call build_scalar_coords(this, scalars, nsc)
       call this%ncp%create_group(diag_ncid, trim(this%id), x, y, &
-                                 names, vmeta, methods, n, this%n_stats > 0)
+                                 names, vmeta, methods, n, this%n_stats > 0, &
+                                 scalars(1:nsc))
    end subroutine init_netcdf_points
 
    ! Point-channel variable list: snapshot variables plus every
@@ -826,16 +1114,16 @@ contains
    ! the base variable's attrs minus the flag pair
    subroutine build_point_varlist(this, names, methods, vmeta, n)
       class(type_output_channel), intent(in) :: this
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable, intent(out) :: names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable, intent(out) :: names(:)
       character(32), allocatable, intent(out) :: methods(:)
       type(type_var_meta), allocatable, intent(out) :: vmeta(:)
       integer, intent(out) :: n
 
-      integer :: iv, is
+      integer :: iv, is, it, n_it
 
-      allocate (names(this%n_vars*(1 + this%n_stats)))
-      allocate (methods(this%n_vars*(1 + this%n_stats)))
-      allocate (vmeta(this%n_vars*(1 + this%n_stats)))
+      allocate (names(this%n_vars*(1 + this%n_stats*max(1, this%n_thr))))
+      allocate (methods(this%n_vars*(1 + this%n_stats*max(1, this%n_thr))))
+      allocate (vmeta(this%n_vars*(1 + this%n_stats*max(1, this%n_thr))))
       n = 0
       do iv = 1, this%n_vars
          if (this%snapshot) then
@@ -845,11 +1133,14 @@ contains
             vmeta(n) = this%meta(iv)
          end if
          do is = 1, this%n_stats
-            n = n + 1
-            names(n) = trim(this%prefixes(iv))//'_'//trim(this%statistics(is))
-            methods(n) = stat_cell_method(trim(this%statistics(is)))
-            vmeta(n) = this%meta(iv)
-            vmeta(n)%n_flags = 0
+            n_it = 1
+            if (any(EVENT_STATS == this%statistics(is))) n_it = max(1, this%n_thr)
+            do it = 1, n_it
+               n = n + 1
+               names(n) = stat_name(this, iv, is, it)
+               methods(n) = stat_cell_method(trim(this%statistics(is)))
+               vmeta(n) = stat_meta(this, iv, is, it)
+            end do
          end do
       end do
    end subroutine build_point_varlist
@@ -871,13 +1162,14 @@ contains
       class(type_output_channel), intent(in) :: this
       integer, intent(in), optional :: m, n   ! field: global grid size
 
-      character(VARNAME_LEN + STATNAME_LEN + 1), allocatable :: names(:)
+      character(VARNAME_LEN + STATNAME_LEN + THRTAG_LEN + 1), allocatable :: names(:)
       character(32), allocatable :: methods(:)
       type(type_var_meta), allocatable :: vmeta(:)
+      type(type_scalar_coord), allocatable :: scalars(:)
       type(type_dictionary), pointer :: root, blk, vars, var
       integer(int8) :: probe(4)
       character(8) :: bits
-      integer :: unit, i, nv
+      integer :: unit, i, nv, nsc
       logical :: field
 
       field = present(m)
@@ -900,7 +1192,7 @@ contains
             call blk%set_string('layout', yaml_quoted('one line per y, x values across'))
          end if
       else
-         call blk%set_string('pattern', yaml_quoted(trim(this%id)//'_<variable>.dat'))
+         call blk%set_string('pattern', yaml_quoted('<variable>.dat'))
          call blk%set_string('dtype', yaml_quoted('text'))
          call blk%set_string('layout', &
                              yaml_quoted('one line per flush: time, then the point values in order'))
@@ -933,6 +1225,12 @@ contains
          call var%set_string('bounds', yaml_quoted('time_bnds'))
          var => yaml_child(vars, 'time_bnds')
       end if
+      call build_scalar_coords(this, scalars, nsc)
+      do i = 1, nsc
+         var => yaml_child(vars, trim(scalars(i)%name))
+         call var%set_string('value', threshold_text(scalars(i)%value))
+         call yaml_var_atts(var, scalars(i)%meta)
+      end do
       if (field) then
          do i = 1, this%nc_n
             var => yaml_child(vars, trim(this%nc_names(i)))
@@ -978,6 +1276,8 @@ contains
          call var%set_string('funwave_name', yaml_quoted(trim(meta%funwave_name)))
       if (len_trim(meta%comment) > 0) &
          call var%set_string('comment', yaml_quoted(trim(meta%comment)))
+      if (len_trim(meta%coordinates) > 0) &
+         call var%set_string('coordinates', yaml_quoted(trim(meta%coordinates)))
       if (meta%n_flags > 0) then
          allocate (vals)
          do k = 1, meta%n_flags
@@ -1031,6 +1331,12 @@ contains
          cm = 'time: minimum'
       case ('max')
          cm = 'time: maximum'
+      case ('duration_max')
+         cm = 'time: maximum'
+      case ('duration', 'count')
+         cm = 'time: sum'
+      case ('max_time', 'first_time', 'last_time')
+         cm = 'time: point'
       case ('mean')
          cm = 'time: mean'
       case ('std')
@@ -1150,7 +1456,7 @@ contains
    ! Truncate all point files this channel will append to (IO rank only).
    subroutine truncate_point_files(this)
       class(type_output_channel), intent(in) :: this
-      integer :: iv, is, unit
+      integer :: iv, is, it, n_it, unit
 
       do iv = 1, this%n_vars
          if (this%snapshot) then
@@ -1159,10 +1465,13 @@ contains
             close (unit)
          end if
          do is = 1, this%n_stats
-            open (newunit=unit, file=point_file_name(this, &
-                                                     trim(this%prefixes(iv))//'_'//trim(this%statistics(is))), &
-                  status='replace', action='write')
-            close (unit)
+            n_it = 1
+            if (any(EVENT_STATS == this%statistics(is))) n_it = max(1, this%n_thr)
+            do it = 1, n_it
+               open (newunit=unit, file=point_file_name(this, stat_name(this, iv, is, it)), &
+                     status='replace', action='write')
+               close (unit)
+            end do
          end do
       end do
    end subroutine truncate_point_files
@@ -1220,6 +1529,9 @@ contains
       if (len_trim(meta%comment) > 0) &
          call nc_check(nf90_put_att(ncid, varid, 'comment', trim(meta%comment)), &
                        'att comment '//trim(name))
+      if (len_trim(meta%coordinates) > 0) &
+         call nc_check(nf90_put_att(ncid, varid, 'coordinates', trim(meta%coordinates)), &
+                       'att coordinates '//trim(name))
       if (meta%n_flags > 0) then
          if (single) then
             call nc_check(nf90_put_att(ncid, varid, 'flag_values', &
@@ -1250,7 +1562,7 @@ contains
    ! one SP-kind variable per name with its CF attrs.  Clobbers any
    ! existing file.  With root, fname names a GROUP defined in that
    ! shared file instead (layout 'single'; the root owner closes).
-   subroutine nc_create(this, fname, M, N, dx, dy, names, meta, n_names, root)
+   subroutine nc_create(this, fname, M, N, dx, dy, names, meta, n_names, root, scalars)
       class(type_netcdf_field_writer), intent(inout) :: this
       character(*), intent(in) :: fname
       integer, intent(in) :: M, N
@@ -1259,9 +1571,11 @@ contains
       type(type_var_meta), intent(in) :: meta(:)
       integer, intent(in) :: n_names
       integer, intent(in), optional :: root
+      type(type_scalar_coord), intent(in), optional :: scalars(:)
 
       integer :: x_dim, y_dim, t_dim, x_var, y_var
       integer :: i
+      integer, allocatable :: sc_var(:)
       real(SP), allocatable :: coord(:)
 
       this%owns_file = .not. present(root)
@@ -1301,6 +1615,7 @@ contains
                        'def var '//trim(names(i)))
          call nc_put_var_atts(this%ncid, this%varids(i), names(i), meta(i), this%single)
       end do
+      call nc_def_scalars(this%ncid, scalars, sc_var)
 
       ! group mode: the root already carries the global attrs, and a
       ! NETCDF4 root needs no define/data mode juggling
@@ -1322,10 +1637,48 @@ contains
          coord(i) = real(i - 1, SP)*dy
       end do
       call nc_check(nf90_put_var(this%ncid, y_var, coord(1:N)), 'put y')
+      call nc_put_scalars(this%ncid, scalars, sc_var)
 
       this%nrec = 0
       this%is_open = .true.
    end subroutine nc_create
+
+   ! Scalar coordinate variables (no dimensions): define with their attrs
+   ! before enddef, put the values after -- sc_var carries the ids across
+   subroutine nc_def_scalars(ncid, scalars, sc_var)
+      integer, intent(in) :: ncid
+      type(type_scalar_coord), intent(in), optional :: scalars(:)
+      integer, allocatable, intent(out) :: sc_var(:)
+
+      integer :: no_dims(0)
+      integer :: i
+
+      if (.not. present(scalars)) then
+         allocate (sc_var(0))
+         return
+      end if
+      allocate (sc_var(size(scalars)))
+      do i = 1, size(scalars)
+         call nc_check(nf90_def_var(ncid, trim(scalars(i)%name), NF90_DOUBLE, &
+                                    no_dims, sc_var(i)), &
+                       'def scalar '//trim(scalars(i)%name))
+         call nc_put_var_atts(ncid, sc_var(i), scalars(i)%name, scalars(i)%meta, .false.)
+      end do
+   end subroutine nc_def_scalars
+
+   subroutine nc_put_scalars(ncid, scalars, sc_var)
+      integer, intent(in) :: ncid
+      type(type_scalar_coord), intent(in), optional :: scalars(:)
+      integer, intent(in) :: sc_var(:)
+
+      integer :: i
+
+      if (.not. present(scalars)) return
+      do i = 1, size(scalars)
+         call nc_check(nf90_put_var(ncid, sc_var(i), real(scalars(i)%value, 8)), &
+                       'put scalar '//trim(scalars(i)%name))
+      end do
+   end subroutine nc_put_scalars
 
    ! Advance the record dimension and stamp its time value.
    subroutine nc_begin_frame(this, t)
@@ -1394,7 +1747,7 @@ contains
    ! groups add time_bnds(bnds, time) spanning each closed window.
    ! NETCDF4 files need no define/data mode juggling across groups.
    subroutine ncp_create_group(this, root, id, x, y, names, meta, &
-                               methods, n_names, windowed)
+                               methods, n_names, windowed, scalars)
       class(type_netcdf_point_writer), intent(inout) :: this
       integer, intent(in) :: root
       character(*), intent(in) :: id
@@ -1404,9 +1757,11 @@ contains
       character(*), intent(in) :: methods(:)
       integer, intent(in) :: n_names
       logical, intent(in) :: windowed
+      type(type_scalar_coord), intent(in), optional :: scalars(:)
 
       integer :: p_dim, t_dim, b_dim, x_var, y_var
       integer :: i
+      integer, allocatable :: sc_var(:)
 
       call nc_check(nf90_def_grp(root, id, this%grpid), 'def group '//id)
 
@@ -1451,9 +1806,11 @@ contains
                        'att cell_methods '//trim(names(i)))
          call nc_put_var_atts(this%grpid, this%varids(i), names(i), meta(i), .false.)
       end do
+      call nc_def_scalars(this%grpid, scalars, sc_var)
 
       call nc_check(nf90_put_var(this%grpid, x_var, x), 'put x '//id)
       call nc_check(nf90_put_var(this%grpid, y_var, y), 'put y '//id)
+      call nc_put_scalars(this%grpid, scalars, sc_var)
 
       this%nrec = 0
       this%is_open = .true.
@@ -1536,6 +1893,9 @@ contains
       if (len_trim(meta%comment) > 0) &
          call pnc_check(nf90mpi_put_att(ncid, varid, 'comment', trim(meta%comment)), &
                         'att comment '//trim(name))
+      if (len_trim(meta%coordinates) > 0) &
+         call pnc_check(nf90mpi_put_att(ncid, varid, 'coordinates', trim(meta%coordinates)), &
+                        'att coordinates '//trim(name))
       if (meta%n_flags > 0) then
          if (single) then
             call pnc_check(nf90mpi_put_att(ncid, varid, 'flag_values', &
@@ -1566,7 +1926,7 @@ contains
    ! writer.  Static coords and per-frame times use the count-0
    ! collective pattern — every rank participates, only the IO rank
    ! contributes elements.
-   subroutine pnc_create(this, fname, M, N, dx, dy, names, meta, n_names, comm)
+   subroutine pnc_create(this, fname, M, N, dx, dy, names, meta, n_names, comm, scalars)
       class(type_pnetcdf_field_writer), intent(inout) :: this
       character(*), intent(in) :: fname
       integer, intent(in) :: M, N
@@ -1575,9 +1935,12 @@ contains
       type(type_var_meta), intent(in) :: meta(:)
       integer, intent(in) :: n_names
       type(type_comm), intent(inout) :: comm
+      type(type_scalar_coord), intent(in), optional :: scalars(:)
 
       integer :: x_dim, y_dim, t_dim, x_var, y_var
-      integer :: i
+      integer :: i, nsc
+      integer :: no_dims(0)
+      integer, allocatable :: sc_var(:)
       integer(kind=MPI_OFFSET_KIND) :: dlen
       real(SP), allocatable :: coord(:)
 
@@ -1618,6 +1981,16 @@ contains
                         'def var '//trim(names(i)))
          call pnc_put_var_atts(this%ncid, this%varids(i), names(i), meta(i), this%single)
       end do
+      ! scalar coordinates (the event thresholds): no dimensions
+      nsc = 0
+      if (present(scalars)) nsc = size(scalars)
+      allocate (sc_var(nsc))
+      do i = 1, nsc
+         call pnc_check(nf90mpi_def_var(this%ncid, trim(scalars(i)%name), NF90_DOUBLE, &
+                                        no_dims, sc_var(i)), &
+                        'def scalar '//trim(scalars(i)%name))
+         call pnc_put_var_atts(this%ncid, sc_var(i), scalars(i)%name, scalars(i)%meta, .false.)
+      end do
 
       call pnc_check(nf90mpi_put_att(this%ncid, NF90_GLOBAL, 'Conventions', &
                                      'CF-1.8'), 'att Conventions')
@@ -1637,6 +2010,10 @@ contains
       end do
       call pnc_check(pnc_put_replicated(this%ncid, y_var, coord(1:N), 1), &
                      'put y')
+      do i = 1, nsc
+         call pnc_check(pnc_put_replicated(this%ncid, sc_var(i), [scalars(i)%value], 1), &
+                        'put scalar '//trim(scalars(i)%name))
+      end do
 
       this%nrec = 0
       this%is_open = .true.
@@ -1716,15 +2093,17 @@ contains
 
    subroutine channel_finalize(this)
       class(type_output_channel), intent(inout) :: this
-      integer :: iv
+      integer :: iv, it
       call this%interp%finalize()
       call this%gatherer%finalize()
       call this%nc%close()
       call this%ncp%reset()
       call this%pnc%close()
       if (allocated(this%accum)) then
-         do iv = 1, size(this%accum)
-            call this%accum(iv)%finalize()
+         do iv = 1, size(this%accum, 1)
+            do it = 1, size(this%accum, 2)
+               call this%accum(iv, it)%finalize()
+            end do
          end do
          deallocate (this%accum)
       end if

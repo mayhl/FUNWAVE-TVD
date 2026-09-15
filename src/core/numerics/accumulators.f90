@@ -39,9 +39,34 @@
 !! f_{\mathrm{std}}\f$.  The shift changes neither the variance nor the
 !! reconstructed mean/RMS; shifted accumulation engages only when "std"
 !! is requested, so channels without it keep the historical bit pattern.
+!!
+!! **Extremes with time** — `max_time` rides `max`: the sample time at
+!! which the running maximum was last raised.
+!!
+!! **Events** — a per-cell state machine on a threshold condition
+!! (`set_threshold`: value and direction, `above` or `below`), tested on
+!! wet samples only when a wet mask is given.  An event opens at the
+!! first sample meeting the condition and closes at the first sample
+!! failing it; it is COMMITTED at close (never while open), so a window
+!! flush never sees a partial event and a discarded one leaves no trace:
+!! `count` (events closed), `first_time` and `last_time` (onset of the
+!! first and last committed event), `duration` (sum of the time meeting
+!! the condition) and `duration_max`.  Filters, off at zero: `gap`
+!! re-opens the same event when the condition returns within that many
+!! seconds (the gap itself is not counted as duration); `min_duration`
+!! discards a shorter event at close.  `reset` clears only the committed
+!! values, so an event straddling a window boundary lands whole in the
+!! window it closes in and adjacent windows sum exactly.  Time-valued
+!! results hold FILL_VALUE where nothing ever triggered; counts and
+!! durations hold 0.
 module core_accumulators_mod
    use core_constants_mod, only: SP
    implicit none
+
+   !> Never-triggered marker of the time-valued statistics (the registry
+   !! fill value, so a writer needs no translation).
+   real(SP), parameter, public :: FILL_VALUE = -9999.0_SP
+   integer, parameter, public :: THR_NONE = 0, THR_ABOVE = 1, THR_BELOW = -1
 
    !> Accumulates time-weighted statistics for a 2-D field array.
    !!
@@ -75,9 +100,30 @@ module core_accumulators_mod
       logical  :: have_shift = .false.
       !> Per-cell shift \f$f_{\mathrm{shift}}\f$ (allocated for "std").
       real(SP), allocatable :: shift(:, :)
+      !> Sample time of the running maximum (allocated for "max_time").
+      real(SP), allocatable :: t_max(:, :)
+      !> Event threshold value and direction (THR_ABOVE / THR_BELOW).
+      real(SP) :: thr = 0.0_SP
+      integer  :: thr_dir = THR_NONE
+      !> Event filters in seconds; 0 = off.
+      real(SP) :: gap = 0.0_SP
+      real(SP) :: min_duration = 0.0_SP
+      !> Open-event state (allocated by any event statistic; survives reset)
+      logical, allocatable :: in_event(:, :)   !< condition met at the last sample
+      logical, allocatable :: closing(:, :)    !< condition lost, gap not yet elapsed
+      real(SP), allocatable :: t_on(:, :)       !< onset of the open event
+      real(SP), allocatable :: t_off(:, :)      !< first sample failing the condition
+      real(SP), allocatable :: pend_dur(:, :)   !< duration of the open event so far
+      !> Committed event values (reset per window)
+      real(SP), allocatable :: first_time(:, :)
+      real(SP), allocatable :: last_time(:, :)
+      real(SP), allocatable :: dur_sum(:, :)
+      real(SP), allocatable :: dur_max(:, :)
+      real(SP), allocatable :: count(:, :)
    contains
       procedure, public :: init
       procedure, public :: allocate_stat
+      procedure, public :: set_threshold
       procedure, public :: accumulate
       procedure, public :: reset
       procedure, public :: finalize
@@ -146,10 +192,41 @@ contains
          if (.not. allocated(this%shift)) &
             allocate (this%shift(this%dim1, this%dim2), source=0.0_SP)
          this%shifted = .true.
+      case ("max_time")
+         if (.not. allocated(this%val_max)) &
+            allocate (this%val_max(this%dim1, this%dim2), source=-huge(1.0_SP))
+         if (.not. allocated(this%t_max)) &
+            allocate (this%t_max(this%dim1, this%dim2), source=FILL_VALUE)
+      case ("first_time", "last_time", "duration", "duration_max", "count")
+         if (.not. allocated(this%in_event)) then
+            allocate (this%in_event(this%dim1, this%dim2), source=.false.)
+            allocate (this%closing(this%dim1, this%dim2), source=.false.)
+            allocate (this%t_on(this%dim1, this%dim2), source=FILL_VALUE)
+            allocate (this%t_off(this%dim1, this%dim2), source=FILL_VALUE)
+            allocate (this%pend_dur(this%dim1, this%dim2), source=0.0_SP)
+            allocate (this%first_time(this%dim1, this%dim2), source=FILL_VALUE)
+            allocate (this%last_time(this%dim1, this%dim2), source=FILL_VALUE)
+            allocate (this%dur_sum(this%dim1, this%dim2), source=0.0_SP)
+            allocate (this%dur_max(this%dim1, this%dim2), source=0.0_SP)
+            allocate (this%count(this%dim1, this%dim2), source=0.0_SP)
+         end if
       case default
          error stop "Unknown statistic operation: "//trim(op)
       end select
    end subroutine allocate_stat
+
+   !> Set the event condition: value and direction (THR_ABOVE: sample >
+   !! value; THR_BELOW: sample < value) and the two filters in seconds.
+   subroutine set_threshold(this, value, direction, gap, min_duration)
+      class(type_accumulator), intent(inout) :: this
+      real(SP), intent(in) :: value
+      integer, intent(in) :: direction
+      real(SP), intent(in), optional :: gap, min_duration
+      this%thr = value
+      this%thr_dir = direction
+      if (present(gap)) this%gap = gap
+      if (present(min_duration)) this%min_duration = min_duration
+   end subroutine set_threshold
 
    !> Ingest one time step of field data.
    !!
@@ -163,14 +240,23 @@ contains
    !! @param[in]  value  Field snapshot at the current time step,
    !!                    shape `(dim1, dim2)`.
    !! @param[in]  dt     Time-step size \f$\Delta t > 0\f$.
-   subroutine accumulate(this, value, dt)
+   !! @param[in]  t      Sample time; required by max_time and the events.
+   !! @param[in]  wet    Wet mask; events sample only where true (absent =
+   !!                    every cell).
+   subroutine accumulate(this, value, dt, t, wet)
       class(type_accumulator), intent(inout) :: this
       real(SP), intent(in) :: value(:, :)
       real(SP), intent(in) :: dt
+      real(SP), intent(in), optional :: t
+      logical, intent(in), optional :: wet(:, :)
 
       this%total_dt = this%total_dt + dt
       if (allocated(this%val_min)) this%val_min = min(this%val_min, value)
+      if (allocated(this%t_max) .and. present(t)) &
+         where (value > this%val_max) this%t_max = t
       if (allocated(this%val_max)) this%val_max = max(this%val_max, value)
+      if (allocated(this%in_event) .and. present(t)) &
+         call step_events(this, value, dt, t, wet)
       if (this%shifted) then
          if (.not. this%have_shift) then
             this%shift = value
@@ -183,6 +269,70 @@ contains
          if (allocated(this%val_sum_sq)) this%val_sum_sq = this%val_sum_sq + value**2*dt
       end if
    end subroutine accumulate
+
+   !> Advance the per-cell event state machine by one sample.
+   subroutine step_events(this, value, dt, t, wet)
+      class(type_accumulator), intent(inout) :: this
+      real(SP), intent(in) :: value(:, :)
+      real(SP), intent(in) :: dt, t
+      logical, intent(in), optional :: wet(:, :)
+
+      logical :: met
+      integer :: i, j
+
+      do j = 1, this%dim2
+         do i = 1, this%dim1
+            if (this%thr_dir == THR_ABOVE) then
+               met = value(i, j) > this%thr
+            else
+               met = value(i, j) < this%thr
+            end if
+            if (present(wet)) met = met .and. wet(i, j)
+
+            if (met) then
+               if (.not. this%in_event(i, j)) then
+                  if (this%closing(i, j)) then
+                     ! back within the gap: the same event continues
+                     this%closing(i, j) = .false.
+                  else
+                     this%t_on(i, j) = t
+                     this%pend_dur(i, j) = 0.0_SP
+                  end if
+                  this%in_event(i, j) = .true.
+               end if
+               this%pend_dur(i, j) = this%pend_dur(i, j) + dt
+            else if (this%in_event(i, j)) then
+               this%in_event(i, j) = .false.
+               this%t_off(i, j) = t
+               if (this%gap > 0.0_SP) then
+                  this%closing(i, j) = .true.
+               else
+                  call commit_event(this, i, j)
+               end if
+            end if
+            ! the gap has run out: close for good
+            if (this%closing(i, j) .and. .not. this%in_event(i, j)) then
+               if (t - this%t_off(i, j) > this%gap) call commit_event(this, i, j)
+            end if
+         end do
+      end do
+   end subroutine step_events
+
+   !> Commit the closed event of one cell, or discard it under min_duration.
+   subroutine commit_event(this, i, j)
+      class(type_accumulator), intent(inout) :: this
+      integer, intent(in) :: i, j
+
+      this%closing(i, j) = .false.
+      if (this%pend_dur(i, j) >= this%min_duration) then
+         this%count(i, j) = this%count(i, j) + 1.0_SP
+         if (this%first_time(i, j) == FILL_VALUE) this%first_time(i, j) = this%t_on(i, j)
+         this%last_time(i, j) = this%t_on(i, j)
+         this%dur_sum(i, j) = this%dur_sum(i, j) + this%pend_dur(i, j)
+         this%dur_max(i, j) = max(this%dur_max(i, j), this%pend_dur(i, j))
+      end if
+      this%pend_dur(i, j) = 0.0_SP
+   end subroutine commit_event
 
    !> Retrieve the final statistic as a 2-D array.
    !!
@@ -233,6 +383,18 @@ contains
          if (allocated(this%val_sum_sq) .and. this%total_dt > 0.0_SP) &
             stat = sqrt(max(0.0_SP, this%val_sum_sq/this%total_dt &
                             - (this%val_sum/this%total_dt)**2))
+      case ("max_time")
+         if (allocated(this%t_max)) stat = this%t_max
+      case ("first_time")
+         if (allocated(this%first_time)) stat = this%first_time
+      case ("last_time")
+         if (allocated(this%last_time)) stat = this%last_time
+      case ("duration")
+         if (allocated(this%dur_sum)) stat = this%dur_sum
+      case ("duration_max")
+         if (allocated(this%dur_max)) stat = this%dur_max
+      case ("count")
+         if (allocated(this%count)) stat = this%count
       case default
          error stop "Unknown statistic operation: "//trim(op)
       end select
@@ -249,6 +411,15 @@ contains
       if (allocated(this%val_sum_sq)) this%val_sum_sq = 0.0_SP
       if (allocated(this%val_max)) this%val_max = -huge(1.0_SP)
       if (allocated(this%val_min)) this%val_min = huge(1.0_SP)
+      if (allocated(this%t_max)) this%t_max = FILL_VALUE
+      ! committed events only: an open event carries into the next window
+      if (allocated(this%first_time)) then
+         this%first_time = FILL_VALUE
+         this%last_time = FILL_VALUE
+         this%dur_sum = 0.0_SP
+         this%dur_max = 0.0_SP
+         this%count = 0.0_SP
+      end if
       ! re-capture the shift each window (tracks a drifting mean)
       this%have_shift = .false.
    end subroutine reset
@@ -261,6 +432,14 @@ contains
       if (allocated(this%val_sum)) deallocate (this%val_sum)
       if (allocated(this%val_sum_sq)) deallocate (this%val_sum_sq)
       if (allocated(this%shift)) deallocate (this%shift)
+      if (allocated(this%t_max)) deallocate (this%t_max)
+      if (allocated(this%in_event)) deallocate (this%in_event, this%closing, &
+                                                this%t_on, this%t_off, this%pend_dur, &
+                                                this%first_time, this%last_time, &
+                                                this%dur_sum, this%dur_max, this%count)
+      this%thr_dir = THR_NONE
+      this%gap = 0.0_SP
+      this%min_duration = 0.0_SP
       this%shifted = .false.
       this%have_shift = .false.
       this%dim1 = 0

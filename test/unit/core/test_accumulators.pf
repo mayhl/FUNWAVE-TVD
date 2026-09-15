@@ -1,7 +1,7 @@
 module test_accumulators
    use FUnit
    use core_constants_mod, only: SP
-   use core_accumulators_mod, only: type_accumulator
+   use core_accumulators_mod, only: type_accumulator, FILL_VALUE, THR_ABOVE, THR_BELOW
    implicit none
 
 contains
@@ -218,5 +218,184 @@ contains
       stat = acc%get_stat("std")
       @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-5_SP)
    end subroutine test_std_reset_recaptures_shift
+
+   ! ----------------------------------------------------------------
+   ! events: helper feeding one cell a sample series at unit dt, t = 0, 1, ...
+   ! ----------------------------------------------------------------
+   subroutine feed(acc, series, wet)
+      type(type_accumulator), intent(inout) :: acc
+      real(SP), intent(in) :: series(:)
+      logical, intent(in), optional :: wet(:)
+      real(SP) :: val(1, 1)
+      logical :: w(1, 1)
+      integer :: n
+      do n = 1, size(series)
+         val(1, 1) = series(n)
+         if (present(wet)) then
+            w(1, 1) = wet(n)
+            call acc%accumulate(val, 1.0_SP, t=real(n - 1, SP), wet=w)
+         else
+            call acc%accumulate(val, 1.0_SP, t=real(n - 1, SP))
+         end if
+      end do
+   end subroutine feed
+
+   ! ----------------------------------------------------------------
+   ! two events above 0.5: [1,2] and [4]; the trailing below sample closes
+   ! the second -> count 2, first 1, last 4, duration 3, duration_max 2
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_basic()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(0.5_SP, THR_ABOVE)
+      call feed(acc, [0.0_SP, 1.0_SP, 1.0_SP, 0.0_SP, 1.0_SP, 0.0_SP])
+
+      stat = acc%get_stat("count")
+
+      @assertEqual(2.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("first_time")
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("last_time")
+      @assertEqual(4.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration_max")
+      @assertEqual(2.0_SP, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_event_basic
+
+   ! ----------------------------------------------------------------
+   ! an open event is not committed; reset keeps it open and it lands
+   ! whole in the window it closes in
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_open_carries_over_reset()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+      real(SP) :: val(1, 1)
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("duration")
+      call acc%set_threshold(0.5_SP, THR_ABOVE)
+      call feed(acc, [1.0_SP, 1.0_SP])
+      stat = acc%get_stat("count")
+      @assertEqual(0.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("first_time")
+      @assertEqual(FILL_VALUE, stat(1, 1), tolerance=1e-6_SP)
+
+      call acc%reset()
+      val(1, 1) = 1.0_SP; call acc%accumulate(val, 1.0_SP, t=2.0_SP)
+      val(1, 1) = 0.0_SP; call acc%accumulate(val, 1.0_SP, t=3.0_SP)
+      stat = acc%get_stat("count")
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("first_time")
+      @assertEqual(0.0_SP, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_event_open_carries_over_reset
+
+   ! ----------------------------------------------------------------
+   ! gap 1.5 s merges [1,2] and [4] into one event of duration 3; the
+   ! gap sample itself is not duration
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_gap_merge()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(0.5_SP, THR_ABOVE, gap=1.5_SP)
+      call feed(acc, [0.0_SP, 1.0_SP, 1.0_SP, 0.0_SP, 1.0_SP, 0.0_SP, 0.0_SP, 0.0_SP])
+
+      stat = acc%get_stat("count")
+
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration_max")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("last_time")
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_event_gap_merge
+
+   ! ----------------------------------------------------------------
+   ! min_duration 1.5 s discards the one-sample event without a trace
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_min_duration_discard()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("first_time")
+      call acc%set_threshold(0.5_SP, THR_ABOVE, min_duration=1.5_SP)
+      call feed(acc, [0.0_SP, 1.0_SP, 0.0_SP, 1.0_SP, 1.0_SP, 0.0_SP])
+
+      stat = acc%get_stat("count")
+
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("first_time")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration")
+      @assertEqual(2.0_SP, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_event_min_duration_discard
+
+   ! ----------------------------------------------------------------
+   ! dry samples never meet the condition; below direction and fill
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_wet_only_below_and_fill()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+
+      call acc%init(1, 1, "eta")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(-0.5_SP, THR_BELOW)
+      call feed(acc, [-1.0_SP, -1.0_SP, 0.0_SP, -1.0_SP, 0.0_SP], &
+                wet=[.false., .false., .true., .true., .true.])
+
+      stat = acc%get_stat("count")
+
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("first_time")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+
+      call acc%init(1, 1, "eta")
+      call acc%allocate_stat("last_time")
+      call acc%set_threshold(0.5_SP, THR_ABOVE)
+      call feed(acc, [0.0_SP, 0.0_SP])
+      stat = acc%get_stat("last_time")
+      @assertEqual(FILL_VALUE, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration")
+      @assertEqual(0.0_SP, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_event_wet_only_below_and_fill
+
+   ! ----------------------------------------------------------------
+   ! max_time rides max: the time the running maximum was last raised;
+   ! reset returns it to fill
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_max_time()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+
+      call acc%init(1, 1, "eta")
+      call acc%allocate_stat("max")
+      call acc%allocate_stat("max_time")
+      call feed(acc, [0.1_SP, 0.9_SP, 0.3_SP, 0.9_SP])
+
+      stat = acc%get_stat("max")
+
+      @assertEqual(0.9_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("max_time")
+      @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      call acc%reset()
+      stat = acc%get_stat("max_time")
+      @assertEqual(FILL_VALUE, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_max_time
 
 end module test_accumulators
