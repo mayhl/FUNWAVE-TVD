@@ -1,0 +1,50 @@
+# Yoshii, Tanaka & Matsuyama (2017): TSTLE case C2, fixed-bed channel = the
+# hydrodynamic gate of NTHMP sediment benchmark 3.  A bore over a 1/50 slope
+# with a 0.2 m dune at x = 40.9 (still-water shoreline x = 40).  The measured
+# eta and u at the x = 0.5 m gauge drive the west face through the Flather
+# characteristic (the benchmark supplies no wavemaker); cell 1 sits at that
+# gauge, so engine x = flume x - 0.5.  The land slope continues past the
+# 60.4 m survey to x = 65.  Viscous breaker with the SWE gate, as every
+# sediment deck: after 100 s the landward pond drains seaward over the crest
+# as a 1-2 cm supercritical film, and the Froude cap of 2 is what carries
+# that phase (cap 3 collapses at t = 122 s; a 2 cm floor never wets the last
+# gauge).  Legacy benchmark's CFL 0.1 and cd 0.003.
+grid:
+  cell_size: [0.04, 0.04]
+  n_cells: [1613, 3]
+  bathymetry:
+    type: file
+    file: depth_c2.txt
+simulation:
+  title: lab_yoshii_c2_fixed
+  total_time: 130.0
+  screen_interval: 10.0
+boundaries:
+  west:
+    forcing:
+      file: west_c2.txt
+breaking:
+  swe_gate: true
+friction:
+  cd: 0.003
+numerics:
+  cfl: 0.1
+  froude_cap: 2.0
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: gauges  # h, not eta: the lab gauges on land read the water column
+      geometry: stations
+      variables: [h, u]
+      interval: 0.05
+    - name: fields
+      geometry: field
+      variables: [eta, u, mask]
+      interval: 0.5
+  geometries:
+    - name: stations
+      type: station
+      x: [19.5, 29.5, 35.5, 37.5, 39.5, 41.5, 43.5, 45.5, 49.5, 53.5]
+      y: [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]

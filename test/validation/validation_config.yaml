@@ -589,6 +589,41 @@ simulations:
       sediment.min_depth_pickup: [0.01, 0.02, 0.03, 0.05, 0.07, 0.10]
       sediment.shields_cr: [0.045, 0.065]
 
+  # ── Yoshii et al. 2017/2018: TSTLE case C2, NTHMP sediment benchmark 3 ──
+  # Fixed-bed channel = the hydrodynamic gate; the measured x = 0.5 m eta/u
+  # series drives the west face (Flather).  Gate: worst gauge 22 % at first
+  # light (09-15), the shallow last station.
+  - name: lab_yoshii_c2_fixed
+    <<: &yoshii_c2
+      exe_type: validation-2d
+      np: 2
+      input: test/validation/inputs/yoshii_tanaka
+      input_files: [c2_fixed.yaml]
+      binary: funwave
+      output_dir: output
+      tags: [lab, sediment, gauges, 1d]
+      postprocess:
+        gauges: test.validation.oracles.gauges
+      tolerances:
+        gauges:
+          file: gauges_c2.txt
+          variable: h
+          align: none
+          channel: gauges
+          window_s: [20.0, 130.0]
+          gauge_nrmse_pct: 30.0
+
+  # Stability study, report-only (tag study + c2): the pond drains over the
+  # dune crest as a 1-2 cm supercritical film at the wet/dry floor; floor x
+  # cap, viscous throughout (09-15: cap 2 at the 1 cm floor is the survivor,
+  # cap 3 blows up at t = 122 s, floors of 2 cm and more lose the last gauge).
+  - name: study_c2_stability
+    <<: *yoshii_c2
+    tags: [study, c2]
+    sweep:
+      numerics.min_depth: [0.01, 0.02, 0.03]
+      numerics.froude_cap: [2.0, 3.0]
+
   # ── Pintado-Patino et al. 2016: dam-break swash over an erodible beach ──
   # Runs to 8.5 s — the paper's own comparison regime (before the reflected
   # bore, which the experiment's second gate blocked, reaches the beach).

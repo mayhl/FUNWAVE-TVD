@@ -5,7 +5,8 @@ align: none), never per-gauge.  Modes: timeseries (worst-gauge NRMSE) or
 heights (H_rms error + the Shi et al. 2012 Sec. 4.2 sigma/skew/asym set;
 aggregates gate only when named, stat_exclude trims them).
 
-Keys: file, gauges, align, max_lag_s, channel, window_s, mode, stat_exclude.
+Keys: file, gauges, align, max_lag_s, channel, variable (the point-channel
+variable the table holds, default eta), window_s, mode, stat_exclude.
 """
 
 from __future__ import annotations
@@ -26,6 +27,7 @@ ACCEPTED_KEYS = (
     "file",
     "gauges",
     "channel",
+    "variable",
     "align",
     "max_lag_s",
     "window_s",
@@ -60,7 +62,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
 
     meta = read_run_metadata(dev_dir)
     try:
-        t_mod, v_mod = wave_stats.read_point_channel(meta.output_dir, "eta", tolerances.get("channel"))
+        t_mod, v_mod = wave_stats.read_point_channel(meta.output_dir, tolerances.get("variable", "eta"), tolerances.get("channel"))
     except FileNotFoundError as exc:
         return _skip(str(exc))
     if v_mod.shape[1] < len(gauge_names):
