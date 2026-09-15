@@ -49,7 +49,7 @@ contains
    subroutine wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                             dx, dy, dt, t_brk, advance_age, min_depth_frc, &
                             cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap, &
-                            vis_scheme, swe_eta_dep, in_wm_zone, &
+                            vis_scheme, nu_scale, swe_eta_dep, in_wm_zone, &
                             nu_break, age, roller_flux, undertow_u, undertow_v, &
                             cap_time, cap_w, n_capped)
       type(type_loop_bounds), intent(in) :: lp
@@ -61,6 +61,7 @@ contains
       logical, intent(in)  :: advance_age
       real(SP), intent(in)  :: cbrk1, cbrk2, wavemaker_cbrk, nu_bkg, nu_cap
       integer, intent(in)  :: vis_scheme
+      real(SP), intent(in)  :: nu_scale   ! breaker magnitude multiplier (zone term unscaled)
       real(SP), intent(in)  :: swe_eta_dep
       logical, intent(in)  :: in_wm_zone(:, :)
       real(SP), intent(inout) :: nu_break(:, :), age(:, :)
@@ -96,7 +97,7 @@ contains
             ! ---- VIS_DEPTH_RATIO: ratio-based detection, no age -----
             if (vis_scheme == VIS_SCHEME_DEPTH_RATIO) then
                if (abs(eta(i, j))/max(depth(i, j), min_depth_frc) > swe_eta_dep) then
-                  cap1 = max(depth(i, j), min_depth_frc) + eta(i, j)
+                  cap1 = nu_scale*(max(depth(i, j), min_depth_frc) + eta(i, j))
                   b = 0.0_SP
                   if (etat(i, j) > thr1 .and. etat(i, j) <= 2.0_SP*thr1) then
                      b = etat(i, j)/thr1 - 1.0_SP
@@ -162,7 +163,7 @@ contains
             else
                if (age(i, j) > 0.0_SP .and. age(i, j) < t_brk .and. &
                    etat(i, j) > thr2) then
-                  cap1 = max(depth(i, j), min_depth_frc) + eta(i, j)
+                  cap1 = nu_scale*(max(depth(i, j), min_depth_frc) + eta(i, j))
 
                   select case (vis_scheme)
                   case (VIS_SCHEME_KENNEDY_ORIG)

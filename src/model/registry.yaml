@@ -625,6 +625,8 @@ sections:
       cbrk1: {legacy: Cbrk1, default: 0.55, units: ~, latex: '$C_{\mathrm{brk1}}$', doc: "Breaking onset threshold coefficient (legacy default 0.65; 0.55 is the 2026-08 breaking-board fit for the split solve)."}
       cbrk2: {legacy: Cbrk2, default: 0.35, units: ~, latex: '$C_{\mathrm{brk2}}$', doc: Breaking cessation threshold coefficient.}
       nu_bkg: {legacy: nu_bkg, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{bkg}}$', doc: Background eddy viscosity added everywhere.}
+      nu_scale: {legacy: ~, default: 1.0, units: ~, latex: '$s_\nu$', doc: "Multiplier on the breaker eddy-viscosity magnitude. Every scheme scales nu with cbrk2 x sqrt(gh) x depth, so cbrk2 carried cessation and magnitude together; nu_scale separates them (1 = as calibrated; the wavemaker-zone term is not scaled)."}
+      scheme: {legacy: ~, default: constant, units: ~, values: [constant, kennedy, kennedy_orig, static_trans, depth_ratio], doc: "Breaker viscosity form: constant = nu fixed at cbrk2 x sqrt(gh) x depth while active (legacy); kennedy = the steepness-ramped form nu = depth x cbrk2 x sqrt(gh) x (1 + B), B ramping over [cbrk1, 2 cbrk1]; kennedy_orig = Kennedy et al. 2000 with the age-ramped onset threshold and T* = 5 sqrt(h/g); static_trans = linear cbrk1 -> cbrk2 transition over t_brk; depth_ratio = onset on eta/depth > swe_eta_dep, no age."}
       # show_breaking RETIRED: the breaker-diagnostics pass is derived —
       # viscosity breaking (incl. roller forcing) or any AGE/ROLLER/UNDERTOW
       # output request; to_legacy emits the resolved SHOW_BREAKING

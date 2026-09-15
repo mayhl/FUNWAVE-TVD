@@ -55,6 +55,9 @@ module model_breaking_mod
    character(len=20), parameter :: BREAKING_MODELS(4) = &
                                    [character(len=20) :: "eddy_viscosity", "shock_capturing", &
                                                           "wavemaker_viscosity", "none"]
+   character(len=12), parameter :: VISC_SCHEMES(5) = &
+                                   [character(len=12) :: "constant", "kennedy", "kennedy_orig", &
+                                                          "static_trans", "depth_ratio"]
    character(len=20), parameter :: VISC_SOLVERS(3) = &
                                    [character(len=20) :: "explicit", "split_implicit", &
                                                           "stage_split"]
@@ -80,6 +83,12 @@ module model_breaking_mod
       ! breaking-event age threshold (legacy hard-coded 20 s; the
       ! per-wavemaker assignments were dead code — parity ledger 17d/e)
       real(SP) :: t_brk = 20.0_SP
+      ! viscosity magnitude multiplier: every scheme scales nu with
+      ! cbrk2*sqrt(gh)*depth, so cbrk2 carried cessation AND magnitude;
+      ! nu_scale separates them (1 = as calibrated)
+      real(SP) :: nu_scale = 1.0_SP
+      ! viscosity scheme (kernel forms; constant = the legacy default)
+      character(:), allocatable :: scheme
       ! legacy accrues breaker age every RK stage (3x wall-clock); the
       ! cbrk defaults were calibrated with it.  false = once per step
       logical  :: age_per_stage = .true.
@@ -133,6 +142,7 @@ contains
 
       this%model = "eddy_viscosity"
       this%solver = "split_implicit"
+      this%scheme = "constant"
 
       sub_env = get_sub_env(env, "breaking", is_empty=no_blk)
       this%is_activated = .not. no_blk
@@ -145,6 +155,10 @@ contains
       ! wavemaker_viscosity zone term (it stays an explicit source), so
       ! leaving solver unread there lets the detector flag it
       if (trim(this%model) == "eddy_viscosity") then
+         call sub_env%yaml%read("nu_scale", silent=no_key, val=this%nu_scale, &
+                                default="1.0")
+         call sub_env%yaml%read_enum("scheme", VISC_SCHEMES, silent=no_key, &
+                                     val=this%scheme, default="constant")
          call sub_env%yaml%read_enum("solver", VISC_SOLVERS, silent=no_key, &
                                      val=this%solver, default="split_implicit")
          this%split_implicit = trim(this%solver) /= "explicit"

@@ -81,7 +81,7 @@ contains
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                          dx, dy, 0.1_SP, 10.0_SP, .true., 1.0e-4_SP, &
                          0.35_SP, 0.65_SP, 0.5_SP, NU_BKG, 0.0_SP, &
-                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         VIS_SCHEME_DEFAULT, 1.0_SP, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
       ic = lp%ib; jc = lp%jb
@@ -120,7 +120,7 @@ contains
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                          dx, dy, DT, 10.0_SP, .true., 1.0e-4_SP, &
                          0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, 0.0_SP, &
-                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         VIS_SCHEME_DEFAULT, 1.0_SP, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
       ic = lp%ib; jc = lp%jb
@@ -166,7 +166,7 @@ contains
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                          dx, dy, 0.05_SP, 10.0_SP, .true., 1.0e-4_SP, &
                          0.35_SP, 0.65_SP, 0.5_SP, 0.0_SP, 0.0_SP, &
-                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         VIS_SCHEME_DEFAULT, 1.0_SP, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
       @assertEqual(expected_nu, nu_break(ic, jc), tolerance=TOL)
@@ -214,7 +214,7 @@ contains
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                          dx, dy, 0.05_SP, 10.0_SP, .true., 1.0e-4_SP, &
                          0.50_SP, 0.65_SP, 0.5_SP, 0.0_SP, 0.0_SP, &
-                         VIS_SCHEME_KENNEDY, 0.8_SP, in_wm_zone, &
+                         VIS_SCHEME_KENNEDY, 1.0_SP, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
       @assertEqual(expected_nu, nu_break(ic, jc), tolerance=TOL)
@@ -256,7 +256,7 @@ contains
       call wave_breaking(lp, etax, etay, etat, eta, depth, h, u, v, etamean, &
                          dx, dy, 0.05_SP, 10.0_SP, .true., 1.0e-4_SP, &
                          0.35_SP, 0.65_SP, WM_CBRK, 0.0_SP, 0.0_SP, &
-                         VIS_SCHEME_DEFAULT, 0.8_SP, in_wm_zone, &
+                         VIS_SCHEME_DEFAULT, 1.0_SP, 0.8_SP, in_wm_zone, &
                          nu_break, age, roller_flux, undertow_u, undertow_v)
 
       @assertEqual(expected_nu, nu_break(ic, jc), tolerance=TOL)

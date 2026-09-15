@@ -73,7 +73,9 @@ module model_stepper_2d_mod
                                      RK_ALPHA, RK_BETA
    use model_kernel_masks_mod, only: update_mask, update_mask9, update_disp_weight
    use model_kernel_breaker_mod, only: wave_breaking, viscosity_wmaker, &
-                                       VIS_SCHEME_DEFAULT
+                                       VIS_SCHEME_DEFAULT, VIS_SCHEME_KENNEDY, &
+                                       VIS_SCHEME_KENNEDY_ORIG, VIS_SCHEME_STATIC_TRANS, &
+                                       VIS_SCHEME_DEPTH_RATIO
 
    implicit none
 
@@ -124,6 +126,7 @@ module model_stepper_2d_mod
 
       ! Breaking-age threshold (legacy T_brk — see above)
       real(SP) :: t_brk = 20.0_SP
+      integer  :: vis_scheme = 0   ! kernel viscosity form, from breaking%scheme
 
       ! dt of the step in flight (estimate_dt -> post_step means/stats)
       real(SP) :: dt_step = 0.0_SP
@@ -368,6 +371,14 @@ contains
       this%bc%exch_nu = physics%viscosity_breaking .or. breaking%wavemaker_vis
 
       this%t_brk = breaking%t_brk
+      ! breaking.scheme -> the kernel's viscosity form
+      select case (trim(breaking%scheme))
+      case ("kennedy"); this%vis_scheme = VIS_SCHEME_KENNEDY
+      case ("kennedy_orig"); this%vis_scheme = VIS_SCHEME_KENNEDY_ORIG
+      case ("static_trans"); this%vis_scheme = VIS_SCHEME_STATIC_TRANS
+      case ("depth_ratio"); this%vis_scheme = VIS_SCHEME_DEPTH_RATIO
+      case default; this%vis_scheme = VIS_SCHEME_DEFAULT
+      end select
 
       this%west_dirichlet = .false.
       if (grid%is_back_boundary .and. associated(this%wm_bc)) &
@@ -798,7 +809,6 @@ contains
             ! breaker always fills nu_break/age/roller here, but only
             ! viscosity_breaking feeds nu_break into the momentum
             ! sources (merge_nu_vis) — show-only leaves dynamics alone
-            ! TODO(6e+): vis_scheme selection beyond DEFAULT
             ! age accrues per stage under the legacy quirk knob, else only
             ! on the final stage (true wall-clock age)
             call wave_breaking(lp, this%etax, this%etay, this%etat, &
@@ -808,7 +818,7 @@ contains
                                num%MinDepthFrc, this%breaking%cbrk1, &
                                this%breaking%cbrk2, this%breaking%wavemaker_cbrk, &
                                this%breaking%nu_bkg, this%breaking%nu_cap, &
-                               VIS_SCHEME_DEFAULT, &
+                               this%vis_scheme, this%breaking%nu_scale, &
                                this%breaking%swe_eta_dep, this%in_wm_zone, &
                                f%nu_break, f%age_break, this%roller_flux, &
                                this%undertow_u, this%undertow_v, &
