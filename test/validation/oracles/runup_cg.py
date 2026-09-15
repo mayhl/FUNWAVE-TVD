@@ -148,7 +148,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     omega = 2.0 * math.pi / period
 
     mid = meta.ny // 2
-    x = (np.arange(meta.nx) + 0.5) * meta.dx
+    x = np.arange(meta.nx) * meta.dx  # cell i at (i-1) dx, the engine's registration
     dep = meta.read_field(dep_files[0]).astype(float)[mid]
 
     # flat-section measurement window: clear of the source (3 half-widths) and toe

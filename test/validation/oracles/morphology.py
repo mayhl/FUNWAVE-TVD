@@ -56,7 +56,7 @@ def _final_dz(meta) -> tuple[np.ndarray, np.ndarray]:
         arr = meta.read_field(files[-1]).astype(float)
         total = arr if total is None else total + arr
     row = total[total.shape[0] // 2, :]
-    x = (np.arange(len(row)) + 0.5) * meta.dx
+    x = np.arange(len(row)) * meta.dx  # cell i at (i-1) dx, the engine's registration
     return x, row
 
 

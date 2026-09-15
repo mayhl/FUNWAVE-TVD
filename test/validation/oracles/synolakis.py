@@ -67,7 +67,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     x_shore = float(bathy["x0"]) + h / float(bathy["slope"])
 
     dep = meta.read_field(dep_files[0]).astype(float)[meta.ny // 2]
-    x_cell = (np.arange(meta.nx) + 0.5) * meta.dx  # cell centers, matching dep.out
+    x_cell = np.arange(meta.nx) * meta.dx  # cell i sits at (i-1) dx, as the slope bathymetry and the stations place it
     xprime = (x_shore - x_cell) / h  # decreasing along i
 
     loaded = []
