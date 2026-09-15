@@ -63,7 +63,7 @@ Wave generation: a spectrum (shape x discretization) feeding a Wei-Kirby interna
 | `spectrum.format` | `DATA_1D` | `WAVE_DATA_TYPE` | — | *(spectrum_2d)* 2D-spectrum data format. |
 | `source.x_center` | `0.0` | `Xc_WK` | m | Source-box x center (presence of source: => Wei-Kirby). |
 | `source.y_center` | `0.0` | `Yc_WK` | m | Source-box y center. |
-| `source.depth` | `0.0` | `DEP_WK` | m | Source-box reference depth. |
+| `source.depth` | `0.0` | `DEP_WK` | m | Source-box reference depth; absent = the bed mean under the box, refused unless the bed there is flat within 1 %. |
 | `source.delta` | `0.5` | `Delta_WK` | — | Source-box width parameter. |
 | `source.y_width` | `999999.0` | `Ywidth_WK` | m | Source-box alongshore width (large = full span). |
 | `source.time_ramp` | `0.0` | `Time_ramp` | s | Source ramp-up time. |
@@ -104,7 +104,7 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 | `<face>.forcing.v` | — | `Tide<Face>_V` | m/s | Prescribed y-velocity forcing. |
 | `<face>.forcing.file` | — | `Tide<Face>FileName` | — | Time-series forcing file (presence => DATA forcing). |
 | `<face>.forcing.wavemaker` | — | — | — | Name of a spectrum-only wavemaker entry driving this face (nee ABS). |
-| `<face>.forcing.depth` | — | — | m | Reference depth for the wavemaker forcing series (nee DepthWaveMaker).  (west: legacy `DepthWaveMaker`) |
+| `<face>.forcing.depth` | — | — | m | Reference depth for the wavemaker forcing series (nee DepthWaveMaker); absent = the bed mean along the fed face, refused unless flat within 1 %.  (west: legacy `DepthWaveMaker`) |
 
 ## `numerics:`
 

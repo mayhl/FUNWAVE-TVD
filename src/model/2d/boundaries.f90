@@ -659,7 +659,7 @@ contains
 
       type(type_path) :: file
       real(SP) :: eta, u, v
-      logical :: no_eta, no_u, no_v, no_file
+      logical :: no_eta, no_u, no_v, no_file, no_key
 
       has_file = .false.
       has_const = .false.
@@ -678,8 +678,10 @@ contains
                                     "' does not match the entry name '"//wavemaker%name//"'")
 
       ! series reference depth (nee DepthWaveMaker; no DEP_WK fallback —
-      ! a boundary entry has no source box)
-      call frc_yaml%read("depth", val=wavemaker%DepthWaveMaker)
+      ! a boundary entry has no source box); absent = read off the bed
+      call frc_yaml%read("depth", silent=no_key, val=wavemaker%DepthWaveMaker)
+      wavemaker%feed_depth_auto = no_key
+      wavemaker%feed_face = f
       wavemaker%wavemaker_type = "boundary"
 
       ! optional tide target on the same face = generating-absorbing (nee

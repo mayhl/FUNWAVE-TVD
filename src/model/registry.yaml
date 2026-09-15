@@ -329,7 +329,7 @@ sections:
       spectrum.format: { legacy: WAVE_DATA_TYPE, default: DATA_1D, units: ~, variant: [spectrum_2d], doc: "2D-spectrum data format." }
       source.x_center: { legacy: Xc_WK, default: 0.0, units: m, latex: "$x_c$", doc: "Source-box x center (presence of source: => Wei-Kirby)." }
       source.y_center: { legacy: Yc_WK, default: 0.0, units: m, latex: "$y_c$", doc: "Source-box y center." }
-      source.depth: { legacy: DEP_WK, default: 0.0, units: m, doc: "Source-box reference depth." }
+      source.depth: { legacy: DEP_WK, default: 0.0, units: m, doc: "Source-box reference depth; absent = the bed mean under the box, refused unless the bed there is flat within 1 %." }
       source.delta: { legacy: Delta_WK, default: 0.5, units: ~, latex: "$\\delta$", doc: "Source-box width parameter." }
       source.y_width: { legacy: Ywidth_WK, default: 999999.0, units: m, doc: "Source-box alongshore width (large = full span)." }
       source.time_ramp: { legacy: Time_ramp, default: 0.0, units: s, doc: "Source ramp-up time." }
@@ -454,7 +454,7 @@ sections:
           legacy: ~
           default: ~
           units: "m"
-          doc: "Reference depth for the wavemaker forcing series (nee DepthWaveMaker)."
+          doc: "Reference depth for the wavemaker forcing series (nee DepthWaveMaker); absent = the bed mean along the fed face, refused unless flat within 1 %."
       overrides:
         west.forcing.depth: { legacy: DepthWaveMaker } # legacy global; west-only
 

@@ -833,7 +833,8 @@ contains
       call this%meteo%init_compute(this%grid)
       do i = 1, size(this%wavemakers)
          call this%wavemakers(i)%init_compute(this%grid, this%physics%periodic, &
-                                              this%env, this%physics%Beta_ref)
+                                              this%env, this%physics%Beta_ref, &
+                                              this%fields%depth)
       end do
       call this%obstacle%init_compute(this%grid, this%geometry%dx, &
                                       this%geometry%dy, this%env)

@@ -63,6 +63,9 @@ module model_wavemaker_mod
 
    ! Hedges (1995) boundary where Stokes theory hands over to cnoidal
    real(SP), parameter :: URSELL_WARN = 26.0_SP
+   ! bed under a source box / along a fed face may deviate this fraction of
+   ! its mean before the one-depth assumption of the series is refused
+   real(SP), parameter :: DEPTH_FLAT_TOL = 0.01_SP
 
    private
    public :: type_model_wavemaker
@@ -106,6 +109,7 @@ module model_wavemaker_mod
       real(SP) :: Xc_WK = 0.0_SP
       real(SP) :: Yc_WK = 0.0_SP
       real(SP) :: DEP_WK = 0.0_SP
+      logical  :: depth_auto = .false.   ! source.depth absent: read the bed under the box
       real(SP) :: Time_ramp = 0.0_SP
       real(SP) :: Delta_WK = 0.5_SP
       real(SP) :: Ywidth_WK = 999999.0_SP   ! LARGE in old code
@@ -171,7 +175,9 @@ module model_wavemaker_mod
       real(SP) :: TroughLimit = 0.0_SP
 
       ! Boundary-feed relaxation (nee ABS / LEFT_BC_IRR)
-      real(SP) :: DepthWaveMaker = 0.0_SP   ! forcing.depth (nee DEP_Ser); required, no DEP_WK fallback
+      real(SP) :: DepthWaveMaker = 0.0_SP   ! forcing.depth (nee DEP_Ser); no DEP_WK fallback
+      logical  :: feed_depth_auto = .false. ! forcing.depth absent: read the bed along the face
+      integer  :: feed_face = 0             ! FACE_* of the fed face
       real(SP) :: WidthWaveMaker = 0.0_SP
       real(SP) :: R_sponge_wavemaker = 0.0_SP
       real(SP) :: A_sponge_wavemaker = 0.0_SP
@@ -930,6 +936,7 @@ contains
                        default="0.0")
          call blk%read("depth", silent=no_key, val=this%DEP_WK, &
                        default="0.0")
+         this%depth_auto = no_key
          call blk%read("delta", silent=no_key, val=this%Delta_WK, &
                        default="0.5")
          call blk%read("y_width", silent=no_key, val=this%Ywidth_WK, &
@@ -992,8 +999,9 @@ contains
       class(type_model_wavemaker), intent(inout) :: this
       real(SP), intent(in) :: water_level
 
-      this%DEP_WK = this%DEP_WK + water_level
-      if (this%wavemaker_type == "boundary") &
+      ! an auto depth is read off the bed, which already carries the offset
+      if (.not. this%depth_auto) this%DEP_WK = this%DEP_WK + water_level
+      if (this%wavemaker_type == "boundary" .and. .not. this%feed_depth_auto) &
          this%DepthWaveMaker = this%DepthWaveMaker + water_level
 
    end subroutine wavemaker_apply_water_level
@@ -1012,13 +1020,14 @@ contains
    ! The spectral family snaps per component inside the coefficient
    ! loop instead — different legacy algorithm, kept separate.
    ! ----------------------------------------------------------------
-   subroutine wavemaker_init_compute(this, grid, periodic, env, beta_ref)
+   subroutine wavemaker_init_compute(this, grid, periodic, env, beta_ref, depth)
       use core_grid_mod, only: type_grid_2d
       class(type_model_wavemaker), intent(inout) :: this
       type(type_grid_2d), intent(in) :: grid
       logical, intent(in) :: periodic
       type(type_env), intent(inout) :: env
       real(SP), intent(in) :: beta_ref
+      real(SP), intent(in), optional :: depth(:, :)   ! ghost-inclusive bed
 
       integer :: i, j, mloc, nloc
       real(SP) :: wave_length, ursell
@@ -1071,6 +1080,20 @@ contains
          this%ymk_wk(j) = real(j - grid%lp%jb, SP)*grid%dy0 &
                           + real(grid%jbegin - 1, SP)*grid%dy0
       end do
+
+      ! depth from the bed when the deck gave none (source.depth /
+      ! forcing.depth absent): the mean under the box or along the fed
+      ! face, refused where the bed is not flat
+      if ((this%feed_depth_auto .and. this%boundary_source) .or. &
+          (this%depth_auto .and. this%has_mass_source)) then
+         if (.not. present(depth)) call env%log%exit_on_error( &
+            "wavemaker: depth absent from the deck and no bathymetry to read it from")
+         if (this%boundary_source) then
+            call face_depth_from_bed(this, grid, depth, env)
+         else
+            call box_depth_from_bed(this, grid, depth, env)
+         end if
+      end if
 
       ! boundary wavemakers build the series modes only — no mass
       ! source, zone box, or breaker zone
@@ -1151,6 +1174,162 @@ contains
       end if
 
    end subroutine wavemaker_init_compute
+
+   ! ----------------------------------------------------------------
+   ! Private: generation depth read off the bed.  A first pass on the
+   ! column nearest x_center sizes the box at the deck's peak period, a
+   ! second pass takes the box mean; the bed there must sit within
+   ! DEPTH_FLAT_TOL of that mean, since the Wei-Kirby solve assumes one
+   ! depth.  Reductions on cart_comm, so every rank sees the same verdict.
+   ! ----------------------------------------------------------------
+   subroutine box_depth_from_bed(this, grid, depth, env)
+      use core_grid_mod, only: type_grid_2d
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: depth(:, :)
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: t_peak, width, acc(4)
+      character(len=256) :: msg
+
+      select case (this%wavemaker_type)
+      case ("WK_REG")
+         t_peak = this%Tperiod
+      case ("WK_TIME")
+         t_peak = this%PeakPeriod
+      case default
+         t_peak = 0.0_SP
+         if (this%FreqPeak > 0.0_SP) t_peak = 1.0_SP/this%FreqPeak
+      end select
+      if (t_peak <= 0.0_SP) call env%log%exit_on_error( &
+         "wavemaker: source.depth absent and no peak period to size the box"// &
+         " -- set source.depth for a file spectrum")
+
+      call box_bed_stats(this, grid, depth, 0.5_SP*grid%dx0, acc)
+      if (acc(2) == 0.0_SP) call env%log%exit_on_error( &
+         "wavemaker: source.depth absent and x_center lies outside the domain")
+      call wk_peak_width(t_peak, acc(1)/acc(2), this%Delta_WK, width)
+      call box_bed_stats(this, grid, depth, width, acc)
+      if (acc(4) - acc(3) > DEPTH_FLAT_TOL*acc(1)/acc(2)) then
+         write (msg, '(A,F8.3,A,F8.3,A,F8.1,A,F8.1,A)') &
+            "wavemaker: the bed under the source box is not flat (", acc(3), &
+            " to ", acc(4), " m within ", width, " m of x_center ", this%Xc_WK, &
+            "); set source.depth or flatten the bed there"
+         call env%log%exit_on_error(trim(msg))
+      end if
+      this%DEP_WK = acc(1)/acc(2)
+      this%DepthWaveMaker = this%DEP_WK
+      write (msg, '(A,F8.3,A)') "wavemaker: source depth read from the bed: ", &
+         this%DEP_WK, " m"
+      call env%log%info(trim(msg))
+
+   end subroutine box_depth_from_bed
+
+   ! sum, count, min, max of the bed over interior cells within half_width
+   ! of x_center and inside the y_width span, reduced on cart_comm
+   subroutine box_bed_stats(this, grid, depth, half_width, acc)
+      use core_constants_mod, only: MPI_SP, LARGE
+      use core_grid_mod, only: type_grid_2d
+      use mpi_f08, only: MPI_Allreduce, MPI_SUM, MPI_MIN, MPI_MAX, MPI_IN_PLACE
+      class(type_model_wavemaker), intent(in) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: depth(:, :), half_width
+      real(SP), intent(out) :: acc(4)
+
+      integer :: i, j, ierr
+
+      acc = [0.0_SP, 0.0_SP, LARGE, -LARGE]
+      do j = grid%lp%jb, grid%lp%je
+         if (abs(this%ymk_wk(j) - this%Yc_WK) >= this%Ywidth_WK/2.0_SP) cycle
+         do i = grid%lp%ib, grid%lp%ie
+            if (abs(this%xmk_wk(i) - this%Xc_WK) > half_width) cycle
+            acc(1) = acc(1) + depth(i, j)
+            acc(2) = acc(2) + 1.0_SP
+            acc(3) = min(acc(3), depth(i, j))
+            acc(4) = max(acc(4), depth(i, j))
+         end do
+      end do
+      call MPI_Allreduce(MPI_IN_PLACE, acc(1:2), 2, MPI_SP, MPI_SUM, grid%cart_comm, ierr)
+      call MPI_Allreduce(MPI_IN_PLACE, acc(3), 1, MPI_SP, MPI_MIN, grid%cart_comm, ierr)
+      call MPI_Allreduce(MPI_IN_PLACE, acc(4), 1, MPI_SP, MPI_MAX, grid%cart_comm, ierr)
+
+   end subroutine box_bed_stats
+
+   ! ----------------------------------------------------------------
+   ! Private: series reference depth read off the bed along the fed
+   ! face -- the west relaxation strip (x <= WidthWaveMaker, the only
+   ! strip form) or the edge column/row of any Flather-fed face.
+   ! ----------------------------------------------------------------
+   subroutine face_depth_from_bed(this, grid, depth, env)
+      use core_constants_mod, only: MPI_SP, LARGE
+      use core_grid_mod, only: type_grid_2d
+      use model_sponge_mod, only: FACE_W, FACE_E, FACE_S, FACE_N
+      use mpi_f08, only: MPI_Allreduce, MPI_SUM, MPI_MIN, MPI_MAX, MPI_IN_PLACE
+      class(type_model_wavemaker), intent(inout) :: this
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: depth(:, :)
+      type(type_env), intent(inout) :: env
+
+      real(SP) :: acc(4)
+      character(len=256) :: msg
+      integer :: i, j, ierr
+
+      acc = [0.0_SP, 0.0_SP, LARGE, -LARGE]
+      select case (this%feed_face)
+      case (FACE_W)
+         do j = grid%lp%jb, grid%lp%je
+            do i = grid%lp%ib, grid%lp%ie
+               if (this%xmk_wk(i) > this%WidthWaveMaker) exit
+               call take(depth(i, j))
+            end do
+         end do
+      case (FACE_E)
+         if (grid%is_shore_boundary) then
+            do j = grid%lp%jb, grid%lp%je
+               call take(depth(grid%lp%ie, j))
+            end do
+         end if
+      case (FACE_S)
+         if (grid%is_right_boundary) then
+            do i = grid%lp%ib, grid%lp%ie
+               call take(depth(i, grid%lp%jb))
+            end do
+         end if
+      case (FACE_N)
+         if (grid%is_left_boundary) then
+            do i = grid%lp%ib, grid%lp%ie
+               call take(depth(i, grid%lp%je))
+            end do
+         end if
+      case default
+         call env%log%exit_on_error("wavemaker: forcing.depth absent and the fed face is unknown")
+      end select
+      call MPI_Allreduce(MPI_IN_PLACE, acc(1:2), 2, MPI_SP, MPI_SUM, grid%cart_comm, ierr)
+      call MPI_Allreduce(MPI_IN_PLACE, acc(3), 1, MPI_SP, MPI_MIN, grid%cart_comm, ierr)
+      call MPI_Allreduce(MPI_IN_PLACE, acc(4), 1, MPI_SP, MPI_MAX, grid%cart_comm, ierr)
+
+      if (acc(4) - acc(3) > DEPTH_FLAT_TOL*acc(1)/acc(2)) then
+         write (msg, '(A,F8.3,A,F8.3,A)') &
+            "wavemaker: the bed along the fed face is not flat (", acc(3), &
+            " to ", acc(4), " m); set forcing.depth or flatten the bed there"
+         call env%log%exit_on_error(trim(msg))
+      end if
+      this%DepthWaveMaker = acc(1)/acc(2)
+      write (msg, '(A,F8.3,A)') "wavemaker: forcing depth read from the bed: ", &
+         this%DepthWaveMaker, " m"
+      call env%log%info(trim(msg))
+
+   contains
+
+      subroutine take(d)
+         real(SP), intent(in) :: d
+         acc(1) = acc(1) + d
+         acc(2) = acc(2) + 1.0_SP
+         acc(3) = min(acc(3), d)
+         acc(4) = max(acc(4), d)
+      end subroutine take
+
+   end subroutine face_depth_from_bed
 
    ! Deterministic, rank-uniform seed for the wavemaker phase RNG.  Every rank
    ! seeds RANDOM_NUMBER with the same value so the random phase realization is
