@@ -372,8 +372,12 @@ class RegressionRunner(BaseRunner):
             *parents, leaf = dotted.split(".")
             node = deck
             for key in parents:
-                node = node.setdefault(key, {})
-            node[leaf] = value
+                # an integer segment indexes a list (output.channels.2.gap)
+                node = node[int(key)] if isinstance(node, list) else node.setdefault(key, {})
+            if isinstance(node, list):
+                node[int(leaf)] = value
+            else:
+                node[leaf] = value
         with open(path, "w") as f:
             yaml.safe_dump(deck, f, sort_keys=False)
 

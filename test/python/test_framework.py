@@ -170,3 +170,16 @@ def test_wave_number_limits():
     assert math.isclose(_wave_number(omega, h), omega**2 / G, rel_tol=1e-3)
     omega = 2.0 * math.pi / 200.0  # shallow water
     assert math.isclose(_wave_number(omega, h), omega / math.sqrt(G * h), rel_tol=1e-3)
+
+
+def test_override_deck_sets_dotted_keys_and_list_indices(tmp_path: Path):
+    from test.framework.regression_runner import RegressionRunner
+
+    deck = tmp_path / "deck.yaml"
+    deck.write_text("breaking: {model: shock_capturing}\noutput:\n  channels:\n    - {name: a}\n    - {name: b, gap: 0.0}\n")
+    RegressionRunner._override_deck(deck, {"breaking.model": "eddy_viscosity", "output.channels.1.gap": 0.5, "new.key": 1})
+    out = yaml.safe_load(deck.read_text())
+    assert out["breaking"]["model"] == "eddy_viscosity"
+    assert out["output"]["channels"][1] == {"name": "b", "gap": 0.5}
+    assert out["output"]["channels"][0] == {"name": "a"}
+    assert out["new"]["key"] == 1
