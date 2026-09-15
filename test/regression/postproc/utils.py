@@ -17,85 +17,44 @@ if TYPE_CHECKING:
 # dep.out is the only static exception (written once at init for DEPTH_OUT).
 # ---------------------------------------------------------------------------
 
-# Field prefixes the comparator recognises: the registry variable names
-# (src/model/registry.yaml), the vector- and product-derived channel names,
-# the running-envelope channel spellings, and the 3D vendor ref's volumetric
-# prefixes (vendor/3d-fd writes _%04d frames).
+# Output prefixes the comparators recognise, derived from the registry
+# (src/model/registry.yaml `variables:`) so a new engine field needs no
+# edit here: a snapshot writes <name>_NNNNN, a statistics channel writes
+# <name>_<stat>_NNNNN.  The extremes and event statistics ride with the
+# snapshots (running-envelope channels); the moments are the statistics
+# kind.  Threshold-tagged event names (<name>_<stat>_<value>) are not
+# listed -- a tolerance on one still fails loudly as "in neither run".
+_REGISTRY = Path(__file__).resolve().parents[3] / "src" / "model" / "registry.yaml"
+
+
+def _registry_names() -> list[str]:
+    with open(_REGISTRY) as f:
+        return [v["name"] for v in yaml.safe_load(f)["variables"]]
+
+
+_MOMENT_STATS = ("mean", "rms", "std")
+_EXTREME_STATS = ("max", "min", "max_time", "first_time", "last_time", "duration", "duration_max", "count")
+# sediment fields the stepper registers without registry metadata, and the
+# 3D vendor ref's volumetric prefixes (vendor/3d-fd writes _%04d frames)
+_SEDIMENT_PREFIXES = (
+    "sediment_c",
+    "sediment_pickup",
+    "sediment_depo",
+    "sediment_bedfx",
+    "sediment_bedfy",
+    "sediment_bedstr",
+    "sediment_pavg",
+    "sediment_davg",
+    "sediment_dchgs",
+    "sediment_dchgb",
+    "sediment_aval",
+    "sediment_avalac",
+)
+_VENDOR_3D_PREFIXES = ("w", "tke", "eps", "prod", "mu", "upwp", "sali", "temp", "rho", "b")
+
+_NAMES = _registry_names()
 FIELD_PREFIXES: frozenset[str] = frozenset(
-    [
-        "eta",
-        "u",
-        "v",
-        "h",
-        "depth",
-        "p_flux",
-        "q_flux",
-        "p",
-        "q",
-        "mask",
-        "mask9",
-        "velocity.mag",
-        "velocity.dir",
-        "vorticity",
-        "momentum_flux",
-        "nu_break",
-        "age_break",
-        "roller_flux",
-        "undertow_u",
-        "undertow_v",
-        "d_break",
-        "disp_gate",
-        "breaking_active",
-        "nu_capped",
-        "froude_scale",
-        "xi_0",
-        "xi_b",
-        "gamma_b",
-        "front_steepness",
-        "a",
-        "a_x",
-        "a_y",
-        "b_x",
-        "b_y",
-        "meteo_pressure",
-        "meteo_wind_u",
-        "meteo_wind_v",
-        "vessel_pressure",
-        "vessel_up",
-        "vessel_vp",
-        # running envelope channels (statistics: max/min/max_time, accumulate: running)
-        "eta_max",
-        "eta_min",
-        "eta_max_time",
-        "velocity.mag_max",
-        "momentum_flux_max",
-        "vorticity_max",
-        "eta_first_time",
-        # sediment (registry names; the stepper registers exactly these)
-        "sediment_c",
-        "sediment_pickup",
-        "sediment_depo",
-        "sediment_bedfx",
-        "sediment_bedfy",
-        "sediment_bedstr",
-        "sediment_pavg",
-        "sediment_davg",
-        "sediment_dchgs",
-        "sediment_dchgb",
-        "sediment_aval",
-        "sediment_avalac",
-        # 3D vendor ref (volumetric, putfile3D layout)
-        "w",
-        "tke",
-        "eps",
-        "prod",
-        "mu",
-        "upwp",
-        "sali",
-        "temp",
-        "rho",
-        "b",
-    ]
+    [*_NAMES, *(f"{n}_{st}" for n in _NAMES for st in _EXTREME_STATS), *_SEDIMENT_PREFIXES, *_VENDOR_3D_PREFIXES]
 )
 
 # Binary mask fields — use mismatch fraction instead of normalized L2.
@@ -107,16 +66,9 @@ MASK_PREFIXES: frozenset[str] = frozenset({"mask", "mask9"})
 # ||diff|| < floor * tol = 1e-4 * 1e-4 = 1e-8, consistent with relative intent.
 DEFAULT_FLOOR: float = 1e-4
 
-# Statistics-channel prefixes (<var>_<stat> and the product-derived hsig).
-STATS_PREFIXES: frozenset[str] = frozenset(
-    [
-        "eta_mean",
-        "u_mean",
-        "v_mean",
-        "eta_std",
-        "hsig",
-    ]
-)
+# Statistics-channel prefixes: the moments of every registry name plus the
+# product-derived hsig.
+STATS_PREFIXES: frozenset[str] = frozenset([*(f"{n}_{st}" for n in _NAMES for st in _MOMENT_STATS), "hsig"])
 
 # Legacy flag spelling -> output prefix, for the oracles that still ask by
 # flag name (ETA/U/V/MASK/P/Q).

@@ -378,6 +378,13 @@ class RegressionRunner(BaseRunner):
                     verbose=verbose,
                 )
                 result.subsections.append(sub)
+                # an oracle that returns nothing skipped (missing input, an
+                # unrecognised deck): an error, never a pass on its siblings
+                if not sub.metrics:
+                    result.status = "POSTPROCESS_ERROR"
+                    result.notes += f"\n[{kind}] returned no metrics (oracle skipped?)"
+                    self.reporter.error(f"    [{kind}] returned no metrics -- skipped")
+                    return result
             except Exception as exc:
                 result.status = "POSTPROCESS_ERROR"
                 result.notes += f"\n[{kind}] {type(exc).__name__}: {exc}"

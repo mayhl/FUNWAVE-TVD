@@ -79,8 +79,14 @@ def run(
         rv = ref_map[prefix]
         dv = dev_map[prefix]
 
+        tol = tolerances.get(prefix, tolerances.get("default", np.inf))
+        # a tolerated variable that blew up in either run, or whose frames
+        # never overlap, fails the gate outright: a note alone gates nothing
         if rv.unstable or dv.unstable:
             rows.append(_Row(prefix, rv, dv, l2_mean=None, l2_max=None, note="unstable"))
+            if np.isfinite(tol):
+                _console.print(f"[red]FAIL:[/red] '{prefix}' blew up in {'ref' if rv.unstable else 'dev'} (99999 frame)")
+                metrics.append(MetricResult(variable=prefix, stat="stable", value=0.0, passed=False, tolerance=1.0))
             continue
 
         # Compare over shared index range
@@ -88,13 +94,15 @@ def run(
         idx_last = min(rv.last, dv.last)
         if idx_first > idx_last:
             rows.append(_Row(prefix, rv, dv, l2_mean=None, l2_max=None, note="no overlap"))
+            if np.isfinite(tol):
+                _console.print(f"[red]FAIL:[/red] '{prefix}' frames do not overlap between the runs")
+                metrics.append(MetricResult(variable=prefix, stat="overlap", value=0.0, passed=False, tolerance=1.0))
             continue
 
         metric_series = compute_metric_series(ref_meta, dev_meta, prefix, idx_first, idx_last)
 
         err_mean = float(np.mean(metric_series))
         err_max = float(np.max(metric_series))
-        tol = tolerances.get(prefix, tolerances.get("default", np.inf))
         passed = err_mean < tol
 
         metrics.append(
