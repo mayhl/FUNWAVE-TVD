@@ -1,0 +1,59 @@
+# Cnoidal-wave generation — flat flume, internal source, gauge transect.
+# The cnoidal spectrum type expands the first-order profile (H 0.128 m,
+# h 0.4 m, T 5 s: the Ting-Kirby plunging paddle, Ursell ~150) into its
+# harmonics and feeds them through the multi-component source; the oracle
+# reads the gauges back against the same theory: realized height, the
+# fundamental's celerity, the harmonic lock (every harmonic at one speed,
+# not its free linear speed) and the cn^2 shape.  Sponges both ends; the
+# gauges sit between the source and the east sponge.
+grid:
+  cell_size: [0.05, 0.2]
+  n_cells: [800, 3]
+  bathymetry:
+    type: flat
+    depth: 0.4
+simulation:
+  title: cnoidal_flume
+  total_time: 60.0
+  screen_interval: 20.0
+wavemaker:
+  spectrum:
+    type: cnoidal
+    amplitude: 0.064
+    period: 5.0
+    direction: 0.0
+  source:
+    x_center: 12.0
+    y_center: 0.3
+    delta: 0.5
+    time_ramp: 5.0
+boundaries:
+  west:
+    sponge:
+      width: 10.0
+      direct:
+        r: 0.85
+        a: 5.0
+  east:
+    sponge:
+      width: 10.0
+      direct:
+        r: 0.85
+        a: 5.0
+numerics:
+  cfl: 0.5
+  froude_cap: 10.0
+  min_depth: 0.001
+output:
+  result_folder: ./output/
+  channels:
+    - name: line
+      geometry: gauges
+      variables: [eta]
+      interval: 0.02
+  geometries:
+    - name: gauges
+      type: transect
+      start: [16.0, 0.3]
+      end: [29.0, 0.3]
+      n_points: 14

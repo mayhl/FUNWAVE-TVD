@@ -93,6 +93,23 @@ simulations:
       soliton: { celerity_error_pct: 1.0, amplitude_decay_pct: 1.0, shape_error_pct: 5.0 }
     sweep_tolerances: { celerity_error_pct: 0.05, amplitude_decay_pct: 0.1, shape_error_pct: 1.0 }
 
+  # ── cnoidal generation: flat flume, the TK plunging paddle (Ursell ~150) ──
+  # The cnoidal spectrum type's harmonics read back at a gauge transect:
+  # realized height, the fundamental's celerity, every harmonic at one speed
+  # (permanent form, not free linear waves), the cn^2 shape.  Ref-less.
+  - name: cnoidal_2d
+    exe_type: validation-2d
+    np_pin: 2
+    input: test/validation/inputs/cnoidal_2d
+    input_files: [cnoidal_flume.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [2d, wavemaker, cnoidal]
+    postprocess:
+      cnoidal: test.validation.oracles.cnoidal
+    tolerances:
+      cnoidal: { channel: line, height_error_pct: 8.0, celerity_error_pct: 6.0, harmonic_lock_pct: 3.0, shape_error_pct: 8.0 }
+
   # ── oblique tiled train: 45-deg crest, doubly periodic square box ────────
   # Full 2D path (nonzero v, both periodic tridiagonals).  Crest metrics stay
   # tight (trace celerity 0.004 %, amplitude 0.44 %); the shape gate is
