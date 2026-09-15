@@ -413,8 +413,8 @@ sections:
       belongs to (untagged keys apply regardless, e.g. source/limiter).
     keys:
       name: { legacy: ~, default: ~, units: ~, doc: "Name (referenced by boundaries.<face>.forcing.wavemaker)." }
-      seed: { legacy: ~, default: 66, units: ~, doc: "Phase-RNG seed for the random spectral realization (reproducible + restart-coherent; entries offset by index)." }
-      zero_phase: { legacy: ~, default: false, units: ~, doc: "Zero every component phase instead of the seeded draw (parity/regression builds)." }
+      seed: {advanced: true, legacy: ~, default: 66, units: ~, doc: "Phase-RNG seed for the random spectral realization (reproducible + restart-coherent; entries offset by index)." }
+      zero_phase: {advanced: true, legacy: ~, default: false, units: ~, doc: "Zero every component phase instead of the seeded draw (parity/regression builds)." }
       spectrum.type:
         { legacy: WAVEMAKER, default: ~, units: ~, values: [regular, cnoidal, jonswap, tma, spectrum_2d, components], doc: "Spectrum shape discriminant." }
       spectrum.amplitude: { legacy: AMP_WK, default: 0.0, units: m, latex: "$a$", variant: [regular, cnoidal], doc: "Monochromatic wave amplitude (cnoidal: H/2; the profile is expanded into its harmonics)." }
@@ -423,7 +423,7 @@ sections:
       spectrum.hm0: { legacy: Hmo, default: 0.0, units: m, latex: "$H_{m0}$", variant: [jonswap, tma], doc: "Significant wave height (total eta)." }
       spectrum.gamma: { legacy: GammaTMA, default: 3.3, units: ~, latex: "$\\gamma$", variant: [jonswap, tma], doc: "Peak enhancement factor." }
       spectrum.normalize:
-        { legacy: ~, default: band, units: ~, values: [band, total], variant: [jonswap, tma], doc: "Hm0 normalization: band renormalizes the truncated [min, max] band to carry the full Hm0 (legacy); total keeps the band's natural share of the full-spectrum integral." }
+        {advanced: true, legacy: ~, default: band, units: ~, values: [band, total], variant: [jonswap, tma], doc: "Hm0 normalization: band renormalizes the truncated [min, max] band to carry the full Hm0 (legacy); total keeps the band's natural share of the full-spectrum integral." }
       spectrum.freq.peak: { legacy: FreqPeak, default: 0.0, units: Hz, latex: "$f_p$", variant: [jonswap, tma], doc: "Peak frequency (exact legacy path)." }
       spectrum.freq.min: { legacy: FreqMin, default: 0.0, units: Hz, variant: [jonswap, tma], doc: "Minimum frequency." }
       spectrum.freq.max: { legacy: FreqMax, default: 0.0, units: Hz, variant: [jonswap, tma], doc: "Maximum frequency." }
@@ -432,13 +432,13 @@ sections:
       spectrum.period.max: { legacy: ~, default: ~, units: s, variant: [jonswap, tma], doc: "Alt to freq.min." }
       spectrum.directional.peak: { legacy: ThetaPeak, default: 0.0, units: deg, variant: [jonswap, tma], doc: "Mean direction (presence => 2D spreading)." }
       spectrum.directional.spread: { legacy: Sigma_Theta, default: ~, units: deg, variant: [jonswap, tma], doc: "Directional spread (required -- the block's presence means spreading is wanted)." }
-      spectrum.discretization.freq_bins: { legacy: Nfreq, default: 45, units: ~, variant: [jonswap, tma], doc: "Frequency bin count." }
-      spectrum.discretization.theta_bins: { legacy: Ntheta, default: 24, units: ~, variant: [jonswap, tma], doc: "Directional bin count (requires a directional: block; 1D runs force 1)." }
-      spectrum.discretization.equal_energy: { legacy: EqualEnergy, default: none, units: ~, values: [none, freq, dir, both], variant: [jonswap, tma], doc: "Equal-energy binning per axis; the legacy boolean spellings still read as none/freq." }
+      spectrum.discretization.freq_bins: {advanced: true, legacy: Nfreq, default: 45, units: ~, variant: [jonswap, tma], doc: "Frequency bin count." }
+      spectrum.discretization.theta_bins: {advanced: true, legacy: Ntheta, default: 24, units: ~, variant: [jonswap, tma], doc: "Directional bin count (requires a directional: block; 1D runs force 1)." }
+      spectrum.discretization.equal_energy: {advanced: true, legacy: EqualEnergy, default: none, units: ~, values: [none, freq, dir, both], variant: [jonswap, tma], doc: "Equal-energy binning per axis; the legacy boolean spellings still read as none/freq." }
       spectrum.discretization.method:
-        { legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*)." }
-      spectrum.discretization.coherence_percent: { legacy: ~, default: 0.0, units: "%", variant: [jonswap, tma, spectrum_2d], doc: "Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse)." }
-      spectrum.discretization.group_coherence: { legacy: alpha_c, default: 0.0, units: "%", variant: [jonswap, tma], doc: "Salatin frequency-grouping coherence: percent of components sharing a frequency (single_dir_per_freq only)." }
+        {advanced: true, legacy: ~, default: grid, units: ~, values: [grid, single_dir_per_freq], variant: [jonswap, tma], doc: "Discretization method: directional grid, or one direction per frequency component (nee WK_NEW_*)." }
+      spectrum.discretization.coherence_percent: {advanced: true, legacy: ~, default: 0.0, units: "%", variant: [jonswap, tma, spectrum_2d], doc: "Directional-phase coherence: percent by which a frequency's directions share a phase (0 = independent, realistic sea; 100 = the legacy fully-coherent collapse)." }
+      spectrum.discretization.group_coherence: {advanced: true, legacy: alpha_c, default: 0.0, units: "%", variant: [jonswap, tma], doc: "Salatin frequency-grouping coherence: percent of components sharing a frequency (single_dir_per_freq only)." }
       spectrum.file: { legacy: WaveCompFile, default: ~, units: ~, variant: [components, spectrum_2d], doc: "Wave-component / 2D-spectrum data file." }
       spectrum.locations: { legacy: ~, default: ~, units: ~, variant: [spectrum_2d], doc: "Manifest of along-face anchor spectra (`<coord> file` per line; coordinate all-or-none, omitted => equispaced) for a spatially-varying boundary feed; mutually exclusive with spectrum.file." }
       spectrum.convention: { legacy: ~, default: local, units: ~, values: [local, cartesian, nautical], variant: [jonswap, tma, spectrum_2d], doc: "Boundary-feed direction frame: local (theta=0 is the fed face inward normal), cartesian (theta=0 is grid +x), nautical (azimuth CW from true North via grid.crs; pending)." }
@@ -448,14 +448,14 @@ sections:
       source.x_center: { legacy: Xc_WK, default: 0.0, units: m, latex: "$x_c$", doc: "Source-box x center (presence of source: => Wei-Kirby)." }
       source.y_center: { legacy: Yc_WK, default: 0.0, units: m, latex: "$y_c$", doc: "Source-box y center." }
       source.depth: { legacy: DEP_WK, default: 0.0, units: m, doc: "Source-box reference depth; absent = the bed mean under the box, refused unless the bed there is flat within 1 %." }
-      source.delta: { legacy: Delta_WK, default: 0.5, units: ~, latex: "$\\delta$", doc: "Source-box width parameter." }
+      source.delta: {advanced: true, legacy: Delta_WK, default: 0.5, units: ~, latex: "$\\delta$", doc: "Source-box width parameter." }
       source.y_width: { legacy: Ywidth_WK, default: 999999.0, units: m, doc: "Source-box alongshore width (large = full span)." }
       source.time_ramp: { legacy: Time_ramp, default: 0.0, units: s, doc: "Source ramp-up time." }
-      source.current_cd: { legacy: WaveMakerCd, default: ~, units: ~, doc: "Current-balance drag (presence enables; nee WaveMakerCurrentBalance)." }
-      source.breaking.cbrk: { legacy: WAVEMAKER_Cbrk, default: 1.0, units: ~, latex: '$C_{\mathrm{brk,wm}}$', doc: "Zone breaking-onset coefficient (Cbrk family vs sqrt(gH), not a scale on cbrk1)." }
-      source.breaking.visbrk: { legacy: WAVEMAKER_visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk,wm}}$', doc: "Zone breaking-viscosity coefficient." }
-      limiter.crest: { legacy: CrestLimit, default: ~, units: m, doc: "Crest elevation limit (nee ETA_LIMITER). Read and stored; the clamp itself is not ported, so the key has no effect yet." }
-      limiter.trough: { legacy: TroughLimit, default: ~, units: m, doc: "Trough elevation limit; same standing as limiter.crest." }
+      source.current_cd: {advanced: true, legacy: WaveMakerCd, default: ~, units: ~, doc: "Current-balance drag (presence enables; nee WaveMakerCurrentBalance)." }
+      source.breaking.cbrk: {advanced: true, legacy: WAVEMAKER_Cbrk, default: 1.0, units: ~, latex: '$C_{\mathrm{brk,wm}}$', doc: "Zone breaking-onset coefficient (Cbrk family vs sqrt(gH), not a scale on cbrk1)." }
+      source.breaking.visbrk: {advanced: true, legacy: WAVEMAKER_visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk,wm}}$', doc: "Zone breaking-viscosity coefficient." }
+      limiter.crest: {advanced: true, legacy: CrestLimit, default: ~, units: m, doc: "Crest elevation limit (nee ETA_LIMITER). Read and stored; the clamp itself is not ported, so the key has no effect yet." }
+      limiter.trough: {advanced: true, legacy: TroughLimit, default: ~, units: m, doc: "Trough elevation limit; same standing as limiter.crest." }
 
   # ── boundaries (per-face de-dup) ───────────────────────────────────────────
   boundaries:
@@ -477,10 +477,10 @@ sections:
       # block present here turns that mechanism on for every face sponge.
       # Face mechanism keys also take a boolean: on = enable with the
       # inherited/default coefficients, off = opt out of the shared template
-      sponge.direct.r: {legacy: ~, default: ~, units: ~, latex: '$R_s$', doc: "Shared direct-sponge damping ratio all face sponges inherit."}
-      sponge.direct.a: {legacy: ~, default: ~, units: ~, latex: '$A_s$', doc: "Shared direct-sponge damping exponent."}
-      sponge.friction.cd: {legacy: ~, default: ~, units: ~, doc: "Shared friction-sponge drag coefficient."}
-      sponge.diffusion.nu: {legacy: ~, default: ~, units: 'm2 s-1', doc: "Shared diffusion-sponge viscosity."}
+      sponge.direct.r: {advanced: true, legacy: ~, default: ~, units: ~, latex: '$R_s$', doc: "Shared direct-sponge damping ratio all face sponges inherit."}
+      sponge.direct.a: {advanced: true, legacy: ~, default: ~, units: ~, latex: '$A_s$', doc: "Shared direct-sponge damping exponent."}
+      sponge.friction.cd: {advanced: true, legacy: ~, default: ~, units: ~, doc: "Shared friction-sponge drag coefficient."}
+      sponge.diffusion.nu: {advanced: true, legacy: ~, default: ~, units: 'm2 s-1', doc: "Shared diffusion-sponge viscosity."}
     per_face:
       faces: [west, east, south, north] # {face}=west  {Face}=West  {F}=W
       keys:
@@ -496,36 +496,42 @@ sections:
           latex: "$W_{s,{F}}$"
           doc: "Absorbing sponge strip width (0 = no sponge). On a forced or wavemaker-fed face this also sizes the relaxation strip (cells = width/dx at init)."
         sponge.direct.r:
+          advanced: true
           legacy: R_sponge
           default: 0.85
           units: ~
           latex: "$R_s$"
           doc: "Direct-sponge damping ratio."
         sponge.direct.a:
+          advanced: true
           legacy: A_sponge
           default: 5.0
           units: ~
           latex: "$A_s$"
           doc: "Direct-sponge damping exponent."
         sponge.friction.cd:
+          advanced: true
           legacy: CDsponge
           default: 0.0
           units: ~
           latex: "$C_{d,s}$"
           doc: "Sponge bottom-friction coefficient."
         sponge.diffusion.nu:
+          advanced: true
           legacy: Csp
           default: 0.1
           units: ~
           latex: "$C_{\\mathrm{sp}}$"
           doc: "Sponge diffusion coefficient."
         sponge.pml.r_target:
+          advanced: true
           legacy: ~
           default: 0.001
           units: ~
           latex: "$R_{\\mathrm{pml}}$"
           doc: "PML target reflection coefficient; sets sigma_max = 3c/(2W) ln(1/R). North/south faces only."
         sponge.pml.h_gate:
+          advanced: true
           legacy: ~
           default: 2.0
           units: "m"
@@ -538,6 +544,7 @@ sections:
           latex: "$W_{\\mathrm{pml}}$"
           doc: "PML sub-strip width measured inward from the face; 0 = half the face sponge width (the hybrid default). Confining the PML (and its NSWE zone) to the outer sub-strip leaves an inner Boussinesq-live pre-strip where the friction taper absorbs the dispersive band before it reaches the SWE interface; set to the face width for a full-strip PML."
         sponge.pml.cd:
+          advanced: true
           legacy: ~
           default: 10.0
           units: ~
@@ -587,12 +594,14 @@ sections:
         latex: "$C_{\\mathrm{CFL}}$"
         doc: "CFL number for the adaptive timestep. Exclusive with dt: setting both is a config error."
       dt:
+        advanced: true
         legacy: DT_fixed
         default: ~
         units: "s"
         latex: "$\\Delta t$"
         doc: "Presence selects a fixed timestep (nee simulation.time_stepping); the default cfl still caps it by halving. Absent = adaptive CFL stepping."
       flux_solver:
+        advanced: true
         legacy: CONSTRUCTION
         default: hllc
         units: ~
@@ -611,16 +620,19 @@ sections:
         latex: "$d_{\\min}$"
         doc: "Floor on the water column wherever it divides or scales: the Froude cap, friction, the SWE gate ratio, the dispersion taper and sediment concentration (legacy folded MinDepth/MinDepthFrc). Not the wet/dry threshold, which is h > 0."
       tridiag.chunk:
+        advanced: true
         legacy: ~
         default: 48
         units: ~
         doc: "Transverse chunk width of the pipelined tridiagonal sweeps. System-tuned; bitwise-neutral (reference sweep flat over 16-64)."
       tridiag.transpose_min_py:
+        advanced: true
         legacy: ~
         default: 40
         units: ~
         doc: "Minimum y-rank count that switches the distributed y solve to the all-to-all transpose. System-tuned latency/bandwidth crossover; bitwise-neutral."
       reconstruction:
+        advanced: true
         legacy: HIGH_ORDER
         default: fourth
         units: ~
@@ -638,7 +650,7 @@ sections:
       dx_file: {legacy: ~, default: ~, units: ~, doc: "Variable x-spacing file (with dy_file; alternative to cell_size). Not yet implemented in the new path."}
       dy_file: {legacy: ~, default: ~, units: ~, doc: "Variable y-spacing file (with dx_file)."}
       n_cells: {legacy: ~, default: ~, units: ~, latex: '$[N_x, N_y]$', doc: "Global domain size [nx, ny] (nee Mglob/Nglob; grid_size; bathymetry.nx/ny). Required for flat/slope; for file bathymetry absent = inferred from the file (ASCII dimension scan) and present = an origin-anchored subset window, fit-checked under --validate."}
-      n_procs: {legacy: ~, default: ~, units: ~, latex: '$[P_x, P_y]$', doc: "MPI decomposition [px, py] (nee PX/PY; decomposition.nx_proc/ny_proc); absent = auto-decompose."}
+      n_procs: {advanced: true, legacy: ~, default: ~, units: ~, latex: '$[P_x, P_y]$', doc: "MPI decomposition [px, py] (nee PX/PY; decomposition.nx_proc/ny_proc); absent = auto-decompose."}
       origin: {legacy: ~, default: ~, units: m, latex: '$[x_0, y_0]$', doc: "Local coordinates [x0, y0] of the cell (1,1) centre; default [0, 0]."}
       bathymetry.type: {legacy: DEPTH_TYPE, default: file, units: ~, values: [flat, file, slope], doc: Bathymetry source.}
       bathymetry.depth: {legacy: DEPTH_FLAT, default: ~, units: m, latex: $d_0$, doc: Still-water depth (flat and slope types).}
@@ -648,7 +660,7 @@ sections:
       bathymetry.file_type: {legacy: ~, default: ascii, units: ~, values: [ascii], doc: Bathymetry file format.}
       bathymetry.correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass (file type).}
       bathymetry.smooth_below_depth: {legacy: ~, default: ~, units: m, doc: "Correction-pass smoothing floor; absent = off (-LARGE sentinel)."}
-      bathymetry.slope_cap: {legacy: ~, default: 1.0, units: ~, doc: Correction-pass maximum bed slope.}
+      bathymetry.slope_cap: {advanced: true, legacy: ~, default: 1.0, units: ~, doc: Correction-pass maximum bed slope.}
       # crs: georef of the (possibly rotated) rectilinear grid — the shared
       # funtools<->engine contract; supersedes the ad-hoc X_origin/Y_origin/
       # EPSG/rotation_deg keys funtools emitted into input.txt.  World from
@@ -712,15 +724,15 @@ sections:
   dispersion:
     doc: "Boussinesq dispersion — named scheme XOR an explicit atomic Gamma triple."
     keys:
-      beta_ref: {legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
-      slope_disp_max: {legacy: ~, default: 0.0, units: ~, latex: '$|\\nabla h|_{\\max}$', doc: "Bathymetry-slope dispersion gate: |grad h| at or above which the dispersive terms are fully off (0 = gate disabled). The Boussinesq derivation assumes a mild slope, so on a near-vertical face digitised into the bathymetry the dispersive operator is outside its own validity and goes marginally unstable; gating back toward NSWE there leaves the geometry and overtopping untouched, unlike smoothing the bathymetry. Static (bathymetry-derived), evaluated once at init."}
-      slope_disp_ramp: {legacy: ~, default: 0.0, units: ~, doc: "Slope-gate smoothstep taper width in |grad h| units, below slope_disp_max. Required (positive) whenever slope_disp_max is set: a hard switch turns last-bit differences into O(1) residual flips at threshold cells, which is the known blow-up injector."}
+      beta_ref: {advanced: true, legacy: Beta_ref, default: -0.531, units: ~, latex: '$\beta_{\mathrm{ref}}$', doc: Reference depth level for the Boussinesq operator.}
+      slope_disp_max: {advanced: true, legacy: ~, default: 0.0, units: ~, latex: '$|\\nabla h|_{\\max}$', doc: "Bathymetry-slope dispersion gate: |grad h| at or above which the dispersive terms are fully off (0 = gate disabled). The Boussinesq derivation assumes a mild slope, so on a near-vertical face digitised into the bathymetry the dispersive operator is outside its own validity and goes marginally unstable; gating back toward NSWE there leaves the geometry and overtopping untouched, unlike smoothing the bathymetry. Static (bathymetry-derived), evaluated once at init."}
+      slope_disp_ramp: {advanced: true, legacy: ~, default: 0.0, units: ~, doc: "Slope-gate smoothstep taper width in |grad h| units, below slope_disp_max. Required (positive) whenever slope_disp_max is set: a hard switch turns last-bit differences into O(1) residual flips at threshold cells, which is the known blow-up injector."}
       # gamma triple: atomic (any present => all three) and exclusive with
       # scheme: — expert mode states the whole triple; dispersion stays ON
       # (kernels-off NSWE is reachable only via scheme: nswe)
-      gamma1: {legacy: Gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: "Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme)."}
-      gamma2: {legacy: Gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: "Dispersion coefficient (atomic triple)."}
-      gamma3: {legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: "Dispersion coefficient (atomic triple)."}
+      gamma1: {advanced: true, legacy: Gamma1, default: ~, units: ~, latex: $\Gamma_1$, doc: "Dispersion coefficient (atomic triple with gamma2/gamma3; exclusive with scheme)."}
+      gamma2: {advanced: true, legacy: Gamma2, default: ~, units: ~, latex: $\Gamma_2$, doc: "Dispersion coefficient (atomic triple)."}
+      gamma3: {advanced: true, legacy: Gamma3, default: ~, units: ~, latex: $\Gamma_3$, doc: "Dispersion coefficient (atomic triple)."}
       scheme:
         legacy: ~
         default: fully_nonlinear
@@ -740,26 +752,26 @@ sections:
   breaking:
     doc: "Wave breaking — dissipation model, roller, and thresholds (core physics, not presence-gated). Wavemaker-zone overrides live in wavemaker.source.breaking."
     keys:
-      cbrk1: {legacy: Cbrk1, default: 0.45, units: ~, latex: '$C_{\mathrm{brk1}}$', doc: "Breaking onset threshold coefficient (legacy default 0.65; 0.45 is the 2026-09 breaking-board fit for the split solve with nu_scale 2)."}
-      cbrk2: {legacy: Cbrk2, default: 0.35, units: ~, latex: '$C_{\mathrm{brk2}}$', doc: Breaking cessation threshold coefficient.}
-      nu_bkg: {legacy: nu_bkg, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{bkg}}$', doc: Background eddy viscosity added everywhere.}
-      nu_scale: {legacy: ~, default: 2.0, units: ~, latex: '$s_\nu$', doc: "Multiplier on the breaker eddy-viscosity magnitude. Every scheme scales nu with cbrk2 x sqrt(gh) x depth, so cbrk2 carried cessation and magnitude together; nu_scale separates them (1 = legacy magnitude; 2 = the 2026-09 breaking-board knee; the wavemaker-zone term is not scaled)."}
-      scheme: {legacy: ~, default: constant, units: ~, values: [constant, kennedy, kennedy_orig, static_trans, depth_ratio], doc: "Breaker viscosity form: constant = nu fixed at cbrk2 x sqrt(gh) x depth while active (legacy); kennedy = the steepness-ramped form nu = depth x cbrk2 x sqrt(gh) x (1 + B), B ramping over [cbrk1, 2 cbrk1]; kennedy_orig = Kennedy et al. 2000 with the age-ramped onset threshold and T* = 5 sqrt(h/g); static_trans = linear cbrk1 -> cbrk2 transition over t_brk; depth_ratio = onset on eta/depth > swe_eta_dep, no age."}
+      cbrk1: {advanced: true, legacy: Cbrk1, default: 0.45, units: ~, latex: '$C_{\mathrm{brk1}}$', doc: "Breaking onset threshold coefficient (legacy default 0.65; 0.45 is the 2026-09 breaking-board fit for the split solve with nu_scale 2)."}
+      cbrk2: {advanced: true, legacy: Cbrk2, default: 0.35, units: ~, latex: '$C_{\mathrm{brk2}}$', doc: Breaking cessation threshold coefficient.}
+      nu_bkg: {advanced: true, legacy: nu_bkg, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{bkg}}$', doc: Background eddy viscosity added everywhere.}
+      nu_scale: {advanced: true, legacy: ~, default: 2.0, units: ~, latex: '$s_\nu$', doc: "Multiplier on the breaker eddy-viscosity magnitude. Every scheme scales nu with cbrk2 x sqrt(gh) x depth, so cbrk2 carried cessation and magnitude together; nu_scale separates them (1 = legacy magnitude; 2 = the 2026-09 breaking-board knee; the wavemaker-zone term is not scaled)."}
+      scheme: {advanced: true, legacy: ~, default: constant, units: ~, values: [constant, kennedy, kennedy_orig, static_trans, depth_ratio], doc: "Breaker viscosity form: constant = nu fixed at cbrk2 x sqrt(gh) x depth while active (legacy); kennedy = the steepness-ramped form nu = depth x cbrk2 x sqrt(gh) x (1 + B), B ramping over [cbrk1, 2 cbrk1]; kennedy_orig = Kennedy et al. 2000 with the age-ramped onset threshold and T* = 5 sqrt(h/g); static_trans = linear cbrk1 -> cbrk2 transition over t_brk; depth_ratio = onset on eta/depth > swe_eta_dep, no age."}
       # show_breaking RETIRED: the breaker-diagnostics pass is derived —
       # viscosity breaking (incl. roller forcing) or any AGE/ROLLER/UNDERTOW
       # output request; to_legacy emits the resolved SHOW_BREAKING
-      model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing, wavemaker_viscosity, none], doc: "Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. none = no breaker and no SWE gate, dispersion everywhere (analytic cases, debugging; refused with sediment)."}
-      visbrk: {legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: "Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model)."}
+      model: {advanced: true, legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing, wavemaker_viscosity, none], doc: "Breaking dissipation model; eddy_viscosity is the supported closure and the only one the sediment module accepts (shock_capturing is refused with sediment). wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. none = no breaker and no SWE gate, dispersion everywhere (analytic cases, debugging; refused with sediment)."}
+      visbrk: {advanced: true, legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: "Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model)."}
       roller: {legacy: ROLLER, default: false, units: ~, doc: Enable the surface roller (forces model eddy_viscosity, as legacy).}
-      swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: "Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion."}
-      swe_eta_ramp: {legacy: ~, default: 0.10, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: "eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity)."}
-      wetdry_disp_ramp: {legacy: ~, default: 3.0, units: ~, latex: '$\Delta H_{\mathrm{wd}}$', doc: "Wet/dry-proximity dispersion taper: water-column multiples of numerics.min_depth over which disp_w smoothsteps up from 0 at the wet/dry threshold; 0 = off (legacy). Applies under every breaking model — the viscous path has no SWE gate, so swash-edge mask flips otherwise radiate through the dispersive terms."}
+      swe_eta_dep: {advanced: true, legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: "Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion."}
+      swe_eta_ramp: {advanced: true, legacy: ~, default: 0.10, units: ~, latex: '$\Delta\eta_{\mathrm{SWE}}$', doc: "eta/depth width of the SWE-gate smoothstep below swe_eta_dep; 0 = legacy hard switch. Read only when the gate exists (model not eddy_viscosity)."}
+      wetdry_disp_ramp: {advanced: true, legacy: ~, default: 3.0, units: ~, latex: '$\Delta H_{\mathrm{wd}}$', doc: "Wet/dry-proximity dispersion taper: water-column multiples of numerics.min_depth over which disp_w smoothsteps up from 0 at the wet/dry threshold; 0 = off (legacy). Applies under every breaking model — the viscous path has no SWE gate, so swash-edge mask flips otherwise radiate through the dispersive terms."}
       swe_gate: {legacy: ~, default: false, units: ~, doc: "Apply the eta/h SWE-transition gate (mask9 zeroing + swe_eta_ramp taper) under eddy_viscosity, capping the dispersion amplitude at steep bores. Default false leaves dispersion ungated, as the legacy viscous breaker did."}
-      nu_cap: {legacy: ~, default: 0.0, units: ~, doc: "Clamp nu_break at this fraction of the explicit-diffusion stability bound 1/(2 dt (1/dx^2 + 1/dy^2)). The Laplacian integrates with the advective-CFL dt (no viscous term in estimate_dt, matching legacy), so an uncapped breaker viscosity can exceed the stable limit several-fold at energetic breakpoints. 0 = off (legacy, unbounded); 0.5 recommended under the explicit solver (the split solvers never read it)."}
-      solver: {legacy: ~, default: split_implicit, units: ~, values: [explicit, split_implicit, stage_split], doc: "Breaker-viscosity integrator: explicit source term (legacy), a once-per-step operator-split ADI solve on Hu/Hv, or the same solve applied to each RK stage's Euler predictor before the SSP blend (stage_split, IMEX form) — both splits unconditionally stable, nu_cap not applied. Read under eddy_viscosity only; the wavemaker_viscosity zone term stays an explicit source."}
-      theta: {legacy: ~, default: 1.0, units: ~, latex: "$\\theta$", doc: "Implicitness weight of the split breaker-viscosity solve: 1 = backward Euler, 0.5 = Crank-Nicolson. A-stable on [0.5, 1]. Read for the split solvers only."}
-      t_brk: {legacy: ~, default: 20.0, units: s, latex: '$T_{\mathrm{brk}}$', doc: "Breaking-event age threshold (legacy hard-coded 20 s — the per-wavemaker assignments were dead code)."}
-      age_per_stage: {legacy: ~, default: true, units: ~, doc: "Accrue breaker age every RK stage, so age advances three times per step as in legacy (the cbrk defaults were calibrated with it); false = once per time step."}
+      nu_cap: {advanced: true, legacy: ~, default: 0.0, units: ~, doc: "Clamp nu_break at this fraction of the explicit-diffusion stability bound 1/(2 dt (1/dx^2 + 1/dy^2)). The Laplacian integrates with the advective-CFL dt (no viscous term in estimate_dt, matching legacy), so an uncapped breaker viscosity can exceed the stable limit several-fold at energetic breakpoints. 0 = off (legacy, unbounded); 0.5 recommended under the explicit solver (the split solvers never read it)."}
+      solver: {advanced: true, legacy: ~, default: split_implicit, units: ~, values: [explicit, split_implicit, stage_split], doc: "Breaker-viscosity integrator: explicit source term (legacy), a once-per-step operator-split ADI solve on Hu/Hv, or the same solve applied to each RK stage's Euler predictor before the SSP blend (stage_split, IMEX form) — both splits unconditionally stable, nu_cap not applied. Read under eddy_viscosity only; the wavemaker_viscosity zone term stays an explicit source."}
+      theta: {advanced: true, legacy: ~, default: 1.0, units: ~, latex: "$\\theta$", doc: "Implicitness weight of the split breaker-viscosity solve: 1 = backward Euler, 0.5 = Crank-Nicolson. A-stable on [0.5, 1]. Read for the split solvers only."}
+      t_brk: {advanced: true, legacy: ~, default: 20.0, units: s, latex: '$T_{\mathrm{brk}}$', doc: "Breaking-event age threshold (legacy hard-coded 20 s — the per-wavemaker assignments were dead code)."}
+      age_per_stage: {advanced: true, legacy: ~, default: true, units: ~, doc: "Accrue breaker age every RK stage, so age advances three times per step as in legacy (the cbrk defaults were calibrated with it); false = once per time step."}
 
   # ── friction ──
   friction:
@@ -775,7 +787,7 @@ sections:
     keys:
       file: {legacy: OBSTACLE_FILE, default: ~, units: ~, doc: Obstacle mask file (presence enables interior walls).}
       breakwater.file: {legacy: BREAKWATER_FILE, default: ~, units: ~, doc: Breakwater location file.}
-      breakwater.absorb_coef: {legacy: BreakWaterAbsorbCoef, default: 10.0, units: ~, latex: '$C_{\mathrm{bw}}$', doc: Breakwater absorption coefficient.}
+      breakwater.absorb_coef: {advanced: true, legacy: BreakWaterAbsorbCoef, default: 10.0, units: ~, latex: '$C_{\mathrm{bw}}$', doc: Breakwater absorption coefficient.}
 
   # ── meteo ──
   meteo:
@@ -783,15 +795,15 @@ sections:
     keys:
       gaussian.file: {legacy: METEO_GAUSIAN_FILE, default: ~, units: ~, doc: Gaussian pressure-disturbance file (presence enables; forces pressure coupling).}
       wind.file: {legacy: CONSTANT_WIND_FILE, default: ~, units: ~, doc: Constant wind-field file (presence enables wind stress).}
-      wind.cd: {legacy: Cdw, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient.}
-      wind.wave_interaction: {legacy: ~, default: false, units: ~, doc: Modulate wind stress by the wave field.}
-      wind.crest_percent: {legacy: WindCrestPercent, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
+      wind.cd: {advanced: true, legacy: Cdw, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient.}
+      wind.wave_interaction: {advanced: true, legacy: ~, default: false, units: ~, doc: Modulate wind stress by the wave field.}
+      wind.crest_percent: {advanced: true, legacy: WindCrestPercent, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
       holland.file: {legacy: STORM_FILE, default: ~, units: ~, doc: Holland-model storm-track file.}
       holland.air_pressure: {legacy: AirPressure, default: false, units: ~, doc: Apply the storm pressure coupling.}
       holland.wind_force: {legacy: WindForce, default: false, units: ~, doc: Apply the storm wind-stress coupling.}
-      holland.cd: {legacy: ~, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient (Holland).}
-      holland.wave_interaction: {legacy: ~, default: false, units: ~, doc: Modulate storm wind stress by the wave field.}
-      holland.crest_percent: {legacy: ~, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
+      holland.cd: {advanced: true, legacy: ~, default: 0.002, units: ~, latex: '$C_{dw}$', doc: Wind drag coefficient (Holland).}
+      holland.wave_interaction: {advanced: true, legacy: ~, default: false, units: ~, doc: Modulate storm wind stress by the wave field.}
+      holland.crest_percent: {advanced: true, legacy: ~, default: ~, units: ~, doc: Fraction of crest exposed to wind (requires wave_interaction).}
       slide.file: {legacy: SLIDE_FILE, default: ~, units: ~, doc: Submarine-landslide forcing file (presence enables; forces pressure coupling).}
 
   # ── subgrid ──
@@ -806,11 +818,11 @@ sections:
   foam:
     doc: "Foam / bubble model — production and decay parameters."
     keys:
-      source_coef: {legacy: f_source, default: 0.05, units: ~, latex: '$f_{\mathrm{source}}$', doc: Foam production coefficient.}
-      time_scale: {legacy: FoamTimeScale, default: 3.8, units: s, latex: $\tau_f$, doc: Foam decay time scale.}
-      burst_time_non_breaking: {legacy: BurstTimeNonBreaking, default: 1.0, units: s, doc: Foam burst time in non-breaking regions.}
-      min_thickness: {legacy: MinThick, default: 0.01, units: m, doc: Minimum foam-layer thickness tracked.}
-      cd: {legacy: CdFoam, default: 0.5, units: ~, latex: '$C_{d,f}$', doc: Foam-layer drag coefficient.}
+      source_coef: {advanced: true, legacy: f_source, default: 0.05, units: ~, latex: '$f_{\mathrm{source}}$', doc: Foam production coefficient.}
+      time_scale: {advanced: true, legacy: FoamTimeScale, default: 3.8, units: s, latex: $\tau_f$, doc: Foam decay time scale.}
+      burst_time_non_breaking: {advanced: true, legacy: BurstTimeNonBreaking, default: 1.0, units: s, doc: Foam burst time in non-breaking regions.}
+      min_thickness: {advanced: true, legacy: MinThick, default: 0.01, units: m, doc: Minimum foam-layer thickness tracked.}
+      cd: {advanced: true, legacy: CdFoam, default: 0.5, units: ~, latex: '$C_{d,f}$', doc: Foam-layer drag coefficient.}
 
   # ── precipitation ──
   precipitation:
@@ -833,45 +845,45 @@ sections:
       propeller: {legacy: ~, default: false, units: ~, doc: Enable propeller jets (must match the build's -DPROPELLER).}
       deep_draft.clearance: {legacy: CLEARANCE, default: ~, units: m, doc: Keel clearance above the bed (required for deep_draft).}
       deep_draft.mask: {legacy: MaskMethod, default: true, units: ~, doc: Mask cells fully blocked by the hull.}
-      deep_draft.cd: {legacy: CdDeepDraft, default: ~, units: ~, latex: '$C_{d,v}$', doc: Hull drag coefficient (presence enables hull drag).}
-      deep_draft.nu: {legacy: VisDeepDraft, default: ~, units: m^2/s, doc: Hull eddy viscosity (presence enables).}
+      deep_draft.cd: {advanced: true, legacy: CdDeepDraft, default: ~, units: ~, latex: '$C_{d,v}$', doc: Hull drag coefficient (presence enables hull drag).}
+      deep_draft.nu: {advanced: true, legacy: VisDeepDraft, default: ~, units: m^2/s, doc: Hull eddy viscosity (presence enables).}
 
   # ── sediment ──
   sediment:
     doc: "Sediment — single grain size, morphology, avalanching, cohesive, and flow-feedback sub-blocks."
     keys:
-      scheme: {legacy: Sed_Scheme, default: upwinding, units: ~, values: [upwinding, tvd], doc: Advection scheme for suspended load.}
-      solver: {legacy: ~, default: split_implicit, units: ~, values: [explicit, split_implicit], doc: "Suspended-load diffusion integrator: a once-per-step operator-split backward-Euler ADI solve on CH (unconditionally stable), or the explicit face flux inside the RK stages (legacy; clamped at the stability bound, which the Elder diffusivity tops under ~0.5 m cells)."}
+      scheme: {advanced: true, legacy: Sed_Scheme, default: upwinding, units: ~, values: [upwinding, tvd], doc: Advection scheme for suspended load.}
+      solver: {advanced: true, legacy: ~, default: split_implicit, units: ~, values: [explicit, split_implicit], doc: "Suspended-load diffusion integrator: a once-per-step operator-split backward-Euler ADI solve on CH (unconditionally stable), or the explicit face flux inside the RK stages (legacy; clamped at the stability bound, which the Elder diffusivity tops under ~0.5 m cells)."}
       d50: {legacy: D50, default: ~, units: m, latex: '$D_{50}$', doc: 'Median grain diameter (absent: 0.5 mm sand / 5 nm mud by cohesive).'}
       specific_gravity: {legacy: Sdensity, default: 2.68, units: ~, latex: $s$, doc: Sediment specific gravity.}
       porosity: {legacy: n_porosity, default: 0.47, units: ~, latex: $n$, doc: Bed porosity.}
       settling_velocity: {legacy: WS, default: ~, units: m/s, latex: $w_s$, doc: Settling velocity (absent = computed from grain size).}
-      shields_cr: {legacy: Shields_cr, default: 0.055, units: ~, latex: '$\theta_{cr}$', doc: Critical Shields parameter for suspension.}
+      shields_cr: {advanced: true, legacy: Shields_cr, default: 0.055, units: ~, latex: '$\theta_{cr}$', doc: Critical Shields parameter for suspension.}
       min_depth_pickup: {legacy: MinDepthPickup, default: 0.1, units: m, doc: Minimum water depth for pickup.}
-      pickup_ramp: {legacy: ~, default: 0.0, units: ~, doc: "Wet/dry-proximity source taper: multiples of min_depth_pickup over which the sand pickup, the bedload flux, and the split-diffusion faces smoothstep up from zero at the cutoff; 0 = off (legacy hard switch). The wetdry_disp_ramp idiom applied to the sediment column."}
-      pickup_reduction: {legacy: PickupReduction, default: true, units: ~, doc: "Cap the bed concentration c_b at reduction_parameter (pickup scaled by min(1, reduction_parameter/c_b))."}
-      reduction_parameter: {legacy: ReductionParameter, default: 0.65, units: ~, doc: "The c_b cap (requires pickup_reduction)."}
-      c_limiter: {legacy: C_limiter, default: ~, units: ~, doc: Suspended-concentration limiter (presence enables).}
+      pickup_ramp: {advanced: true, legacy: ~, default: 0.0, units: ~, doc: "Wet/dry-proximity source taper: multiples of min_depth_pickup over which the sand pickup, the bedload flux, and the split-diffusion faces smoothstep up from zero at the cutoff; 0 = off (legacy hard switch). The wetdry_disp_ramp idiom applied to the sediment column."}
+      pickup_reduction: {advanced: true, legacy: PickupReduction, default: true, units: ~, doc: "Cap the bed concentration c_b at reduction_parameter (pickup scaled by min(1, reduction_parameter/c_b))."}
+      reduction_parameter: {advanced: true, legacy: ReductionParameter, default: 0.65, units: ~, doc: "The c_b cap (requires pickup_reduction)."}
+      c_limiter: {advanced: true, legacy: C_limiter, default: ~, units: ~, doc: Suspended-concentration limiter (presence enables).}
       morph_interval: {legacy: Morph_interval, default: ~, units: s, doc: Morphology update interval.}
       bed_change: {legacy: Bed_Change, default: false, units: ~, doc: Enable bed-level change (morphodynamics).}
       bedload: {legacy: BedLoad, default: false, units: ~, doc: Include bed-load transport.}
-      shields_cr_bedload: {legacy: Shields_cr_bedload, default: ~, units: ~, latex: '$\theta_{cr,b}$', doc: Critical Shields for bed load (absent = shields_cr).}
-      morph_factor: {legacy: Morph_factor, default: 1, units: ~, doc: Morphological acceleration factor.}
+      shields_cr_bedload: {advanced: true, legacy: Shields_cr_bedload, default: ~, units: ~, latex: '$\theta_{cr,b}$', doc: Critical Shields for bed load (absent = shields_cr).}
+      morph_factor: {advanced: true, legacy: Morph_factor, default: 1, units: ~, doc: Morphological acceleration factor.}
       hard_bottom.file: {legacy: Hard_bottom_file, default: ~, units: ~, doc: Non-erodible hard-bottom mask file (required).}
       avalanche.tan_phi: {legacy: Tan_phi, default: ~, units: ~, latex: $\tan\phi$, doc: Tangent of the repose angle (required for avalanche).}
-      avalanche.interval: {legacy: Aval_interval, default: ~, units: s, doc: Avalanche relaxation interval (absent = every step).}
+      avalanche.interval: {advanced: true, legacy: Aval_interval, default: ~, units: s, doc: Avalanche relaxation interval (absent = every step).}
       cohesive.soft_bed: {legacy: SoftBed, default: true, units: ~, doc: Track a consolidating soft-bed layer.}
       cohesive.tau_cr: {legacy: Tau_cr_coh, default: ~, units: m2/s2, latex: '$\tau_{cr}$', doc: Critical erosion shear stress (required for cohesive).}
-      cohesive.tau_crd: {legacy: Tau_crd_coh, default: 0.001, units: m2/s2, latex: '$\tau_{cr,d}$', doc: Critical deposition shear stress.}
-      cohesive.e: {legacy: E_coh, default: 0.0001, units: m/s, latex: $E$, doc: Erosion-rate coefficient.}
-      cohesive.alpha: {legacy: alpha_coh, default: 1.0, units: ~, latex: $\alpha$, doc: Consolidation coefficient.}
-      cohesive.a: {legacy: a_coh, default: 0.1, units: ~, latex: $a$, doc: Soft-bed density parameter a.}
-      cohesive.b: {legacy: b_coh, default: 2.0, units: ~, latex: $b$, doc: Soft-bed density parameter b.}
-      cohesive.n: {legacy: n_coh, default: 0.5, units: ~, latex: $n$, doc: Soft-bed exponent n.}
-      cohesive.m: {legacy: m_coh, default: 1.5, units: ~, latex: $m$, doc: Soft-bed exponent m.}
-      feedback.mass_source: {legacy: SedimentMassSource, default: false, units: ~, doc: Feed erosion/deposition mass back into continuity.}
-      feedback.moment_dc: {legacy: SedimentMomentDC, default: false, units: ~, doc: Feed the density-current momentum term back.}
-      feedback.moment_exg: {legacy: SedimentMomentEXG, default: false, units: ~, doc: Feed the sediment-exchange momentum term back.}
+      cohesive.tau_crd: {advanced: true, legacy: Tau_crd_coh, default: 0.001, units: m2/s2, latex: '$\tau_{cr,d}$', doc: Critical deposition shear stress.}
+      cohesive.e: {advanced: true, legacy: E_coh, default: 0.0001, units: m/s, latex: $E$, doc: Erosion-rate coefficient.}
+      cohesive.alpha: {advanced: true, legacy: alpha_coh, default: 1.0, units: ~, latex: $\alpha$, doc: Consolidation coefficient.}
+      cohesive.a: {advanced: true, legacy: a_coh, default: 0.1, units: ~, latex: $a$, doc: Soft-bed density parameter a.}
+      cohesive.b: {advanced: true, legacy: b_coh, default: 2.0, units: ~, latex: $b$, doc: Soft-bed density parameter b.}
+      cohesive.n: {advanced: true, legacy: n_coh, default: 0.5, units: ~, latex: $n$, doc: Soft-bed exponent n.}
+      cohesive.m: {advanced: true, legacy: m_coh, default: 1.5, units: ~, latex: $m$, doc: Soft-bed exponent m.}
+      feedback.mass_source: {advanced: true, legacy: SedimentMassSource, default: false, units: ~, doc: Feed erosion/deposition mass back into continuity.}
+      feedback.moment_dc: {advanced: true, legacy: SedimentMomentDC, default: false, units: ~, doc: Feed the density-current momentum term back.}
+      feedback.moment_exg: {advanced: true, legacy: SedimentMomentEXG, default: false, units: ~, doc: Feed the sediment-exchange momentum term back.}
 
   # ── coupling ──
   coupling:
@@ -908,7 +920,7 @@ sections:
       # statistics channel supersedes the means block (hsig = the wave
       # height product).  nee PLOT_INTV / the OUT_* flags list /
       # T_INTV_mean + STEADY_TIME.
-      blowup_threshold: {legacy: EtaBlowVal, default: ~, units: m, doc: Elevation above which the run aborts (absent = 100*max|Depth|).}
+      blowup_threshold: {advanced: true, legacy: EtaBlowVal, default: ~, units: m, doc: Elevation above which the run aborts (absent = 100*max|Depth|).}
       vessel.interval: {legacy: PLOT_INTV_VESSEL, default: ~, units: s, doc: Vessel resistance-series output cadence.}
       # geometries:/channels: are lists of named entries (keys below are per entry)
       geometries.name: {legacy: ~, default: ~, units: ~, doc: Point-set name (referenced by channels.geometry).}

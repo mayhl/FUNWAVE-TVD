@@ -106,6 +106,14 @@ def validate(reg: dict) -> list[str]:
         for field in ("name", "units", "default", "latex"):
             if field not in p:
                 errors.append(f"{p.get('yaml_path')}: missing field {field!r}")
+    for sec_name, sec in (reg.get("sections") or {}).items():
+        metas = list((sec.get("keys") or {}).items())
+        if sec.get("per_face"):
+            metas += list((sec["per_face"].get("keys") or {}).items())
+        for key, meta in metas:
+            adv = (meta or {}).get("advanced")
+            if adv is not None and adv is not True:
+                errors.append(f"{sec_name}.{key}: advanced must be true or absent (binary tier)")
     for v in reg.get("variables", []):
         if not v.get("standard_name") and not v.get("funwave_name"):
             errors.append(f"variable {v.get('name')}: needs standard_name or funwave_name")
@@ -167,6 +175,11 @@ The **Legacy** column gives the corresponding `input.txt` parameter name from
 FUNWAVE-TVD, for migrating old decks; `—` marks keys with no legacy
 counterpart.
 
+Each section lists its common keys first; an **Advanced** table beneath holds
+the keys meant for research on the model rather than for production runs
+(closure coefficients, scheme choices, reproducibility and tuning controls).
+Every advanced key has a default, so a production deck never needs to set one.
+
 """
 
 
@@ -223,9 +236,16 @@ def generate_docs(reg: dict) -> str:
             lines.append(badge + (_md_escape(doc) if doc else "") + "\n\n")
 
         keys = sec.get("keys") or {}
-        if keys:
+        common = {k: m for k, m in keys.items() if not (m or {}).get("advanced")}
+        advanced = {k: m for k, m in keys.items() if (m or {}).get("advanced")}
+        if common:
             lines.append(TABLE_HEAD)
-            for key, meta in keys.items():
+            for key, meta in common.items():
+                lines.append(_md_row(key, meta))
+            lines.append("\n")
+        if advanced:
+            lines.append("**Advanced**\n\n" + TABLE_HEAD)
+            for key, meta in advanced.items():
                 lines.append(_md_row(key, meta))
             lines.append("\n")
 
@@ -233,8 +253,8 @@ def generate_docs(reg: dict) -> str:
         if pf:
             faces = " / ".join(f"`{f}:`" for f in pf["faces"])
             lines.append(f"### Per-face keys ({faces})\n\n")
-            lines.append(TABLE_HEAD)
             overrides = pf.get("overrides") or {}
+            rows = {False: [], True: []}
             for subkey, meta in (pf.get("keys") or {}).items():
                 row_meta = dict(meta or {})
                 notes = []
@@ -245,8 +265,12 @@ def generate_docs(reg: dict) -> str:
                         notes.append(f"{face}: {ov_bits}")
                 if notes:
                     row_meta["doc"] = (row_meta.get("doc") or "") + "  (" + "; ".join(notes) + ")"
-                lines.append(_md_row(f"<face>.{subkey}", _subst_meta(row_meta)))
-            lines.append("\n")
+                rows[bool(row_meta.get("advanced"))].append(_md_row(f"<face>.{subkey}", _subst_meta(row_meta)))
+            for adv in (False, True):
+                if rows[adv]:
+                    lines.append(("**Advanced**\n\n" if adv else "") + TABLE_HEAD)
+                    lines.extend(rows[adv])
+                    lines.append("\n")
     return "".join(lines)
 
 
@@ -324,10 +348,10 @@ def check_field_meta(reg: dict) -> list[str]:
         m = re.match(r'\s*m%(units|long_name|standard_name|funwave_name|flag_meanings|comment) = "([^"]*)"', line)
         if m and name:
             code[name][m.group(1)] = m.group(2)
-        m = re.match(r'\s*m%flag_values\(1:\d+\) = \[([^\]]*)\]', line)
+        m = re.match(r"\s*m%flag_values\(1:\d+\) = \[([^\]]*)\]", line)
         if m and name:
             code[name]["flag_values"] = " ".join(str(float(x.replace("_SP", ""))) for x in m.group(1).split(","))
-        m = re.match(r'\s*m%fill_value = ([-0-9.eE+]+)_SP', line)
+        m = re.match(r"\s*m%fill_value = ([-0-9.eE+]+)_SP", line)
         if m and name:
             code[name]["fill_value"] = str(float(m.group(1)))
 
