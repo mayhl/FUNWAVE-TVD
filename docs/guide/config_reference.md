@@ -218,7 +218,7 @@ Wave breaking — dissipation model, roller, and thresholds (core physics, not p
 | `cbrk1` | `0.55` | `Cbrk1` | — | Breaking onset threshold coefficient (legacy default 0.65; 0.55 is the 2026-08 breaking-board fit for the split solve). |
 | `cbrk2` | `0.35` | `Cbrk2` | — | Breaking cessation threshold coefficient. |
 | `nu_bkg` | `0.0` | `nu_bkg` | m2 s-1 | Background eddy viscosity added everywhere. |
-| `model` | `eddy_viscosity` | `VISCOSITY_BREAKING` | — | Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. One of `eddy_viscosity` \| `shock_capturing` \| `wavemaker_viscosity`. |
+| `model` | `eddy_viscosity` | `VISCOSITY_BREAKING` | — | Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. none = no breaker and no SWE gate, dispersion everywhere (analytic cases, debugging; refused with sediment). One of `eddy_viscosity` \| `shock_capturing` \| `wavemaker_viscosity` \| `none`. |
 | `visbrk` | `0.0` | `visbrk` | m2 s-1 | Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model). |
 | `roller` | `false` | `ROLLER` | — | Enable the surface roller (forces model eddy_viscosity |
 | `swe_eta_dep` | `0.8` | `SWE_ETA_DEP` | — | Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion. |

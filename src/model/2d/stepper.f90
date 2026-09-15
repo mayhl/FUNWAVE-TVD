@@ -500,7 +500,10 @@ contains
                          .or. (this%breaking%show_breaking &
                                .and. .not. this%breaking%wavemaker_vis)
 
-      this%m9_forced = this%physics%viscosity_breaking .and. .not. this%breaking%swe_gate
+      ! mask9 forced all-one = no SWE gate: the viscous breaker without its
+      ! optional gate, or no breaker at all
+      this%m9_forced = (this%physics%viscosity_breaking .and. .not. this%breaking%swe_gate) &
+                       .or. trim(this%breaking%model) == "none"
 
       ! legacy allocates + zeroes ROLLER_FLUX/UNDERTOW unconditionally,
       ! so OUT_ROLLER/OUT_UNDERTOW without a running breaker still

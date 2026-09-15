@@ -12,7 +12,9 @@ last window_periods periods at every gauge:
                         along the transect (k_1 = -d phi_1/dx)
   harmonic_lock_pct   — max over n = 2, 3 of |c_n - c_1| / c_1: a permanent
                         form carries every harmonic at one speed; a free
-                        harmonic would run at its own linear speed
+                        harmonic would run at its own linear speed.  Harmonics
+                        under 10 % of the fundamental are left out (no usable
+                        phase at low Ursell number)
   shape_error_pct     — RMS of the record (mean removed) against the theory
                         profile over one period, crest-aligned, per H
 
@@ -43,6 +45,7 @@ from test.validation.oracles._lab import load_deck, new_figure, save_figure
 from test.validation.oracles.surf import _station_x
 
 G = 9.81
+WEAK_HARMONIC = 0.1  # fraction of the fundamental below which a harmonic has no usable phase
 _LABEL = "Cnoidal generation"
 ACCEPTED_KEYS = (
     "channel",
@@ -185,14 +188,21 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     # per-harmonic celerity from the phase slope along the transect
     spec_c = np.fft.rfft(e - mean_level, axis=0)
     f = np.fft.rfftfreq(npts, dt)
-    c_n = []
+    # a harmonic below WEAK_HARMONIC of the fundamental carries no usable phase
+    # (near-sinusoidal waves at low Ursell number): its speed is reported but
+    # left out of the lock, which then reads 0 when nothing qualifies
+    c_n, strong = [], []
     for nh in (1, 2, 3):
         i = int(np.argmin(np.abs(f - nh / period)))
         ph = np.unwrap(np.angle(spec_c[i, :]))
         k_n = -float(np.polyfit(x, ph, 1)[0])
         c_n.append(2.0 * math.pi * nh / period / k_n)
+        strong.append(
+            float(np.mean(np.abs(spec_c[i, :])))
+            >= WEAK_HARMONIC * float(np.mean(np.abs(spec_c[int(np.argmin(np.abs(f - 1.0 / period))), :])))
+        )
     celerity_error = abs(c_n[0] - th["c"]) / th["c"] * 100.0
-    harmonic_lock = max(abs(c_n[1] - c_n[0]), abs(c_n[2] - c_n[0])) / c_n[0] * 100.0
+    harmonic_lock = max([abs(c_n[n] - c_n[0]) / c_n[0] * 100.0 for n in (1, 2) if strong[n]], default=0.0)
     i1 = int(np.argmin(np.abs(f - 1.0 / period)))
     i2 = int(np.argmin(np.abs(f - 2.0 / period)))
     a2_a1 = float(np.mean(np.abs(spec_c[i2, :]) / np.abs(spec_c[i1, :])))

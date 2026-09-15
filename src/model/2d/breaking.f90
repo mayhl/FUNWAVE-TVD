@@ -50,9 +50,11 @@ module model_breaking_mod
    private
    public :: type_model_breaking
 
-   character(len=20), parameter :: BREAKING_MODELS(3) = &
+   ! none = no breaker and no SWE gate: dispersion everywhere, nothing
+   ! dissipates a bore -- analytic cases and debugging, never a beach
+   character(len=20), parameter :: BREAKING_MODELS(4) = &
                                    [character(len=20) :: "eddy_viscosity", "shock_capturing", &
-                                                          "wavemaker_viscosity"]
+                                                          "wavemaker_viscosity", "none"]
    character(len=20), parameter :: VISC_SOLVERS(3) = &
                                    [character(len=20) :: "explicit", "split_implicit", &
                                                           "stage_split"]
@@ -195,7 +197,8 @@ contains
          call sub_env%yaml%read("swe_gate", silent=no_key, val=this%swe_gate, &
                                 default="NO")
       end if
-      if (trim(this%model) /= "eddy_viscosity" .or. this%swe_gate) then
+      if (trim(this%model) == "shock_capturing" .or. trim(this%model) == "wavemaker_viscosity" &
+          .or. this%swe_gate) then
          call sub_env%yaml%read("swe_eta_ramp", silent=no_key, val=this%swe_eta_ramp, &
                                 default="0.1")
       end if

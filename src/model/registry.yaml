@@ -628,7 +628,7 @@ sections:
       # show_breaking RETIRED: the breaker-diagnostics pass is derived —
       # viscosity breaking (incl. roller forcing) or any AGE/ROLLER/UNDERTOW
       # output request; to_legacy emits the resolved SHOW_BREAKING
-      model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing, wavemaker_viscosity], doc: "Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone."}
+      model: {legacy: VISCOSITY_BREAKING, default: eddy_viscosity, units: ~, values: [eddy_viscosity, shock_capturing, wavemaker_viscosity, none], doc: "Breaking dissipation model. wavemaker_viscosity (nee WAVEMAKER_VIS) = shock-capturing globally + Kennedy-style viscosity inside the wavemaker zone. none = no breaker and no SWE gate, dispersion everywhere (analytic cases, debugging; refused with sediment)."}
       visbrk: {legacy: visbrk, default: 0.0, units: m2 s-1, latex: '$\nu_{\mathrm{brk}}$', doc: "Breaking eddy-viscosity coefficient (wavemaker_viscosity threshold; read only under that model)."}
       roller: {legacy: ROLLER, default: false, units: ~, doc: Enable the surface roller (forces model eddy_viscosity, as legacy).}
       swe_eta_dep: {legacy: SWE_ETA_DEP, default: 0.8, units: ~, latex: '$\eta_{\mathrm{SWE}}$', doc: "Bore-regime eta/depth threshold: the SWE dispersion gate (shock family) and the viscous breaker's extra onset criterion."}
