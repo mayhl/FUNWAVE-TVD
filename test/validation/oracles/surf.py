@@ -6,7 +6,12 @@ fitted.  Setup is anchored at the seaward-most station (lab datum); the
 removed offset reports ungated as mean_level_offset_m.
 
 Keys: heights/setup (file names), channel, height_stat, window_s.
-Gates: height_nrmse_pct (peak norm), setup_nrmse_pct (range norm).
+Gates: height_nrmse_pct (peak norm), setup_rms_pct (rms setup error over
+the seaward-most measured height H0 -- setup scales with H, and a range
+norm turns a few mm into tens of percent).  Report-only:
+breakpoint_offset_m, mean_level_offset_m, setup_slope_error_pct (linear
+setup gradient shoreward of the measured breakpoint, model vs measured --
+the radiation-stress balance, blind to the datum).
 """
 
 from __future__ import annotations
@@ -23,9 +28,10 @@ from test.validation.oracles import wave_stats
 from test.validation.oracles._lab import load_deck, new_figure, nrmse_pct, read_table, save_figure
 
 MIN_WAVES = 5  # stations with fewer zero-crossing waves are swash/dry — excluded
+MIN_SLOPE_POINTS = 3  # setup stations shoreward of the breakpoint needed for a gradient
 
 _LABEL = "Surf profiles"
-ACCEPTED_KEYS = ("heights", "setup", "window_s", "channel", "height_stat", "height_nrmse_pct", "setup_nrmse_pct")
+ACCEPTED_KEYS = ("heights", "setup", "window_s", "channel", "height_stat", "height_nrmse_pct", "setup_rms_pct")
 
 
 def _skip(msg: str) -> SubsectionResult:
@@ -55,6 +61,8 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     s_name = tolerances.get("setup")
     if not (h_name or s_name):
         return _skip("tolerances block needs heights: or setup:")
+    if s_name and not h_name:
+        return _skip("setup: needs heights: for the H0 norm and the breakpoint")
     window = tolerances.get("window_s")
     if not window:
         return _skip("no steady window: set window_s in tolerances")
@@ -126,11 +134,19 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         metrics.append(MetricResult("surf", "mean_level_offset_m", float(s_fit[k0] - s_meas[k0]), True, math.inf))
         s_fit = s_fit - s_fit[k0]
         s_meas = s_meas - s_meas[k0]
-        s_err = nrmse_pct(s_meas, s_fit, norm="range") if np.isfinite(s_fit).all() else float("inf")
-        s_tol = float(tolerances.get("setup_nrmse_pct", 20.0))
+        h0 = float(h_meas[int(np.argmin(xm_h))])
+        s_err = 100.0 * float(np.sqrt(np.mean((s_fit - s_meas) ** 2))) / h0 if np.isfinite(s_fit).all() else float("inf")
+        s_tol = float(tolerances.get("setup_rms_pct", 5.0))
         s_ok = math.isfinite(s_err) and s_err < s_tol
         ok = ok and s_ok
-        metrics.append(MetricResult("surf", "setup_nrmse_pct", s_err, s_ok, s_tol))
+        metrics.append(MetricResult("surf", "setup_rms_pct", s_err, s_ok, s_tol))
+        inner = xm_s > float(xm_h[int(np.argmax(h_meas))])
+        if inner.sum() >= MIN_SLOPE_POINTS and np.isfinite(s_fit[inner]).all():
+            slope_meas = float(np.polyfit(xm_s[inner], s_meas[inner], 1)[0])
+            slope_fit = float(np.polyfit(xm_s[inner], s_fit[inner], 1)[0])
+            if slope_meas != 0.0:
+                slope_err = 100.0 * (slope_fit - slope_meas) / abs(slope_meas)
+                metrics.append(MetricResult("surf", "setup_slope_error_pct", slope_err, True, math.inf))
 
     fig, axes = new_figure(nrows=(1 if h_name else 0) + (1 if s_name else 0), height_per_row=2.6)
     ax_iter = iter(axes)

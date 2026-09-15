@@ -388,12 +388,12 @@ simulations:
         channel: line
         window_s: [30.0, 100.0]
         height_nrmse_pct: 15.0
-        setup_nrmse_pct: 30.0
+        setup_rms_pct: 2.5
     # the same deck under both breaking closures; the viscous arm carries
     # its own calibrated bounds where they differ
     variants:
       shock: { overrides: { breaking.model: shock_capturing } }
-      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_nrmse_pct: 40.0 } } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 3.5 } } }
 
 
   - name: lab_hs_plunging
@@ -413,17 +413,18 @@ simulations:
         channel: line
         window_s: [30.0, 100.0]
         height_nrmse_pct: 15.0
-        setup_nrmse_pct: 25.0
+        setup_rms_pct: 2.0
     # the same deck under both breaking closures; the viscous arm carries
     # its own calibrated bounds where they differ
     variants:
       shock: { overrides: { breaking.model: shock_capturing } }
-      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0 } } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 2.5 } } }
 
 
   # ── Ting & Kirby 1994: spilling/plunging cnoidal pair ───────────────────
-  # 50 % gates = sinusoid-era tripwire; a cnoidal maker should reach ~20
-  # anchors: spilling 21.8+49.4 / 17.4+47.4, plunging shock 22.4+36.3
+  # gates from the 2026-09-15 cnoidal-paddle board (0.45 / 0.35 / nu 2):
+  # height shock 21.3 / 14.7, viscous 16.0 / 14.6; setup rms over H0
+  # shock 5.3 / 4.2, viscous 4.3 / 2.4 (spilling / plunging)
   - name: lab_tk_spilling
     exe_type: validation-2d
     np: 2
@@ -440,13 +441,13 @@ simulations:
         setup: setup_spilling.txt
         channel: line
         window_s: [100.0, 300.0]
-        setup_nrmse_pct: 50.0
-        height_nrmse_pct: 50.0
+        setup_rms_pct: 7.0
+        height_nrmse_pct: 25.0
     # the same deck under both breaking closures; the viscous arm carries
     # its own calibrated bounds where they differ
     variants:
       shock: { overrides: { breaking.model: shock_capturing } }
-      viscous: { overrides: { breaking.model: eddy_viscosity } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 6.0 } } }
 
 
   - name: lab_tk_plunging
@@ -465,13 +466,13 @@ simulations:
         setup: setup_plunging.txt
         channel: line
         window_s: [150.0, 400.0]
-        setup_nrmse_pct: 50.0
-        height_nrmse_pct: 50.0
+        setup_rms_pct: 6.0
+        height_nrmse_pct: 20.0
     # the same deck under both breaking closures; the viscous arm carries
     # its own calibrated bounds where they differ
     variants:
       shock: { overrides: { breaking.model: shock_capturing } }
-      viscous: { overrides: { breaking.model: eddy_viscosity } }
+      viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 3.5 } } }
 
 
   # ── Wavemaker fidelity: the h470 incident gauge as its own gated case ───
