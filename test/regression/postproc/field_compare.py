@@ -18,7 +18,6 @@ from test.regression.postproc.utils import (
     get_output_variables,
     compute_metric_series,
     metric_stat_name,
-    MASK_PREFIXES,
 )
 
 _console = Console()
@@ -29,21 +28,31 @@ _console = Console()
 # ---------------------------------------------------------------------------
 
 
+_LABELS = {"field": "Field Data", "statistics": "Statistics Data"}
+
+
 def run(
     ref_dir: str | Path,
     dev_dir: str | Path,
     tolerances: dict,
     plots_dir: Path,
     verbose: bool = False,
+    kind: str = "field",
 ) -> SubsectionResult:
+    """Compare every frame series of one output kind between the two runs.
+
+    kind selects the prefix catalogue: "field" (snapshots) or "statistics"
+    (the <var>_<stat> channel products); statistics_compare is the
+    statistics entry point of this same comparison.
+    """
     ref_dir = Path(ref_dir)
     dev_dir = Path(dev_dir)
 
     ref_meta = read_run_metadata(ref_dir)
     dev_meta = read_run_metadata(dev_dir)
 
-    ref_vars = get_output_variables(ref_meta.output_dir, kind="field")
-    dev_vars = get_output_variables(dev_meta.output_dir, kind="field")
+    ref_vars = get_output_variables(ref_meta.output_dir, kind=kind)
+    dev_vars = get_output_variables(dev_meta.output_dir, kind=kind)
 
     ref_map = {v.prefix: v for v in ref_vars}
     dev_map = {v.prefix: v for v in dev_vars}
@@ -118,8 +127,8 @@ def run(
     if verbose or any_failed:
         _print_table(ref_meta, dev_meta, rows)
 
-    result = SubsectionResult(kind="field", label="Field Data", metrics=metrics)
-    fig = _make_figure(series_data, plots_dir)
+    result = SubsectionResult(kind=kind, label=_LABELS[kind], metrics=metrics)
+    fig = _make_figure(series_data, plots_dir, kind)
     if fig is not None:
         result.figures.append(fig)
 
@@ -219,7 +228,7 @@ def _build_fig(series_data: list[tuple], dark: bool) -> go.Figure:
     return fig
 
 
-def _make_figure(series_data: list[tuple], plots_dir: Path) -> FigureSpec | None:
+def _make_figure(series_data: list[tuple], plots_dir: Path, kind: str = "field") -> FigureSpec | None:
     """Build L2-vs-step figure for tolerated variables only; returns None if none exist."""
     tolerated = [s for s in series_data if np.isfinite(s[4])]  # s[4] = tol
     if not tolerated:
@@ -227,7 +236,7 @@ def _make_figure(series_data: list[tuple], plots_dir: Path) -> FigureSpec | None
     fig_dark = _build_fig(tolerated, dark=True)
     fig_light = _build_fig(tolerated, dark=False)
 
-    png_path = plots_dir / "field_l2.png"
+    png_path = plots_dir / f"{kind}_l2.png"
     fig_light.write_image(str(png_path), width=900, height=320, scale=2)
 
     return FigureSpec(

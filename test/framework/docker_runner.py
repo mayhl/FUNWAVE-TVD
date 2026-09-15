@@ -12,7 +12,7 @@ from __future__ import annotations
 import re
 import subprocess
 import time
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import product
 from pathlib import Path
 
@@ -119,8 +119,6 @@ def _run_build(cmd: list[str], verbose: bool, no_cache: bool) -> tuple[int, str]
 
 def _ccache_mount(name: str) -> list[str]:
     """Return docker run args to mount a per-compiler ccache volume."""
-    import os
-
     cache_dir = Path.home() / ".cache" / "funwave-ccache" / name
     cache_dir.mkdir(parents=True, exist_ok=True)
     return ["-v", f"{cache_dir}:/ccache"]

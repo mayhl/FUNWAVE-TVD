@@ -5,10 +5,10 @@ import os
 
 from test.framework.runners import UnitTestRunner
 from test.framework.regression_runner import RegressionRunner
-from test.framework.docker_runner import run as docker_run, DEFAULT_BUILD_TYPES
+from test.framework.docker_runner import run as docker_run
 from test.framework.reporters import ConsoleReporter
 from test.framework.providers.base import LocalProvider
-from test.framework.workspace_utils import get_build_path, setup_workspace
+from test.framework.workspace_utils import setup_workspace
 
 PROJ_ROOT = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

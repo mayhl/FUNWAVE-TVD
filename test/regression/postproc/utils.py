@@ -13,26 +13,57 @@ if TYPE_CHECKING:
 # ---------------------------------------------------------------------------
 # Output file prefix catalogues (sourced from src/model/2d/old/io.F)
 # All 2D snapshot files use prefix_%05d naming.
-# Station files use sta_%04d.
+# Station files: the 3D vendor ref writes sta_%04d; 2D point channels write <chan>/<var>.dat.
 # dep.out is the only static exception (written once at init for DEPTH_OUT).
 # ---------------------------------------------------------------------------
 
-# Prefixes written at each PLOT_INTV (time-evolving field snapshots).
-# 2D prefixes: sourced from src/model/2d/old/io.F  (_%05d naming)
-# 3D prefixes: sourced from src/model/3d/old/io.F  (_%04d naming)
+# Field prefixes the comparator recognises: the registry variable names
+# (src/model/registry.yaml), the vector- and product-derived channel names,
+# the running-envelope channel spellings, and the 3D vendor ref's volumetric
+# prefixes (vendor/3d-fd writes _%04d frames).
 FIELD_PREFIXES: frozenset[str] = frozenset(
     [
-        # 2D model outputs (registry-name spellings since the channels
-        # migration; the legacy prefixes stay for old ref trees)
         "eta",
-        "h_max",
-        "h_min",
-        "u_max",
-        "mf_max",
-        "vort_max",
-        "arr_time",
-        # running envelope channels (the retired h_max/h_min/u_max/mf_max/
-        # vort_max/arr_time spellings above stay for old ref trees)
+        "u",
+        "v",
+        "h",
+        "depth",
+        "p_flux",
+        "q_flux",
+        "p",
+        "q",
+        "mask",
+        "mask9",
+        "velocity.mag",
+        "velocity.dir",
+        "vorticity",
+        "momentum_flux",
+        "nu_break",
+        "age_break",
+        "roller_flux",
+        "undertow_u",
+        "undertow_v",
+        "d_break",
+        "disp_gate",
+        "breaking_active",
+        "nu_capped",
+        "froude_scale",
+        "xi_0",
+        "xi_b",
+        "gamma_b",
+        "front_steepness",
+        "a",
+        "a_x",
+        "a_y",
+        "b_x",
+        "b_y",
+        "meteo_pressure",
+        "meteo_wind_u",
+        "meteo_wind_v",
+        "vessel_pressure",
+        "vessel_up",
+        "vessel_vp",
+        # running envelope channels (statistics: max/min/max_time, accumulate: running)
         "eta_max",
         "eta_min",
         "eta_max_time",
@@ -40,35 +71,6 @@ FIELD_PREFIXES: frozenset[str] = frozenset(
         "momentum_flux_max",
         "vorticity_max",
         "eta_first_time",
-        "p_flux",
-        "q_flux",
-        "velocity.mag",
-        "velocity.dir",
-        "vorticity",
-        "momentum_flux",
-        "etasrn",
-        "u",
-        "v",
-        "mask",
-        "mask9",
-        "hmax",
-        "hmin",
-        "umax",
-        "MFmax",
-        "VORmax",
-        "p",
-        "q",
-        "age",
-        "roller",
-        "U_undertow",
-        "V_undertow",
-        "nubrk",
-        "FrcInsX",
-        "FrcInsY",
-        "BrkSrcX",
-        "BrkSrcY",
-        "time",
-        "Pstorm",
         # sediment (registry names; the stepper registers exactly these)
         "sediment_c",
         "sediment_pickup",
@@ -82,37 +84,7 @@ FIELD_PREFIXES: frozenset[str] = frozenset(
         "sediment_dchgb",
         "sediment_aval",
         "sediment_avalac",
-        "Ustorm",
-        "Vstorm",
-        "Fves",
-        "Pves",
-        "VesUp",
-        "VesVp",
-        "tmp",
-        "Ax",
-        "Ay",
-        "Bx",
-        "By",
-        "dep",
-        "C",
-        "Pick",
-        "Depo",
-        "Pavg",
-        "Davg",
-        "DchgS",
-        "DchgB",
-        "BedFx",
-        "BedFy",
-        "BedStr",
-        "Aval",
-        "AvalAc",
-        "Cb",
-        "Ca",
-        "Redu",
-        "TauEx",
-        "Hpo",
-        "FoamEta",
-        # 3D model outputs (volumetric — see putfile3D in src/model/3d/old/io.F)
+        # 3D vendor ref (volumetric, putfile3D layout)
         "w",
         "tke",
         "eps",
@@ -135,62 +107,25 @@ MASK_PREFIXES: frozenset[str] = frozenset({"mask", "mask9"})
 # ||diff|| < floor * tol = 1e-4 * 1e-4 = 1e-8, consistent with relative intent.
 DEFAULT_FLOOR: float = 1e-4
 
-# Prefixes written at T_INTV_mean after STEADY_TIME (wave-averaged statistics).
+# Statistics-channel prefixes (<var>_<stat> and the product-derived hsig).
 STATS_PREFIXES: frozenset[str] = frozenset(
     [
-        # channel-stat spellings (<var>_<stat> since the channels migration)
         "eta_mean",
         "u_mean",
         "v_mean",
         "eta_std",
         "hsig",
-        "umean",
-        "vmean",
-        "etamean",
-        "ulagm",
-        "vlagm",
-        "Hrms",
-        "Havg",
-        "Hsig",
-        "Sxx",
-        "Sxy",
-        "Syy",
-        "DxSxx",
-        "DySxy",
-        "DySyy",
-        "DxSxy",
-        "PgrdX",
-        "PgrdY",
-        "DxUUH",
-        "DyUVH",
-        "DyVVH",
-        "DxUVH",
-        "FRCX",
-        "FRCY",
-        "BrkDissX",
-        "BrkDissY",
     ]
 )
 
-# Canonical variable name (from input flags) → primary output file prefix.
-# WaveHeight produces three files (Hrms, Havg, Hsig); Hrms is listed as primary.
-# DEPTH_OUT → dep.out (static, not a %05d series).
+# Legacy flag spelling -> output prefix, for the oracles that still ask by
+# flag name (ETA/U/V/MASK/P/Q).
 VAR_TO_PREFIX: dict[str, str] = {
     "ETA": "eta",
-    "ETAscreen": "etasrn",
     "U": "u",
     "V": "v",
-    "Umean": "umean",
-    "Vmean": "vmean",
-    "ETAmean": "etamean",
     "MASK": "mask",
     "MASK9": "mask9",
-    "Hmax": "hmax",
-    "Hmin": "hmin",
-    "MFmax": "MFmax",
-    "Umax": "umax",
-    "VORmax": "VORmax",
-    "WaveHeight": "Hrms",  # also produces Havg, Hsig
     "P": "p",
     "Q": "q",
 }
@@ -200,39 +135,6 @@ STATIC_FILES: dict[str, str] = {
     "DEPTH_OUT": "dep.out",
 }
 
-# All txt input flag names recognised as output variables.
-_TXT_VAR_FLAGS = [
-    "DEPTH_OUT",
-    "U",
-    "V",
-    "ETA",
-    "ETAscreen",
-    "Hmax",
-    "Hmin",
-    "MFmax",
-    "Umax",
-    "VORmax",
-    "Umean",
-    "Vmean",
-    "ETAmean",
-    "MASK",
-    "MASK9",
-    "SXL",
-    "SXR",
-    "SYL",
-    "SYR",
-    "SourceX",
-    "SourceY",
-    "P",
-    "Q",
-    "Fx",
-    "Fy",
-    "Gx",
-    "Gy",
-    "AGE",
-    "TMP",
-    "WaveHeight",
-]
 
 _TSERIES_RE = re.compile(r"^(.+)_(\d{4,5})$")  # 5-digit (2D) or 4-digit (3D)
 _STATION_RE = re.compile(r"^sta_(\d{4})$")
@@ -269,9 +171,7 @@ class RunMetadata:
     ny: int  # Nglob / grid_size[1]
     dx: float
     dy: float
-    binary: bool = False  # True if FIELD_IO_TYPE = BINARY; default is ASCII
-    output_res: int = 1  # OUTPUT_RES stride (ASCII only; binary is always full res)
-    variables: list[str] = field(default_factory=list)  # canonical names from input
+    binary: bool = False  # True if output.format is binary; default is ASCII
     nz: int = 0  # Kglob for 3D runs; 0 for 2D runs
     # per-prefix parent dir cache for field_path (flat vs channel subfolder)
     _prefix_dirs: dict = field(default_factory=dict)
@@ -444,27 +344,7 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
     result_folder = out.get("result_folder", "output").rstrip("/")
     output_dir = (run_dir / result_folder).resolve()
 
-    # channels-primary since the output migration: union the field-channel
-    # products (visible variables, <var>_<stat> stats, derived names);
-    # the flags list survives only in old ref trees
-    variables = list(out.get("variables", []))
-    for ch in out.get("channels") or []:
-        if ch.get("geometry") != "field":
-            continue
-        cvars = [v for v in ch.get("variables", []) if v != "hsig"]
-        stats = ch.get("statistics") or []
-        if stats:
-            variables += [f"{v}_{st}" for v in cvars for st in stats]
-        else:
-            variables += cvars
-        if "hsig" in ch.get("variables", []):
-            variables.append("hsig")
-    if out.get("depth_out", False):
-        variables = ["DEPTH_OUT"] + variables
-
-    fmt = out.get("format", out.get("field_io_type", "binary"))
-    binary = str(fmt).upper() == "BINARY"
-    output_res = int(out.get("output_res", 1))
+    binary = str(out.get("format", "binary")).upper() == "BINARY"
 
     return RunMetadata(
         run_dir=run_dir,
@@ -475,8 +355,6 @@ def _from_yaml(run_dir: Path, path: Path) -> RunMetadata:
         dx=float(cell_size[0]),
         dy=float(cell_size[1]),
         binary=binary,
-        output_res=output_res,
-        variables=variables,
     )
 
 
@@ -486,10 +364,7 @@ def _from_txt(run_dir: Path, path: Path) -> RunMetadata:
     result_folder = kv.get("RESULT_FOLDER", "output").rstrip("/")
     output_dir = (run_dir / result_folder).resolve()
 
-    variables = [v for v in _TXT_VAR_FLAGS if kv.get(v, "F").upper() in ("T", ".TRUE.", "TRUE")]
-
     binary = kv.get("FIELD_IO_TYPE", "ASCII").upper() == "BINARY"
-    output_res = int(kv.get("OUTPUT_RES", 1))
 
     return RunMetadata(
         run_dir=run_dir,
@@ -500,8 +375,6 @@ def _from_txt(run_dir: Path, path: Path) -> RunMetadata:
         dx=float(kv.get("DX", 1.0)),
         dy=float(kv.get("DY", 1.0)),
         binary=binary,
-        output_res=output_res,
-        variables=variables,
     )
 
 

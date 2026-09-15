@@ -241,14 +241,6 @@ _WK_PARAMS: dict[str, list[str]] = {
     ],
 }
 
-# Common optional wavemaker keys not in any type-specific list
-_WK_COMMON = [
-    "WaveMakerCurrentBalance",
-    "WaveMakerCd",
-    "WAVEMAKER_Cbrk",
-]
-
-
 def _put(dst: dict, block: str, key: str, val):
     if val is not None:
         dst.setdefault(block, {})[key] = val

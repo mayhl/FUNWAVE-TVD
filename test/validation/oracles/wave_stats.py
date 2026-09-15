@@ -27,9 +27,7 @@ import numpy as np
 __all__ = [
     "zero_crossing_waves",
     "height_stats",
-    "welch_psd",
     "hilbert_analytic",
-    "envelope",
     "skewness_asymmetry",
     "lag_align",
     "read_point_channel",
@@ -88,49 +86,6 @@ def height_stats(t: np.ndarray, eta: np.ndarray) -> dict[str, float]:
 # ---------------------------------------------------------------------------
 
 
-def welch_psd(
-    x: np.ndarray,
-    dt: float,
-    nperseg: int | None = None,
-    overlap: float = 0.5,
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return (f, psd) — a Hann-windowed, segment-averaged one-sided PSD.
-
-    We follow the Welch construction: demeaned segments of length nperseg
-    (default: the largest power of two giving at least 8 segments, floored
-    at 64 samples), Hann window, 50 % overlap, periodograms normalized so
-    that sum(psd) * df equals the record variance (one-sided density).
-    """
-    x = np.asarray(x, dtype=float)
-    n = len(x)
-    if nperseg is None:
-        nperseg = max(64, 2 ** int(np.log2(max(n // 8, 2))))
-    nperseg = min(nperseg, n)
-    step = max(1, int(nperseg * (1.0 - overlap)))
-
-    # Hann window and its power normalization
-    w = 0.5 - 0.5 * np.cos(2.0 * np.pi * np.arange(nperseg) / nperseg)
-    norm = dt / np.sum(w**2)
-
-    f = np.fft.rfftfreq(nperseg, d=dt)
-    acc = np.zeros(len(f))
-    nseg = 0
-    for start in range(0, n - nperseg + 1, step):
-        seg = x[start : start + nperseg]
-        seg = (seg - seg.mean()) * w
-        p = np.abs(np.fft.rfft(seg)) ** 2 * norm
-        # one-sided: interior bins carry both halves
-        p[1:-1] *= 2.0
-        acc += p
-        nseg += 1
-    return f, acc / max(nseg, 1)
-
-
-# ---------------------------------------------------------------------------
-# Analytic signal (Hilbert via FFT)
-# ---------------------------------------------------------------------------
-
-
 def hilbert_analytic(x: np.ndarray) -> np.ndarray:
     """Return the analytic signal x + i H[x] via the FFT construction."""
     x = np.asarray(x, dtype=float)
@@ -144,12 +99,6 @@ def hilbert_analytic(x: np.ndarray) -> np.ndarray:
     else:
         h[1 : (n + 1) // 2] = 2.0
     return np.fft.ifft(X * h)
-
-
-def envelope(x: np.ndarray) -> np.ndarray:
-    """Return the Hilbert envelope |x + i H[x]| of a demeaned record."""
-    x = np.asarray(x, dtype=float)
-    return np.abs(hilbert_analytic(x - x.mean()))
 
 
 def skewness_asymmetry(x: np.ndarray) -> tuple[float, float]:

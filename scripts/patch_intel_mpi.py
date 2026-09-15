@@ -11,7 +11,6 @@ ID written to ECX by rdtscp is unused in Intel MPI's timing code.
   nop:      90        (1 byte)
 """
 
-import ctypes
 import glob
 import sys
 
