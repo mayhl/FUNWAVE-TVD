@@ -1,8 +1,9 @@
 # Ting & Kirby (1994) plunging — T = 5.0 s cnoidal, H = 0.128 m over the
 # h0 = 0.40 m flat, 1:35 slope.  Truth: setup + digitized heights here.
-# The sinusoid stand-in at kh ~ 0.25 is the roughest in the rung;
-# amplitude 0.050 = 0.78 x H/2, x_center 16 clears the sponge.
-
+# The paddle ran Goring cnoidal signals; the cnoidal spectrum type
+# generates the same wave (amplitude = H/2, no calibration factor).  The
+# west sponge carries a friction strip: under the harmonic-rich cnoidal
+# wave the direct sponge alone dies at t ~250 s (09-14 sponge probe).
 grid:
   cell_size: [0.025, 0.2]
   n_cells: [1600, 3]
@@ -17,8 +18,8 @@ simulation:
   screen_interval: 20.0
 wavemaker:
   spectrum:
-    type: regular
-    amplitude: 0.050
+    type: cnoidal
+    amplitude: 0.0640
     period: 5.0
     direction: 0.0
   source:
@@ -34,6 +35,8 @@ boundaries:
       direct:
         r: 0.85
         a: 5.0
+      friction:
+        cd: 5.0
 numerics:
   cfl: 0.5
   froude_cap: 10.0
