@@ -48,6 +48,8 @@ jobs:
       # Python
       - name: Check Python formatting
         run: uv run ruff format --check
+      - name: Python unit tests (framework, comparators, oracle helpers)
+        run: uv run pytest -q
 
       # CMake (tracked files only: the find it replaced bound -not -path to
       # the .cmake term alone and walked every CMakeLists under build trees)

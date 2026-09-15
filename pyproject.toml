@@ -85,7 +85,15 @@ dev = [
     "cmake-format>=0.6.13",
     "fprettify>=0.3.7",
     "netcdf4>=1.7",
+    "pytest>=8",
 ]
+
+[tool.pytest.ini_options]
+testpaths = ["test/python"]
+# the repo's `test` package must shadow the stdlib one, as it does under
+# `python -m test.framework.cli` from the repo root
+pythonpath = ["."]
+addopts = "--import-mode=importlib"
 
 [tool.ruff.lint.isort]
 known-first-party = ["test"]
