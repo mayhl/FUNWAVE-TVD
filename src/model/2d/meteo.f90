@@ -88,7 +88,7 @@
 !            wind to the RUNNING wave envelope (etat/etax/etay, etamean, h_max).
 !            They are ported for completeness but no legacy case exercises them;
 !            the crest mask additionally needs h_max, which the modern engine
-!            only tracks under OUT_Hmax.  The parity cases keep
+!            maintains on demand (output%need).  The parity cases keep
 !            WindWaveInteraction off and WindCrestPercent = LARGE (mask == 1).
 !            At istage 1 the derivative fields hold the previous step's values,
 !            which is the legacy cadence (METEO_FORCING before the RK loop).

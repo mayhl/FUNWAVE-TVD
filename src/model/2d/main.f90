@@ -808,16 +808,14 @@ contains
       call this%sediment%init_compute(this%grid, this%env, this%fields%depth)
       if (this%hot_start%use_checkpoint .and. this%sediment%is_activated) &
          call load_checkpoint_sediment(this)
-      ! The crest mask rides the h_max running envelope, and update_max_min
-      ! maintains that only under an h_max output request AND past the spin-up
-      ! gate.  Missing either, the mask reads an all-zero envelope and cuts on
-      ! eta < etamean -- roughly half the domain, not the crests -- silently.
-      ! Refuse both decks rather than force the envelope on: h_max is an output
-      ! the user asked for or did not, and spinup deliberately withholds it.
+      ! The crest mask rides the h_max running envelope, which update_max_min
+      ! maintains only on demand AND past the spin-up gate.  Missing either,
+      ! the mask reads an all-zero envelope and cuts on eta < etamean --
+      ! roughly half the domain, not the crests -- silently.  Register the
+      ! need (writing stays on the channel request); refuse spinup, which
+      ! deliberately withholds the envelope.
       if (this%meteo%wind_crest_percent /= LARGE) then
-         if (.not. this%output%OUT_Hmax) call this%env%log%exit_on_error( &
-            "meteo: crest_percent needs h_max requested as an output variable"// &
-            " (the crest mask rides that running envelope)")
+         call this%output%need("h_max")
          if (this%simulation%spinup > 0.0_SP) call this%env%log%exit_on_error( &
             "meteo: crest_percent cannot run with simulation: spinup"// &
             " (the envelope it reads stays zero until the spin-up gate opens)")

@@ -252,6 +252,7 @@ module model_output_mod
       real(SP) :: STEADY_TIME = 999999.0_SP
    contains
       procedure :: read_input => output_read_input
+      procedure :: need => output_need
       procedure :: resolve_blowup => output_resolve_blowup
    end type type_model_output
 
@@ -361,9 +362,7 @@ contains
 
    end subroutine output_read_input
 
-   ! Registry names -> internal demand flags (nee the variables: list).
-   ! Only the names whose machinery is gated need mapping; plain fields
-   ! (eta/u/v/p_flux/...) are always registered.
+   ! Channel variables -> demand flags (nee the variables: list)
    subroutine derive_demand_flags(this, cfg)
       type(type_model_output), intent(inout) :: this
       type(type_channel_config), intent(in) :: cfg
@@ -371,29 +370,43 @@ contains
       integer :: iv
 
       do iv = 1, size(cfg%variables)
-         select case (trim(cfg%variables(iv)))
-         case ("h_max"); this%OUT_Hmax = .true.
-         case ("h_min"); this%OUT_Hmin = .true.
-         case ("u_max"); this%OUT_Umax = .true.
-         case ("mf_max"); this%OUT_MFmax = .true.
-         case ("vort_max"); this%OUT_VORmax = .true.
-         case ("mask"); this%OUT_MASK = .true.
-         case ("mask9"); this%OUT_MASK9 = .true.
-         case ("nu_break"); this%OUT_NU = .true.
-         case ("age_break"); this%OUT_AGE = .true.
-         case ("roller_flux"); this%OUT_ROLLER = .true.
-         case ("undertow_u", "undertow_v"); this%OUT_UNDERTOW = .true.
-         case ("meteo_pressure"); this%OUT_Pstorm = .true.
-         case ("meteo_wind_u"); this%OUT_Ustorm = .true.
-         case ("meteo_wind_v"); this%OUT_Vstorm = .true.
-         case ("vessel_pressure"); this%OUT_Pves = .true.
-         case ("vessel_up"); this%OUT_VesUp = .true.
-         case ("vessel_vp"); this%OUT_VesVp = .true.
-         case ("arr_time"); this%out_arr_time = .true.
-         end select
+         call this%need(cfg%variables(iv))
       end do
 
    end subroutine derive_demand_flags
+
+   ! Registry name -> the demand flag that keeps its array maintained.
+   ! Raised by every channel variable and by any consumer that reads a
+   ! maintained array without writing it (the meteo crest mask on h_max),
+   ! the way a hidden hsig source accumulates unrequested; writing stays
+   ! gated on the channel request.  Only names whose machinery is gated
+   ! need mapping; plain fields (eta/u/v/p_flux/...) are always registered.
+   subroutine output_need(this, name)
+      class(type_model_output), intent(inout) :: this
+      character(len=*), intent(in) :: name
+
+      select case (trim(name))
+      case ("h_max"); this%OUT_Hmax = .true.
+      case ("h_min"); this%OUT_Hmin = .true.
+      case ("u_max"); this%OUT_Umax = .true.
+      case ("mf_max"); this%OUT_MFmax = .true.
+      case ("vort_max"); this%OUT_VORmax = .true.
+      case ("mask"); this%OUT_MASK = .true.
+      case ("mask9"); this%OUT_MASK9 = .true.
+      case ("nu_break"); this%OUT_NU = .true.
+      case ("age_break"); this%OUT_AGE = .true.
+      case ("roller_flux"); this%OUT_ROLLER = .true.
+      case ("undertow_u", "undertow_v"); this%OUT_UNDERTOW = .true.
+      case ("meteo_pressure"); this%OUT_Pstorm = .true.
+      case ("meteo_wind_u"); this%OUT_Ustorm = .true.
+      case ("meteo_wind_v"); this%OUT_Vstorm = .true.
+      case ("vessel_pressure"); this%OUT_Pves = .true.
+      case ("vessel_up"); this%OUT_VesUp = .true.
+      case ("vessel_vp"); this%OUT_VesVp = .true.
+      case ("arr_time"); this%out_arr_time = .true.
+      end select
+
+   end subroutine output_need
 
    subroutine read_geometries(this, sub_env, min_spacing)
       type(type_model_output), intent(inout) :: this
