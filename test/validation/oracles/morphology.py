@@ -24,8 +24,8 @@ import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
-from test.validation.oracles._lab import new_figure, read_table, save_figure
+from test.framework.run_output import read_run_metadata
+from test.validation.oracles._lab import new_figure, read_table, save_figure, nrmse_pct
 
 _LABEL = "Morphology"
 ACCEPTED_KEYS = (
@@ -78,7 +78,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         gate_x = float(tolerances.get("gate_x", 0.0))
         xm, dzm = data[:, 0] + gate_x, data[:, 1]
         fit = np.interp(xm, x_mod, dz_mod)
-        err = float(np.sqrt(np.mean((fit - dzm) ** 2))) / float(np.max(np.abs(dzm))) * 100.0
+        err = nrmse_pct(dzm, fit, norm="max")
         tol = float(tolerances.get("bedchange_nrmse_pct", 60.0))
         ok = err < tol
         metrics.append(MetricResult("morphology", "bedchange_nrmse_pct", err, ok, tol))

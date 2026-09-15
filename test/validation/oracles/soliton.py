@@ -40,14 +40,14 @@ import math
 from pathlib import Path
 
 import numpy as np
-import yaml
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
+from test.validation.oracles._lab import load_deck
 from test.validation.oracles._lab import frame_times
 
 _console = Console()
@@ -58,9 +58,7 @@ G = 9.81  # m s-2
 
 def _deck_params(run_dir: Path) -> tuple[float, float, float]:
     """Return (amplitude, depth, angle_deg) from the deck's initial.solitary block."""
-    deck = sorted(run_dir.glob("*.yaml"))[0]
-    with open(deck) as f:
-        cfg = yaml.safe_load(f)
+    cfg = load_deck(run_dir)
     sol = cfg.get("initial", {}).get("solitary", {})
     return float(sol["amplitude"]), float(sol["depth"]), float(sol.get("angle", 0.0))
 

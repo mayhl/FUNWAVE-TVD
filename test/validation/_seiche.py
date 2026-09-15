@@ -20,6 +20,8 @@ from pathlib import Path
 
 import numpy as np
 
+from test.validation.oracles import wave_stats
+
 from test.validation.oracles.dispersion import (
     BETA_REF_DEFAULT,
     _boussinesq_period,
@@ -143,14 +145,15 @@ def run_seiche(
         capture_output=True,
         text=True,
     )
-    sta = out_dir / "sta" / "eta.dat"
-    if run.returncode != 0 or not sta.exists():
+    try:
+        t, v = wave_stats.read_point_channel(out_dir, "eta", channel="sta")
+    except FileNotFoundError:
+        t = None
+    if run.returncode != 0 or t is None:
         if verbose:
             print(f"  [{title}] run failed (rc={run.returncode}):\n{run.stdout[-400:]}\n{run.stderr[-400:]}", file=sys.stderr)
         return None
 
-    arr = np.loadtxt(sta)
-    if arr.ndim == 1:
-        arr = arr.reshape(1, -1)
+    arr = np.column_stack([t, v])
     t_start = max(0.0, float(arr[-1, 0]) * 0.2)  # drop the first 20 % as start-up
     return _extract_period(arr, t_start=t_start)

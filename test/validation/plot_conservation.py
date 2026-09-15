@@ -39,7 +39,9 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from test.regression.postproc.utils import read_run_metadata
+from test.validation.oracles._lab import frame_times
+
+from test.framework.run_output import read_run_metadata
 from test.validation.oracles.conservation import G, _windowed_decay_pct
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -95,16 +97,8 @@ def _load(run_dir: Path, label: str, kh: float, gated: bool) -> Series | None:
         ke.append(0.5 * float(np.sum(hh * (u * u + v * v))) * da)
     vols = np.asarray(vols)
 
-    # Frame times from time_dt.out col 0 (written at the output cadence); fall back
-    # to the frame index if the file is missing.
-    n = len(eta_files)
-    tfile = run_dir / "time_dt.out"
-    if tfile.exists():
-        t = np.loadtxt(tfile)[:, 0][:n]
-        if len(t) < n:
-            t = np.arange(n, dtype=float)
-    else:
-        t = np.arange(n, dtype=float)
+    # frame times from the channel's t.out index (fails loud when absent)
+    t = frame_times(eta_files)
 
     # A perfectly flat floor would be log(0); clip to a tiny epsilon for the log axis.
     v_drift = np.abs(vols - vols[0]) / v_still * 100.0

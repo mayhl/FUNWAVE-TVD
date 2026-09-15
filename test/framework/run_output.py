@@ -1,3 +1,11 @@
+"""Run-output access shared by the comparators and the validation oracles.
+
+RunMetadata resolves a run directory (its deck or legacy input.txt) to the
+output folder, grid size and frame format; the readers below list and load
+frame series and the prefix catalogues say which prefixes belong to which
+comparison kind.
+"""
+
 from __future__ import annotations
 from collections import defaultdict
 from dataclasses import dataclass, field
@@ -11,7 +19,7 @@ if TYPE_CHECKING:
 
 
 # ---------------------------------------------------------------------------
-# Output file prefix catalogues (sourced from src/model/2d/old/io.F)
+# Output file prefix catalogues (registry-derived; see FIELD_PREFIXES)
 # All 2D snapshot files use prefix_%05d naming.
 # Station files: the 3D vendor ref writes sta_%04d; 2D point channels write <chan>/<var>.dat.
 # dep.out is the only static exception (written once at init for DEPTH_OUT).
@@ -24,7 +32,7 @@ if TYPE_CHECKING:
 # snapshots (running-envelope channels); the moments are the statistics
 # kind.  Threshold-tagged event names (<name>_<stat>_<value>) are not
 # listed -- a tolerance on one still fails loudly as "in neither run".
-_REGISTRY = Path(__file__).resolve().parents[3] / "src" / "model" / "registry.yaml"
+_REGISTRY = Path(__file__).resolve().parents[2] / "src" / "model" / "registry.yaml"
 
 
 def _registry_names() -> list[str]:

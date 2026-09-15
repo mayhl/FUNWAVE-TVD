@@ -57,14 +57,15 @@ from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
-import yaml
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
+from test.validation.oracles import wave_stats
+from test.validation.oracles._lab import load_deck
 
 _console = Console()
 ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct")
@@ -111,11 +112,10 @@ def _read_data2d_table(path: Path) -> tuple[float, np.ndarray, np.ndarray]:
 
 def _read_case(run_dir: Path) -> CaseSpec | None:
     """Build the analytic target spec from the run deck (single *.yaml)."""
-    yaml_files = sorted(run_dir.glob("*.yaml"))
-    if not yaml_files:
+    try:
+        cfg = load_deck(run_dir)
+    except FileNotFoundError:
         return None
-    with open(yaml_files[0]) as fh:
-        cfg = yaml.safe_load(fh)
 
     spec = cfg.get("wavemaker", {}).get("spectrum", {})
     stype = str(spec.get("type", "")).lower()
@@ -160,13 +160,13 @@ def _load_gauges(output_dir: Path) -> tuple[np.ndarray, np.ndarray] | None:
     t, eta(1..n) per row); the flat <name>_eta.dat spelling is kept as a
     fallback for older run dirs.
     """
-    sta_files = sorted(output_dir.glob("*/eta.dat")) or sorted(output_dir.glob("*_eta.dat"))
-    if not sta_files:
+    try:
+        t, v = wave_stats.read_point_channel(output_dir, "eta")
+    except FileNotFoundError:
         return None
-    sta = np.loadtxt(sta_files[0])
-    if sta.ndim == 1 or sta.shape[0] < 16:
+    if t.shape[0] < 16:
         return None
-    t = sta[:, 0]
+    sta = np.column_stack([t, v])
     keep = np.concatenate([[True], np.diff(t) > 0.0])  # drop any pad rows
     return t[keep], sta[keep, 1:]
 

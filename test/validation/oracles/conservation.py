@@ -48,7 +48,7 @@ from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
 
 _console = Console()
 ACCEPTED_KEYS = ("mass_drift_pct", "energy_drift_pct")

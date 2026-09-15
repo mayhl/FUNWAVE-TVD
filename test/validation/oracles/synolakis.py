@@ -17,7 +17,7 @@ import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
 from test.validation.oracles._lab import frame_times, load_deck, new_figure, read_table, save_figure
 
 G = 9.81  # m s-2

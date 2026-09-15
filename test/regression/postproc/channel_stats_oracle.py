@@ -26,7 +26,7 @@ import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
 
 # deck constants (keep in lockstep with channel_stats.yaml)
 DT = 0.02

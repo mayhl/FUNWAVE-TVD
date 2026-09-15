@@ -29,7 +29,7 @@ from pathlib import Path
 import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
 
 _DT_RE = re.compile(r"dt =\s*([0-9.Ee+-]+)")
 

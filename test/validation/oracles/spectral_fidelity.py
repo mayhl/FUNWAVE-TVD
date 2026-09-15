@@ -33,14 +33,15 @@ import math
 from pathlib import Path
 
 import numpy as np
-import yaml
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
+from test.validation.oracles import wave_stats
+from test.validation.oracles._lab import load_deck
 
 _console = Console()
 ACCEPTED_KEYS = ("hm0_error_pct", "band_error_pct")
@@ -89,11 +90,10 @@ def _band_fractions(f: np.ndarray, dens: np.ndarray, edges: tuple[float, float, 
 
 def _read_case(run_dir: Path) -> tuple[float, float, float, float, float, float, bool] | None:
     """Parse (hm0, fp, fmin, fmax, gamma, depth, is_jonswap) from the run YAML."""
-    yaml_files = sorted(run_dir.glob("*.yaml"))
-    if not yaml_files:
+    try:
+        cfg = load_deck(run_dir)
+    except FileNotFoundError:
         return None
-    with open(yaml_files[0]) as fh:
-        cfg = yaml.safe_load(fh)
 
     spec = cfg.get("wavemaker", {}).get("spectrum", {})
     freq = spec.get("freq", {})
@@ -114,11 +114,6 @@ def _read_case(run_dir: Path) -> tuple[float, float, float, float, float, float,
     )
 
 
-def _find_station_files(output_dir: Path) -> list[Path]:
-    """Point-channel eta files (<name>_eta.dat: t, eta(1..n) per row)."""
-    return sorted(output_dir.glob("*/eta.dat")) or sorted(output_dir.glob("*_eta.dat"))
-
-
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -128,8 +123,9 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     dev_dir = Path(dev_dir)
     check_keys(tolerances, ACCEPTED_KEYS, "spectral_fidelity")
     output_dir = read_run_metadata(dev_dir).output_dir
-    sta_files = _find_station_files(output_dir)
-    if not sta_files:
+    try:
+        t_sta, v_sta = wave_stats.read_point_channel(output_dir, "eta")
+    except FileNotFoundError:
         _console.print("[yellow]spectral_fidelity:[/yellow] no station files found — skipping")
         return SubsectionResult(kind="statistics", label="Spectral Fidelity", metrics=[])
 
@@ -144,9 +140,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     hm0_sta: list[float] = []
     psd_sum: np.ndarray | None = None
     freq_axis: np.ndarray | None = None
-    sta = np.loadtxt(sta_files[0])
-    if sta.ndim == 1:
-        sta = sta.reshape(1, -1)
+    sta = np.column_stack([t_sta, v_sta])
     if sta.shape[0] >= 16:
         t = sta[:, 0]
         mask = t >= t[-1] / 3.0

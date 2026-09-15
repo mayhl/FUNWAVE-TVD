@@ -17,7 +17,7 @@ import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
 from test.validation.oracles import wave_stats
 from test.validation.oracles._lab import new_figure, nrmse_pct, read_table, save_figure
 
@@ -123,8 +123,8 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         aggregates = {
             "sigma_error_pct": float(sig_errs.max()),
             "sigma_rmse_pct": float(np.sqrt(np.mean(sig_errs**2))),
-            "skew_rmse_pct": float(np.sqrt(np.mean((sk_d - sk_m) ** 2)) / np.abs(sk_m).max() * 100.0),
-            "asym_rmse_pct": float(np.sqrt(np.mean((as_d - as_m) ** 2)) / np.abs(as_m).max() * 100.0),
+            "skew_rmse_pct": nrmse_pct(sk_m, sk_d, norm="max"),
+            "asym_rmse_pct": nrmse_pct(as_m, as_d, norm="max"),
         }
         for key, value in aggregates.items():
             key_tol = tolerances.get(key)

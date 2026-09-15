@@ -11,7 +11,7 @@ from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn
 from rich.table import Table
 
 from test.framework.results import SubsectionResult, MetricResult, FigureSpec, InteractiveFigure
-from test.regression.postproc.utils import (
+from test.framework.run_output import (
     RunMetadata,
     VariableInfo,
     read_run_metadata,

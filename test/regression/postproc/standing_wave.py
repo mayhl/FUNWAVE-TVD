@@ -35,7 +35,7 @@ from test.framework.results import (
     MetricResult,
     SubsectionResult,
 )
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
 
 _console = Console()
 

@@ -34,14 +34,15 @@ import math
 from pathlib import Path
 
 import numpy as np
-import yaml
 from rich import box
 from rich.console import Console
 from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
 from test.framework.tolerances import check_keys
-from test.regression.postproc.utils import read_run_metadata
+from test.framework.run_output import read_run_metadata
+from test.validation.oracles import wave_stats
+from test.validation.oracles._lab import load_deck
 from test.validation.oracles._lab import new_figure, save_figure
 
 _console = Console()
@@ -113,11 +114,10 @@ def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, i
     The INI_SINE mode numbers default to the fundamental seiche (1, 0) when absent,
     so a case with no ``mode_x/mode_y`` keys reduces to the 1D standing wave.
     """
-    yaml_files = sorted(run_dir.glob("*.yaml"))
-    if not yaml_files:
+    try:
+        cfg = load_deck(run_dir)
+    except FileNotFoundError:
         return None, 0.0, 0.0, BETA_REF_DEFAULT, 1, 0, "fully_nonlinear"
-    with open(yaml_files[0]) as fh:
-        cfg = yaml.safe_load(fh)
 
     geo = cfg.get("grid", {})
     gs = geo.get("n_cells", geo.get("grid_size", [1, 1]))
@@ -145,11 +145,6 @@ def _read_case(run_dir: Path) -> tuple[float | None, float, float, float, int, i
     return h, lx, ly, beta_ref, mode_x, mode_y, scheme
 
 
-def _find_station_files(output_dir: Path) -> list[Path]:
-    """Point-channel eta files (<name>/eta.dat: t, eta(1..n) per row; flat <name>_eta.dat kept as a fallback)."""
-    return sorted(output_dir.glob("*/eta.dat")) or sorted(output_dir.glob("*_eta.dat"))
-
-
 # ---------------------------------------------------------------------------
 # Entry point
 # ---------------------------------------------------------------------------
@@ -159,8 +154,9 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     dev_dir = Path(dev_dir)
     check_keys(tolerances, ACCEPTED_KEYS, "dispersion")
     output_dir = read_run_metadata(dev_dir).output_dir
-    sta_files = _find_station_files(output_dir)
-    if not sta_files:
+    try:
+        t_sta, v_sta = wave_stats.read_point_channel(output_dir, "eta")
+    except FileNotFoundError:
         _console.print("[yellow]dispersion:[/yellow] no station files found — skipping")
         return SubsectionResult(kind="statistics", label="Linear Dispersion", metrics=[])
 
@@ -182,9 +178,7 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     # (c = sqrt(gh)); the dispersive presets share the Nwogu linear relation
     T_target = lam / math.sqrt(G * h) if scheme == "nswe" else T_bous
 
-    sta = np.loadtxt(sta_files[0])
-    if sta.ndim == 1:
-        sta = sta.reshape(1, -1)
+    sta = np.column_stack([t_sta, v_sta])
     t_start = max(0.0, float(sta[-1, 0]) * 0.2)  # skip the first 20% as start-up
     T_meas = _extract_period(sta, t_start=t_start)
 
