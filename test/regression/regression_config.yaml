@@ -18,10 +18,10 @@ refs:
     cmake_flags: ["HYPRE_DIR={repo_root}/extern/hypre/installed"]
 
 executables:
-  # ── 2D  (ref: regression-ref/v4.0-modern @ 206842a — single-application
-  #    breaker viscosity absorbed 2026-08-22 (the 1449539 pin carried the
-  #    doubled explicit+split dissipation); drift signal on the viscous cases
-  #    restarts from this pin: ref and dev src are identical for one cycle) ───
+  # ── 2D  (ref: regression-ref/v4.0-modern @ d0c99da — the cnoidal-paddle
+  #    breaking defaults (cbrk1 0.45, nu_scale 2) absorbed 2026-09-15 with
+  #    the whole tree; drift signal restarts from this pin: ref and dev src
+  #    are identical for one cycle) ───────────────────────────────────────
   # NOTE: the ZERO_PHASE build flag is retired — the seeded per-entry phase
   # draw is deterministic per compiler, so refs carry the seeded realization
   # (a deck may still set wavemaker zero_phase: for parity work).
@@ -343,8 +343,6 @@ simulations:
   # roundoff-level tolerance -- the durable replacement for the retired
   # means.f90 comparison target.
   # sediment: one base deck, one variant per code branch in sediment.f90.
-  # The base pins the explicit solver until the 2D ref is re-pinned past the
-  # split ADI; sediment_split is the default solver's sentinel meanwhile.
   - name: sediment
     exe_type: central
     input: test/regression/inputs/sediment
@@ -368,20 +366,6 @@ simulations:
       pickup_caps: { overrides: { sediment.pickup_reduction: false, sediment.c_limiter: 0.5, sediment.pickup_ramp: 2.0 } }
       hard_bottom: { overrides: { sediment.hard_bottom: { file: data/hard_bottom_2cm.txt } } }
       feedback: { overrides: { sediment.feedback: { mass_source: true, moment_dc: true, moment_exg: true } } }
-
-  - name: sediment_split
-    exe_type: central-random
-    input: test/regression/inputs/sediment
-    input_files: [kl_sediment.yaml]
-    decomp: [2, 1]
-    binary: funwave
-    output_dir: output
-    tags: [sediment, 1d, stability]
-    overrides: { sediment.solver: split_implicit }
-    postprocess:
-      stability: test.regression.postproc.stability_check
-    tolerances:
-      stability: { min_dt: 0.002, max_abs_eta: 2.0 }
 
   - name: channel_stats
     exe_type: central-random

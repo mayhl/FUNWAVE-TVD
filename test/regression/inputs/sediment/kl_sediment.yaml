@@ -20,7 +20,6 @@ initial:
 friction:
   cd: 0.01
 sediment:
-  solver: explicit
   d50: 0.00018
   specific_gravity: 2.6
   porosity: 0.4
