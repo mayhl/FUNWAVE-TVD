@@ -12,7 +12,7 @@
 !    roller:        <bool>   enable the surface roller (nee ROLLER;
 !                            forces eddy_viscosity, as legacy), default NO
 !    show_breaking: <bool>   enable breaking detection,          default YES
-!    cbrk1:         <real>   onset breaking threshold,           default 0.55
+!    cbrk1:         <real>   onset breaking threshold,           default 0.45
 !    cbrk2:         <real>   cessation breaking threshold,       default 0.35
 !    visbrk:        <real>   breaking viscosity,                 default 0.0
 !    nu_bkg:        <real>   background viscosity floor,         default 0.0
@@ -76,7 +76,7 @@ module model_breaking_mod
       ! solution-neutral; off by default = skip the diagnostics cost)
       logical  :: show_breaking = .false.
 
-      real(SP) :: cbrk1 = 0.55_SP
+      real(SP) :: cbrk1 = 0.45_SP
       real(SP) :: cbrk2 = 0.35_SP
       real(SP) :: wavemaker_cbrk = 1.0_SP
 
@@ -85,8 +85,8 @@ module model_breaking_mod
       real(SP) :: t_brk = 20.0_SP
       ! viscosity magnitude multiplier: every scheme scales nu with
       ! cbrk2*sqrt(gh)*depth, so cbrk2 carried cessation AND magnitude;
-      ! nu_scale separates them (1 = as calibrated)
-      real(SP) :: nu_scale = 1.0_SP
+      ! nu_scale separates them (2 = the 2026-09 board knee)
+      real(SP) :: nu_scale = 2.0_SP
       ! viscosity scheme (kernel forms; constant = the legacy default)
       character(:), allocatable :: scheme
       ! legacy accrues breaker age every RK stage (3x wall-clock); the
@@ -156,7 +156,7 @@ contains
       ! leaving solver unread there lets the detector flag it
       if (trim(this%model) == "eddy_viscosity") then
          call sub_env%yaml%read("nu_scale", silent=no_key, val=this%nu_scale, &
-                                default="1.0")
+                                default="2.0")
          call sub_env%yaml%read_enum("scheme", VISC_SCHEMES, silent=no_key, &
                                      val=this%scheme, default="constant")
          call sub_env%yaml%read_enum("solver", VISC_SOLVERS, silent=no_key, &
@@ -193,7 +193,7 @@ contains
       ! under shock_capturing too: the display breaker may run (derived
       ! show_breaking, known only after output reads) and uses them
       if (trim(this%model) /= "wavemaker_viscosity") then
-         call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default="0.55")
+         call sub_env%yaml%read("cbrk1", silent=no_key, val=this%cbrk1, default="0.45")
          call sub_env%yaml%read("cbrk2", silent=no_key, val=this%cbrk2, default="0.35")
          call sub_env%yaml%read("t_brk", silent=no_key, val=this%t_brk, default="20.0")
          call sub_env%yaml%read("age_per_stage", silent=no_key, val=this%age_per_stage, &
