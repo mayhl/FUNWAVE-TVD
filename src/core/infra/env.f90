@@ -17,6 +17,7 @@
 module core_env_mod
    use core_comm_mod, only: type_comm, new_comm
    use core_log_io_mod, only: type_log_writer, new_log_writer
+   use core_version_mod, only: build_info_lines, n_build_info_lines, build_info_line_len
    use core_yaml_file_mod, only: type_yaml_reader
 
    implicit none
@@ -50,6 +51,8 @@ contains
       character(*), intent(in), optional :: log_path
 
       character(:), allocatable :: log_fpath, yaml_fpath
+      character(build_info_line_len) :: info(n_build_info_lines)
+      integer :: i
 
       ! Allocate components on the heap to satisfy pointer requirements
       allocate (this%comm)
@@ -68,6 +71,11 @@ contains
       else
          this%log = new_log_writer(label, this%comm%is_io_node())
       end if
+      ! Build identity heads every log so provenance travels with the run
+      info = build_info_lines()
+      do i = 1, n_build_info_lines
+         call this%log%info(trim(adjustl(info(i))))
+      end do
 
       ! 3. Initialize YAML Reader
       yaml_fpath = yaml_path

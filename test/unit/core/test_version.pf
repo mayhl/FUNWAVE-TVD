@@ -1,0 +1,29 @@
+module test_version
+   use FUnit
+   use core_version_mod, only: version, git_describe, version_line, build_info_lines, &
+                               n_build_info_lines, build_info_line_len
+   implicit none
+
+contains
+
+   @test
+   subroutine test_version_line_shape()
+      @assertTrue(len(version) > 0)
+      @assertTrue(len(git_describe) > 0)
+      @assertEqual("FUNWAVE-TVD "//version//" ("//git_describe//")", version_line())
+   end subroutine test_version_line_shape
+
+   ! every line after the name line is an indented "key: value" fact
+   @test
+   subroutine test_build_info_keys()
+      character(build_info_line_len) :: lines(n_build_info_lines)
+      integer :: i
+      lines = build_info_lines()
+      @assertEqual("funwave (FUNWAVE-TVD) "//version, trim(lines(1)))
+      do i = 2, n_build_info_lines
+         @assertEqual("  ", lines(i) (1:2))
+         @assertTrue(index(lines(i), ": ") > 2)
+      end do
+   end subroutine test_build_info_keys
+
+end module test_version

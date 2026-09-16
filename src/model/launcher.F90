@@ -26,6 +26,8 @@ module model_launcher_mod
    use core_log_io_mod, only: log_level_debug, log_level_off, &
                               set_default_log_levels
    use model_main_mod, only: type_model_main
+   use core_version_mod, only: version_line, build_info_lines, n_build_info_lines, &
+                               build_info_line_len
 # if defined (ENABLE_3D)
    use model_3d_mod, only: type_model_3d
 # endif
@@ -38,9 +40,10 @@ contains
 
    subroutine launch()
       character(2048)          :: yaml_path, log_path, arg
+      character(build_info_line_len) :: info(n_build_info_lines)
       type(type_env)           :: env, grid_env
       integer, allocatable     :: dims(:)
-      integer                  :: ndim, i
+      integer                  :: ndim, i, j
       logical                  :: missing, no_grid, quiet, dbg, want_log, have_deck, validate
       type(type_model_main)    :: model_2d
 # if defined (ENABLE_3D)
@@ -50,7 +53,8 @@ contains
       ! CLI: flags anywhere, first non-flag argument is the deck
       ! (default input.yaml); -l redirects the log (default funwave.log);
       ! --validate runs the config read + setup + every module init_compute,
-      ! then stops before output and the time loop (deck lint, no steps)
+      ! then stops before output and the time loop (deck lint, no steps);
+      ! -v/--version and --build-info print and stop before MPI comes up
       quiet = .false.
       dbg = .false.
       validate = .false.
@@ -70,20 +74,25 @@ contains
          case ("-d", "--debug"); dbg = .true.
          case ("-l", "--log"); want_log = .true.
          case ("--validate"); validate = .true.
+            ! return, not stop: cce prints " STOP " on a bare stop and that
+            ! would trail the parsed output
+         case ("-v", "--version")
+            write (*, "(a)") version_line()
+            return
+         case ("--build-info")
+            info = build_info_lines()
+            do j = 1, n_build_info_lines
+               write (*, "(a)") trim(info(j))
+            end do
+            return
          case default
             ! one deck argument; anything dash-led here is an unknown flag
-            if (arg(1:1) == "-" .or. have_deck) then
-               write (*, "(a)") "Usage: funwave [-q] [-d] [--validate] [-l <log path>] [input.yaml]"
-               stop 1
-            end if
+            if (arg(1:1) == "-" .or. have_deck) call usage_stop()
             yaml_path = arg
             have_deck = .true.
          end select
       end do
-      if (want_log) then
-         write (*, "(a)") "Usage: funwave [-q] [-d] [--validate] [-l <log path>] [input.yaml]"
-         stop 1
-      end if
+      if (want_log) call usage_stop()
 
       ! -d opens both sinks to the debug config-resolution trace; -q turns
       ! the console off (errors fall through to stderr).  Defaults are set
@@ -126,6 +135,12 @@ contains
 # endif
       end if
    end subroutine launch
+
+   subroutine usage_stop()
+      write (*, "(a)") "Usage: funwave [-q] [-d] [--validate] [-l <log path>] [input.yaml]"
+      write (*, "(a)") "       funwave -v | --version | --build-info"
+      stop 1
+   end subroutine usage_stop
 
    ! ── 2D path ────────────────────────────────────────────────────────────
    ! Uses init_from_env so that the env created above is reused rather than

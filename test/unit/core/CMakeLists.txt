@@ -17,6 +17,7 @@ qadd_pfunit_ctest(test_crs)
 qadd_pfunit_ctest(test_solver_tridiag 4)
 
 qadd_pfunit_ctest(test_misc)
+qadd_pfunit_ctest(test_version)
 qadd_pfunit_ctest(test_units)
 
 qadd_pfunit_ctest(test_time)

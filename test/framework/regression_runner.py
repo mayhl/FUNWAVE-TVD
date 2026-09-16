@@ -161,6 +161,21 @@ class RegressionRunner(BaseRunner):
         dirty = subprocess.call(["git", "-C", source_dir, "diff", "--quiet"], stderr=subprocess.DEVNULL) != 0
         return f"{hash_}-dirty" if dirty else hash_
 
+    def _build_info(self, binary_path) -> dict | None:
+        """The binary's own `--build-info` block as {key: value}, plus its
+        `--version` line under "version"; None when it cannot be run here
+        (e.g. a container-built binary on the host)."""
+        try:
+            version = subprocess.check_output([binary_path, "--version"], text=True, stderr=subprocess.DEVNULL).strip()
+            block = subprocess.check_output([binary_path, "--build-info"], text=True, stderr=subprocess.DEVNULL)
+        except (OSError, subprocess.CalledProcessError):
+            return None
+        info = {"version": version}
+        for line in block.splitlines()[1:]:
+            key, _, value = line.strip().partition(":")
+            info[key] = value.strip()
+        return info
+
     def _is_build_current(self, build_dir, source_dir, binary_path):
         if not os.path.exists(binary_path):
             return False
@@ -1018,7 +1033,9 @@ class RegressionRunner(BaseRunner):
             self.reporter.warn(result_line)
         return result
 
-    def _results_record(self, simulations, sim_results, report_base, dev_branch, dev_hash, exe_dirs, ref_hashes) -> dict:
+    def _results_record(
+        self, simulations, sim_results, report_base, dev_branch, dev_hash, exe_dirs, ref_hashes, build_info
+    ) -> dict:
         """The board's results record: tier + provenance + one row per sim.
 
         No hostnames and no run directories -- pages generated from this are
@@ -1078,7 +1095,7 @@ class RegressionRunner(BaseRunner):
             )
         return {
             "tier": self.tier,
-            "engine": {"branch": dev_branch, "sha": dev_hash},
+            "engine": {"branch": dev_branch, "sha": dev_hash, "builds": build_info},
             "ref": ref,
             "generated_at": datetime.now().strftime("%Y-%m-%dT%H:%M:%S"),
             "results": rows,
@@ -1207,6 +1224,7 @@ class RegressionRunner(BaseRunner):
         # Build one binary per exe_type needed. Store dirs so the sim loop doesn't recompute.
         exe_dirs = {}  # exe_type -> (ref_build_dir, curr_build_dir, ref_branch)
         ref_hashes = {}
+        build_info = {}  # exe_type -> the dev binary's --build-info facts
         curr_hash = ""
 
         def _tag(branch, h, rebuilt):
@@ -1231,6 +1249,7 @@ class RegressionRunner(BaseRunner):
                 force=force,
                 label=f"dev/{exe_type}  ({current_branch})",
             )
+            build_info[exe_type] = self._build_info(curr_bin)
 
             # validation exe — one build; the postproc compares against theory, not a ref run
             if oracle_mode:
@@ -1281,7 +1300,9 @@ class RegressionRunner(BaseRunner):
         report_base.parent.mkdir(parents=True, exist_ok=True)
         report_base.with_suffix(".json").write_text(
             json.dumps(
-                self._results_record(simulations, sim_results, report_base, current_branch, curr_hash, exe_dirs, ref_hashes),
+                self._results_record(
+                    simulations, sim_results, report_base, current_branch, curr_hash, exe_dirs, ref_hashes, build_info
+                ),
                 indent=1,
             )
         )
