@@ -13,10 +13,10 @@
 !    solitary:  {amplitude, depth, x_center, direction: +x|-x,
 !                angle, y_center}
 !    sine_mode: {amplitude, depth, mode_x (default 1), mode_y (default 0)}
-!    fields:    {eta, u, v, format} — t=0 fields from file (file_spec
-!               refs; the IC-flavored INITIAL_UVZ, the restart-flavored
-!               twin stays in hot_start:).  A deformed bed belongs to
-!               grid.bathymetry, not here.
+!    fields:    {eta, u, v, format, time, bed_deformation} — fields
+!               from file (file_spec refs, any format) at t = time;
+!               INITIAL_UVZ and the legacy ASCII hot start in one.
+!               bed_deformation takes eta as a bed displacement too.
 !    hump:      pending (INI_REC/GAU/DIP not in apply_ic yet)
 !    n_wave:    pending
 !  The still-water offset lives in grid.water_level (it survives
@@ -82,6 +82,8 @@ module model_initial_mod
       type(type_file_spec) :: eta_spec
       type(type_file_spec) :: u_spec
       type(type_file_spec) :: v_spec
+      real(SP) :: fields_time = 0.0_SP      ! the run starts here (nee HotStartTime)
+      logical :: bed_deformation = .false.  ! eta is a bed displacement too (nee BED_DEFORMATION)
 
    contains
       procedure :: read_input => initial_read_input
@@ -221,6 +223,9 @@ contains
          call parse_ref(env, "initial/fields/u", ref_u, this%u_spec)
          call parse_ref(env, "initial/fields/v", ref_v, this%v_spec)
       end if
+
+      call blk_yaml%read_nonnegative("time", val=this%fields_time, default="0.0")
+      call blk_yaml%read("bed_deformation", val=this%bed_deformation, default="NO")
 
    contains
 

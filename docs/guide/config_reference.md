@@ -200,10 +200,12 @@ Initial condition — block presence selects the type (solitary/sine_mode/fields
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `fields.eta` | — | — | — | Initial surface-elevation field ref (path, or container#/group/var once NetCDF input lands). |
+| `fields.bed_deformation` | `false` | `BED_DEFORMATION` | — | Take eta as a bed displacement as well: depth = depth - eta at load (co-seismic source). |
+| `fields.eta` | — | `ETA_FILE` | — | Surface-elevation field ref: a path or other.nc#/group/var, formats as grid.bathymetry.file. |
 | `fields.format` | — | — | — | Field-file format override (default from the extension). One of `ascii` \| `binary` \| `netcdf`. |
-| `fields.u` | — | — | — | Initial x-velocity field ref (with fields.v; absent = still). |
-| `fields.v` | — | — | — | Initial y-velocity field ref (with fields.u). |
+| `fields.time` | `0.0` | `HotStartTime` | s | Simulation time the fields hold; the run starts there. |
+| `fields.u` | — | `U_FILE` | — | x-velocity field ref (with fields.v; absent = still). |
+| `fields.v` | — | `V_FILE` | — | y-velocity field ref (with fields.u). |
 | `hump.amplitude` | — | `AMP` | m | Hump amplitude. The hump block is pending: the engine rejects it at init rather than silently ignoring it. |
 | `hump.radius` | — | — | m | Gaussian hump radius (legacy used WID for both shapes). |
 | `hump.shape` | — | — | — | Hump shape. One of `rect` \| `gaussian` \| `dipole`. |
@@ -436,18 +438,12 @@ External-model coupling — coupling data file.
 
 ## `hot_start:`
 
-Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time, output numbering.
+Hot start — restart from a binary checkpoint set; output numbering.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `checkpoint` | — | — | — | Restart from a binary checkpoint directory (holds core.bin; supersedes the ASCII field/time keys). |
-| `bed_deformation` | `false` | `BED_DEFORMATION` | — | Apply bed deformation on restart. |
-| `eta_file` | — | `ETA_FILE` | — | Surface-elevation restart field file. |
-| `mask_file` | — | `MASK_FILE` | — | Wet/dry mask restart field file. |
+| `checkpoint` | — | — | — | Restart from a binary checkpoint directory (holds core.bin: state and time). Required when the block is present; a start from field files is initial.fields. |
 | `output_start_number` | `1` | — | — | First output frame number after restart. |
-| `time` | `0.0` | `HotStartTime` | s | Simulation time at the restart instant. |
-| `u_file` | — | `U_FILE` | — | x-velocity restart field file. |
-| `v_file` | — | `V_FILE` | — | y-velocity restart field file. |
 
 ## `output:`
 

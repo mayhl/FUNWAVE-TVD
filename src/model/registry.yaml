@@ -699,10 +699,12 @@ sections:
   initial:
     doc: "Initial condition — block presence selects the type (solitary/sine_mode/fields/hump/n_wave). Still-water level lives in grid.water_level."
     keys:
-      fields.eta: {legacy: ~, default: ~, units: ~, doc: "Initial surface-elevation field ref (path, or container#/group/var once NetCDF input lands)."}
+      fields.bed_deformation: {legacy: BED_DEFORMATION, default: false, units: ~, doc: "Take eta as a bed displacement as well: depth = depth - eta at load (co-seismic source)."}
+      fields.eta: {legacy: ETA_FILE, default: ~, units: ~, doc: "Surface-elevation field ref: a path or other.nc#/group/var, formats as grid.bathymetry.file."}
       fields.format: {legacy: ~, default: ~, units: ~, values: [ascii, binary, netcdf], doc: Field-file format override (default from the extension).}
-      fields.u: {legacy: ~, default: ~, units: ~, doc: Initial x-velocity field ref (with fields.v; absent = still).}
-      fields.v: {legacy: ~, default: ~, units: ~, doc: Initial y-velocity field ref (with fields.u).}
+      fields.time: {legacy: HotStartTime, default: 0.0, units: s, latex: '$t_{\\mathrm{hs}}$', doc: Simulation time the fields hold; the run starts there.}
+      fields.u: {legacy: U_FILE, default: ~, units: ~, doc: x-velocity field ref (with fields.v; absent = still).}
+      fields.v: {legacy: V_FILE, default: ~, units: ~, doc: y-velocity field ref (with fields.u).}
       hump.amplitude: {legacy: AMP, default: ~, units: m, doc: "Hump amplitude. The hump block is pending: the engine rejects it at init rather than silently ignoring it."}
       hump.radius: {legacy: ~, default: ~, units: m, doc: "Gaussian hump radius (legacy used WID for both shapes)."}
       hump.shape: {legacy: ~, default: ~, units: ~, values: [rect, gaussian, dipole], doc: Hump shape.}
@@ -900,16 +902,13 @@ sections:
 
   # ── hot_start ──
   hot_start:
-    doc: "Hot-start (restart) — binary checkpoint set OR ASCII field files, restart time, output numbering."
+    doc: "Hot start — restart from a binary checkpoint set; output numbering."
     keys:
-      checkpoint: {legacy: ~, default: ~, units: ~, doc: Restart from a binary checkpoint directory (holds core.bin; supersedes the ASCII field/time keys).}
-      bed_deformation: {legacy: BED_DEFORMATION, default: false, units: ~, doc: Apply bed deformation on restart.}
-      eta_file: {legacy: ETA_FILE, default: ~, units: ~, doc: Surface-elevation restart field file.}
-      mask_file: {legacy: MASK_FILE, default: ~, units: ~, doc: Wet/dry mask restart field file.}
+      checkpoint: {legacy: ~, default: ~, units: ~, doc: "Restart from a binary checkpoint directory (holds core.bin: state and time). Required when the block is present; a start from field files is initial.fields."}
       output_start_number: {legacy: ~, default: 1, units: ~, doc: First output frame number after restart.}
-      time: {legacy: HotStartTime, default: 0.0, units: s, latex: '$t_{\mathrm{hs}}$', doc: Simulation time at the restart instant.}
-      u_file: {legacy: U_FILE, default: ~, units: ~, doc: x-velocity restart field file.}
-      v_file: {legacy: V_FILE, default: ~, units: ~, doc: y-velocity restart field file.}
+      # eta_file/u_file/v_file/time/bed_deformation retired: initial.fields
+      # (ETA_FILE, U_FILE, V_FILE, HotStartTime, BED_DEFORMATION map there);
+      # MASK_FILE dropped -- the wet/dry mask is derived from eta and depth
 
   # ── output ──
   output:

@@ -5,31 +5,30 @@
 !
 !  Hot start parameters YAML reader
 !
-!  YAML block: hot_start:      (top-level; omit to disable)
-!    checkpoint: <dir>         restart from a binary checkpoint set (holds
-!                              core.bin = eta,p,q,mask,time; later per-module
-!                              bins).  When present, the eta/u/v/mask/time keys
-!                              below are unused (state + time come from the bin).
-!    eta_file: <path>          required (ASCII path; when checkpoint absent)
-!    u_file: <path>            optional (zero velocity if absent)
-!    v_file: <path>            optional (zero velocity if absent)
-!    mask_file: <path>         optional (no mask if absent)
-!    bed_deformation: <bool>   optional, default false
-!    time: <time>              optional, default 0
+!  YAML block: hot_start:      (top-level; omit for a cold start)
+!    checkpoint: <dir>         required: restart from a binary checkpoint
+!                              set (core.bin = eta,p,q,mask,time; later
+!                              per-module bins).  State and time come
+!                              from the bins.
 !    output_start_number: <int> optional, default 1
+!
+!  The legacy ASCII restart (ETA_FILE/U_FILE/V_FILE/MASK_FILE,
+!  HotStartTime, BED_DEFORMATION) is retired: initial: fields reads the
+!  same fields in every format, with time and bed_deformation; the
+!  wet/dry mask is derived from eta and depth.
 !
 !  is_activated = .true.  when the hot_start: block is present
 !  is_activated = .false. when the block is absent (cold start)
 !
 !  HISTORY :
 !    05/13/2026  Michael-Angelo Y.H. Lam
+!    09/16/2026  checkpoint only; the ASCII path moved to initial: fields
 !
 !-------------------------------------------------
 
 module model_hot_start_mod
    use core_constants_mod, only: SP
    use core_env_mod, only: type_env, get_sub_env
-   use core_path_mod, only: type_path
    use model_base_mod, only: type_model_base
 
    implicit none
@@ -39,16 +38,9 @@ module model_hot_start_mod
 
    type, extends(type_model_base) :: type_model_hot_start
 
-      character(:), allocatable :: checkpoint   ! restart checkpoint dir ("" if unused)
-      logical :: use_checkpoint = .false.
-      type(type_path) :: eta_file
-      type(type_path) :: u_file
-      type(type_path) :: v_file
-      type(type_path) :: mask_file
-      logical :: no_uv_file = .true.
-      logical :: no_mask_file = .true.
-      logical :: bed_deformation = .false.
-      real(SP) :: time = 0.0_SP
+      character(:), allocatable :: checkpoint   ! restart checkpoint dir
+      logical :: use_checkpoint = .false.       ! = is_activated; kept for the call sites
+      real(SP) :: time = 0.0_SP                 ! restored from core.bin
       integer :: output_start_number = 1
 
    contains
@@ -62,28 +54,16 @@ contains
       type(type_env), intent(inout), target :: env
 
       type(type_env) :: sub_env
-      logical :: no_hs, no_chk, no_u, no_v, no_mask
+      logical :: no_hs, no_chk
 
       sub_env = get_sub_env(env, "hot_start", is_empty=no_hs)
       this%is_activated = .not. no_hs
       if (.not. this%is_activated) return
 
-      ! A binary checkpoint set supersedes the ASCII eta/u/v/mask path: state
-      ! and time come from core.bin, so those keys are not read when present.
       call sub_env%yaml%read("checkpoint", silent=no_chk, val=this%checkpoint, default="")
-      this%use_checkpoint = .not. no_chk
-
-      if (.not. this%use_checkpoint) then
-         call sub_env%yaml%read_input_path("eta_file", val=this%eta_file)
-         call sub_env%yaml%read_input_path("u_file", silent=no_u, val=this%u_file)
-         call sub_env%yaml%read_input_path("v_file", silent=no_v, val=this%v_file)
-         call sub_env%yaml%read_input_path("mask_file", silent=no_mask, val=this%mask_file)
-         this%no_uv_file = no_u .or. no_v
-         this%no_mask_file = no_mask
-
-         call sub_env%yaml%read("bed_deformation", val=this%bed_deformation, default="NO")
-         call sub_env%yaml%read_nonnegative("time", val=this%time, default="0.0")
-      end if
+      if (no_chk) call env%log%exit_on_error( &
+         "hot_start: checkpoint is required (a start from field files is initial: fields)")
+      this%use_checkpoint = .true.
 
       call sub_env%yaml%read_positive("output_start_number", val=this%output_start_number, default="1")
 

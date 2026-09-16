@@ -25,7 +25,7 @@ module model_main_mod
    use core_path_mod, only: type_path
 
    use model_geometry_mod, only: type_model_geometry, stagger_depth
-   use model_field_input_mod, only: read_field, read_field_ascii
+   use model_field_input_mod, only: read_field
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
    use model_initial_mod, only: type_model_initial
@@ -303,29 +303,22 @@ contains
             call this%wavemakers(i)%apply_water_level(this%geometry%water_level)
          end do
       end if
-      ! apply_ic zeroes eta/u/v before its solitary branch, so the hot
-      ! start loads AFTER it (legacy zeroes long before INI_UVZ; bed
+      ! apply_ic zeroes eta/u/v before its solitary branch, so the field
+      ! files load AFTER it (legacy zeroes long before INI_UVZ; bed
       ! deformation never refreshes DepthX/DepthY).  Solitary IC plus
-      ! hot start would resolve the other way in legacy — pathological,
+      ! field files would resolve the other way in legacy — pathological,
       ! not supported here.
       call this%initial%apply_ic(this%grid, this%fields%eta, &
                                  this%fields%u, this%fields%v)
       if (this%initial%has_fields) call load_initial_fields(this)
-      if (this%hot_start%use_checkpoint) then
-         call load_checkpoint(this)   ! seeds eta,p,q,mask + hot_start%time
-      else if (this%hot_start%is_activated) then
-         call load_hot_start(this)    ! ASCII eta/u/v (u,v -> p=Hu below)
-      end if
+      if (this%hot_start%use_checkpoint) call load_checkpoint(this)   ! eta,p,q,mask + time
 
       ! wet/dry mask from the initial condition (structure masks: Step 6+);
-      ! a hot-start mask file REPLACES this derivation (legacy NO_MASK_FILE
+      ! a checkpoint mask REPLACES this derivation (legacy NO_MASK_FILE
       ! guard on the "get Eta and H" block)
       this%fields%mask_struc = 1
       associate (f => this%fields, lp => this%grid%lp)
-         ! a hot-start mask (ASCII mask_file OR checkpoint) REPLACES the derivation
-         if (.not. ((this%hot_start%is_activated .and. &
-                     .not. this%hot_start%no_mask_file) .or. &
-                    this%hot_start%use_checkpoint)) then
+         if (.not. this%hot_start%use_checkpoint) then
             do j = 1, lp%nloc
                do i = 1, lp%mloc
                   if (f%eta(i, j) < -f%depth(i, j)) then
@@ -557,10 +550,11 @@ contains
    ! centres only, matching legacy).
    ! ----------------------------------------------------------------
    ! ----------------------------------------------------------------
-   ! t=0 fields from file (initial: fields, the IC-flavored
-   ! INITIAL_UVZ): eta (+u/v) through the file_spec reader, ghosts
-   ! replicated like the hot-start path.  No bed handling — a
-   ! deformed bed is a grid.bathymetry concern.
+   ! Fields from file (initial: fields — INITIAL_UVZ and the legacy
+   ! ASCII hot start in one): eta (+u/v) through the file_spec reader,
+   ! ghosts replicated (legacy GetFile).  bed_deformation takes eta as
+   ! a bed displacement as well: depth -= eta at cell centres only, the
+   ! staggered faces stay (legacy BED_DEFORMATION).
    ! ----------------------------------------------------------------
    subroutine load_initial_fields(this)
       class(type_model_main), intent(inout) :: this
@@ -575,42 +569,11 @@ contains
             call ghost_fill_replicate(this, f%u)
             call ghost_fill_replicate(this, f%v)
          end if
+         if (ini%bed_deformation) f%depth = f%depth - f%eta
 
       end associate
 
    end subroutine load_initial_fields
-
-   subroutine load_hot_start(this)
-      class(type_model_main), intent(inout) :: this
-
-      real(SP), allocatable :: rmask(:, :)
-
-      associate (hs => this%hot_start, f => this%fields, g => this%grid)
-
-         call read_field_ascii(this%env, hs%eta_file%root, g, f%eta)
-         call ghost_fill_replicate(this, f%eta)
-         if (.not. hs%no_uv_file) then
-            call read_field_ascii(this%env, hs%u_file%root, g, f%u)
-            call read_field_ascii(this%env, hs%v_file%root, g, f%v)
-            call ghost_fill_replicate(this, f%u)
-            call ghost_fill_replicate(this, f%v)
-         else
-            f%u = 0.0_SP
-            f%v = 0.0_SP
-         end if
-
-         if (.not. hs%no_mask_file) then
-            allocate (rmask(g%lp%mloc, g%lp%nloc), source=1.0_SP)
-            call read_field_ascii(this%env, hs%mask_file%root, g, rmask)
-            call ghost_fill_replicate(this, rmask)
-            f%mask = int(rmask)
-         end if
-
-         if (hs%bed_deformation) f%depth = f%depth - f%eta
-
-      end associate
-
-   end subroutine load_hot_start
 
    ! Restart from a checkpoint set: read core.bin into the live core fields,
    ! restore the saved time (drives engine%init).  Only eta gets a crude edge
@@ -883,8 +846,9 @@ contains
          if (this%need_vec_dir) monitor%vec_dir => this%vec_dir
          if (this%need_mflux) monitor%mflux => this%mflux
 
-         call engine%init(merge(this%hot_start%time, 0.0_SP, &
-                                this%hot_start%is_activated), &
+         call engine%init(merge(this%hot_start%time, &
+                                merge(this%initial%fields_time, 0.0_SP, this%initial%has_fields), &
+                                this%hot_start%use_checkpoint), &
                           this%simulation%total_time, &
                           this%simulation%screen_interval)
          call engine%run(stepper, monitor, this%env%log)
@@ -971,7 +935,7 @@ contains
       folder = trim(this%output%result_folder)
       if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
       ! either hot-start form appends to the table behind a seam line
-      restart = this%hot_start%use_checkpoint .or. this%hot_start%is_activated
+      restart = this%hot_start%use_checkpoint
       do k = 1, size(this%output%diagnostics)
          if (len_trim(this%output%diagnostics(k)%var) == 0) cycle
          if (.not. this%registry%has(trim(this%output%diagnostics(k)%var))) &
@@ -1095,7 +1059,7 @@ contains
       ! Vector-derived scratch: register once when any channel asks;
       ! refreshed each manager step (zero until the first step)
       ! either hot-start form appends the event logs behind a seam line
-      restart = this%hot_start%use_checkpoint .or. this%hot_start%is_activated
+      restart = this%hot_start%use_checkpoint
       do k = 1, this%output%n_channels
          do iv = 1, size(this%output%channels(k)%variables)
             select case (trim(this%output%channels(k)%variables(iv)))
