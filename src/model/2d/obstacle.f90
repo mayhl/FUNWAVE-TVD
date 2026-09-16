@@ -6,9 +6,10 @@
 !  Obstacle and breakwater parameters YAML reader
 !
 !  YAML block: obstacle:       (top-level; omit for no obstacle or breakwater)
-!    file: <path>             presence = obstacle mask on (nee obstacle_file)
+!    file: <ref>              presence = obstacle mask on (nee obstacle_file)
 !    breakwater:              presence = breakwater drag on
-!      file: <path>           width field, required (nee breakwater_file)
+!      file: <ref>            width field, required (nee breakwater_file)
+!  Both refs take the field_input grammar (ascii / binary / netcdf).
 !      absorb_coef: <real>    default 10.0 (nee BreakWaterAbsorbCoef)
 !
 !  HISTORY :
@@ -20,7 +21,7 @@ module model_obstacle_mod
    use core_constants_mod, only: SP, N_GHOST
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d
-   use core_path_mod, only: type_path
+   use model_field_input_mod, only: type_file_spec, parse_file_spec, read_field_global
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
@@ -31,8 +32,8 @@ module model_obstacle_mod
 
    type, extends(type_model_base) :: type_model_obstacle
 
-      type(type_path) :: obstacle_file
-      type(type_path) :: breakwater_file
+      type(type_file_spec) :: obstacle_spec
+      type(type_file_spec) :: breakwater_spec
 
       logical  :: obstacle = .false.
       logical  :: breakwater = .false.
@@ -56,21 +57,24 @@ contains
 
       type(type_env) :: sub_env
       type(type_yaml_reader) :: bw_yaml
+      character(:), allocatable :: ref
       logical :: no_blk, no_obs, no_bw, no_key
 
       sub_env = get_sub_env(env, "obstacle", is_empty=no_blk)
       this%is_activated = .not. no_blk
       if (.not. this%is_activated) return
 
-      call sub_env%yaml%read_input_path("file", silent=no_obs, val=this%obstacle_file)
+      call sub_env%yaml%read_string("file", silent=no_obs, val=ref)
       this%obstacle = .not. no_obs
+      if (this%obstacle) call parse_file_spec(env, "obstacle/file", ref, this%obstacle_spec)
 
       bw_yaml = sub_env%yaml%cast_dictionary("breakwater", no_bw)
       this%breakwater = .not. no_bw
       if (this%breakwater) then
-         call bw_yaml%read_input_path("file", silent=no_key, val=this%breakwater_file)
+         call bw_yaml%read_string("file", silent=no_key, val=ref)
          if (no_key) call env%log%exit_on_error( &
             "obstacle: breakwater requires file (the width field)")
+         call parse_file_spec(env, "obstacle/breakwater/file", ref, this%breakwater_spec)
          call bw_yaml%read("absorb_coef", silent=no_key, &
                            val=this%BreakWaterAbsorbCoef, &
                            default="10.0")
@@ -91,7 +95,7 @@ contains
    ! the GLOBAL width field on rank 0, computes there, and scatters
    ! ghost-inclusive windows; every rank redoing the identical global
    ! compute and slicing its own window is bitwise the same and
-   ! MPI-free (init-time only, like read_field_ascii).
+   ! MPI-free (init-time only, like read_field).
    ! Bug-for-bug notes vs legacy:
    !   1. NOTE: search radius Iwidth = INT(W/dx) truncates, but the
    !      keep test is ri <= W — cells at the clipped corners inside
@@ -109,8 +113,7 @@ contains
       real(SP), allocatable :: width(:, :), cd_glob(:, :)
       real(SP) :: ri, tmp_2d
       integer :: i, j, ib, jb, iwidth, jwidth
-      integer :: mp, np, unit
-      logical :: exists
+      integer :: mp, np
 
       if (.not. this%breakwater) return
 
@@ -118,19 +121,9 @@ contains
          mp = m + 2*ng
          np = n + 2*ng
 
-         inquire (file=this%breakwater_file%root, exist=exists)
-         if (.not. exists) then
-            call env%log%exit_on_error( &
-               "obstacle: cannot find "//this%breakwater_file%root)
-         end if
-
          allocate (width(mp, np), source=0.0_SP)
-         open (newunit=unit, file=this%breakwater_file%root, &
-               status="old", action="read")
-         do j = ng + 1, n + ng
-            read (unit, *) (width(i, j), i=ng + 1, m + ng)
-         end do
-         close (unit)
+         call read_field_global(env, this%breakwater_spec, m, n, &
+                                width(ng + 1:m + ng, ng + 1:n + ng))
 
          ! ghost replication, legacy order (corners land on edge values
          ! via the second loop)

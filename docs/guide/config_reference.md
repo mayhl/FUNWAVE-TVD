@@ -290,8 +290,8 @@ Interior obstacles — obstacle mask file and breakwater absorbing block.
 
 | Key | Default | Legacy | Units | Description |
 |---|---|---|---|---|
-| `file` | — | `OBSTACLE_FILE` | — | Obstacle mask file (presence enables interior walls). |
-| `breakwater.file` | — | `BREAKWATER_FILE` | — | Breakwater location file. |
+| `file` | — | `OBSTACLE_FILE` | — | Obstacle mask field, 1 water / 0 structure (presence enables interior walls); ascii, binary or netcdf as grid.bathymetry.file. |
+| `breakwater.file` | — | `BREAKWATER_FILE` | — | Breakwater width field in metres per cell, 0 = none; ascii, binary or netcdf as grid.bathymetry.file. |
 
 **Advanced**
 
@@ -396,7 +396,7 @@ Sediment — single grain size, morphology, avalanching, cohesive, and flow-feed
 | `morph_interval` | — | `Morph_interval` | s | Morphology update interval. |
 | `bed_change` | `false` | `Bed_Change` | — | Enable bed-level change (morphodynamics). |
 | `bedload` | `false` | `BedLoad` | — | Include bed-load transport. |
-| `hard_bottom.file` | — | `Hard_bottom_file` | — | Non-erodible hard-bottom mask file (required). |
+| `hard_bottom.file` | — | `Hard_bottom_file` | — | Non-erodible bed level z_s field (required); ascii, binary or netcdf as grid.bathymetry.file. |
 | `avalanche.tan_phi` | — | `Tan_phi` | — | Tangent of the repose angle (required for avalanche). |
 | `cohesive.soft_bed` | `true` | `SoftBed` | — | Track a consolidating soft-bed layer. |
 | `cohesive.tau_cr` | — | `Tau_cr_coh` | m2/s2 | Critical erosion shear stress (required for cohesive). |

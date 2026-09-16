@@ -10,7 +10,7 @@ module test_field_input
    use core_log_io_mod, only: new_log_writer
    use core_grid_mod, only: type_grid_2d
    use model_field_input_mod, only: type_file_spec, parse_file_spec, read_field, &
-                                    scan_field_dims, check_binary_size
+                                    read_field_global, scan_field_dims, check_binary_size
 
    implicit none
 
@@ -308,5 +308,44 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_window_np2
+
+   ! ----------------------------------------------------------------
+   ! read_field_global hands every rank the whole leading block, past
+   ! its own window, ascii and netcdf alike.
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_global_np2(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env)       :: env
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_file_spec) :: spec
+      real(SP), allocatable :: glob_a(:, :), glob_n(:, :)
+      integer :: gi, gj
+
+      call open_env_grid(this, env, grid, comm, nx_proc=2)
+      allocate (glob_a(TEST_M + 4, TEST_N + 2), source=0.0_SP)
+      allocate (glob_n(TEST_M + 4, TEST_N + 2), source=0.0_SP)
+
+      if (comm%is_io_node()) then
+         call write_rows("fi_glob.txt", TEST_M + 4, TEST_N + 2, binary=.false.)
+         call write_nc("fi_glob.nc", TEST_M + 4, TEST_N + 2, "", decoy=.false.)
+      end if
+      call MPI_Barrier(this%getMpiCommunicator())
+
+      call parse_file_spec(env, "test", "fi_glob.txt", spec)
+      call read_field_global(env, spec, TEST_M + 4, TEST_N + 2, glob_a)
+      call parse_file_spec(env, "test", "fi_glob.nc", spec)
+      call read_field_global(env, spec, TEST_M + 4, TEST_N + 2, glob_n)
+
+      do gj = 1, TEST_N + 2
+         do gi = 1, TEST_M + 4
+            @assertEqual(fill(gi, gj), glob_a(gi, gj), TOL_SP)
+         end do
+      end do
+      @assertEqual(0.0_SP, maxval(abs(glob_a - glob_n)), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_global_np2
 
 end module test_field_input

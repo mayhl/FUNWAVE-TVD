@@ -792,8 +792,8 @@ sections:
   obstacle:
     doc: "Interior obstacles — obstacle mask file and breakwater absorbing block."
     keys:
-      file: {legacy: OBSTACLE_FILE, default: ~, units: ~, doc: Obstacle mask file (presence enables interior walls).}
-      breakwater.file: {legacy: BREAKWATER_FILE, default: ~, units: ~, doc: Breakwater location file.}
+      file: {legacy: OBSTACLE_FILE, default: ~, units: ~, doc: "Obstacle mask field, 1 water / 0 structure (presence enables interior walls); ascii, binary or netcdf as grid.bathymetry.file."}
+      breakwater.file: {legacy: BREAKWATER_FILE, default: ~, units: ~, doc: "Breakwater width field in metres per cell, 0 = none; ascii, binary or netcdf as grid.bathymetry.file."}
       breakwater.absorb_coef: {advanced: true, legacy: BreakWaterAbsorbCoef, default: 10.0, units: ~, latex: '$C_{\mathrm{bw}}$', doc: Breakwater absorption coefficient.}
 
   # ── meteo ──
@@ -876,7 +876,7 @@ sections:
       bedload: {legacy: BedLoad, default: false, units: ~, doc: Include bed-load transport.}
       shields_cr_bedload: {advanced: true, legacy: Shields_cr_bedload, default: ~, units: ~, latex: '$\theta_{cr,b}$', doc: Critical Shields for bed load (absent = shields_cr).}
       morph_factor: {advanced: true, legacy: Morph_factor, default: 1, units: ~, doc: Morphological acceleration factor.}
-      hard_bottom.file: {legacy: Hard_bottom_file, default: ~, units: ~, doc: Non-erodible hard-bottom mask file (required).}
+      hard_bottom.file: {legacy: Hard_bottom_file, default: ~, units: ~, doc: "Non-erodible bed level z_s field (required); ascii, binary or netcdf as grid.bathymetry.file."}
       avalanche.tan_phi: {legacy: Tan_phi, default: ~, units: ~, latex: $\tan\phi$, doc: Tangent of the repose angle (required for avalanche).}
       avalanche.interval: {advanced: true, legacy: Aval_interval, default: ~, units: s, doc: Avalanche relaxation interval (absent = every step).}
       cohesive.soft_bed: {legacy: SoftBed, default: true, units: ~, doc: Track a consolidating soft-bed layer.}

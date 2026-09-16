@@ -527,8 +527,7 @@ contains
 
       associate (g => this%grid)
          allocate (rstruc(g%lp%mloc, g%lp%nloc), source=1.0_SP)
-         call read_field_ascii(this%env, this%obstacle%obstacle_file%root, &
-                               g, rstruc)
+         call read_field(this%env, this%obstacle%obstacle_spec, g, rstruc)
          call ghost_fill_replicate(this, rstruc)
          this%fields%mask_struc = int(rstruc)
       end associate

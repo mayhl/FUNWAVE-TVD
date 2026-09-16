@@ -27,7 +27,8 @@
 !
 !  HISTORY :
 !    07/21/2026  Michael-Angelo Y.H. Lam
-!    09/16/2026  netcdf reader; ascii reader + dims scan moved from geometry
+!    09/16/2026  netcdf reader; ascii reader + dims scan moved from geometry;
+!                read_field_global for the breakwater width
 !
 !-------------------------------------------------
 
@@ -44,7 +45,7 @@ module model_field_input_mod
    public :: type_file_spec
    public :: parse_file_spec
    public :: read_field
-   public :: read_field_ascii
+   public :: read_field_global
    public :: scan_field_dims
    public :: check_binary_size
 
@@ -111,8 +112,8 @@ contains
    end subroutine parse_file_spec
 
    ! ----------------------------------------------------------------
-   ! Dispatching snapshot-field reader.  Ghosts are the caller's
-   ! concern (same contract as read_field_ascii).
+   ! Dispatching snapshot-field reader: this rank's interior window of
+   ! the file's leading M x N block.  Ghosts are the caller's concern.
    ! ----------------------------------------------------------------
    subroutine read_field(env, spec, grid, arr)
       type(type_env), intent(inout) :: env
@@ -120,21 +121,48 @@ contains
       type(type_grid_2d), intent(in) :: grid
       real(SP), intent(inout) :: arr(:, :)
 
+      call read_window(env, spec, grid%M, grid%N, grid%ibegin, grid%istop, &
+                       grid%jbegin, grid%jstop, &
+                       arr(grid%lp%ib:grid%lp%ie, grid%lp%jb:grid%lp%je))
+
+   end subroutine read_field
+
+   ! ----------------------------------------------------------------
+   ! The whole nx x ny block on every rank — for the init-time fields a
+   ! global compute consumes before slicing (breakwater drag).
+   ! ----------------------------------------------------------------
+   subroutine read_field_global(env, spec, nx, ny, arr)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      integer, intent(in) :: nx, ny
+      real(SP), intent(inout) :: arr(:, :)
+
+      call read_window(env, spec, nx, ny, 1, nx, 1, ny, arr)
+
+   end subroutine read_field_global
+
+   ! the [i0:i1, j0:j1] window of the file's leading nx x ny block
+   subroutine read_window(env, spec, nx, ny, i0, i1, j0, j1, win)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      integer, intent(in) :: nx, ny, i0, i1, j0, j1
+      real(SP), intent(inout) :: win(:, :)
+
       call check_container(env, spec)
 
       select case (spec%format)
       case ("ascii")
-         call read_field_ascii(env, spec%path, grid, arr)
+         call read_rows(env, spec%path, .false., nx, ny, i0, i1, j0, j1, win)
       case ("binary")
-         call read_field_binary(env, spec%path, grid, arr)
+         call read_rows(env, spec%path, .true., nx, ny, i0, i1, j0, j1, win)
       case ("netcdf")
-         call read_field_netcdf(env, spec, grid, arr)
+         call read_window_netcdf(env, spec, nx, ny, i0, i1, j0, j1, win)
       case default
          call env%log%exit_on_error("field input: unknown format '"// &
                                     spec%format//"'")
       end select
 
-   end subroutine read_field
+   end subroutine read_window
 
    ! ----------------------------------------------------------------
    ! File dimensions for the self-describing formats (n_cells
@@ -190,124 +218,96 @@ contains
    end subroutine check_binary_size
 
    ! ----------------------------------------------------------------
-   ! Legacy GetFile rows: one record of Mglob values per global J.
-   ! Every rank reads the file — init-time only, no scatter.  A
-   ! list-directed read drops the rest of a longer record, which is
-   ! what makes a present n_cells an origin-anchored window; it also
-   ! takes an empty field (",,") as a null that leaves the element
-   ! untouched, so the row is sentinel-filled and checked.  A short
-   ! record silently continues into the next one — only the dims scan
-   ! (n_cells absent, or --validate) catches those.
+   ! Row files: one record of nx values per global J (legacy GetFile),
+   ! as text or as a real(SP) stream with no header.  Every rank reads
+   ! the file — init-time only, no scatter.  A list-directed read drops
+   ! the rest of a longer record, which is what makes a present n_cells
+   ! an origin-anchored window; it also takes an empty field (",,") as
+   ! a null that leaves the element untouched, so the row is
+   ! sentinel-filled and checked.  A short record silently continues
+   ! into the next one — only the dims scan (n_cells absent, or
+   ! --validate) catches those.
    ! ----------------------------------------------------------------
-   subroutine read_field_ascii(env, fname, grid, arr)
+   subroutine read_rows(env, fname, binary, nx, ny, i0, i1, j0, j1, win)
       type(type_env), intent(inout) :: env
       character(*), intent(in) :: fname
-      type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(inout) :: arr(:, :)
+      logical, intent(in) :: binary
+      integer, intent(in) :: nx, ny, i0, i1, j0, j1
+      real(SP), intent(inout) :: win(:, :)
 
       real(SP), parameter :: NULL_FIELD = huge(1.0_SP)
       real(SP), allocatable :: row(:)
       character(16) :: row_s
-      logical :: exists
+      logical :: exists, has_null
       integer :: gj, unit, ios
 
       inquire (file=trim(fname), exist=exists)
       if (.not. exists) then
-         call env%log%exit_on_error( &
-            "read_field_ascii: cannot find "//trim(fname))
+         call env%log%exit_on_error("field input: cannot find "//trim(fname))
       end if
 
-      allocate (row(grid%M))
-      open (newunit=unit, file=trim(fname), status="old", action="read")
-      do gj = 1, grid%N
-         row = NULL_FIELD
-         read (unit, *, iostat=ios) row
-         if (ios /= 0 .or. any(row == NULL_FIELD)) then
+      allocate (row(nx))
+      if (binary) then
+         open (newunit=unit, file=trim(fname), status="old", action="read", &
+               access="stream", form="unformatted")
+      else
+         open (newunit=unit, file=trim(fname), status="old", action="read")
+      end if
+      do gj = 1, ny
+         has_null = .false.
+         if (binary) then
+            read (unit, iostat=ios) row
+         else
+            row = NULL_FIELD
+            read (unit, *, iostat=ios) row
+            has_null = ios == 0 .and. any(row == NULL_FIELD)
+         end if
+         if (ios /= 0 .or. has_null) then
             write (row_s, '(I0)') gj
-            if (ios > 0) then
-               call env%log%exit_on_error("read_field_ascii: "//trim(fname)// &
-                                          " row "//trim(row_s)//": not a numeric value (header line?)")
+            if (has_null) then
+               call env%log%exit_on_error("field input: "//trim(fname)// &
+                                          " row "//trim(row_s)//": empty field")
             else if (ios < 0) then
-               call env%log%exit_on_error("read_field_ascii: "//trim(fname)// &
+               call env%log%exit_on_error("field input: "//trim(fname)// &
                                           " ends at row "//trim(row_s)//", fewer rows than the grid")
             else
-               call env%log%exit_on_error("read_field_ascii: "//trim(fname)// &
-                                          " row "//trim(row_s)//": empty field")
+               call env%log%exit_on_error("field input: "//trim(fname)// &
+                                          " row "//trim(row_s)//": not a numeric value (header line?)")
             end if
          end if
-         if (gj >= grid%jbegin .and. gj <= grid%jstop) then
-            arr(grid%lp%ib:grid%lp%ie, grid%lp%jb + gj - grid%jbegin) = &
-               row(grid%ibegin:grid%istop)
-         end if
+         if (gj >= j0 .and. gj <= j1) win(:, gj - j0 + 1) = row(i0:i1)
       end do
       close (unit)
 
-   end subroutine read_field_ascii
+   end subroutine read_rows
 
    ! ----------------------------------------------------------------
-   ! Binary twin of read_field_ascii: the same global row layout (one
-   ! row of Mglob values per global J) as a plain real(SP) stream, no
-   ! header.  Every rank reads the file — init-time only, no scatter.
-   ! ----------------------------------------------------------------
-   subroutine read_field_binary(env, fname, grid, arr)
-      type(type_env), intent(inout) :: env
-      character(*), intent(in) :: fname
-      type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(inout) :: arr(:, :)
-
-      real(SP), allocatable :: row(:)
-      logical :: exists
-      integer :: gj, unit
-
-      inquire (file=trim(fname), exist=exists)
-      if (.not. exists) then
-         call env%log%exit_on_error( &
-            "read_field_binary: cannot find "//trim(fname))
-      end if
-
-      allocate (row(grid%M))
-      open (newunit=unit, file=trim(fname), status="old", action="read", &
-            access="stream", form="unformatted")
-      do gj = 1, grid%N
-         read (unit) row
-         if (gj >= grid%jbegin .and. gj <= grid%jstop) then
-            arr(grid%lp%ib:grid%lp%ie, grid%lp%jb + gj - grid%jbegin) = &
-               row(grid%ibegin:grid%istop)
-         end if
-      end do
-      close (unit)
-
-   end subroutine read_field_binary
-
-   ! ----------------------------------------------------------------
-   ! NetCDF: every rank reads its own (x, y) window of the variable —
-   ! the library does the row skipping the ascii reader pays for by
-   ! scanning.  The file may be larger than the grid (window), never
+   ! NetCDF: the [i0:i1, j0:j1] window straight from the variable —
+   ! the library does the row skipping the row readers pay for by
+   ! reading.  The file may be larger than nx x ny (window), never
    ! smaller.
    ! ----------------------------------------------------------------
-   subroutine read_field_netcdf(env, spec, grid, arr)
+   subroutine read_window_netcdf(env, spec, nx, ny, i0, i1, j0, j1, win)
       type(type_env), intent(inout) :: env
       type(type_file_spec), intent(in) :: spec
-      type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(inout) :: arr(:, :)
+      integer, intent(in) :: nx, ny, i0, i1, j0, j1
+      real(SP), intent(inout) :: win(:, :)
 
-      integer :: ncid, grp, varid, nx, ny
+      integer :: ncid, grp, varid, fx, fy
       character(32) :: dims_s
 
-      call open_field_netcdf(env, spec, ncid, grp, varid, nx, ny)
-      if (nx < grid%M .or. ny < grid%N) then
-         write (dims_s, '(I0,A,I0)') nx, " x ", ny
+      call open_field_netcdf(env, spec, ncid, grp, varid, fx, fy)
+      if (fx < nx .or. fy < ny) then
+         write (dims_s, '(I0,A,I0)') fx, " x ", fy
          call env%log%exit_on_error("field input: "//nc_name(spec)//" is "// &
                                     trim(dims_s)//", smaller than the grid")
       end if
-      call nc_check(env, nf90_get_var(grp, varid, &
-                                      arr(grid%lp%ib:grid%lp%ie, grid%lp%jb:grid%lp%je), &
-                                      start=[grid%ibegin, grid%jbegin], &
-                                      count=[grid%local_nx, grid%local_ny]), &
+      call nc_check(env, nf90_get_var(grp, varid, win, start=[i0, j0], &
+                                      count=[i1 - i0 + 1, j1 - j0 + 1]), &
                     "read "//nc_name(spec))
       call nc_check(env, nf90_close(ncid), "close "//nc_name(spec))
 
-   end subroutine read_field_netcdf
+   end subroutine read_window_netcdf
 
    ! ----------------------------------------------------------------
    ! Open the file and locate the field: the named variable under the

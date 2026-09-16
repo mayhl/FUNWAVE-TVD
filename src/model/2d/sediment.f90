@@ -249,14 +249,13 @@ module model_sediment_mod
    use core_constants_mod, only: SP, ZERO, SMALL, LARGE, GRAV, RHO_WATER
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d, type_loop_bounds
-   use core_path_mod, only: type_path
 
    use core_solver_tridiag_mod, only: trid_x, trid_x_periodic, trid_y, &
                                       trid_y_periodic, type_trid_workspace
    use model_base_mod, only: type_model_base
    use model_bc_mod, only: type_model_bc
    use model_geometry_mod, only: stagger_depth
-   use model_field_input_mod, only: read_field_ascii
+   use model_field_input_mod, only: type_file_spec, parse_file_spec, read_field
    use core_yaml_file_mod, only: type_yaml_reader
 
    implicit none
@@ -310,7 +309,7 @@ module model_sediment_mod
       logical  :: moment_dc = .false.
       logical  :: moment_exg = .false.
 
-      type(type_path) :: hard_bottom_file
+      type(type_file_spec) :: hard_bottom_spec
       integer  :: morph_factor = 1
 
       real(SP) :: d50 = ZERO
@@ -413,6 +412,7 @@ contains
 
       type(type_env) :: sub_env
       type(type_yaml_reader) :: blk
+      character(:), allocatable :: ref
       logical :: no_blk, no_key
       real(SP) :: tmp_r
 
@@ -548,10 +548,10 @@ contains
       blk = sub_env%yaml%cast_dictionary("hard_bottom", no_key)
       this%hard_bottom = .not. no_key
       if (this%hard_bottom) then
-         call blk%read_input_path("file", silent=no_key, &
-                                  val=this%hard_bottom_file)
+         call blk%read_string("file", silent=no_key, val=ref)
          if (no_key) call env%log%exit_on_error( &
             "sediment: hard_bottom requires file (the z_s field)")
+         call parse_file_spec(env, "sediment/hard_bottom/file", ref, this%hard_bottom_spec)
       end if
 
       ! ---- avalanching (block presence, nee the Avalanche bool)
@@ -663,7 +663,7 @@ contains
       ! legacy GetFile: interior only, so the ghosts keep their LARGE — which
       ! is what the (interior-only) clamp wants anyway
       if (this%hard_bottom) then
-         call read_field_ascii(env, this%hard_bottom_file%root, grid, this%zs)
+         call read_field(env, this%hard_bottom_spec, grid, this%zs)
       end if
 
       ! legacy overloads k_coh as the molecular viscosity here.  It is a dead
