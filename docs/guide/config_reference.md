@@ -125,6 +125,7 @@ Per-face boundary conditions.  The reader DERIVES each face's BC from which bloc
 | `<face>.sponge.pml.r_target` | `0.001` | — | — | PML target reflection coefficient; sets sigma_max = 3c/(2W) ln(1/R). North/south faces only. |
 | `<face>.sponge.pml.h_gate` | `2.0` | — | m | PML depth gate; sigma tapers smoothly to 0 below this depth so the strip hands off to the beach. |
 | `<face>.sponge.pml.cd` | `10.0` | — | — | Friction drag auto-enabled over the face strip when the PML is on — the hybrid absorber's inner pre-strip; eq2d showed the bare PML recirculates the kh > 1 band off its SWE interface. Ignored when the face configures friction explicitly; 0 = pure PML. |
+| `<face>.forcing.disp_ramp` | — | — | m | Dispersion taper from a characteristic (Flather) face: the dispersive terms are off at the face and smoothstep back to full strength over this distance, so the face solves the shallow-water equations the Flather condition is derived for. Absent = 5 x the deepest still water along the face (logged at init); 0 = off. With the dispersion on at the face its closure sends a third of a wave group's amplitude back (Kr 35 % at kh ~ 1; 0.5 % at 5 depths, 0.3 % at 10), and a strong sustained flow grows a two-cell mode there that no ghost content or strip damps (2 m on a bore flume removes it). A face whose depth varies strongly gets the deep end's length everywhere; set the key to override. Refused on a wavemaker-fed face (its short waves need the dispersion) and on a relaxation face. |
 
 ## `numerics:`
 

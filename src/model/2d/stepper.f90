@@ -71,7 +71,8 @@ module model_stepper_2d_mod
                                      cal_etauv_assemble_x, cal_etauv_assemble_y, &
                                      cal_uv_no_dispersion, cal_etauv_update, &
                                      RK_ALPHA, RK_BETA
-   use model_kernel_masks_mod, only: update_mask, update_mask9, update_disp_weight
+   use model_kernel_masks_mod, only: update_mask, update_mask9, update_disp_weight, &
+                                     open_face_disp_ramp
    use model_kernel_breaker_mod, only: wave_breaking, viscosity_wmaker, &
                                        VIS_SCHEME_DEFAULT, VIS_SCHEME_KENNEDY, &
                                        VIS_SCHEME_KENNEDY_ORIG, VIS_SCHEME_STATIC_TRANS, &
@@ -452,6 +453,27 @@ contains
             call this%grid%halo_exchange(this%disp_slope_gate)
          end if
 
+         ! auto taper: a file/const-forced Flather face without the key
+         ! gets 5 x its deepest still water (the response is flat past
+         ! ~5 depths: Kr 0.5 % at 5, 0.3 % at 10, 35 % bare on a kh 0.9
+         ! group).  Max along the face, so the deep end sets the length;
+         ! every rank joins the reduction
+         if (physics%dispersion .and. any(this%tide%flather .and. this%tide%disp_ramp_auto)) &
+            call size_auto_disp_ramp(this, env, grid)
+
+         ! dispersion taper from every Flather face that asks for one
+         ! (forcing.disp_ramp): rides the same static gate.  Global-index
+         ! ramp, so no exchange; a rank not owning the face is untouched
+         ! since flather_owned is rank-masked and the taper counts from
+         ! the domain edge either way
+         if (any(this%tide%flather .and. this%tide%disp_ramp_m > 0.0_SP)) then
+            if (.not. allocated(this%disp_slope_gate)) &
+               allocate (this%disp_slope_gate(mloc, nloc), source=1.0_SP)
+            call open_face_disp_ramp(grid%lp, grid%ibegin, grid%jbegin, grid%M, grid%N, &
+                                     grid%dx(1, 1), grid%dy(1, 1), this%tide%disp_ramp_m, &
+                                     this%tide%flather, this%disp_slope_gate)
+         end if
+
          ! legacy init.F dry-cell face flattening: every initially-dry
          ! cell gets locally flat face depths (the in-loop update_mask
          ! only flattens on wet/dry TRANSITIONS, so the initial state
@@ -602,6 +624,39 @@ contains
       end if
 
    end subroutine stepper_init
+
+   ! Auto forcing.disp_ramp: 5 x the deepest still water along each
+   ! flagged Flather face (dry cells skipped), reduced over the ranks.
+   subroutine size_auto_disp_ramp(this, env, grid)
+      use mpi_f08, only: MPI_Allreduce, MPI_IN_PLACE, MPI_MAX
+      class(type_model_stepper_2d), intent(inout) :: this
+      type(type_env), intent(inout) :: env
+      type(type_grid_2d), intent(in) :: grid
+
+      real(SP), parameter :: DEPTHS = 5.0_SP
+      character(len=*), parameter :: FACE_KEY(4) = [character(len=5) :: "west", "east", "south", "north"]
+      real(SP) :: hmax(4)
+      integer :: f, ierr
+      character(len=160) :: msg
+
+      hmax = 0.0_SP
+      associate (lp => grid%lp, d => this%fields%depth)
+         if (this%flather_owned(1)) hmax(1) = maxval(d(lp%ib, lp%jb:lp%je))
+         if (this%flather_owned(2)) hmax(2) = maxval(d(lp%ie, lp%jb:lp%je))
+         if (this%flather_owned(3)) hmax(3) = maxval(d(lp%ib:lp%ie, lp%jb))
+         if (this%flather_owned(4)) hmax(4) = maxval(d(lp%ib:lp%ie, lp%je))
+      end associate
+      call MPI_Allreduce(MPI_IN_PLACE, hmax, 4, MPI_SP, MPI_MAX, grid%cart_comm, ierr)
+
+      do f = 1, 4
+         if (.not. (this%tide%flather(f) .and. this%tide%disp_ramp_auto(f))) cycle
+         this%tide%disp_ramp_m(f) = DEPTHS*max(hmax(f), 0.0_SP)
+         write (msg, '(3A,F0.2,A)') "boundaries/", trim(FACE_KEY(f)), &
+            "/forcing/disp_ramp not set: using ", this%tide%disp_ramp_m(f), &
+            " m (5 x the deepest still water along the face)"
+         call env%log%info(trim(msg))
+      end do
+   end subroutine size_auto_disp_ramp
 
    ! ----------------------------------------------------------------
    ! Step head (legacy loop): save the step-start state, refresh

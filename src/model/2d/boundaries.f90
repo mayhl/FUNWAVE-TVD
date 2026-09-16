@@ -229,6 +229,10 @@ contains
                   derived(f) = BC_FLATHER
                   tide%flather(f) = .true.
                else
+                  if (tide%disp_ramp_m(f) > 0.0_SP) &
+                     call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                                "/forcing/disp_ramp: needs a characteristic face"// &
+                                                " (drop sponge.direct)")
                   derived(f) = BC_RELAX
                   ! the tide strip inherits the face sponge geometry +
                   ! direct coefficients (rung 11)
@@ -561,8 +565,8 @@ contains
 
       type(type_yaml_reader) :: frc_yaml
       type(type_path) :: file
-      real(SP) :: eta, u, v
-      logical :: no_frc, no_eta, no_u, no_v, no_file, no_key
+      real(SP) :: eta, u, v, ramp
+      logical :: no_frc, no_eta, no_u, no_v, no_file, no_key, no_ramp
       character(:), allocatable :: wm_name
       integer :: k
 
@@ -575,10 +579,25 @@ contains
       frc_yaml = face_yaml%cast_dictionary("forcing", no_frc)
       if (no_frc) return
 
+      ! dispersion taper from the face: characteristic faces only; an
+      ! absent key on a file/const-forced face is sized at stepper init
+      ! (flagged below once the wavemaker-fed case is known)
+      call frc_yaml%read("disp_ramp", silent=no_ramp, val=ramp)
+      if (.not. no_ramp) then
+         if (ramp < 0.0_SP) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/forcing/disp_ramp: must be >= 0")
+         tide%disp_ramp_m(f) = ramp
+      end if
+
       ! named-wavemaker reference: the face consumes the spectrum-only
       ! wavemaker entry as its relaxation signal (nee ABS / GEN_ABS)
       call frc_yaml%read_string("wavemaker", silent=no_key, val=wm_name)
       if (.not. no_key) then
+         if (tide%disp_ramp_m(f) > 0.0_SP) &
+            call env%log%exit_on_error("boundaries/"//trim(FACE_KEY(f))// &
+                                       "/forcing/disp_ramp: not on a wavemaker-fed face"// &
+                                       " (its short waves need the dispersion)")
          wm_forced = .true.
          do k = 1, size(wavemakers)
             if (wavemakers(k)%boundary_candidate .and. &
@@ -595,6 +614,9 @@ contains
          return
       end if
       forced = .true.
+      ! file/const-forced face without the key: the taper is sized at
+      ! stepper init (the wavemaker-fed branch returned above)
+      tide%disp_ramp_auto(f) = no_ramp
 
       call frc_yaml%read_input_path("file", silent=no_file, val=file)
       call frc_yaml%read("eta", silent=no_eta, val=eta)

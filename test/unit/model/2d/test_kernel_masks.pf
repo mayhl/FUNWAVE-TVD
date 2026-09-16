@@ -4,7 +4,7 @@ module test_kernel_masks
    use FUnit
    use core_constants_mod, only: SP
    use core_grid_mod, only: type_loop_bounds
-   use model_kernel_masks_mod, only: update_mask, update_mask9
+   use model_kernel_masks_mod, only: update_mask, update_mask9, open_face_disp_ramp
 
    implicit none
 
@@ -236,5 +236,48 @@ contains
 
       call dummy_fix_lint()
    end subroutine test_update_mask9_viscosity_breaking
+
+   ! ----------------------------------------------------------------
+   ! Open-face dispersion taper: 0 at the face cell, smoothstep to 1 at
+   ! the ramp length, untouched elsewhere; global indices on a rank
+   ! whose first cell is global cell 4.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_open_face_disp_ramp()
+      type(type_loop_bounds) :: lp
+      real(SP) :: gate(MLOC, NLOC), s, w
+      integer :: i
+
+      call make_lp(lp)
+      gate = 1.0_SP
+      ! west face, ramp 4 m at dx 1: cells 1..4 tapered, 5.. untouched
+      call open_face_disp_ramp(lp, 1, 1, 100, 100, 1.0_SP, 1.0_SP, &
+                               [4.0_SP, 0.0_SP, 0.0_SP, 0.0_SP], &
+                               [.true., .false., .false., .false.], gate)
+      do i = 1, 4
+         s = (real(i, SP) - 0.5_SP)/4.0_SP
+         w = s*s*(3.0_SP - 2.0_SP*s)
+         @assertEqual(w, gate(lp%ib + i - 1, lp%jb), 1.0e-6_SP)
+      end do
+      @assertEqual(1.0_SP, gate(lp%ib + 4, lp%jb), 1.0e-6_SP)
+      @assertEqual(1.0_SP, gate(lp%ie, lp%je), 1.0e-6_SP)
+
+      ! east face on a rank starting at global cell 4 of 9: global cell 9
+      ! (local ib + 5) is the face cell
+      gate = 1.0_SP
+      call open_face_disp_ramp(lp, 4, 1, 9, 100, 1.0_SP, 1.0_SP, &
+                               [0.0_SP, 2.0_SP, 0.0_SP, 0.0_SP], &
+                               [.false., .true., .false., .false.], gate)
+      s = 0.5_SP/2.0_SP
+      @assertEqual(s*s*(3.0_SP - 2.0_SP*s), gate(lp%ib + 5, lp%jb), 1.0e-6_SP)
+      @assertEqual(1.0_SP, gate(lp%ib + 3, lp%jb), 1.0e-6_SP)
+
+      ! a face that is not open leaves the gate alone
+      gate = 1.0_SP
+      call open_face_disp_ramp(lp, 1, 1, 100, 100, 1.0_SP, 1.0_SP, &
+                               [4.0_SP, 0.0_SP, 0.0_SP, 0.0_SP], &
+                               [.false., .false., .false., .false.], gate)
+      @assertEqual(1.0_SP, gate(lp%ib, lp%jb), 1.0e-6_SP)
+   end subroutine test_open_face_disp_ramp
 
 end module test_kernel_masks

@@ -5,7 +5,7 @@ module model_kernel_masks_mod
    implicit none
    private
 
-   public :: update_mask, update_mask9, update_disp_weight
+   public :: update_mask, update_mask9, update_disp_weight, open_face_disp_ramp
 
 contains
 
@@ -188,5 +188,56 @@ contains
          end do
       end if
    end subroutine update_disp_weight
+
+   ! ----------------------------------------------------------------
+   ! Dispersion taper from an open (Flather) face, multiplied into the
+   ! static gate: with $d$ the distance of a cell centre from the face
+   ! (cell 1 sits half a cell in) and $L$ the ramp length,
+   !   $$ w = S(d/L), \qquad S(s) = s^2 (3 - 2s) \text{ on } [0, 1] $$
+   ! so the face itself solves NSWE -- the equations the Flather
+   ! characteristic is derived for -- and full Boussinesq resumes at
+   ! $L$.  Global indices, so the ramp is rank-independent; faces
+   ! [W, E, S, N] with ramp_m <= 0 or open .false. leave the gate alone.
+   ! Uniform spacing assumed along the ramp (d counts cells at d0).
+   ! ----------------------------------------------------------------
+   pure subroutine open_face_disp_ramp(lp, ibegin, jbegin, m_glob, n_glob, dx0, dy0, &
+                                       ramp_m, open_face, gate)
+      type(type_loop_bounds), intent(in) :: lp
+      integer, intent(in) :: ibegin, jbegin, m_glob, n_glob
+      real(SP), intent(in) :: dx0, dy0, ramp_m(4)
+      logical, intent(in) :: open_face(4)
+      real(SP), intent(inout) :: gate(:, :)
+
+      real(SP) :: d, s
+      integer :: i, j, ig, jg
+
+      do j = 1, lp%nloc
+         jg = jbegin + (j - lp%jb)
+         do i = 1, lp%mloc
+            ig = ibegin + (i - lp%ib)
+            if (open_face(1) .and. ramp_m(1) > 0.0_SP) then
+               d = (real(ig, SP) - 0.5_SP)*dx0
+               s = min(1.0_SP, max(0.0_SP, d/ramp_m(1)))
+               gate(i, j) = gate(i, j)*s*s*(3.0_SP - 2.0_SP*s)
+            end if
+            if (open_face(2) .and. ramp_m(2) > 0.0_SP) then
+               d = (real(m_glob - ig, SP) + 0.5_SP)*dx0
+               s = min(1.0_SP, max(0.0_SP, d/ramp_m(2)))
+               gate(i, j) = gate(i, j)*s*s*(3.0_SP - 2.0_SP*s)
+            end if
+            if (open_face(3) .and. ramp_m(3) > 0.0_SP) then
+               d = (real(jg, SP) - 0.5_SP)*dy0
+               s = min(1.0_SP, max(0.0_SP, d/ramp_m(3)))
+               gate(i, j) = gate(i, j)*s*s*(3.0_SP - 2.0_SP*s)
+            end if
+            if (open_face(4) .and. ramp_m(4) > 0.0_SP) then
+               d = (real(n_glob - jg, SP) + 0.5_SP)*dy0
+               s = min(1.0_SP, max(0.0_SP, d/ramp_m(4)))
+               gate(i, j) = gate(i, j)*s*s*(3.0_SP - 2.0_SP*s)
+            end if
+         end do
+      end do
+
+   end subroutine open_face_disp_ramp
 
 end module model_kernel_masks_mod

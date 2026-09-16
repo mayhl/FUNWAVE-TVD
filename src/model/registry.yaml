@@ -580,6 +580,13 @@ sections:
           default: ~
           units: "m"
           doc: "Reference depth for the wavemaker forcing series (nee DepthWaveMaker); absent = the bed mean along the fed face, refused unless flat within 1 %."
+        forcing.disp_ramp:
+          advanced: true
+          legacy: ~
+          default: ~
+          units: m
+          latex: "$L_{\\mathrm{disp}}$"
+          doc: "Dispersion taper from a characteristic (Flather) face: the dispersive terms are off at the face and smoothstep back to full strength over this distance, so the face solves the shallow-water equations the Flather condition is derived for. Absent = 5 x the deepest still water along the face (logged at init); 0 = off. With the dispersion on at the face its closure sends a third of a wave group's amplitude back (Kr 35 % at kh ~ 1; 0.5 % at 5 depths, 0.3 % at 10), and a strong sustained flow grows a two-cell mode there that no ghost content or strip damps (2 m on a bore flume removes it). A face whose depth varies strongly gets the deep end's length everywhere; set the key to override. Refused on a wavemaker-fed face (its short waves need the dispersion) and on a relaxation face."
       overrides:
         west.forcing.depth: { legacy: DepthWaveMaker } # legacy global; west-only
 

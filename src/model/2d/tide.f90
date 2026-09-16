@@ -90,6 +90,11 @@ module model_tide_mod
       ! rides the boundary-normal flux (kernel flux_flather_bc), NOT this
       ! relaxation strip, so apply_bc skips them
       logical :: flather(4) = .false.
+      ! dispersion taper length (m) from a Flather face, 0 = off; auto =
+      ! key absent on a file/const-forced face, sized at stepper init from
+      ! the deepest still water along the face (5 depths)
+      real(SP) :: disp_ramp_m(4) = 0.0_SP
+      logical :: disp_ramp_auto(4) = .false.
 
       ! Flather external-target arrays along each face (west/east indexed
       ! in j over nloc, south/north in i over mloc; sized (max(mloc,nloc),
