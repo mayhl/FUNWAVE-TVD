@@ -1,3 +1,4 @@
+import hashlib
 import json
 import math
 import platform
@@ -67,6 +68,7 @@ class _SimTask:
     decomp: tuple[int, int]
     dt_mode: str
     ref_state: str
+    stamp_val: str = ""
     ref_status: str = "pending"
     dev_status: str = "pending"
     ref_elapsed: float = 0.0
@@ -648,8 +650,9 @@ class RegressionRunner(BaseRunner):
         """Resolve run dirs, the ref cache state, and the effective np for one sim.
 
         Effective np is the declared np capped to the rank budget so a single
-        run always fits the pool. The ref cache is keyed on (dt_mode, eff_np):
-        a stamp written under a different rank budget is stale and re-runs.
+        run always fits the pool. The ref cache is keyed on (dt_mode, eff_np,
+        ref sha, deck content): a stamp written under a different rank budget,
+        ref build or deck is stale and re-runs.
         """
         exe_type = sim["exe_type"]
         ref_build_dir, curr_build_dir, _ref_branch = exe_dirs[exe_type]
@@ -682,8 +685,16 @@ class RegressionRunner(BaseRunner):
             # scores the mixture
             if os.path.exists(curr_run_dir):
                 shutil.rmtree(curr_run_dir, ignore_errors=True)
+        stamp_val = ""
         if not oracle_mode:
-            stamp_val = f"{dt_mode} np={eff_np}"
+            stamp_val = self._ref_stamp(
+                dt_mode,
+                eff_np,
+                self._read_build_stamp(ref_build_dir),
+                os.path.join(self.repo_root, sim["input"]),
+                sim["input_file"],
+                sim.get("overrides"),
+            )
             cached = False
             if os.path.exists(sim_stamp):
                 try:
@@ -717,6 +728,7 @@ class RegressionRunner(BaseRunner):
             decomp=decomp,
             dt_mode=dt_mode,
             ref_state=ref_state,
+            stamp_val=stamp_val,
             ref_status="pending" if ref_state == "needs_run" else ref_state,
         )
 
@@ -863,15 +875,47 @@ class RegressionRunner(BaseRunner):
         return self.provider.submit(binary, input_file, run_dir, np=task.eff_np)
 
     def _write_sim_stamp(self, task: _SimTask) -> None:
-        """Record (dt_mode, eff_np) so a later run under a different rank budget re-runs the ref."""
+        """Record the ref cache key so a later run under another rank budget, ref
+        build or deck re-runs the ref instead of comparing against a stale run."""
         if task.sim_stamp is None:  # self_consistency: leg A never caches
             return
         try:
             os.makedirs(task.ref_out, exist_ok=True)
             with open(task.sim_stamp, "w") as f:
-                f.write(f"{task.dt_mode} np={task.eff_np}\n")
+                f.write(task.stamp_val + "\n")
         except Exception:
             pass
+
+    @staticmethod
+    def _read_build_stamp(build_dir) -> str:
+        """The git hash a build dir was last built from ('' when unstamped)."""
+        try:
+            with open(os.path.join(build_dir, STAMP_FILE)) as f:
+                return f.read().strip()
+        except OSError:
+            return ""
+
+    @staticmethod
+    def _ref_stamp(dt_mode, eff_np, ref_hash, input_dir, input_file, overrides) -> str:
+        """The ref cache key: rank budget, dt mode, the ref build's sha and a digest
+        of what the run dir is staged from (the deck text, the dotted overrides,
+        the data/ listing by name and size -- data files can be GB, so not their
+        bytes). A cached ref run whose deck grammar has since changed passed as
+        'cached' and compared against a stale channel set (09-16)."""
+        h = hashlib.sha256()
+        try:
+            with open(os.path.join(input_dir, input_file), "rb") as f:
+                h.update(f.read())
+        except OSError:
+            pass
+        h.update(json.dumps(overrides or {}, sort_keys=True).encode())
+        data_dir = os.path.join(input_dir, "data")
+        if os.path.isdir(data_dir):
+            for root, _dirs, files in sorted(os.walk(data_dir)):
+                for name in sorted(files):
+                    path = os.path.join(root, name)
+                    h.update(f"{os.path.relpath(path, data_dir)}:{os.path.getsize(path)}".encode())
+        return f"{dt_mode} np={eff_np} ref={ref_hash[:12]} deck={h.hexdigest()[:12]}"
 
     @staticmethod
     def _sched_desc(running, used, budget, queued) -> str:

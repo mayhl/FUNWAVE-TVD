@@ -87,6 +87,24 @@ def test_merge_tolerances_updates_per_kind_blocks():
     assert merged == {"surf": {"a": 1, "b": 3}, "other": 6}
 
 
+def test_ref_stamp_tracks_the_deck_ref_and_overrides(tmp_path: Path):
+    (tmp_path / "case.yaml").write_text("simulation:\n  total_time: 1.0\n")
+    stamp = RegressionRunner._ref_stamp("adaptive", 4, "abcdef0123456789", str(tmp_path), "case.yaml", None)
+    assert stamp.startswith("adaptive np=4 ref=abcdef012345 deck=")
+    assert stamp == RegressionRunner._ref_stamp("adaptive", 4, "abcdef0123456789", str(tmp_path), "case.yaml", {})
+    assert stamp != RegressionRunner._ref_stamp(
+        "adaptive", 4, "abcdef0123456789", str(tmp_path), "case.yaml", {"numerics.cfl": 0.4}
+    )
+    assert stamp != RegressionRunner._ref_stamp("adaptive", 4, "0123456789abcdef", str(tmp_path), "case.yaml", None)
+    (tmp_path / "case.yaml").write_text("simulation:\n  total_time: 2.0\n")
+    assert stamp != RegressionRunner._ref_stamp("adaptive", 4, "abcdef0123456789", str(tmp_path), "case.yaml", None)
+    (tmp_path / "data").mkdir()
+    (tmp_path / "data" / "depth.txt").write_text("1 2 3\n")
+    with_data = RegressionRunner._ref_stamp("adaptive", 4, "abcdef0123456789", str(tmp_path), "case.yaml", None)
+    (tmp_path / "data" / "depth.txt").write_text("1 2 3 4\n")
+    assert with_data != RegressionRunner._ref_stamp("adaptive", 4, "abcdef0123456789", str(tmp_path), "case.yaml", None)
+
+
 def test_override_deck_sets_dotted_keys_on_the_copy(tmp_path: Path):
     deck = tmp_path / "d.yaml"
     deck.write_text("breaking: {model: eddy_viscosity, cbrk1: 0.45}\noutput: {channels: [{name: a}]}\n")
