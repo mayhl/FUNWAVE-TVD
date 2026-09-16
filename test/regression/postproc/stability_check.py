@@ -11,6 +11,10 @@ below 1e-2 within a few seconds of onset; we additionally require the final
 eta field to be finite and bounded.  ref_dir is unused (oracle mode — the
 sim's exe entry carries no ref branch).
 
+The dt series comes from output/diagnostics.dat when the deck carries an
+output.diagnostics block with dt (sampled on the monitor cadence, densified
+through a collapse), else from the screen-log lines.
+
 Tolerance keys in regression_config.yaml (under tolerances: stability:):
   min_dt      — floor the observed dt must never cross (default: 0.011)
   max_abs_eta — bound on |eta| in the final frame, metres (default: 30.0)
@@ -42,6 +46,33 @@ def _last_netcdf_frame(path: Path, variable: str) -> np.ndarray:
         return np.array(ds["fields"][variable][-1, :, :], dtype=float)
 
 
+def _table_dts(path: Path) -> list[float]:
+    """The dt column of output/diagnostics.dat (header names the columns); the
+    t_start row carries dt = 0 and is skipped."""
+    if not path.exists():
+        return []
+    lines = path.read_text().splitlines()
+    if not lines or not lines[0].startswith("#"):
+        return []
+    cols = lines[0][1:].split()
+    if "dt" not in cols:
+        return []
+    idt = cols.index("dt")
+    dts = []
+    for line in lines[1:]:
+        if line.startswith("#"):  # a restart seam line
+            continue
+        parts = line.split()
+        if len(parts) > idt:
+            try:
+                dt = float(parts[idt])
+            except ValueError:
+                continue
+            if dt > 0.0:
+                dts.append(dt)
+    return dts
+
+
 def run(
     ref_dir: str | Path | None,
     dev_dir: str | Path,
@@ -60,10 +91,12 @@ def run(
 
     metrics: list[MetricResult] = []
 
-    # ---- dt floor from the run log ----------------------------------
+    # ---- dt floor: the diagnostics table when the deck writes one (every
+    # sample, plus the forced sample a collapse triggers), else the run log
+    meta = read_run_metadata(dev_dir)
+    dts = _table_dts(meta.output_dir / "diagnostics.dat")
     log = dev_dir / "funwave.log"
-    dts = []
-    if log.exists():
+    if not dts and log.exists():
         for line in log.read_text(errors="replace").splitlines():
             m = _DT_RE.search(line)
             if m:
@@ -83,7 +116,6 @@ def run(
     )
 
     # ---- final eta finite and bounded -------------------------------
-    meta = read_run_metadata(dev_dir)
     eta_files = meta.output_files("eta")
     single_nc = meta.output_dir / "output.nc"
     if eta_files or single_nc.exists():

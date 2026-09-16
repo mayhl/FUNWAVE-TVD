@@ -19,6 +19,7 @@ module model_main_mod
    use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
    use core_output_manager_mod, only: type_output_manager
+   use core_diagnostics_mod, only: type_diagnostics
    use core_output_channel_mod, only: type_output_channel, write_field_file
    use core_stepper_engine_mod, only: type_stepper_engine, type_engine_monitor
    use core_path_mod, only: type_path
@@ -63,6 +64,7 @@ module model_main_mod
       type(type_comm), pointer :: comm => null()
       type(type_model_tracer), pointer :: tracer => null()
       type(type_model_vessel), pointer :: vessel => null()
+      type(type_diagnostics), pointer :: diag => null()
       ! vector-derived scratch refresh hooks (null unless channels ask)
       type(type_fields_2d), pointer :: fields => null()
       real(SP), pointer :: vec_mag(:, :) => null()
@@ -751,6 +753,7 @@ contains
       type(type_model_stepper_2d) :: stepper
       type(type_stepper_engine) :: engine
       type(type_output_manager), target :: output_mgr
+      type(type_diagnostics), target :: diag
       type(type_output_monitor) :: monitor
       real(SP), pointer :: pf(:, :), qf(:, :)
       integer :: i
@@ -868,6 +871,10 @@ contains
          end if
 
          call build_field_channel(this, output_mgr)
+         if (this%output%diagnostics_on) then
+            call build_diagnostics(this, diag, output_mgr)
+            monitor%diag => diag
+         end if
          monitor%mgr => output_mgr
          monitor%registry => this%registry
          monitor%comm => this%env%comm
@@ -893,6 +900,7 @@ contains
                                       stepper%depth_fx, stepper%depth_fy)
 
          call output_mgr%finalize()
+         if (diag%is_activated) call diag%finalize()
       end if
 
       call stepper%free()
@@ -929,6 +937,8 @@ contains
          this%mflux = this%fields%h*(this%fields%u**2 + this%fields%v**2)
 
       call this%mgr%step(t, dt, this%registry, this%comm, force=forced)
+      ! scalar reductions on their own cadence (loop top, like the channels)
+      if (associated(this%diag)) call this%diag%step(t, dt, force=forced)
       ! the forced final flush covers field frames only: tracer/vessel
       ! keep their cadence
       if (.not. forced) then
@@ -950,6 +960,50 @@ contains
    ! and a truncated time_dt.out.  MASK/MASK9 and the legacy P/Q
    ! interface fluxes ride the stepper's register_output entries.
    ! ----------------------------------------------------------------
+   ! The diagnostics channel reads registry arrays by name; every metric's
+   ! need was raised at config read, so the mirrors exist by now
+   subroutine build_diagnostics(this, diag, mgr)
+      class(type_model_main), intent(inout), target :: this
+      type(type_diagnostics), intent(inout) :: diag
+      type(type_output_manager), intent(inout) :: mgr
+      character(:), allocatable :: folder
+      integer :: k
+      logical :: to_netcdf, restart
+
+      folder = trim(this%output%result_folder)
+      if (folder(len(folder):len(folder)) /= "/") folder = folder//"/"
+      ! either hot-start form appends to the table behind a seam line
+      restart = this%hot_start%use_checkpoint .or. this%hot_start%is_activated
+      do k = 1, size(this%output%diagnostics)
+         if (len_trim(this%output%diagnostics(k)%var) == 0) cycle
+         if (.not. this%registry%has(trim(this%output%diagnostics(k)%var))) &
+            call this%env%log%exit_on_error("output: diagnostics: '"// &
+                                            trim(this%output%diagnostics(k)%var)// &
+                                            "' is not a registered output field")
+      end do
+      ! a netcdf/pnetcdf deck also gets the group in the shared root
+      ! (created here when no point channel opened it first)
+      to_netcdf = this%output%format == "netcdf" .or. this%output%format == "pnetcdf"
+      if (to_netcdf) then
+         if (this%output%layout == "single") then
+            call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
+         else
+            call mgr%open_diagnostics(folder, this%env%comm)
+         end if
+      end if
+      if (to_netcdf .and. this%env%comm%is_io_node()) then
+         call diag%init(this%output%diagnostics, this%output%diagnostics_interval, &
+                        this%simulation%screen_interval, this%numerics%MinDepthFrc, &
+                        this%grid, this%registry, this%env%log, .true., folder=folder, &
+                        diag_ncid=mgr%diag_ncid, restart=restart)
+      else
+         call diag%init(this%output%diagnostics, this%output%diagnostics_interval, &
+                        this%simulation%screen_interval, this%numerics%MinDepthFrc, &
+                        this%grid, this%registry, this%env%log, &
+                        this%env%comm%is_io_node(), folder=folder, restart=restart)
+      end if
+   end subroutine build_diagnostics
+
    subroutine build_field_channel(this, mgr)
       use core_output_gatherer_mod, only: type_output_gatherer
       class(type_model_main), intent(inout), target :: this

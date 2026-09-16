@@ -63,6 +63,8 @@ test/validation/inputs/beji_battjes/fig4_energy.txt
 # FUNWAVE runtime output (accidentally runs from repo root)
 dump.bin
 output/
+# the source directory of the same name stays tracked
+!src/core/output/
 Grid_Range.out
 time_dt.out
 LOG.txt

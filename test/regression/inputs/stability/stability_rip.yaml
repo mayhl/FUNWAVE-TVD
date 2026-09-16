@@ -63,6 +63,9 @@ breaking:
 output:
   result_folder: output/
   format: binary
+  # the sentinel reads min dt from the table; eta.max / speed.max ride along
+  diagnostics:
+    variables: [eta.max, speed.max, froude.max]
   channels:
     - name: fields
       geometry: field

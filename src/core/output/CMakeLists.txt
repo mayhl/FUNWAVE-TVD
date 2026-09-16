@@ -1,5 +1,6 @@
-add_library(libcore_output STATIC field_registry.f90 output_gatherer.f90
-                                  output_channel.f90 output_manager.f90)
+add_library(
+  libcore_output STATIC field_registry.f90 output_gatherer.f90
+                        output_channel.f90 output_manager.f90 diagnostics.f90)
 
 if(FUNWAVE_HAS_NETCDF)
   # PUBLIC include so test read-backs can `use netcdf` too; BUILD_INTERFACE

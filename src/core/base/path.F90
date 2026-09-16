@@ -3,6 +3,7 @@ module core_path_mod
    use, intrinsic :: iso_c_binding
    implicit none
    private
+   public :: rename_file
 
    ! Determine path separator based on OS
 #ifdef _WIN32
@@ -29,6 +30,12 @@ module core_path_mod
          character(kind=c_char), intent(in) :: path(*)
          logical(c_bool) :: res
       end function mkdir_wrapper
+
+      function rename_wrapper(from, to) bind(c, name="rename_wrapper") result(res)
+         import :: c_char, c_bool
+         character(kind=c_char), intent(in) :: from(*), to(*)
+         logical(c_bool) :: res
+      end function rename_wrapper
 
       function rmdir_wrapper(path) bind(c, name="rmdir_wrapper") result(res)
          import :: c_char, c_bool
@@ -62,6 +69,13 @@ module core_path_mod
    end interface type_path
 
 contains
+
+   ! Atomic replace of `to` by `from` (POSIX rename); false on failure
+   function rename_file(from, to) result(ok)
+      character(len=*), intent(in) :: from, to
+      logical :: ok
+      ok = rename_wrapper(trim(from)//c_null_char, trim(to)//c_null_char)
+   end function rename_file
 
    !> @brief Constructor function
    function new_path(path_str) result(this)

@@ -81,6 +81,9 @@ module model_output_mod
    use mpi_f08
 
    use core_yaml_file_mod, only: type_yaml_reader
+   use core_diagnostics_mod, only: type_diag_metric, parse_metric
+   use model_field_metadata_mod, only: field_meta
+   use core_output_channel_mod, only: type_var_meta
 
    implicit none
 
@@ -207,6 +210,10 @@ module model_output_mod
       ! interval 0 maps to SMALL = legacy every-step default
       logical  :: vessel_series_on = .false.
       real(SP) :: vessel_interval = SMALL
+      ! diagnostics: block presence enables the scalar reduction channel
+      logical :: diagnostics_on = .false.
+      real(SP) :: diagnostics_interval = ZERO   ! 0 = step-derived cadence
+      type(type_diag_metric), allocatable :: diagnostics(:)
 
       ! Per-variable output flags; derived from variables: list
       logical :: OUT_U = .false.
@@ -346,6 +353,12 @@ contains
          if (this%vessel_interval <= ZERO) this%vessel_interval = SMALL
       end if
 
+      ! diagnostics: block presence enables the scalar reductions channel
+      ! (mass, energy, <var>.max, gate counts, ...); every metric raises the
+      ! need of its registry variable, and mask is always needed (wet filter)
+      blk_yaml = sub_env%yaml%cast_dictionary("diagnostics", no_blk)
+      if (.not. no_blk) call read_diagnostics(this, blk_yaml, env)
+
       ! arrival_time: retired -- a total-mode first_time channel supersedes it
       blk_yaml = sub_env%yaml%cast_dictionary("arrival_time", no_blk)
       if (.not. no_blk) call env%log%exit_on_error( &
@@ -434,6 +447,49 @@ contains
       end select
 
    end subroutine output_need
+
+   subroutine read_diagnostics(this, blk, env)
+      type(type_model_output), intent(inout) :: this
+      type(type_yaml_reader), intent(inout) :: blk
+      type(type_env), intent(inout) :: env
+
+      type(type_string), allocatable :: names(:)
+      type(type_yaml_reader) :: abort_blk
+      type(type_var_meta) :: meta
+      logical :: no_key, no_abort, ok
+      integer :: k
+
+      this%diagnostics_on = .true.
+      call blk%read_string_array("variables", silent=no_key, val=names)
+      if (no_key .or. size(names) == 0) call env%log%exit_on_error( &
+         "output: diagnostics: variables: is required (e.g. [mass, energy, eta.max, speed.max])")
+      call blk%read_nonnegative_real("interval", silent=no_key, val=this%diagnostics_interval)
+      if (no_key) this%diagnostics_interval = ZERO
+
+      allocate (this%diagnostics(size(names)))
+      abort_blk = blk%cast_dictionary("abort", no_abort)
+      do k = 1, size(names)
+         call parse_metric(trim(names(k)%s), this%diagnostics(k), ok)
+         if (.not. ok) call env%log%exit_on_error("output: diagnostics: '"//trim(names(k)%s)// &
+                                                  "' is not <variable>.<max|min|sum|mean|count|fraction|area>"// &
+                                                  " or one of mass, energy, speed.max, froude.max, flooded_area")
+         if (len_trim(this%diagnostics(k)%var) > 0) then
+            call this%need(trim(this%diagnostics(k)%var))
+            ! max/min/sum/mean carry the field's own units
+            if (len_trim(this%diagnostics(k)%units) == 0) then
+               meta = field_meta(trim(this%diagnostics(k)%var))
+               this%diagnostics(k)%units = meta%units
+            end if
+         end if
+         if (.not. no_abort) then
+            if (abort_blk%has_key(trim(names(k)%s))) then
+               call abort_blk%read_real(trim(names(k)%s), val=this%diagnostics(k)%abort_above)
+               this%diagnostics(k)%has_abort = .true.
+            end if
+         end if
+      end do
+      call this%need("mask")
+   end subroutine read_diagnostics
 
    subroutine read_geometries(this, sub_env, min_spacing)
       type(type_model_output), intent(inout) :: this

@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <sys/stat.h>
 #include <stdbool.h>
 #include <sys/types.h>
@@ -28,6 +29,11 @@ bool is_regular_file(const char *path) {
 // Returns true if directory creation succeeded
 bool mkdir_wrapper(const char *path) {
     return MKDIR(path) == 0;
+}
+
+// Returns true if the rename succeeded (atomic replace on POSIX)
+bool rename_wrapper(const char *from, const char *to) {
+    return rename(from, to) == 0;
 }
 
 // Returns true if directory removal succeeded

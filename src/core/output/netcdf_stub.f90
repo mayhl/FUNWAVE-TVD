@@ -23,14 +23,16 @@ module netcdf
 
    private
    public :: NF90_NOERR, NF90_CLOBBER, NF90_NETCDF4, NF90_UNLIMITED
-   public :: NF90_FLOAT, NF90_DOUBLE, NF90_GLOBAL
+   public :: NF90_FLOAT, NF90_DOUBLE, NF90_INT, NF90_GLOBAL
    public :: nf90_create, nf90_def_dim, nf90_def_var, nf90_put_att
    public :: nf90_def_grp, nf90_enddef, nf90_put_var, nf90_close, nf90_strerror
+   public :: nf90_sync
 
    integer, parameter :: NF90_NOERR = 0
    integer, parameter :: NF90_CLOBBER = 0
    integer, parameter :: NF90_NETCDF4 = 4096
    integer, parameter :: NF90_UNLIMITED = 0
+   integer, parameter :: NF90_INT = 4
    integer, parameter :: NF90_FLOAT = 5
    integer, parameter :: NF90_DOUBLE = 6
    integer, parameter :: NF90_GLOBAL = 0
@@ -38,7 +40,7 @@ module netcdf
    integer, parameter :: STUB_ERR = -1
 
    interface nf90_put_var
-      module procedure put_var_0d, put_var_1d, put_var_2d
+      module procedure put_var_0d, put_var_i0d, put_var_1d, put_var_2d
    end interface nf90_put_var
 
    ! character and real-array attributes, the two shapes the writer emits
@@ -122,13 +124,25 @@ contains
       status = STUB_ERR
    end function nf90_enddef
 
-   integer function put_var_0d(ncid, varid, values) result(status)
+   integer function put_var_0d(ncid, varid, values, start) result(status)
       integer, intent(in) :: ncid, varid
       real(8), intent(in) :: values
+      integer, intent(in), optional :: start(:)
       associate (i => ncid, v => varid, x => values)
       end associate
+      if (present(start)) continue
       status = STUB_ERR
    end function put_var_0d
+
+   integer function put_var_i0d(ncid, varid, values, start) result(status)
+      integer, intent(in) :: ncid, varid
+      integer, intent(in) :: values
+      integer, intent(in), optional :: start(:)
+      associate (i => ncid, v => varid, x => values)
+      end associate
+      if (present(start)) continue
+      status = STUB_ERR
+   end function put_var_i0d
 
    integer function put_var_1d(ncid, varid, values, start) result(status)
       integer, intent(in) :: ncid, varid
@@ -156,6 +170,13 @@ contains
       end associate
       status = STUB_ERR
    end function nf90_close
+
+   integer function nf90_sync(ncid) result(status)
+      integer, intent(in) :: ncid
+      associate (i => ncid)
+      end associate
+      status = STUB_ERR
+   end function nf90_sync
 
    function nf90_strerror(status) result(msg)
       integer, intent(in) :: status
