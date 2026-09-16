@@ -4,8 +4,9 @@
 # face_relative frame (default) rotates theta = 0 to the east inward normal
 # (-x), so the SAME 1.0 m table radiates westward into the domain.  The west
 # sponge absorbs the transmitted wave.  Oracle recovers Hm0 in the interior vs
-# the 1.0 m target, exactly as the west case does — coverage that the feed
-# works on a non-west boundary end-to-end.
+# the 1.0 m target over the mirrored alongshore column at x = 215, exactly as
+# the west case does — coverage that the feed works on a non-west boundary
+# end-to-end.
 grid:
   cell_size: [1.0, 2.0]
   n_cells: [500, 80]
@@ -26,7 +27,7 @@ output:
   channels:
     - name: sta
       type: station
-      x: [195.0, 205.0, 215.0, 225.0, 235.0, 215.0, 215.0]
-      y: [80.0, 80.0, 80.0, 80.0, 80.0, 40.0, 120.0]
+      x: [215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0, 215.0]
+      y: [4.0, 12.0, 20.0, 28.0, 36.0, 44.0, 52.0, 60.0, 68.0, 76.0, 84.0, 92.0, 100.0, 108.0, 116.0, 124.0, 132.0, 140.0, 148.0, 156.0]
       variables: [eta]
       interval: 0.1

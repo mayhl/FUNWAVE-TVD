@@ -14,12 +14,17 @@ over a full period, cross-frequency variance terms integrate out exactly.
 k = 1 trades line/background bin separation for laptop wall-clock; the comb
 this metric trips (a dead-every-Nth-line pattern, ~14 % pre-fix) sits far
 above the residual bound-harmonic leakage into line bins.  Gauge convention
-(fixed across the lanes): columns 1-5 are the downwave x-line (Hm0 average),
-columns 6-7 the lateral pair that brackets the x-line center gauge
-(homogeneity diagnostic).
+(read from the deck's station geometry): the rig decks carry columns 1-5 as
+the downwave x-line (Hm0 average) and columns 6-7 as the lateral pair that
+brackets the x-line center gauge (homogeneity diagnostic); a deck whose
+stations all share one x is an ALONGSHORE COLUMN, averaged whole.  The
+column form is the boundary-feed convention: the periodic box snaps the
+directional ladder onto alongshore modes, so any single y line reads a
+standing pattern (y = 80 is the m = 1 antinode, ~1.15x), and only the mean
+over one alongshore period recovers the delivered Hm0.
 
 Metrics (only the finite-tolerance ones gate):
-  * ``hm0_err_pct`` (gated) — x-line-mean variance Hm0 (4 sqrt(m0)) vs the
+  * ``hm0_err_pct`` (gated) — group-mean variance Hm0 (4 sqrt(m0)) vs the
     analytic target: the deck hm0 for TMA/JONSWAP (band renormalization makes
     it exact), or 4 sqrt(sum(a^2)/2) over the file table for spectrum_2d.
   * ``fp_err_pct`` (gated, TMA/JONSWAP only) — Welch peak location vs the deck
@@ -44,7 +49,7 @@ Entry point: run(ref_dir, dev_dir, tolerances, plots_dir, verbose) -> Subsection
 (ref_dir is None in oracle mode and unused.)
 
 Tolerance keys (under tolerances: wavemaker_spectrum:):
-  hm0_err_pct    — max allowed % error of x-line-mean Hm0 vs the target
+  hm0_err_pct    — max allowed % error of group-mean Hm0 vs the target
   fp_err_pct     — max allowed % offset of the Welch peak vs the deck peak
   band_frac_pct  — MIN allowed % of variance inside the generated band
   dead_line_pct  — max allowed % of dead ladder lines (uniform ladders only)
@@ -71,7 +76,7 @@ _console = Console()
 ACCEPTED_KEYS = ("hm0_err_pct", "fp_err_pct", "band_frac_pct", "dead_line_pct")
 
 DT_SAMPLE = 0.1  # uniform re-sample step (matches the channel interval)
-N_XLINE = 5  # gauge columns 1..5 = downwave x-line, 6..7 = lateral pair
+N_XLINE = 5  # rig decks: gauge columns 1..5 = downwave x-line, 6..7 = lateral pair
 DEAD_LINE_POWER_FRAC = 0.01  # a line is dead below this fraction of the median
 
 
@@ -151,6 +156,32 @@ def _read_case(run_dir: Path) -> CaseSpec | None:
         nfreq=int(disc.get("freq_bins", 45)),
         uniform_ladder=eqe not in ("freq", "both", "true", "yes"),
     )
+
+
+def _station_x(run_dir: Path) -> list[float]:
+    """Station x-coordinates of the deck's first station channel ([] if none)."""
+    for ch in load_deck(run_dir).get("output", {}).get("channels", []):
+        if str(ch.get("type", "")).lower() == "station" and "x" in ch:
+            return [float(v) for v in ch["x"]]
+    return []
+
+
+def _hm0_group(run_dir: Path, n_gauges: int) -> tuple[list[int], list[int], bool]:
+    """Gauge indices of the Hm0 group, of the homogeneity set, and the column flag.
+
+    One shared x -> an alongshore column: the group is every gauge, the
+    spread is read over the column itself, and Hm0 comes from the pooled
+    variance (the energy the face delivers, standing pattern averaged out).
+    Otherwise the rig layout: the first N_XLINE gauges form the x-line (mean
+    of the per-gauge Hm0), the rest plus the x-line center gauge form the
+    lateral set.
+    """
+    xs = _station_x(run_dir)
+    if len(xs) == n_gauges and len(set(xs)) == 1:
+        grp = list(range(n_gauges))
+        return grp, grp, True
+    grp = list(range(min(N_XLINE, n_gauges)))
+    return grp, list(range(N_XLINE, n_gauges)) + [grp[len(grp) // 2]], False
 
 
 def _load_gauges(output_dir: Path) -> tuple[np.ndarray, np.ndarray] | None:
@@ -237,18 +268,20 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
     eta = np.stack([np.interp(t_uni, t_raw, eta_raw[:, g]) for g in range(eta_raw.shape[1])], axis=1)
     eta -= eta.mean(axis=0)
 
-    # ── realized Hm0: variance-based, averaged over the x-line ────────────
+    # ── realized Hm0: variance-based, averaged over the gauge group ───────
+    grp, lat_idx, column = _hm0_group(dev_dir, eta.shape[1])
     hm0_g = 4.0 * np.sqrt(np.mean(eta**2, axis=0))
-    hm0_mean = float(np.mean(hm0_g[:N_XLINE]))
+    hm0_mean = 4.0 * float(np.sqrt(np.mean(eta[:, grp] ** 2))) if column else float(np.mean(hm0_g[grp]))
     hm0_target = case.hm0
     hm0_err = abs(hm0_mean - hm0_target) / hm0_target * 100.0
-    # lateral pair vs the x-line center gauge (homogeneity diagnostic)
-    lat = np.append(hm0_g[N_XLINE:], hm0_g[N_XLINE // 2])
+    # alongshore homogeneity diagnostic (the column itself, or the lateral
+    # pair against the x-line center gauge)
+    lat = hm0_g[lat_idx]
     lat_spread = float((lat.max() - lat.min()) / lat.mean() * 100.0) if len(lat) > 1 else 0.0
 
-    # ── Welch peak + band containment (x-line-mean spectra) ───────────────
+    # ── Welch peak + band containment (group-mean spectra) ────────────────
     psd_sum = None
-    for g in range(N_XLINE):
+    for g in grp:
         f_w, psd = _welch_psd(eta[:, g], DT_SAMPLE)
         psd_sum = psd if psd_sum is None else psd_sum + psd
     psd_sum[0] = 0.0
@@ -257,17 +290,17 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
 
     freqs_full = np.fft.rfftfreq(n_win, d=DT_SAMPLE)
     pow_full = np.zeros(len(freqs_full))
-    for g in range(N_XLINE):
+    for g in grp:
         pow_full += np.abs(np.fft.rfft(eta[:, g])) ** 2
     df_bin = freqs_full[1]
     in_band = (freqs_full >= case.fmin - 0.5 * df_bin) & (freqs_full <= case.fmax + 0.5 * df_bin)
     band_frac = float(pow_full[in_band].sum() / pow_full.sum() * 100.0)
 
-    # ── line completeness on the equal-df comb (center x-line gauge) ──────
+    # ── line completeness on the equal-df comb (center gauge of the group) ─
     dead_pct = float("nan")
     if case.uniform_ladder:
         lines = np.linspace(case.fmin, case.fmax, case.nfreq)
-        p_line = _line_powers(eta[:, N_XLINE // 2], DT_SAMPLE, lines)
+        p_line = _line_powers(eta[:, grp[len(grp) // 2]], DT_SAMPLE, lines)
         dead_pct = float(np.sum(p_line < DEAD_LINE_POWER_FRAC * np.median(p_line)) / len(lines) * 100.0)
 
     # ── metrics: only the finite-tolerance ones gate ──────────────────────

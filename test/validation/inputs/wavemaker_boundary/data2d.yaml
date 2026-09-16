@@ -3,7 +3,10 @@
 # data2d.yaml (same flat 41x7 table, Hm0 target 1.0 m) but generates at the
 # boundary instead of the internal Wei-Kirby source box.  The west sponge is the
 # ABS relaxation strip (forcing.wavemaker requires sponge.direct); forcing.depth
-# is the series reference depth.  Oracle recovers Hm0 downwave vs the 1.0 m target.
+# is the series reference depth.  Oracle recovers Hm0 vs the 1.0 m target as the
+# mean over an alongshore station column at x = 285 (20 gauges, one 160 m
+# period): the periodic box snaps the ladder onto alongshore modes, so a single
+# y line reads a standing pattern (y = 80 is the m = 1 antinode, ~1.15x).
 grid:
   cell_size: [1.0, 2.0]
   n_cells: [500, 80]
@@ -25,7 +28,7 @@ output:
   channels:
     - name: sta
       type: station
-      x: [265.0, 275.0, 285.0, 295.0, 305.0, 285.0, 285.0]
-      y: [80.0, 80.0, 80.0, 80.0, 80.0, 40.0, 120.0]
+      x: [285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0, 285.0]
+      y: [4.0, 12.0, 20.0, 28.0, 36.0, 44.0, 52.0, 60.0, 68.0, 76.0, 84.0, 92.0, 100.0, 108.0, 116.0, 124.0, 132.0, 140.0, 148.0, 156.0]
       variables: [eta]
       interval: 0.1
