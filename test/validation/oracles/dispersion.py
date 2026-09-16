@@ -39,11 +39,10 @@ from rich.console import Console
 from rich.table import Table
 
 from test.framework.results import MetricResult, SubsectionResult
-from test.framework.tolerances import check_keys
 from test.framework.run_output import read_run_metadata
+from test.framework.tolerances import check_keys
 from test.validation.oracles import wave_stats
-from test.validation.oracles._lab import load_deck
-from test.validation.oracles._lab import new_figure, save_figure
+from test.validation.oracles._lab import load_deck, new_figure, save_figure
 
 _console = Console()
 ACCEPTED_KEYS = ("period_error_pct",)

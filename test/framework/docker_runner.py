@@ -52,6 +52,8 @@ DEFAULT_BUILD_TYPES = ["RelWithDebInfo"]
 
 @dataclass
 class ImageResult:
+    """One image's build, compile and test outcome on the Docker board."""
+
     name: str
     build_type: str = "Release"
     build_status: str = "pending"  # pending | ok | failed
@@ -353,6 +355,7 @@ def run(
     verbose: bool = False,
     clean: bool = False,
 ) -> list[ImageResult]:
+    """Run the Docker board over the selected images and build types."""
     names = discover(filter_names)
     build_types = build_types or DEFAULT_BUILD_TYPES
     if not names:

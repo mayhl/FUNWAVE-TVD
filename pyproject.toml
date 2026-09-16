@@ -49,7 +49,14 @@ exclude = [
     "site-packages",
     "venv",
     "build_*",
-    "test/regression/worktrees/*"
+    "test/regression/worktrees/*",
+    # local scratch, never tracked
+    ".parity",
+    ".sweep",
+    "Testing",
+    "bench_decks",
+    "bench_plots",
+    "examples_FD",
 ]
 
 # Same as Black.
@@ -68,7 +75,27 @@ select = [
 ignore = [
     "D100", # Missing docstring in public module
     "D104", # Missing docstring in public package
+    "D105", # magic methods and __init__ carry no docstring
+    "D107",
+    "D203", # the D211/D212 side of the two incompatible pairs
+    "D213",
+    "D205", # summaries are noun phrases that may wrap, not imperative one-liners
+    "D401",
 ]
+
+[tool.ruff.lint.per-file-ignores]
+# docstrings are gated on the library-like code (tools/, test/framework/);
+# tests, oracles, postproc and one-off scripts are exempt
+"test/unit/**" = ["D"]
+"test/validation/**" = ["D"]
+"test/regression/**" = ["D"]
+"test/python/**" = ["D"]
+"test/__init__.py" = ["D"]
+"scripts/**" = ["D"]
+"docs/**" = ["D"]
+# wave notation (Hm0, Tp, L, k) in the oracles and postproc
+"test/validation/oracles/**" = ["N803", "N806"]
+"test/regression/postproc/**" = ["N803", "N806"]
 
 [tool.ruff.format]
 # Like Black, use double quotes for strings.

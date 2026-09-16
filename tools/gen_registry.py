@@ -88,10 +88,12 @@ def section_params(reg: dict):
 
 
 def all_params(reg: dict) -> list[dict]:
+    """Every parameter entry, top-level and per-section."""
     return list(reg.get("parameters", [])) + list(section_params(reg))
 
 
 def validate(reg: dict) -> list[str]:
+    """Consistency errors in the registry, empty when clean."""
     errors = []
     seen_paths: set[str] = set()
     for p in all_params(reg):
@@ -390,6 +392,7 @@ def _check_one(path: Path, new: str) -> bool:
 
 
 def main() -> int:
+    """Regenerate the outputs, or --check the committed ones."""
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--check", action="store_true", help="verify committed output matches the registry")
     args = ap.parse_args()

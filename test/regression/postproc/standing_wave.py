@@ -24,10 +24,10 @@ from pathlib import Path
 
 import numpy as np
 import plotly.graph_objects as go
+import yaml
 from rich import box
 from rich.console import Console
 from rich.table import Table
-import yaml
 
 from test.framework.results import (
     FigureSpec,

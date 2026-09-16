@@ -48,6 +48,8 @@ jobs:
       # Python
       - name: Check Python formatting
         run: uv run ruff format --check
+      - name: Lint Python
+        run: uv run ruff check
       - name: Python unit tests (framework, comparators, oracle helpers)
         run: uv run pytest -q
 

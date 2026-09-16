@@ -25,8 +25,8 @@ from pathlib import Path
 import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
-from test.framework.tolerances import check_keys
 from test.framework.run_output import read_run_metadata
+from test.framework.tolerances import check_keys
 
 # deck constants (keep in lockstep with channel_stats.yaml)
 DT = 0.02

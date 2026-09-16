@@ -1,21 +1,32 @@
+import copy
 import hashlib
+import importlib
+import itertools
 import json
 import math
+import os
 import platform
 import re
-import time
-import os
 import shutil
 import subprocess
-import importlib
+import time
 import traceback
-import copy
-import itertools
 from collections import deque
-from datetime import datetime
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
+
 import yaml
+from rich import box
+from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
+
+from test.framework.base_runner import BaseRunner
+from test.framework.html_report import ReportMeta
+from test.framework.html_report import generate as generate_html_report
+from test.framework.html_report import generate_pdf as generate_pdf_report
+from test.framework.results import MetricResult, SimResult, SubsectionResult
+from test.framework.workspace_utils import get_build_path
 
 _STRICT_STRIP_RE = re.compile(r"^\s*DT_fixed\s*=", re.IGNORECASE)
 # Grid-size keys in a legacy input.txt; Kglob absent -> 2D (treated as 1 layer).
@@ -28,13 +39,6 @@ _PY_RE = re.compile(r"(?im)^(\s*PY\s*=\s*)\d+")
 _DEFAULT_NP_K = 13.0
 # Halo (Nghost=3) needs a few interior cells; floor each subdomain axis here.
 _MIN_SUBDOMAIN = 4
-from rich import box
-from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
-from rich.table import Table
-from test.framework.base_runner import BaseRunner
-from test.framework.workspace_utils import get_build_path
-from test.framework.results import MetricResult, SimResult, SubsectionResult
-from test.framework.html_report import generate as generate_html_report, generate_pdf as generate_pdf_report, ReportMeta
 
 STAMP_FILE = ".build_stamp"
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "regression", "regression_config.yaml")
@@ -101,7 +105,8 @@ def _run_steps(run_dir: str | None) -> int | None:
 
 def _merge_tolerances(base: dict, override: dict) -> dict:
     """Per-postproc tolerance blocks merged one level deep: a variant overrides
-    single keys, inheriting the rest of its case's block."""
+    single keys, inheriting the rest of its case's block.
+    """
     out = {k: dict(v) if isinstance(v, dict) else v for k, v in base.items()}
     for key, block in override.items():
         if isinstance(block, dict) and isinstance(out.get(key), dict):
@@ -112,6 +117,8 @@ def _merge_tolerances(base: dict, override: dict) -> dict:
 
 
 class RegressionRunner(BaseRunner):
+    """The regression tier: ref/dev workspaces, sims, comparators, reports."""
+
     def __init__(self, reporter, provider):
         super().__init__(reporter)
         self.provider = provider
@@ -166,7 +173,8 @@ class RegressionRunner(BaseRunner):
     def _build_info(self, binary_path) -> dict | None:
         """The binary's own `--build-info` block as {key: value}, plus its
         `--version` line under "version"; None when it cannot be run here
-        (e.g. a container-built binary on the host)."""
+        (e.g. a container-built binary on the host).
+        """
         try:
             version = subprocess.check_output([binary_path, "--version"], text=True, stderr=subprocess.DEVNULL).strip()
             block = subprocess.check_output([binary_path, "--build-info"], text=True, stderr=subprocess.DEVNULL)
@@ -255,7 +263,7 @@ class RegressionRunner(BaseRunner):
                         progress.update(
                             build_task, completed=percent, description=f"make   {tag}  compiling...  [dim]{percent}%[/dim]"
                         )
-                    except:
+                    except (ValueError, IndexError):
                         pass
 
             if make_proc.returncode != 0:
@@ -366,7 +374,7 @@ class RegressionRunner(BaseRunner):
                 with open(src) as f:
                     text = f.read()
                 if not fixed_dt:
-                    text = "".join(l for l in text.splitlines(keepends=True) if not _STRICT_STRIP_RE.match(l))
+                    text = "".join(ln for ln in text.splitlines(keepends=True) if not _STRICT_STRIP_RE.match(ln))
                 if edit_pxpy:
                     text = self._rewrite_pxpy(text, decomp[0], decomp[1])
                 with open(dst, "w") as f:
@@ -382,7 +390,8 @@ class RegressionRunner(BaseRunner):
     def _override_deck(path, overrides):
         """Set dotted keys on the STAGED copy of a deck (the tracked deck is the
         real case; a suite may run it shorter or smaller, e.g. an example's
-        smoke gate).  Comments do not survive the round trip -- only the copy."""
+        smoke gate).  Comments do not survive the round trip -- only the copy.
+        """
         with open(path) as f:
             deck = yaml.safe_load(f) or {}
         for dotted, value in overrides.items():
@@ -486,9 +495,9 @@ class RegressionRunner(BaseRunner):
 
     def _print_summary(self, results: list[SimResult]) -> None:
         """Render a Rich summary table of all SimResult objects."""
-        KINDS = ["field", "station", "statistics"]
-        LABELS = {"field": "Field", "station": "Station", "statistics": "Statistics"}
-        STATUS_FMT = {
+        kinds = ["field", "station", "statistics"]
+        labels = {"field": "Field", "station": "Station", "statistics": "Statistics"}
+        status_fmt = {
             "PASS": "[bold green]✓ PASS[/bold green]",
             "FAIL": "[bold red]✗ FAIL[/bold red]",
             "XFAIL": "[yellow]⚠ XFAIL[/yellow]",
@@ -498,7 +507,7 @@ class RegressionRunner(BaseRunner):
             "COMPLETED": "[dim]COMPLETED[/dim]",
         }
 
-        active_kinds = [k for k in KINDS if any(r.subsection(k) for r in results)]
+        active_kinds = [k for k in kinds if any(r.subsection(k) for r in results)]
 
         table = Table(
             box=box.SIMPLE_HEAD,
@@ -509,10 +518,10 @@ class RegressionRunner(BaseRunner):
         table.add_column("Simulation", min_width=28)
         table.add_column("Status", min_width=12)
         for k in active_kinds:
-            table.add_column(LABELS[k], justify="center", min_width=10)
+            table.add_column(labels[k], justify="center", min_width=10)
 
         for r in results:
-            row = [r.name, STATUS_FMT.get(r.status, r.status)]
+            row = [r.name, status_fmt.get(r.status, r.status)]
             for k in active_kinds:
                 sub = r.subsection(k)
                 row.append(sub.summary if sub else "[dim]—[/dim]")
@@ -820,7 +829,8 @@ class RegressionRunner(BaseRunner):
 
     def _run_blocking(self, binary, input_file, run_dir, np) -> str:
         """Run one leg to completion inline (used for leg B1, which must finish
-        before B2 can restart). Cheap here — B1 is np=1 and a few hundred steps."""
+        before B2 can restart). Cheap here — B1 is np=1 and a few hundred steps.
+        """
         jid = self.provider.submit(binary, input_file, run_dir, np=np)
         while self.provider.get_status(jid) == "RUNNING":
             time.sleep(0.2)
@@ -876,7 +886,8 @@ class RegressionRunner(BaseRunner):
 
     def _write_sim_stamp(self, task: _SimTask) -> None:
         """Record the ref cache key so a later run under another rank budget, ref
-        build or deck re-runs the ref instead of comparing against a stale run."""
+        build or deck re-runs the ref instead of comparing against a stale run.
+        """
         if task.sim_stamp is None:  # self_consistency: leg A never caches
             return
         try:
@@ -901,7 +912,8 @@ class RegressionRunner(BaseRunner):
         of what the run dir is staged from (the deck text, the dotted overrides,
         the data/ listing by name and size -- data files can be GB, so not their
         bytes). A cached ref run whose deck grammar has since changed passed as
-        'cached' and compared against a stale channel set (09-16)."""
+        'cached' and compared against a stale channel set (09-16).
+        """
         h = hashlib.sha256()
         try:
             with open(os.path.join(input_dir, input_file), "rb") as f:
@@ -1043,7 +1055,7 @@ class RegressionRunner(BaseRunner):
             f"ref: {_fmt_run(task.ref_status, task.ref_elapsed)}  dev: {_fmt_run(task.dev_status, task.dev_elapsed)}"
         )
 
-        STATUS_ICON = {
+        status_icon = {
             "PASS": "[bold green]✓ PASS[/bold green]",
             "FAIL": "[bold red]✗ FAIL[/bold red]",
             "XFAIL": "[yellow]⚠ XFAIL[/yellow]",
@@ -1053,7 +1065,7 @@ class RegressionRunner(BaseRunner):
             "COMPLETED": "[dim]no comparison[/dim]",
         }
         sub_summary = "  ".join(f"{s.kind}: {s.summary}" for s in result.subsections)
-        result_icon = STATUS_ICON.get(result.status, result.status)
+        result_icon = status_icon.get(result.status, result.status)
         if result.status in ("XFAIL", "XPASS"):
             result_icon += f" [dim]({sim.get('known_fail')})[/dim]"
         result_line = f"  \\[{sim['name']}]  {result_icon}" + (f"  [dim]{sub_summary}[/dim]" if sub_summary else "")
@@ -1248,6 +1260,7 @@ class RegressionRunner(BaseRunner):
         fixed_dt: bool = False,
         ranks: int | None = None,
     ):
+        """Run the selected sims end to end: build, simulate, compare, report."""
         try:
             current_branch = subprocess.check_output(["git", "rev-parse", "--abbrev-ref", "HEAD"]).decode().strip()
         except Exception:

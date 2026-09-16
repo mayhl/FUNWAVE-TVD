@@ -1,11 +1,13 @@
-from abc import ABC, abstractmethod
+import os
 import shlex
 import subprocess
-import os
+from abc import ABC, abstractmethod
 from pathlib import Path
 
 
 class BaseProvider(ABC):
+    """A job backend: submit, poll, collect."""
+
     @abstractmethod
     def submit(self, binary_path, input_file, work_dir, np=1) -> str:
         """Submit a job and return a job_id."""
@@ -35,6 +37,7 @@ class LocalProvider(BaseProvider):
         self.hpc = hpc if hpc is not None else bool(os.environ.get("SLURM_JOB_ID") or os.environ.get("PBS_JOBID"))
 
     def submit(self, binary_path, input_file, work_dir, np=1) -> str:
+        """Launch the run in the background and hand back its job id."""
         env = os.environ.copy()
         # Let the OS scheduler spread packed runs across the node instead of
         # every launcher binding to the same low cores.  Each var is a no-op
@@ -68,6 +71,7 @@ class LocalProvider(BaseProvider):
         return job_id
 
     def get_status(self, job_id: str) -> str:
+        """PENDING, RUNNING, COMPLETED or FAILED for a job id."""
         entry = self.jobs.get(job_id)
         if not entry:
             return "FAILED"
@@ -79,6 +83,7 @@ class LocalProvider(BaseProvider):
         return "COMPLETED" if returncode == 0 else "FAILED"
 
     def get_output(self, job_id: str) -> tuple[str, str]:
+        """(stdout, stderr) of a finished job, empty while it runs."""
         entry = self.jobs.get(job_id)
         if not entry:
             return "", ""

@@ -20,7 +20,7 @@ from pathlib import Path
 
 import numpy as np
 
-from test.framework.results import SubsectionResult, MetricResult
+from test.framework.results import MetricResult, SubsectionResult
 
 FIELDS = ["eta", "p", "q", "u", "v", "hu", "hv", "mask", "mask9", "pflux", "qflux"]
 NFIELD = len(FIELDS)
@@ -41,7 +41,22 @@ def _read_core_bin(path: Path) -> tuple[float, dict[str, np.ndarray]]:
 
 
 SED_FIELDS_V1 = ["depth", "chh", "susp_load", "bed_load"]
-SED_FIELDS_V2 = SED_FIELDS_V1 + ["c_sum", "p_sum", "d_sum", "c_ave", "p_ave", "d_ave", "aval_accum", "ch", "fx_w", "fx_e", "fy_s", "fy_n", "pickup", "depo"]
+SED_FIELDS_V2 = SED_FIELDS_V1 + [
+    "c_sum",
+    "p_sum",
+    "d_sum",
+    "c_ave",
+    "p_ave",
+    "d_ave",
+    "aval_accum",
+    "ch",
+    "fx_w",
+    "fx_e",
+    "fy_s",
+    "fy_n",
+    "pickup",
+    "depo",
+]
 
 
 def _read_sediment_bin(path: Path) -> dict[str, np.ndarray]:

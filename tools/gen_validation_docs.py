@@ -55,6 +55,7 @@ def group_of(tags: list[str]) -> str:
 
 
 def dig(deck: dict, dotted: str):
+    """The value at a dotted key path, or None."""
     node = deck
     for key in dotted.split("."):
         if not isinstance(node, dict) or key not in node:
@@ -109,6 +110,7 @@ def load_report(path: Path = REPORT) -> dict | None:
 
 
 def fmt(value) -> str:
+    """A deck value for a table cell, lists as 'a x b'."""
     if isinstance(value, list):
         return " x ".join(str(v) for v in value)
     return str(value)
@@ -116,7 +118,8 @@ def fmt(value) -> str:
 
 def figure_target(case: str, variant: str | None, fig: dict) -> str:
     """Where a record figure lands under docs/, relative to docs/ (variants
-    write same-named files, so each gets its own folder)."""
+    write same-named files, so each gets its own folder).
+    """
     return f"{GENERATED}/{SECTION}/{case}/{variant or 'run'}/{Path(fig['path']).name}"
 
 
@@ -125,7 +128,8 @@ def render(
 ) -> str:
     """Render one case page.  `rows` are the record rows for this case (one per
     variant); `depth` = parent directories between docs/ and the page source,
-    the prefix an artifact link needs to climb back to docs/."""
+    the prefix an artifact link needs to climb back to docs/.
+    """
     name = sim["name"]
     decks = load_decks(sim)
     up = "../" * depth
@@ -218,7 +222,8 @@ def render(
 
 def run_label(variant: str | None, labels: dict[str, str]) -> str:
     """Human name for a variant: the config's `labels:` entry, else the deck stem
-    with a rank pin spelled out."""
+    with a rank pin spelled out.
+    """
     if not variant:
         return "run"
     if variant in labels:
@@ -236,7 +241,8 @@ def run_label(variant: str | None, labels: dict[str, str]) -> str:
 
 def _pivot_table(rows: list[dict], labels: dict[str, str]) -> list[str]:
     """One row per variant, one column per (variable, stat) the oracle reported;
-    gated cells carry the verdict, so a sweep reads top to bottom."""
+    gated cells carry the verdict, so a sweep reads top to bottom.
+    """
     columns: list[tuple[str, str]] = []
     for row in rows:
         for m in row.get("metrics") or []:
@@ -296,7 +302,8 @@ def build(
     config_path: Path = CONFIG, report_path: Path = REPORT, docs_dir: Path = REPO / "docs"
 ) -> tuple[dict[str, str], dict, list[tuple[str, dict]]]:
     """Return (pages keyed by docs-relative path, nav subtree for the section,
-    figures to copy as (case, variant, record figure))."""
+    figures to copy as (case, variant, record figure)).
+    """
     config = yaml.safe_load(config_path.read_text())
     report = load_report(report_path)
     by_case: dict[str, list[dict]] = {}

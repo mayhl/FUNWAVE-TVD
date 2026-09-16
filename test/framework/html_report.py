@@ -9,11 +9,13 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
-from test.framework.results import SimResult, SubsectionResult, MetricResult, FigureSpec
+from test.framework.results import FigureSpec, MetricResult, SimResult, SubsectionResult
 
 
 @dataclass
 class ReportMeta:
+    """Provenance stamped on a report: branches, hashes, generation time."""
+
     ref_branch: str
     dev_branch: str
     ref_hash: str = ""

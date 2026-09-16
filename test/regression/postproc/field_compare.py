@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -10,14 +11,14 @@ from rich.console import Console
 from rich.progress import BarColumn, MofNCompleteColumn, Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
-from test.framework.results import SubsectionResult, MetricResult, FigureSpec, InteractiveFigure
+from test.framework.results import FigureSpec, InteractiveFigure, MetricResult, SubsectionResult
 from test.framework.run_output import (
     RunMetadata,
     VariableInfo,
-    read_run_metadata,
-    get_output_variables,
     compute_metric_series,
+    get_output_variables,
     metric_stat_name,
+    read_run_metadata,
 )
 
 _console = Console()

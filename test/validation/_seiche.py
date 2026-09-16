@@ -21,7 +21,6 @@ from pathlib import Path
 import numpy as np
 
 from test.validation.oracles import wave_stats
-
 from test.validation.oracles.dispersion import (
     BETA_REF_DEFAULT,
     _boussinesq_period,

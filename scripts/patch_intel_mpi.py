@@ -20,7 +20,8 @@ replacement = bytes([0x0F, 0x31, 0x90])
 
 def rdtscp_works() -> bool:
     """Return True if rdtscp executes without SIGILL (fork-probe)."""
-    import ctypes.util, os
+    import ctypes.util
+    import os
 
     src = b"\x0f\x01\xf9\xc3"  # rdtscp; ret
     pid = os.fork()

@@ -39,9 +39,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import numpy as np
 
-from test.validation.oracles._lab import frame_times
-
 from test.framework.run_output import read_run_metadata
+from test.validation.oracles._lab import frame_times
 from test.validation.oracles.conservation import G, _windowed_decay_pct
 
 REPO_ROOT = Path(__file__).resolve().parents[2]

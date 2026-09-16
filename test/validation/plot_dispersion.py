@@ -49,8 +49,8 @@ from test.validation._seiche import (
     run_seiche,
 )
 from test.validation.oracles.dispersion import (
-    G,
     BETA_REF_DEFAULT,
+    G,
     _boussinesq_period,
 )
 

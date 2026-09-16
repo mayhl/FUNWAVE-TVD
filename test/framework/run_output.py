@@ -7,11 +7,13 @@ comparison kind.
 """
 
 from __future__ import annotations
+
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
-import re
+
 import yaml
 
 if TYPE_CHECKING:
@@ -107,6 +109,8 @@ _STATION_RE = re.compile(r"^sta_(\d{4})$")
 
 @dataclass
 class VariableInfo:
+    """An output variable's frame range and blow-up flag."""
+
     prefix: str
     first: int  # first valid timestep index
     last: int  # last valid timestep index (99999 excluded)
@@ -125,6 +129,8 @@ class VariableInfo:
 
 @dataclass
 class RunMetadata:
+    """A run's grid shape and output layout."""
+
     run_dir: Path
     output_dir: Path
     nx: int  # Mglob / grid_size[0]
@@ -138,6 +144,7 @@ class RunMetadata:
 
     @property
     def is_3d(self) -> bool:
+        """Whether the run carries vertical layers."""
         return self.nz > 1
 
     def field_path(self, prefix: str, idx: int) -> Path:
@@ -176,7 +183,7 @@ class RunMetadata:
         # ref trees readable
         return sorted(self.output_dir.glob(pattern)) + sorted(self.output_dir.glob(f"*/{pattern}"))
 
-    def read_field(self, path: Path) -> "np.ndarray":
+    def read_field(self, path: Path) -> np.ndarray:
         """Read a field file and return a float32 numpy array.
 
         2D runs return (ny, nx).
@@ -224,6 +231,7 @@ def get_output_variables(
               "statistics" – wave-averaged mean fields (STATS_PREFIXES)
               "station"    – sta_%04d files only
               None         – all prefix_%05d files, unfiltered
+
     """
     output_dir = Path(output_dir)
 
@@ -234,11 +242,11 @@ def get_output_variables(
         # stations carry no 99999 sentinel -- that convention is field-file only
         return [VariableInfo("sta", min(suffixes), max(suffixes), unstable=False)]
 
-    _KIND_MAP: dict[str, frozenset[str]] = {
+    kind_map: dict[str, frozenset[str]] = {
         "field": FIELD_PREFIXES,
         "statistics": STATS_PREFIXES,
     }
-    allowed = _KIND_MAP.get(kind) if kind else None
+    allowed = kind_map.get(kind) if kind else None
 
     prefix_suffixes: dict[str, list[int]] = defaultdict(list)
     # channels own subfolders since board 3 (one level); flat entries keep
@@ -353,7 +361,7 @@ def compute_metric_series(
     idx_first: int,
     idx_last: int,
     floor: float = DEFAULT_FLOOR,
-) -> "np.ndarray":
+) -> np.ndarray:
     """Compute a per-timestep error metric between ref and dev output fields.
 
     For mask fields (MASK_PREFIXES): returns mismatch fraction in [0, 1].

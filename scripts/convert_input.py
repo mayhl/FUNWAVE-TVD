@@ -241,6 +241,7 @@ _WK_PARAMS: dict[str, list[str]] = {
     ],
 }
 
+
 def _put(dst: dict, block: str, key: str, val):
     if val is not None:
         dst.setdefault(block, {})[key] = val

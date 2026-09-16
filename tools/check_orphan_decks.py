@@ -30,6 +30,7 @@ EXEMPT = {"examples/rip_2d/02_error.yaml", "examples/rip_2d/05_future_preview.ya
 
 
 def main() -> int:
+    """Report decks no config references; 1 when any."""
     referenced: set[Path] = set()
     for config in CONFIGS:
         for sim in yaml.safe_load(config.read_text())["simulations"]:

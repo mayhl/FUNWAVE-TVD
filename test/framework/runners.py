@@ -1,16 +1,20 @@
-import time
 import os
 import subprocess
+import time
+
 import yaml
 from rich.console import Console, Group
-from rich.table import Table
-from rich.progress import Progress, BarColumn, TextColumn, TaskProgressColumn, TimeElapsedColumn
 from rich.live import Live
 from rich.panel import Panel
+from rich.progress import BarColumn, Progress, TaskProgressColumn, TextColumn, TimeElapsedColumn
+from rich.table import Table
+
 from test.framework.base_runner import BaseRunner
 
 
 class UnitTestRunner(BaseRunner):
+    """The pFUnit tier: build the test binaries, run them, tabulate."""
+
     def __init__(self, reporter, mode="dev", build_dir=None, compile_only=False):
         super().__init__(reporter)
         self.mode = mode
@@ -39,6 +43,7 @@ class UnitTestRunner(BaseRunner):
         return "\n".join(formatted)
 
     def run(self):
+        """Run the unit tests in dev or ci mode; True when all pass."""
         self.reporter.step(f"Running Unit Tests ({self.mode.upper()} mode)")
         self.reporter.step("")
         if self.mode == "ci":
@@ -74,7 +79,7 @@ class UnitTestRunner(BaseRunner):
 
         # Load test groups from YAML configuration
         config_path = os.path.join(os.environ.get("FUNWAVE_SRC_ROOT", os.getcwd()), "test/unit/test_config.yaml")
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             config = yaml.safe_load(f)
             groups_from_yaml = {g["name"]: g["tests"] for g in config["groups"]}
             all_defined_tests = [t for tests in groups_from_yaml.values() for t in tests]
@@ -163,6 +168,7 @@ class UnitTestRunner(BaseRunner):
         return all(r["status"] == "Pass" for r in results)
 
     def display_results_table(self, results):
+        """Print the per-test status table."""
         table = Table(title="Test Execution Summary")
         table.add_column("Test File", style="cyan", no_wrap=True)
         table.add_column("Status", style="magenta")

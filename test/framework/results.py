@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -7,6 +8,8 @@ from typing import Literal
 
 @dataclass
 class MetricResult:
+    """One comparator metric against its tolerance."""
+
     variable: str
     stat: str  # "L2_mean", "L2_max", "rmse", "max_abs"
     value: float
@@ -17,6 +20,8 @@ class MetricResult:
 
 @dataclass
 class InteractiveFigure:
+    """A serialized interactive figure for the HTML report."""
+
     # Serialized figure for HTML embedding.
     # plotly: fig.to_json()
     # bokeh:  json.dumps(bokeh.embed.json_item(plot.state))  — also covers HoloViews/Bokeh backend
@@ -27,6 +32,8 @@ class InteractiveFigure:
 
 @dataclass
 class FigureSpec:
+    """A report figure: title, raster path, optional interactive embed."""
+
     title: str = ""
     png_path: Path | None = None  # PDF path (matplotlib or kaleido raster)
     interactive: InteractiveFigure | None = None  # HTML embed
@@ -34,6 +41,8 @@ class FigureSpec:
 
 @dataclass
 class SubsectionResult:
+    """A field, station or statistics block of metrics and figures."""
+
     kind: Literal["field", "station", "statistics"]
     label: str
     metrics: list[MetricResult] = field(default_factory=list)
@@ -41,10 +50,12 @@ class SubsectionResult:
 
     @property
     def n_passed(self) -> int:
+        """Gated (finite-tolerance) metrics that passed."""
         return sum(1 for m in self.metrics if math.isfinite(m.tolerance) and m.passed)
 
     @property
     def n_total(self) -> int:
+        """Gated (finite-tolerance) metrics."""
         return sum(1 for m in self.metrics if math.isfinite(m.tolerance))
 
     @property
@@ -58,6 +69,8 @@ class SubsectionResult:
 
 @dataclass
 class SimResult:
+    """One sim's verdict with its subsections and run facts."""
+
     name: str
     # PASS | FAIL | XFAIL | XPASS | SIM_FAILED | POSTPROCESS_ERROR | COMPLETED
     status: str
@@ -70,4 +83,5 @@ class SimResult:
     run: dict = field(default_factory=dict)
 
     def subsection(self, kind: str) -> SubsectionResult | None:
+        """The subsection of a kind, or None."""
         return next((s for s in self.subsections if s.kind == kind), None)

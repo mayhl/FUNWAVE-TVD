@@ -23,9 +23,9 @@ from pathlib import Path
 import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
-from test.framework.tolerances import check_keys
 from test.framework.run_output import read_run_metadata
-from test.validation.oracles._lab import new_figure, read_table, save_figure, nrmse_pct
+from test.framework.tolerances import check_keys
+from test.validation.oracles._lab import new_figure, nrmse_pct, read_table, save_figure
 
 _LABEL = "Morphology"
 ACCEPTED_KEYS = (

@@ -38,8 +38,8 @@ from pathlib import Path
 import numpy as np
 
 from test.framework.results import MetricResult, SubsectionResult
-from test.framework.tolerances import check_keys
 from test.framework.run_output import read_run_metadata
+from test.framework.tolerances import check_keys
 from test.validation.oracles import wave_stats
 from test.validation.oracles._lab import load_deck, new_figure, save_figure
 from test.validation.oracles.surf import _station_x
