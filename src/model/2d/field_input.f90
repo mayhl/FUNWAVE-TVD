@@ -6,29 +6,37 @@
 !  Static-field input seam: one reference grammar + one dispatching
 !  reader for 2D snapshot fields.
 !
-!  Reference grammar (mirrors the planned NetCDF container design):
+!  Reference grammar (mirrors the NetCDF container design):
 !    depth.txt                  loose file, format from the extension
-!    root#/bathymetry/depth     master container (input_container:) path
-!    other.nc#/group/var        explicit container, overrides the master
+!    other.nc#/group/var        one variable inside a container file
+!    root#/bathymetry/depth     master container (input_container:)
 !  A fragment-only "#/path" is rejected — unquoted it parses as an
 !  empty YAML value anyway (comment), so the container token is
 !  mandatory before '#'.
 !
-!  Formats: ascii (legacy GetFile rows) and binary (the same row
-!  contract as a real(SP) stream) are live; netcdf (and with it any
-!  container ref) gates pending the NetCDF bringup — output-first.
+!  Formats: ascii (legacy GetFile rows, one record per global J, values
+!  separated by blanks, tabs or commas — a .csv reads as is); binary
+!  (the same rows as a real(SP) stream, no header, so the deck carries
+!  the dimensions); netcdf (a 2-D variable on (x, y) — a loose .nc
+!  holds exactly one 2-D variable, a container ref names it).
+!  The master container waits on the input_container: key.
+!
+!  Windows: a present grid.n_cells is an origin-anchored subset of a
+!  larger ascii or netcdf file; binary has no record structure to
+!  skip, so its dimensions must equal the deck's (check_binary_size).
 !
 !  HISTORY :
 !    07/21/2026  Michael-Angelo Y.H. Lam
+!    09/16/2026  netcdf reader; ascii reader + dims scan moved from geometry
 !
 !-------------------------------------------------
 
 module model_field_input_mod
+   use netcdf
    use core_constants_mod, only: SP
    use core_env_mod, only: type_env
    use core_grid_mod, only: type_grid_2d
    use core_path_mod, only: type_path
-   use model_geometry_mod, only: read_field_ascii
 
    implicit none
 
@@ -36,6 +44,9 @@ module model_field_input_mod
    public :: type_file_spec
    public :: parse_file_spec
    public :: read_field
+   public :: read_field_ascii
+   public :: scan_field_dims
+   public :: check_binary_size
 
    ! Parsed field-file reference — where the data lives and how to
    ! decode it.  container = "" for a loose file; "root" resolves
@@ -109,11 +120,7 @@ contains
       type(type_grid_2d), intent(in) :: grid
       real(SP), intent(inout) :: arr(:, :)
 
-      if (len(spec%container) > 0) then
-         call env%log%exit_on_error("field input: container refs are pending"// &
-                                    " the NetCDF bringup ('"//spec%container//"#"// &
-                                    spec%group_path//"')")
-      end if
+      call check_container(env, spec)
 
       select case (spec%format)
       case ("ascii")
@@ -121,14 +128,121 @@ contains
       case ("binary")
          call read_field_binary(env, spec%path, grid, arr)
       case ("netcdf")
-         call env%log%exit_on_error("field input: netcdf is pending the"// &
-                                    " NetCDF bringup ('"//spec%path//"')")
+         call read_field_netcdf(env, spec, grid, arr)
       case default
          call env%log%exit_on_error("field input: unknown format '"// &
                                     spec%format//"'")
       end select
 
    end subroutine read_field
+
+   ! ----------------------------------------------------------------
+   ! File dimensions for the self-describing formats (n_cells
+   ! inference and the --validate window check); binary carries none.
+   ! ----------------------------------------------------------------
+   subroutine scan_field_dims(env, spec, nx, ny)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      integer, intent(out) :: nx, ny
+
+      integer :: ncid, grp, varid
+
+      call check_container(env, spec)
+
+      select case (spec%format)
+      case ("ascii")
+         call scan_ascii_dims(env, spec%path, nx, ny)
+      case ("netcdf")
+         call open_field_netcdf(env, spec, ncid, grp, varid, nx, ny)
+         call nc_check(env, nf90_close(ncid), "close "//nc_name(spec))
+      case ("binary")
+         call env%log%exit_on_error("field input: a binary stream carries no"// &
+                                    " dimensions — set grid/n_cells ('"//spec%path//"')")
+      case default
+         call env%log%exit_on_error("field input: unknown format '"// &
+                                    spec%format//"'")
+      end select
+
+   end subroutine scan_field_dims
+
+   ! ----------------------------------------------------------------
+   ! A binary field is exactly nx*ny values of the working precision;
+   ! anything else is the wrong file, precision or dimensions.
+   ! ----------------------------------------------------------------
+   subroutine check_binary_size(env, spec, nx, ny)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      integer, intent(in) :: nx, ny
+
+      integer(8) :: nbytes, want
+      character(32) :: have_s, want_s
+
+      inquire (file=spec%path, size=nbytes)
+      want = int(nx, 8)*int(ny, 8)*int(storage_size(0.0_SP)/8, 8)
+      if (nbytes /= want) then
+         write (have_s, '(I0)') nbytes
+         write (want_s, '(I0)') want
+         call env%log%exit_on_error("field input: "//spec%path//" holds "// &
+                                    trim(have_s)//" bytes, grid/n_cells at the working"// &
+                                    " precision wants "//trim(want_s))
+      end if
+
+   end subroutine check_binary_size
+
+   ! ----------------------------------------------------------------
+   ! Legacy GetFile rows: one record of Mglob values per global J.
+   ! Every rank reads the file — init-time only, no scatter.  A
+   ! list-directed read drops the rest of a longer record, which is
+   ! what makes a present n_cells an origin-anchored window; it also
+   ! takes an empty field (",,") as a null that leaves the element
+   ! untouched, so the row is sentinel-filled and checked.  A short
+   ! record silently continues into the next one — only the dims scan
+   ! (n_cells absent, or --validate) catches those.
+   ! ----------------------------------------------------------------
+   subroutine read_field_ascii(env, fname, grid, arr)
+      type(type_env), intent(inout) :: env
+      character(*), intent(in) :: fname
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: arr(:, :)
+
+      real(SP), parameter :: NULL_FIELD = huge(1.0_SP)
+      real(SP), allocatable :: row(:)
+      character(16) :: row_s
+      logical :: exists
+      integer :: gj, unit, ios
+
+      inquire (file=trim(fname), exist=exists)
+      if (.not. exists) then
+         call env%log%exit_on_error( &
+            "read_field_ascii: cannot find "//trim(fname))
+      end if
+
+      allocate (row(grid%M))
+      open (newunit=unit, file=trim(fname), status="old", action="read")
+      do gj = 1, grid%N
+         row = NULL_FIELD
+         read (unit, *, iostat=ios) row
+         if (ios /= 0 .or. any(row == NULL_FIELD)) then
+            write (row_s, '(I0)') gj
+            if (ios > 0) then
+               call env%log%exit_on_error("read_field_ascii: "//trim(fname)// &
+                                          " row "//trim(row_s)//": not a numeric value (header line?)")
+            else if (ios < 0) then
+               call env%log%exit_on_error("read_field_ascii: "//trim(fname)// &
+                                          " ends at row "//trim(row_s)//", fewer rows than the grid")
+            else
+               call env%log%exit_on_error("read_field_ascii: "//trim(fname)// &
+                                          " row "//trim(row_s)//": empty field")
+            end if
+         end if
+         if (gj >= grid%jbegin .and. gj <= grid%jstop) then
+            arr(grid%lp%ib:grid%lp%ie, grid%lp%jb + gj - grid%jbegin) = &
+               row(grid%ibegin:grid%istop)
+         end if
+      end do
+      close (unit)
+
+   end subroutine read_field_ascii
 
    ! ----------------------------------------------------------------
    ! Binary twin of read_field_ascii: the same global row layout (one
@@ -164,5 +278,240 @@ contains
       close (unit)
 
    end subroutine read_field_binary
+
+   ! ----------------------------------------------------------------
+   ! NetCDF: every rank reads its own (x, y) window of the variable —
+   ! the library does the row skipping the ascii reader pays for by
+   ! scanning.  The file may be larger than the grid (window), never
+   ! smaller.
+   ! ----------------------------------------------------------------
+   subroutine read_field_netcdf(env, spec, grid, arr)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(inout) :: arr(:, :)
+
+      integer :: ncid, grp, varid, nx, ny
+      character(32) :: dims_s
+
+      call open_field_netcdf(env, spec, ncid, grp, varid, nx, ny)
+      if (nx < grid%M .or. ny < grid%N) then
+         write (dims_s, '(I0,A,I0)') nx, " x ", ny
+         call env%log%exit_on_error("field input: "//nc_name(spec)//" is "// &
+                                    trim(dims_s)//", smaller than the grid")
+      end if
+      call nc_check(env, nf90_get_var(grp, varid, &
+                                      arr(grid%lp%ib:grid%lp%ie, grid%lp%jb:grid%lp%je), &
+                                      start=[grid%ibegin, grid%jbegin], &
+                                      count=[grid%local_nx, grid%local_ny]), &
+                    "read "//nc_name(spec))
+      call nc_check(env, nf90_close(ncid), "close "//nc_name(spec))
+
+   end subroutine read_field_netcdf
+
+   ! ----------------------------------------------------------------
+   ! Open the file and locate the field: the named variable under the
+   ! container's group path, or the sole 2-D variable of a loose file.
+   ! Returns the open ids and the variable's (x, y) extents.
+   ! ----------------------------------------------------------------
+   subroutine open_field_netcdf(env, spec, ncid, grp, varid, nx, ny)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      integer, intent(out) :: ncid, grp, varid, nx, ny
+
+      character(NF90_MAX_NAME) :: vname
+      character(:), allocatable :: fname, names
+      logical :: exists
+      integer :: islash, nvars, iv, ndims, n2d, dimids(2)
+
+      fname = nc_name(spec)
+      inquire (file=fname, exist=exists)
+      if (.not. exists) then
+         call env%log%exit_on_error("read_field_netcdf: cannot find "//fname)
+      end if
+      call nc_check(env, nf90_open(fname, NF90_NOWRITE, ncid), "open "//fname)
+
+      if (len(spec%group_path) > 0) then
+         islash = index(spec%group_path, "/", back=.true.)
+         if (islash == len(spec%group_path)) then
+            call env%log%exit_on_error("field input: no variable name in '"// &
+                                       spec%container//"#"//spec%group_path//"'")
+         end if
+         grp = ncid
+         if (islash > 1) then
+            call nc_check(env, nf90_inq_grp_full_ncid(ncid, spec%group_path(1:islash - 1), grp), &
+                          "group "//spec%group_path(1:islash - 1)//" in "//fname)
+         end if
+         call nc_check(env, nf90_inq_varid(grp, spec%group_path(islash + 1:), varid), &
+                       "variable "//spec%group_path(islash + 1:)//" in "//fname)
+      else
+         ! loose file: exactly one 2-D variable, or the deck must name it
+         grp = ncid
+         call nc_check(env, nf90_inquire(ncid, nVariables=nvars), "inquire "//fname)
+         n2d = 0
+         names = ""
+         do iv = 1, nvars
+            call nc_check(env, nf90_inquire_variable(ncid, iv, name=vname, ndims=ndims), &
+                          "inquire variable in "//fname)
+            if (ndims /= 2) cycle
+            n2d = n2d + 1
+            varid = iv
+            names = names//" "//trim(vname)
+         end do
+         if (n2d == 0) then
+            call env%log%exit_on_error("field input: no 2-D variable in "//fname)
+         else if (n2d > 1) then
+            call env%log%exit_on_error("field input: "//fname//" holds several 2-D"// &
+                                       " variables ("//trim(names)//") — name one as "// &
+                                       fname//"#/<var>")
+         end if
+      end if
+
+      call nc_check(env, nf90_inquire_variable(grp, varid, ndims=ndims), &
+                    "inquire "//fname)
+      if (ndims /= 2) then
+         call env%log%exit_on_error("field input: '"//spec%group_path// &
+                                    "' in "//fname//" is not a 2-D variable")
+      end if
+      call nc_check(env, nf90_inquire_variable(grp, varid, dimids=dimids), &
+                    "inquire "//fname)
+      call nc_check(env, nf90_inquire_dimension(grp, dimids(1), len=nx), "x dim of "//fname)
+      call nc_check(env, nf90_inquire_dimension(grp, dimids(2), len=ny), "y dim of "//fname)
+
+   end subroutine open_field_netcdf
+
+   ! the file a netcdf spec names: its container, else its loose path
+   function nc_name(spec) result(fname)
+      type(type_file_spec), intent(in) :: spec
+      character(:), allocatable :: fname
+      if (len(spec%container) > 0) then
+         fname = spec%container
+      else
+         fname = spec%path
+      end if
+   end function nc_name
+
+   ! the master container has no deck key yet
+   subroutine check_container(env, spec)
+      type(type_env), intent(inout) :: env
+      type(type_file_spec), intent(in) :: spec
+      if (spec%container == "root") then
+         call env%log%exit_on_error("field input: input_container: is pending ('root#"// &
+                                    spec%group_path//"')")
+      end if
+   end subroutine check_container
+
+   subroutine nc_check(env, status, what)
+      type(type_env), intent(inout) :: env
+      integer, intent(in) :: status
+      character(*), intent(in) :: what
+      if (status /= NF90_NOERR) then
+         call env%log%exit_on_error("field input/netcdf: "//what//": "// &
+                                    trim(nf90_strerror(status)))
+      end if
+   end subroutine nc_check
+
+   ! ----------------------------------------------------------------
+   ! Dimension scan of a headerless ASCII grid: nx = token count per
+   ! record (rectangularity enforced), ny = record count.  Chunked
+   ! non-advancing reads, so no line-length assumption; blanks, tabs,
+   ! CR and commas separate tokens; blank records are skipped (trailing
+   ! newline tolerance).  Each record's first token must parse as a
+   ! number (a header line is the usual offender) and no comma may
+   ! stand without a token before it (an empty field reads as a null).
+   ! One pass over the bytes -- config-time cost, paid only when
+   ! n_cells is absent (inference) or under --validate (window fit).
+   ! ----------------------------------------------------------------
+   subroutine scan_ascii_dims(env, fname, nx, ny)
+      use, intrinsic :: iso_fortran_env, only: iostat_end, iostat_eor
+      type(type_env), intent(inout) :: env
+      character(*), intent(in) :: fname
+      integer, intent(out) :: nx, ny
+
+      character(4096) :: chunk
+      character(64) :: first_tok
+      character(16) :: row_s
+      character(1) :: c
+      logical :: exists, in_tok
+      integer :: unit, ios, sz, i, count, at_comma, nfirst
+      real(SP) :: probe
+
+      inquire (file=trim(fname), exist=exists)
+      if (.not. exists) then
+         call env%log%exit_on_error( &
+            "scan_ascii_dims: cannot find "//trim(fname))
+      end if
+
+      nx = 0
+      ny = 0
+      open (newunit=unit, file=trim(fname), status="old", action="read")
+      record: do
+         count = 0
+         at_comma = 0        ! token count when the last comma was seen
+         nfirst = 0
+         first_tok = ""
+         in_tok = .false.
+         do
+            read (unit, '(A)', advance="no", size=sz, iostat=ios) chunk
+            do i = 1, sz
+               c = chunk(i:i)
+               if (c == ",") then
+                  in_tok = .false.
+                  if (count == at_comma) call fail("empty field")
+                  at_comma = count
+               else if (c == " " .or. c == char(9) .or. c == char(13)) then
+                  in_tok = .false.
+               else
+                  if (.not. in_tok) then
+                     in_tok = .true.
+                     count = count + 1
+                  end if
+                  if (count == 1 .and. nfirst < len(first_tok)) then
+                     nfirst = nfirst + 1
+                     first_tok(nfirst:nfirst) = c
+                  end if
+               end if
+            end do
+            if (ios == iostat_eor) exit
+            if (ios == iostat_end) then
+               if (count > 0) call check_row()
+               exit record
+            end if
+         end do
+         call check_row()
+      end do record
+      close (unit)
+
+      if (nx == 0 .or. ny == 0) then
+         call env%log%exit_on_error( &
+            "scan_ascii_dims: no data rows in "//trim(fname))
+      end if
+
+   contains
+
+      subroutine fail(what)
+         character(*), intent(in) :: what
+         write (row_s, '(I0)') ny + 1
+         call env%log%exit_on_error("scan_ascii_dims: "//trim(fname)//" row "// &
+                                    trim(row_s)//": "//what)
+      end subroutine fail
+
+      subroutine check_row()
+         integer :: ios_tok
+         if (count == 0) return  ! blank record
+         if (count > 0 .and. count == at_comma) call fail("empty field")
+         read (first_tok, *, iostat=ios_tok) probe
+         if (ios_tok /= 0) call fail("not a numeric value (header line?)")
+         ny = ny + 1
+         if (nx == 0) then
+            nx = count
+         else if (count /= nx) then
+            call env%log%exit_on_error( &
+               "scan_ascii_dims: ragged row in "//trim(fname)// &
+               " (file corrupt or not a rectangular grid)")
+         end if
+      end subroutine check_row
+
+   end subroutine scan_ascii_dims
 
 end module model_field_input_mod

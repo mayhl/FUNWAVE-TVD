@@ -663,8 +663,8 @@ sections:
       bathymetry.depth: {legacy: DEPTH_FLAT, default: ~, units: m, latex: $d_0$, doc: Still-water depth (flat and slope types).}
       bathymetry.slope: {legacy: SLP, default: ~, units: ~, latex: $s$, doc: Bed slope for a sloping-beach bathymetry.}
       bathymetry.x0: {legacy: Xslp, default: 0.0, units: m, latex: '$x_{s0}$', doc: x location where the slope begins.}
-      bathymetry.file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: Bathymetry data file (file type).}
-      bathymetry.file_type: {legacy: ~, default: ascii, units: ~, values: [ascii], doc: Bathymetry file format.}
+      bathymetry.file: {legacy: DEPTH_FILE, default: ~, units: ~, doc: "Bathymetry field (file type): a loose file, format from the extension (.bin real stream, .nc netcdf holding one 2-D variable, anything else ascii rows separated by blanks or commas), or a container reference other.nc#/group/var. Binary carries no dimensions, so n_cells is required and must equal the file's."}
+      bathymetry.format: {legacy: ~, default: ~, units: ~, values: [ascii, binary, netcdf], doc: Bathymetry file format override (default from the extension).}
       bathymetry.correction: {legacy: BATHY_CORRECTION, default: false, units: ~, doc: Apply the bathymetry smoothing/correction pass (file type).}
       bathymetry.smooth_below_depth: {legacy: ~, default: ~, units: m, doc: "Correction-pass smoothing floor; absent = off (-LARGE sentinel)."}
       bathymetry.slope_cap: {advanced: true, legacy: ~, default: 1.0, units: ~, doc: Correction-pass maximum bed slope.}

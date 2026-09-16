@@ -3,12 +3,14 @@ module test_field_input
 
    use mpi_f08
    use pFUnit
+   use netcdf
    use core_comm_mod, only: type_comm, new_comm
    use core_constants_mod, only: SP
    use core_env_mod, only: type_env
    use core_log_io_mod, only: new_log_writer
    use core_grid_mod, only: type_grid_2d
-   use model_field_input_mod, only: type_file_spec, parse_file_spec, read_field
+   use model_field_input_mod, only: type_file_spec, parse_file_spec, read_field, &
+                                    scan_field_dims, check_binary_size
 
    implicit none
 
@@ -25,19 +27,113 @@ contains
 
    ! Minimal env (log only) -- new_env would re-init MPI and clash with
    ! the pFUnit-provided communicator (test_checkpoint pattern)
-   subroutine open_env_grid(this, env, grid, comm)
+   subroutine open_env_grid(this, env, grid, comm, nx_proc)
       class(MpiTestMethod), intent(inout) :: this
       type(type_env), intent(inout) :: env
       type(type_grid_2d), intent(inout) :: grid
       type(type_comm), intent(inout) :: comm
+      integer, intent(in), optional :: nx_proc
       comm = new_comm(io_rank_id=0, comm_id=this%getMpiCommunicator())
       allocate (env%log)
       env%log = new_log_writer("test_fi", comm%is_io_node())
       grid%M = TEST_M; grid%N = TEST_N
       grid%nx_proc = 1; grid%ny_proc = 1
+      if (present(nx_proc)) grid%nx_proc = nx_proc
       call grid%setup(comm, create_partition=.false.)
       call grid%init_spacing(dx0=DX_SP, dy0=DX_SP)
    end subroutine open_env_grid
+
+   ! the analytic fill every encoding carries: 100*j + i
+   pure function fill(gi, gj) result(v)
+      integer, intent(in) :: gi, gj
+      real(SP) :: v
+      v = real(100*gj + gi, SP)
+   end function fill
+
+   ! nx x ny rows of the fill, as legacy ascii records, comma-separated
+   ! records (csv) or a real stream
+   subroutine write_rows(fname, nx, ny, binary, csv)
+      character(*), intent(in) :: fname
+      integer, intent(in) :: nx, ny
+      logical, intent(in) :: binary
+      logical, intent(in), optional :: csv
+      real(SP), allocatable :: row(:)
+      integer :: unit, gi, gj
+      logical :: commas
+      commas = .false.
+      if (present(csv)) commas = csv
+      allocate (row(nx))
+      if (binary) then
+         open (newunit=unit, file=fname, status="replace", &
+               action="write", access="stream", form="unformatted")
+      else
+         open (newunit=unit, file=fname, status="replace", action="write")
+      end if
+      do gj = 1, ny
+         do gi = 1, nx
+            row(gi) = fill(gi, gj)
+         end do
+         if (binary) then
+            write (unit) row
+         else if (commas) then
+            write (unit, '(*(G0,:,","))') row
+         else
+            write (unit, *) row
+         end if
+      end do
+      close (unit)
+   end subroutine write_rows
+
+   ! nx x ny netcdf "depth" on (x, y) under grpname (root when ""), with a
+   ! 1-D x coordinate the sole-2-D rule must ignore and, with decoy, a
+   ! second root 2-D variable "other" = -fill that makes the loose form
+   ! ambiguous
+   subroutine write_nc(fname, nx, ny, grpname, decoy)
+      character(*), intent(in) :: fname, grpname
+      integer, intent(in) :: nx, ny
+      logical, intent(in) :: decoy
+      real(SP), allocatable :: fld(:, :)
+      integer :: ncid, grp, xd, yd, vid, xid, oid, gi, gj
+
+      allocate (fld(nx, ny))
+      do gj = 1, ny
+         do gi = 1, nx
+            fld(gi, gj) = fill(gi, gj)
+         end do
+      end do
+      @assertEqual(NF90_NOERR, nf90_create(fname, ior(NF90_CLOBBER, NF90_NETCDF4), ncid))
+      @assertEqual(NF90_NOERR, nf90_def_dim(ncid, "x", nx, xd))
+      @assertEqual(NF90_NOERR, nf90_def_dim(ncid, "y", ny, yd))
+      @assertEqual(NF90_NOERR, nf90_def_var(ncid, "x", NF90_DOUBLE, [xd], xid))
+      grp = ncid
+      if (len(grpname) > 0) then
+         @assertEqual(NF90_NOERR, nf90_def_grp(ncid, grpname, grp))
+      end if
+      @assertEqual(NF90_NOERR, nf90_def_var(grp, "depth", NF90_DOUBLE, [xd, yd], vid))
+      if (decoy) then
+         @assertEqual(NF90_NOERR, nf90_def_var(ncid, "other", NF90_DOUBLE, [xd, yd], oid))
+      end if
+      @assertEqual(NF90_NOERR, nf90_enddef(ncid))
+      @assertEqual(NF90_NOERR, nf90_put_var(ncid, xid, [(real(gi, 8), gi=1, nx)]))
+      @assertEqual(NF90_NOERR, nf90_put_var(grp, vid, fld))
+      if (decoy) then
+         @assertEqual(NF90_NOERR, nf90_put_var(ncid, oid, -fld))
+      end if
+      @assertEqual(NF90_NOERR, nf90_close(ncid))
+   end subroutine write_nc
+
+   ! this rank's interior equals sign * fill at its global cells
+   subroutine assert_interior(grid, arr, sign)
+      type(type_grid_2d), intent(in) :: grid
+      real(SP), intent(in) :: arr(:, :)
+      real(SP), intent(in) :: sign
+      integer :: gi, gj
+      do gj = grid%jbegin, grid%jstop
+         do gi = grid%ibegin, grid%istop
+            @assertEqual(sign*fill(gi, gj), arr(grid%lp%ib + gi - grid%ibegin, grid%lp%jb + gj - grid%jbegin), TOL_SP)
+         end do
+      end do
+   end subroutine assert_interior
 
    ! ----------------------------------------------------------------
    ! Grammar: loose paths pick the format from the extension;
@@ -82,7 +178,8 @@ contains
 
    ! ----------------------------------------------------------------
    ! ascii and binary round-trip the same global row layout to the
-   ! same interior values.
+   ! same interior values; the ascii scan and the binary size check
+   ! see the same dimensions.
    ! ----------------------------------------------------------------
    @test(npes=[1])
    subroutine test_ascii_binary_round_trip(this)
@@ -91,47 +188,125 @@ contains
       type(type_grid_2d)   :: grid
       type(type_comm)      :: comm
       type(type_file_spec) :: spec
-      real(SP), allocatable :: arr_a(:, :), arr_b(:, :), row(:)
-      integer :: unit, gi, gj
+      real(SP), allocatable :: arr_a(:, :), arr_b(:, :)
+      integer :: nx, ny
 
       call open_env_grid(this, env, grid, comm)
       allocate (arr_a(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
       allocate (arr_b(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
-      allocate (row(TEST_M))
 
-      ! field value 100*j + i, both encodings
-      open (newunit=unit, file="fi_field.txt", status="replace", action="write")
-      do gj = 1, TEST_N
-         do gi = 1, TEST_M
-            row(gi) = real(100*gj + gi, SP)
-         end do
-         write (unit, *) row
-      end do
-      close (unit)
-      open (newunit=unit, file="fi_field.bin", status="replace", &
-            action="write", access="stream", form="unformatted")
-      do gj = 1, TEST_N
-         do gi = 1, TEST_M
-            row(gi) = real(100*gj + gi, SP)
-         end do
-         write (unit) row
-      end do
-      close (unit)
+      call write_rows("fi_field.txt", TEST_M, TEST_N, binary=.false.)
+      call write_rows("fi_field.bin", TEST_M, TEST_N, binary=.true.)
 
       call parse_file_spec(env, "test", "fi_field.txt", spec)
       call read_field(env, spec, grid, arr_a)
+      call scan_field_dims(env, spec, nx, ny)
+      @assertEqual(TEST_M, nx)
+      @assertEqual(TEST_N, ny)
+
       call parse_file_spec(env, "test", "fi_field.bin", spec)
       call read_field(env, spec, grid, arr_b)
+      call check_binary_size(env, spec, TEST_M, TEST_N)
 
       ! interior slice matches the analytic fill, encodings agree exactly
-      do gj = 1, TEST_N
-         do gi = 1, TEST_M
-            @assertEqual(real(100*gj + gi, SP), arr_a(grid%lp%ib + gi - 1, grid%lp%jb + gj - 1), TOL_SP)
-         end do
-      end do
+      call assert_interior(grid, arr_a, 1.0_SP)
       @assertEqual(0.0_SP, maxval(abs(arr_a - arr_b)), TOL_SP)
+
+      ! a csv is the same ascii reader: commas separate, scan agrees
+      call write_rows("fi_field.csv", TEST_M, TEST_N, binary=.false., csv=.true.)
+      call parse_file_spec(env, "test", "fi_field.csv", spec)
+      @assertEqual("ascii", spec%format)
+      arr_b = 0.0_SP
+      call read_field(env, spec, grid, arr_b)
+      @assertEqual(0.0_SP, maxval(abs(arr_a - arr_b)), TOL_SP)
+      call scan_field_dims(env, spec, nx, ny)
+      @assertEqual(TEST_M, nx)
+      @assertEqual(TEST_N, ny)
 
       call dummy_fix_lint()
    end subroutine test_ascii_binary_round_trip
+
+   ! ----------------------------------------------------------------
+   ! netcdf: a loose file resolves to its sole 2-D variable (the 1-D
+   ! coordinate does not count); a container ref names the variable,
+   ! through a group or in the root, past a decoy.
+   ! ----------------------------------------------------------------
+   @test(npes=[1])
+   subroutine test_netcdf_round_trip(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env)       :: env
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_file_spec) :: spec
+      real(SP), allocatable :: arr(:, :)
+      integer :: nx, ny
+
+      call open_env_grid(this, env, grid, comm)
+      allocate (arr(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
+      call write_nc("fi_field.nc", TEST_M, TEST_N, "", decoy=.false.)
+      call write_nc("fi_grp.nc", TEST_M, TEST_N, "bathymetry", decoy=.true.)
+
+      call parse_file_spec(env, "test", "fi_field.nc", spec)
+      call read_field(env, spec, grid, arr)
+      call assert_interior(grid, arr, 1.0_SP)
+      call scan_field_dims(env, spec, nx, ny)
+      @assertEqual(TEST_M, nx)
+      @assertEqual(TEST_N, ny)
+
+      call parse_file_spec(env, "test", "fi_grp.nc#/bathymetry/depth", spec)
+      call read_field(env, spec, grid, arr)
+      call assert_interior(grid, arr, 1.0_SP)
+      call scan_field_dims(env, spec, nx, ny)
+      @assertEqual(TEST_M, nx)
+      @assertEqual(TEST_N, ny)
+
+      call parse_file_spec(env, "test", "fi_grp.nc#/other", spec)
+      call read_field(env, spec, grid, arr)
+      call assert_interior(grid, arr, -1.0_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_netcdf_round_trip
+
+   ! ----------------------------------------------------------------
+   ! Two ranks along x each read their own window of a file larger
+   ! than the grid (origin-anchored n_cells subset), ascii and netcdf
+   ! bitwise equal.
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_window_np2(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_env)       :: env
+      type(type_grid_2d)   :: grid
+      type(type_comm)      :: comm
+      type(type_file_spec) :: spec
+      real(SP), allocatable :: arr_a(:, :), arr_n(:, :)
+      integer :: nx, ny
+
+      call open_env_grid(this, env, grid, comm, nx_proc=2)
+      allocate (arr_a(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+      allocate (arr_n(grid%lp%mloc, grid%lp%nloc), source=0.0_SP)
+
+      if (comm%is_io_node()) then
+         call write_rows("fi_win.txt", TEST_M + 4, TEST_N + 2, binary=.false.)
+         call write_nc("fi_win.nc", TEST_M + 4, TEST_N + 2, "", decoy=.false.)
+      end if
+      call MPI_Barrier(this%getMpiCommunicator())
+
+      call parse_file_spec(env, "test", "fi_win.txt", spec)
+      call read_field(env, spec, grid, arr_a)
+      call assert_interior(grid, arr_a, 1.0_SP)
+
+      call parse_file_spec(env, "test", "fi_win.nc", spec)
+      call read_field(env, spec, grid, arr_n)
+      call assert_interior(grid, arr_n, 1.0_SP)
+      call scan_field_dims(env, spec, nx, ny)
+      @assertEqual(TEST_M + 4, nx)
+      @assertEqual(TEST_N + 2, ny)
+
+      @assertEqual(0.0_SP, maxval(abs(arr_a - arr_n)), TOL_SP)
+
+      call dummy_fix_lint()
+   end subroutine test_window_np2
 
 end module test_field_input

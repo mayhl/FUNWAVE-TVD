@@ -22,7 +22,7 @@ qlink_pfunit_ctest(test_wavemaker libfunwave_model)
 qadd_pfunit_ctest(test_initial 4)
 qlink_pfunit_ctest(test_initial libfunwave_model)
 
-qadd_pfunit_ctest(test_field_input 1)
+qadd_pfunit_ctest(test_field_input 2)
 qlink_pfunit_ctest(test_field_input libfunwave_model)
 
 qadd_pfunit_ctest(test_geometry 4)

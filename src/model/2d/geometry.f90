@@ -25,7 +25,7 @@
 !      slope: <real>            slope only
 !      x0: <real>               slope only, default 0
 !      file: <path>             file only
-!      file_type: ascii         file only, default ascii
+!      format: <enum>           file only, default from the extension
 !      correction: <bool>       file only, default false
 !      smooth_below_depth: <real>  correction only, default -LARGE (off)
 !      slope_cap: <real>        correction only, default 1.0
@@ -41,7 +41,8 @@ module model_geometry_mod
    use core_comm_mod, only: type_comm
    use core_env_mod, only: type_env, get_sub_env
    use core_grid_mod, only: type_grid_2d, type_loop_bounds
-   use core_path_mod, only: type_path
+   use model_field_input_mod, only: type_file_spec, parse_file_spec, &
+                                    scan_field_dims, check_binary_size
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR
@@ -49,12 +50,12 @@ module model_geometry_mod
    implicit none
 
    private
-   public :: type_model_geometry, read_field_ascii, stagger_depth
+   public :: type_model_geometry, stagger_depth
 
    character(len=8), parameter :: BATHY_TYPES(3) = &
                                   [character(len=8) :: "file", "flat", "slope"]
-   character(len=8), parameter :: FILE_TYPES(1) = &
-                                  [character(len=8) :: "ascii"]
+   character(len=8), parameter :: FILE_TYPES(3) = &
+                                  [character(len=8) :: "ascii", "binary", "netcdf"]
 
    type, extends(type_model_base) :: type_model_geometry
 
@@ -78,8 +79,7 @@ module model_geometry_mod
 
       ! Bathymetry
       character(:), allocatable :: bathy_type
-      character(:), allocatable :: bathy_ftype
-      type(type_path) :: bathy_file
+      type(type_file_spec) :: bathy_spec
       real(SP) :: bathy_depth = 0.0_SP
       real(SP) :: bathy_slope = 0.0_SP
       real(SP) :: bathy_slope_x0 = 0.0_SP
@@ -104,9 +104,10 @@ contains
       type(type_yaml_reader) :: bathy_yaml
       real(SP), allocatable :: cell_size(:), origin(:)
       integer, allocatable :: n_cells(:), n_procs(:)
+      character(:), allocatable :: ref, fmt
       integer :: file_nx, file_ny
       logical :: no_cell_size, no_origin, no_decomp, no_ncells
-      logical :: no_dx_file, no_dy_file
+      logical :: no_dx_file, no_dy_file, no_fmt
 
       sub_env = get_sub_env(env, "grid")
       this%is_activated = .true.
@@ -178,8 +179,14 @@ contains
 
       select case (trim(this%bathy_type))
       case ("file")
-         call bathy_yaml%read_enum("file_type", FILE_TYPES, val=this%bathy_ftype, default="ascii")
-         call bathy_yaml%read_input_path("file", val=this%bathy_file)
+         call bathy_yaml%read_enum("format", FILE_TYPES, silent=no_fmt, val=fmt)
+         call bathy_yaml%read_string("file", val=ref)
+         if (no_fmt) then
+            call parse_file_spec(sub_env, "grid/bathymetry/file", ref, this%bathy_spec)
+         else
+            call parse_file_spec(sub_env, "grid/bathymetry/file", ref, this%bathy_spec, &
+                                 format_override=fmt)
+         end if
          call bathy_yaml%read("correction", val=this%bathy_correction, default="NO")
          ! NOTE: the vendored legacy still READ_FLOATs these two with the
          !       flat-txt parser, so under the YAML bridge it always lands
@@ -189,18 +196,29 @@ contains
          call bathy_yaml%read("slope_cap", val=this%slope_cap, default="1.0")
          ! absent n_cells = infer the domain from the file; present = subset
          ! window, whose fit only --validate pays the scan to prove (a
-         ! production run trusts the deck; an oversized window fails the
-         ! row parse at init_depth)
-         if (no_ncells .or. sub_env%yaml%unread_strict) then
-            call scan_ascii_dims(sub_env, this%bathy_file%root, file_nx, file_ny)
-         end if
-         if (no_ncells) then
-            this%grid_nx = file_nx
-            this%grid_ny = file_ny
-         else if (sub_env%yaml%unread_strict) then
-            if (this%grid_nx > file_nx .or. this%grid_ny > file_ny) then
+         ! production run trusts the deck; an oversized window fails at
+         ! read_field).  A binary stream carries no dimensions: n_cells is
+         ! required and must equal the file's
+         if (trim(this%bathy_spec%format) == "binary") then
+            if (no_ncells) then
                call sub_env%log%exit_on_error( &
-                  "grid/n_cells: window exceeds the bathymetry file dimensions")
+                  "grid/n_cells: required for binary bathymetry")
+            end if
+            if (sub_env%yaml%unread_strict) then
+               call check_binary_size(sub_env, this%bathy_spec, this%grid_nx, this%grid_ny)
+            end if
+         else
+            if (no_ncells .or. sub_env%yaml%unread_strict) then
+               call scan_field_dims(sub_env, this%bathy_spec, file_nx, file_ny)
+            end if
+            if (no_ncells) then
+               this%grid_nx = file_nx
+               this%grid_ny = file_ny
+            else if (sub_env%yaml%unread_strict) then
+               if (this%grid_nx > file_nx .or. this%grid_ny > file_ny) then
+                  call sub_env%log%exit_on_error( &
+                     "grid/n_cells: window exceeds the bathymetry file dimensions")
+               end if
             end if
          end if
 
@@ -508,113 +526,5 @@ contains
       end associate
 
    end subroutine geometry_correct_depth
-
-   ! ----------------------------------------------------------------
-   ! Read a global-interior ASCII field (legacy GetFile row layout:
-   ! one row of Mglob values per global J) and slice this rank's
-   ! interior into arr.  Every rank reads the file — init-time only,
-   ! no scatter.  Ghosts are the caller's concern.
-   ! ----------------------------------------------------------------
-   ! ----------------------------------------------------------------
-   ! Dimension scan of a headerless whitespace ASCII grid: nx = token
-   ! count per record (rectangularity enforced), ny = record count.
-   ! Chunked non-advancing reads, so no line-length assumption; tabs and
-   ! CR count as whitespace; blank records are skipped (trailing newline
-   ! tolerance). One pass over the bytes -- config-time cost, paid only
-   ! when n_cells is absent (inference) or under --validate (window fit).
-   ! ----------------------------------------------------------------
-   subroutine scan_ascii_dims(env, fname, nx, ny)
-      use, intrinsic :: iso_fortran_env, only: iostat_end, iostat_eor
-      type(type_env), intent(inout) :: env
-      character(*), intent(in) :: fname
-      integer, intent(out) :: nx, ny
-
-      character(4096) :: chunk
-      character(1) :: c
-      logical :: exists, in_tok
-      integer :: unit, ios, sz, i, count
-
-      inquire (file=trim(fname), exist=exists)
-      if (.not. exists) then
-         call env%log%exit_on_error( &
-            "scan_ascii_dims: cannot find "//trim(fname))
-      end if
-
-      nx = 0
-      ny = 0
-      open (newunit=unit, file=trim(fname), status="old", action="read")
-      record: do
-         count = 0
-         in_tok = .false.
-         do
-            read (unit, '(A)', advance="no", size=sz, iostat=ios) chunk
-            do i = 1, sz
-               c = chunk(i:i)
-               if (c == " " .or. c == char(9) .or. c == char(13)) then
-                  in_tok = .false.
-               else if (.not. in_tok) then
-                  in_tok = .true.
-                  count = count + 1
-               end if
-            end do
-            if (ios == iostat_eor) exit
-            if (ios == iostat_end) then
-               if (count > 0) call check_row()
-               exit record
-            end if
-         end do
-         call check_row()
-      end do record
-      close (unit)
-
-      if (nx == 0 .or. ny == 0) then
-         call env%log%exit_on_error( &
-            "scan_ascii_dims: no data rows in "//trim(fname))
-      end if
-
-   contains
-
-      subroutine check_row()
-         if (count == 0) return  ! blank record
-         ny = ny + 1
-         if (nx == 0) then
-            nx = count
-         else if (count /= nx) then
-            call env%log%exit_on_error( &
-               "scan_ascii_dims: ragged row in "//trim(fname)// &
-               " (file corrupt or not a rectangular grid)")
-         end if
-      end subroutine check_row
-
-   end subroutine scan_ascii_dims
-
-   subroutine read_field_ascii(env, fname, grid, arr)
-      type(type_env), intent(inout) :: env
-      character(*), intent(in) :: fname
-      type(type_grid_2d), intent(in) :: grid
-      real(SP), intent(inout) :: arr(:, :)
-
-      real(SP), allocatable :: row(:)
-      logical :: exists
-      integer :: gj, unit
-
-      inquire (file=trim(fname), exist=exists)
-      if (.not. exists) then
-         call env%log%exit_on_error( &
-            "read_field_ascii: cannot find "//trim(fname))
-      end if
-
-      allocate (row(grid%M))
-      open (newunit=unit, file=trim(fname), status="old", action="read")
-      do gj = 1, grid%N
-         read (unit, *) row
-         if (gj >= grid%jbegin .and. gj <= grid%jstop) then
-            arr(grid%lp%ib:grid%lp%ie, grid%lp%jb + gj - grid%jbegin) = &
-               row(grid%ibegin:grid%istop)
-         end if
-      end do
-      close (unit)
-
-   end subroutine read_field_ascii
 
 end module model_geometry_mod

@@ -255,7 +255,8 @@ module model_sediment_mod
                                       trid_y_periodic, type_trid_workspace
    use model_base_mod, only: type_model_base
    use model_bc_mod, only: type_model_bc
-   use model_geometry_mod, only: read_field_ascii, stagger_depth
+   use model_geometry_mod, only: stagger_depth
+   use model_field_input_mod, only: read_field_ascii
    use core_yaml_file_mod, only: type_yaml_reader
 
    implicit none

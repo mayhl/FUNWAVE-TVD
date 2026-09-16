@@ -164,8 +164,8 @@ Numerical scheme — CFL, Riemann solver, reconstruction, wet/dry floor.
 | `bathymetry.depth` | — | `DEPTH_FLAT` | m | Still-water depth (flat and slope types). |
 | `bathymetry.slope` | — | `SLP` | — | Bed slope for a sloping-beach bathymetry. |
 | `bathymetry.x0` | `0.0` | `Xslp` | m | x location where the slope begins. |
-| `bathymetry.file` | — | `DEPTH_FILE` | — | Bathymetry data file (file type). |
-| `bathymetry.file_type` | `ascii` | — | — | Bathymetry file format. One of `ascii`. |
+| `bathymetry.file` | — | `DEPTH_FILE` | — | Bathymetry field (file type): a loose file, format from the extension (.bin real stream, .nc netcdf holding one 2-D variable, anything else ascii rows separated by blanks or commas), or a container reference other.nc#/group/var. Binary carries no dimensions, so n_cells is required and must equal the file's. |
+| `bathymetry.format` | — | — | — | Bathymetry file format override (default from the extension). One of `ascii` \| `binary` \| `netcdf`. |
 | `bathymetry.correction` | `false` | `BATHY_CORRECTION` | — | Apply the bathymetry smoothing/correction pass (file type). |
 | `bathymetry.smooth_below_depth` | — | — | m | Correction-pass smoothing floor; absent = off (-LARGE sentinel). |
 | `crs.epsg` | — | — | — | EPSG code of the projected horizontal CRS in metres; presence georeferences the grid (absent = local unreferenced). |

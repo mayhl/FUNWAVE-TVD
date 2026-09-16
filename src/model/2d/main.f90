@@ -24,7 +24,8 @@ module model_main_mod
    use core_stepper_engine_mod, only: type_stepper_engine, type_engine_monitor
    use core_path_mod, only: type_path
 
-   use model_geometry_mod, only: type_model_geometry, read_field_ascii, stagger_depth
+   use model_geometry_mod, only: type_model_geometry, stagger_depth
+   use model_field_input_mod, only: read_field, read_field_ascii
    use model_simulation_mod, only: type_model_simulation
    use model_hot_start_mod, only: type_model_hot_start
    use model_initial_mod, only: type_model_initial
@@ -277,8 +278,8 @@ contains
       end if
 
       if (trim(this%geometry%bathy_type) == "file") then
-         call read_field_ascii(this%env, this%geometry%bathy_file%root, &
-                               this%grid, this%fields%depth)
+         call read_field(this%env, this%geometry%bathy_spec, this%grid, &
+                         this%fields%depth)
       end if
       call this%geometry%init_depth(this%grid, this%fields%depth, &
                                     this%fields%depth_x, this%fields%depth_y)
@@ -541,7 +542,6 @@ contains
    ! the parallel legacy GetFile — seam exchange, wall replication.
    ! ----------------------------------------------------------------
    subroutine load_friction(this)
-      use model_field_input_mod, only: read_field
       class(type_model_main), intent(inout) :: this
 
       call read_field(this%env, this%friction%cd_spec, this%grid, &
@@ -564,7 +564,6 @@ contains
    ! deformed bed is a grid.bathymetry concern.
    ! ----------------------------------------------------------------
    subroutine load_initial_fields(this)
-      use model_field_input_mod, only: read_field
       class(type_model_main), intent(inout) :: this
 
       associate (ini => this%initial, f => this%fields, g => this%grid)

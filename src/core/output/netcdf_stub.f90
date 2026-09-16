@@ -27,6 +27,9 @@ module netcdf
    public :: nf90_create, nf90_def_dim, nf90_def_var, nf90_put_att
    public :: nf90_def_grp, nf90_enddef, nf90_put_var, nf90_close, nf90_strerror
    public :: nf90_sync
+   public :: NF90_NOWRITE, NF90_MAX_NAME
+   public :: nf90_open, nf90_inquire, nf90_inquire_variable, nf90_inquire_dimension
+   public :: nf90_inq_varid, nf90_inq_grp_full_ncid, nf90_get_var
 
    integer, parameter :: NF90_NOERR = 0
    integer, parameter :: NF90_CLOBBER = 0
@@ -36,12 +39,19 @@ module netcdf
    integer, parameter :: NF90_FLOAT = 5
    integer, parameter :: NF90_DOUBLE = 6
    integer, parameter :: NF90_GLOBAL = 0
+   integer, parameter :: NF90_NOWRITE = 0
+   integer, parameter :: NF90_MAX_NAME = 256
 
    integer, parameter :: STUB_ERR = -1
 
    interface nf90_put_var
       module procedure put_var_0d, put_var_i0d, put_var_1d, put_var_i1d, put_var_2d
    end interface nf90_put_var
+
+   ! the one shape the field-input reader pulls
+   interface nf90_get_var
+      module procedure get_var_2d
+   end interface nf90_get_var
 
    ! character and real-array attributes, the two shapes the writer emits
    interface nf90_put_att
@@ -175,6 +185,13 @@ contains
       status = STUB_ERR
    end function put_var_2d
 
+   integer function nf90_sync(ncid) result(status)
+      integer, intent(in) :: ncid
+      associate (i => ncid)
+      end associate
+      status = STUB_ERR
+   end function nf90_sync
+
    integer function nf90_close(ncid) result(status)
       integer, intent(in) :: ncid
       associate (i => ncid)
@@ -182,12 +199,91 @@ contains
       status = STUB_ERR
    end function nf90_close
 
-   integer function nf90_sync(ncid) result(status)
+   ! --- read side (field_input) ---
+
+   integer function nf90_open(path, mode, ncid) result(status)
+      character(*), intent(in) :: path
+      integer, intent(in) :: mode
+      integer, intent(out) :: ncid
+      associate (p => path, m => mode)
+      end associate
+      ncid = -1
+      status = STUB_ERR
+   end function nf90_open
+
+   integer function nf90_inquire(ncid, nDimensions, nVariables, nAttributes, &
+                                 unlimitedDimId, formatNum) result(status)
       integer, intent(in) :: ncid
+      integer, intent(out), optional :: nDimensions, nVariables, nAttributes, &
+                                        unlimitedDimId, formatNum
       associate (i => ncid)
       end associate
+      if (present(nDimensions)) nDimensions = 0
+      if (present(nVariables)) nVariables = 0
+      if (present(nAttributes)) nAttributes = 0
+      if (present(unlimitedDimId)) unlimitedDimId = -1
+      if (present(formatNum)) formatNum = 0
       status = STUB_ERR
-   end function nf90_sync
+   end function nf90_inquire
+
+   integer function nf90_inquire_variable(ncid, varid, name, xtype, ndims, dimids, nAtts) &
+      result(status)
+      integer, intent(in) :: ncid, varid
+      character(*), intent(out), optional :: name
+      integer, intent(out), optional :: xtype, ndims, nAtts
+      integer, intent(out), optional :: dimids(:)
+      associate (i => ncid, v => varid)
+      end associate
+      if (present(name)) name = ''
+      if (present(xtype)) xtype = 0
+      if (present(ndims)) ndims = 0
+      if (present(dimids)) dimids = -1
+      if (present(nAtts)) nAtts = 0
+      status = STUB_ERR
+   end function nf90_inquire_variable
+
+   integer function nf90_inquire_dimension(ncid, dimid, name, len) result(status)
+      integer, intent(in) :: ncid, dimid
+      character(*), intent(out), optional :: name
+      integer, intent(out), optional :: len
+      associate (i => ncid, d => dimid)
+      end associate
+      if (present(name)) name = ''
+      if (present(len)) len = 0
+      status = STUB_ERR
+   end function nf90_inquire_dimension
+
+   integer function nf90_inq_varid(ncid, name, varid) result(status)
+      integer, intent(in) :: ncid
+      character(*), intent(in) :: name
+      integer, intent(out) :: varid
+      associate (i => ncid, n => name)
+      end associate
+      varid = -1
+      status = STUB_ERR
+   end function nf90_inq_varid
+
+   integer function nf90_inq_grp_full_ncid(ncid, full_name, grp_ncid) result(status)
+      integer, intent(in) :: ncid
+      character(*), intent(in) :: full_name
+      integer, intent(out) :: grp_ncid
+      associate (i => ncid, n => full_name)
+      end associate
+      grp_ncid = -1
+      status = STUB_ERR
+   end function nf90_inq_grp_full_ncid
+
+   integer function get_var_2d(ncid, varid, values, start, count) result(status)
+      integer, intent(in) :: ncid, varid
+      real(SP), intent(out) :: values(:, :)
+      integer, intent(in), optional :: start(:), count(:)
+      associate (i => ncid, v => varid)
+      end associate
+      if (present(start)) continue
+      if (present(count)) continue
+      values = 0.0_SP
+      status = STUB_ERR
+   end function get_var_2d
 
    function nf90_strerror(status) result(msg)
       integer, intent(in) :: status
