@@ -62,6 +62,14 @@
 !! results, and the extremes of a cell never sampled, hold FILL_VALUE;
 !! counts and
 !! durations hold 0.
+!!
+!! **Event log** — `enable_log(cap)` records every committed event as a
+!! row (onset, end, duration, peak, cell) in a per-accumulator buffer
+!! the owner drains (`n_events`, the `ev_*` arrays, `clear_events`);
+!! `peak` is the SIGNED sample furthest past the threshold (a magnitude
+!! threshold selects on |value|).  Rows beyond `cap` between drains are
+!! dropped and counted in `n_dropped`; `open_events` lists the events
+!! still open for the end-of-leg record.
 module core_accumulators_mod
    use core_constants_mod, only: SP, FILL_VALUE
    implicit none
@@ -117,16 +125,27 @@ module core_accumulators_mod
       real(SP), allocatable :: t_on(:, :)       !< onset of the open event
       real(SP), allocatable :: t_off(:, :)      !< first sample failing the condition
       real(SP), allocatable :: pend_dur(:, :)   !< duration of the open event so far
+      real(SP), allocatable :: pend_peak(:, :)  !< sample furthest past the threshold (log only)
       !> Committed event values (reset per window)
       real(SP), allocatable :: first_time(:, :)
       real(SP), allocatable :: last_time(:, :)
       real(SP), allocatable :: dur_sum(:, :)
       real(SP), allocatable :: dur_max(:, :)
       real(SP), allocatable :: count(:, :)
+      !> Event log: committed events since the last drain (enable_log)
+      logical :: log_events = .false.
+      integer :: ev_cap = 0
+      integer :: n_events = 0
+      integer :: n_dropped = 0                 !< cumulative rows over the cap
+      real(SP), allocatable :: ev_t_on(:), ev_t_off(:), ev_dur(:), ev_peak(:)
+      integer, allocatable :: ev_i(:), ev_j(:)
    contains
       procedure, public :: init
       procedure, public :: allocate_stat
       procedure, public :: set_threshold
+      procedure, public :: enable_log
+      procedure, public :: clear_events
+      procedure, public :: open_events
       procedure, public :: accumulate
       procedure, public :: reset
       procedure, public :: finalize
@@ -290,6 +309,76 @@ contains
       end if
    end subroutine accumulate
 
+   !> Log every committed event as a row; cap = rows kept between drains
+   !! (the buffer starts small and doubles up to it).  Call after the
+   !! event statistics are allocated.
+   subroutine enable_log(this, cap)
+      class(type_accumulator), intent(inout) :: this
+      integer, intent(in) :: cap
+      integer :: n0
+      this%log_events = .true.
+      this%ev_cap = cap
+      this%n_events = 0
+      this%n_dropped = 0
+      if (allocated(this%ev_t_on)) deallocate (this%ev_t_on, this%ev_t_off, this%ev_dur, &
+                                               this%ev_peak, this%ev_i, this%ev_j)
+      n0 = min(cap, 1024)
+      allocate (this%ev_t_on(n0), this%ev_t_off(n0), this%ev_dur(n0), this%ev_peak(n0), &
+                this%ev_i(n0), this%ev_j(n0))
+      if (.not. allocated(this%pend_peak)) &
+         allocate (this%pend_peak(this%dim1, this%dim2), source=0.0_SP)
+   end subroutine enable_log
+
+   !> Double the row buffer, up to the cap; .false. when full
+   logical function grow_log(this) result(ok)
+      class(type_accumulator), intent(inout) :: this
+      real(SP), allocatable :: r(:)
+      integer, allocatable :: k(:)
+      integer :: n, m
+      n = size(this%ev_t_on)
+      ok = n < this%ev_cap
+      if (.not. ok) return
+      m = min(this%ev_cap, 2*n)
+      allocate (r(m)); r(1:n) = this%ev_t_on; call move_alloc(r, this%ev_t_on)
+      allocate (r(m)); r(1:n) = this%ev_t_off; call move_alloc(r, this%ev_t_off)
+      allocate (r(m)); r(1:n) = this%ev_dur; call move_alloc(r, this%ev_dur)
+      allocate (r(m)); r(1:n) = this%ev_peak; call move_alloc(r, this%ev_peak)
+      allocate (k(m)); k(1:n) = this%ev_i; call move_alloc(k, this%ev_i)
+      allocate (k(m)); k(1:n) = this%ev_j; call move_alloc(k, this%ev_j)
+   end function grow_log
+
+   !> Forget the drained rows (the dropped count is cumulative)
+   subroutine clear_events(this)
+      class(type_accumulator), intent(inout) :: this
+      this%n_events = 0
+   end subroutine clear_events
+
+   !> The events still open (met, or within the gap): onset, peak so far
+   !! and cell, for the end-of-leg record
+   subroutine open_events(this, n, t_on, peak, i_cell, j_cell)
+      class(type_accumulator), intent(in) :: this
+      integer, intent(out) :: n
+      real(SP), allocatable, intent(out) :: t_on(:), peak(:)
+      integer, allocatable, intent(out) :: i_cell(:), j_cell(:)
+      integer :: i, j
+      n = 0
+      if (allocated(this%in_event)) n = count(this%in_event .or. this%closing)
+      allocate (t_on(max(1, n)), peak(max(1, n)), i_cell(max(1, n)), j_cell(max(1, n)))
+      if (n == 0) return
+      n = 0
+      do j = 1, this%dim2
+         do i = 1, this%dim1
+            if (.not. (this%in_event(i, j) .or. this%closing(i, j))) cycle
+            n = n + 1
+            t_on(n) = this%t_on(i, j)
+            peak(n) = 0.0_SP
+            if (allocated(this%pend_peak)) peak(n) = this%pend_peak(i, j)
+            i_cell(n) = i
+            j_cell(n) = j
+         end do
+      end do
+   end subroutine open_events
+
    !> Advance the per-cell event state machine by one sample.
    subroutine step_events(this, value, dt, t, wet)
       class(type_accumulator), intent(inout) :: this
@@ -320,10 +409,21 @@ contains
                   else
                      this%t_on(i, j) = t
                      this%pend_dur(i, j) = 0.0_SP
+                     if (this%log_events) this%pend_peak(i, j) = value(i, j)
                   end if
                   this%in_event(i, j) = .true.
                end if
                this%pend_dur(i, j) = this%pend_dur(i, j) + dt
+               if (this%log_events) then
+                  ! furthest past the threshold: the min for a below event
+                  if (this%thr_dir == THR_BELOW) then
+                     this%pend_peak(i, j) = min(this%pend_peak(i, j), value(i, j))
+                  else if (this%thr_dir == THR_ABOVE) then
+                     this%pend_peak(i, j) = max(this%pend_peak(i, j), value(i, j))
+                  else if (abs(value(i, j)) > abs(this%pend_peak(i, j))) then
+                     this%pend_peak(i, j) = value(i, j)
+                  end if
+               end if
             else if (this%in_event(i, j)) then
                this%in_event(i, j) = .false.
                this%t_off(i, j) = t
@@ -345,6 +445,7 @@ contains
    subroutine commit_event(this, i, j)
       class(type_accumulator), intent(inout) :: this
       integer, intent(in) :: i, j
+      logical :: room
 
       this%closing(i, j) = .false.
       if (this%pend_dur(i, j) >= this%min_duration) then
@@ -353,6 +454,21 @@ contains
          this%last_time(i, j) = this%t_on(i, j)
          this%dur_sum(i, j) = this%dur_sum(i, j) + this%pend_dur(i, j)
          this%dur_max(i, j) = max(this%dur_max(i, j), this%pend_dur(i, j))
+         if (this%log_events) then
+            room = this%n_events < size(this%ev_t_on)
+            if (.not. room) room = grow_log(this)
+            if (room) then
+               this%n_events = this%n_events + 1
+               this%ev_t_on(this%n_events) = this%t_on(i, j)
+               this%ev_t_off(this%n_events) = this%t_off(i, j)
+               this%ev_dur(this%n_events) = this%pend_dur(i, j)
+               this%ev_peak(this%n_events) = this%pend_peak(i, j)
+               this%ev_i(this%n_events) = i
+               this%ev_j(this%n_events) = j
+            else
+               this%n_dropped = this%n_dropped + 1
+            end if
+         end if
       end if
       this%pend_dur(i, j) = 0.0_SP
    end subroutine commit_event
@@ -467,6 +583,12 @@ contains
                                                 this%t_on, this%t_off, this%pend_dur, &
                                                 this%first_time, this%last_time, &
                                                 this%dur_sum, this%dur_max, this%count)
+      if (allocated(this%pend_peak)) deallocate (this%pend_peak)
+      if (allocated(this%ev_t_on)) deallocate (this%ev_t_on, this%ev_t_off, this%ev_dur, &
+                                               this%ev_peak, this%ev_i, this%ev_j)
+      this%log_events = .false.
+      this%n_events = 0
+      this%n_dropped = 0
       this%thr_dir = THR_NONE
       this%gap = 0.0_SP
       this%min_duration = 0.0_SP

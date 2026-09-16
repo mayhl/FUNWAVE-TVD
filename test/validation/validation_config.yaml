@@ -425,6 +425,8 @@ simulations:
   # gates from the 2026-09-15 cnoidal-paddle board (0.45 / 0.35 / nu 2):
   # height shock 21.3 / 14.7, viscous 16.0 / 14.6; setup rms over H0
   # shock 5.3 / 4.2, viscous 4.3 / 2.4 (spilling / plunging)
+  # the shock arm has no breaking flag (breaking_active rides nu_break), so
+  # its breaking events are the cells where the SWE gate engaged
   - name: lab_tk_spilling
     <<: &tk_spilling
       exe_type: validation-2d
@@ -447,7 +449,7 @@ simulations:
       # the same deck under both breaking closures; the viscous arm carries
       # its own calibrated bounds where they differ
       variants:
-        shock: { overrides: { breaking.model: shock_capturing } }
+        shock: { overrides: { breaking.model: shock_capturing, output.channels.2.variables: [disp_gate], output.channels.2.threshold: { below: 0.5 } } }
         viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 6.0 } } }
 
 
@@ -473,7 +475,7 @@ simulations:
       # the same deck under both breaking closures; the viscous arm carries
       # its own calibrated bounds where they differ
       variants:
-        shock: { overrides: { breaking.model: shock_capturing } }
+        shock: { overrides: { breaking.model: shock_capturing, output.channels.2.variables: [disp_gate], output.channels.2.threshold: { below: 0.5 } } }
         viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 3.5 } } }
 
 

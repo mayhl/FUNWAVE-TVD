@@ -209,6 +209,12 @@ module core_output_channel_mod
    end type type_channel_derived
 
    integer, parameter :: DERIVED_MAX = 8
+   ! event log: rows kept per rank and per accumulator between flushes
+   ! (the buffer grows on demand up to it, 48 MB of rows at the cap);
+   ! beyond it rows are dropped and counted.  100k lost 1790 rows on the
+   ! TK spilling flume at accumulate total (130k events on one rank)
+   integer, parameter :: LOG_CAP = 1000000
+   integer, parameter :: LOG_NVARS = 8   ! t_on t_off duration peak x y i j
 
    type :: type_output_channel
       character(ID_LEN)              :: id = ''
@@ -233,6 +239,16 @@ module core_output_channel_mod
       ! accumulate: window (reset per interval) | running (since t_start,
       ! written each interval) | total (one write at the end)
       character(8) :: accum_mode = 'window'
+      ! event log (log: true): every committed event of accum(iv, it) as a
+      ! row of events_<prefix><tag>.dat, gathered per flush; on a netcdf
+      ! root also the group <id>_events_<prefix><tag> (CF point features)
+      logical :: log_events = .false.
+      integer :: log_ncid = -1
+      integer, allocatable :: ev_grp(:, :), ev_nrec(:, :), ev_var(:, :, :)
+      integer :: log_dropped = 0          ! IO rank: cumulative over ranks
+      logical :: log_warned = .false.
+      logical :: log_seam_pending = .false.   ! hot start: seam line at the first step
+      real(SP), allocatable :: log_px(:), log_py(:)   ! point geometry coords
       type(type_var_meta)            :: meta(VARS_MAX)
       integer                        :: n_vars = 0
       integer                        :: n_stats = 0
@@ -320,7 +336,8 @@ contains
                            coords_x, coords_y, n_coords, grid, comm, &
                            file_prefixes, icount_start, var_meta, diag_ncid, &
                            chunk_window, hidden, derived, n_derived, single_prec, &
-                           thresholds, thr_dir, gap, min_duration, wet_floor, accum_mode)
+                           thresholds, thr_dir, gap, min_duration, wet_floor, accum_mode, &
+                           log_events, restart, log_ncid)
       class(type_output_channel), intent(inout) :: this
       character(*), intent(in) :: id, geom_type
       character(*), intent(in) :: variables(*)
@@ -355,6 +372,10 @@ contains
       integer, intent(in), optional :: thr_dir
       real(SP), intent(in), optional :: gap, min_duration, wet_floor
       character(*), intent(in), optional :: accum_mode
+      ! event log: rows per committed event; restart appends behind a seam
+      ! line; log_ncid = a netcdf root for the event groups (IO rank)
+      logical, intent(in), optional :: log_events, restart
+      integer, intent(in), optional :: log_ncid
 
       type(type_path) :: chan_dir
       logical :: dir_ok
@@ -430,6 +451,10 @@ contains
       if (present(min_duration)) this%min_duration = min_duration
       if (present(wet_floor)) this%wet_floor = wet_floor
       if (present(accum_mode)) this%accum_mode = accum_mode
+      if (present(log_events)) this%log_events = log_events
+      if (this%log_events .and. .not. this%has_events) &
+         error stop 'output_channel: log: needs an event statistic'
+      if (present(log_ncid)) this%log_ncid = log_ncid
 
       ! Timing control
       this%trigger%t_start = t_start
@@ -471,6 +496,10 @@ contains
 
          ! Accumulators: (n_local, 1)
          call init_accumulators(this, this%n_local, 1)
+         if (this%log_events) then
+            this%log_px = coords_x(1:n_coords)
+            this%log_py = coords_y(1:n_coords)
+         end if
 
       case ('field')
          this%n_local = grid%local_nx*grid%local_ny
@@ -489,6 +518,8 @@ contains
 
          ! Accumulators: (local_nx, local_ny)
          call init_accumulators(this, grid%local_nx, grid%local_ny)
+         this%dx0 = grid%dx0
+         this%dy0 = grid%dy0
 
          ! NetCDF backends: every snapshot + statistic variable defined
          ! up front (names fixed at init).  Layout: a shared-root group
@@ -530,7 +561,390 @@ contains
          call this%accum(this%derived(id_)%iv, 1)%allocate_stat(trim(this%derived(id_)%stat))
       end do
 
+      if (this%log_events) call init_event_log(this, comm, restart)
+
    end subroutine channel_init
+
+   ! Event log files (IO rank): a cold start truncates and writes the
+   ! header, a hot start appends behind a seam line so the pre-restart
+   ! rows survive (open events at the restart are lost either way: the
+   ! state arrays are not checkpointed).  Every rank arms the buffers.
+   subroutine init_event_log(this, comm, restart)
+      class(type_output_channel), intent(inout) :: this
+      type(type_comm), intent(inout) :: comm
+      logical, intent(in), optional :: restart
+
+      integer :: iv, it, unit
+      logical :: appending, exists
+
+      do iv = 1, this%n_vars
+         do it = 1, max(1, this%n_thr)
+            call this%accum(iv, it)%enable_log(LOG_CAP)
+         end do
+      end do
+      if (.not. comm%is_io_node()) return
+
+      appending = .false.
+      if (present(restart)) appending = restart
+      this%log_seam_pending = appending
+      allocate (this%ev_grp(this%n_vars, max(1, this%n_thr)), &
+                this%ev_nrec(this%n_vars, max(1, this%n_thr)), &
+                this%ev_var(LOG_NVARS, this%n_vars, max(1, this%n_thr)))
+      this%ev_grp = -1
+      this%ev_nrec = 0
+      do iv = 1, this%n_vars
+         if (this%hidden(iv)) cycle
+         do it = 1, max(1, this%n_thr)
+            exists = .false.
+            if (appending) inquire (file=event_file_name(this, iv, it), exist=exists)
+            if (exists) then
+               open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
+                     position='append', action='write')
+            else
+               open (newunit=unit, file=event_file_name(this, iv, it), status='replace', &
+                     action='write')
+               write (unit, '(a)') '#'//repeat(' ', 12)//'t_on'//repeat(' ', 12)//'t_off'// &
+                  repeat(' ', 9)//'duration'//repeat(' ', 13)//'peak'//repeat(' ', 16)//'x'// &
+                  repeat(' ', 16)//'y'//repeat(' ', 9)//'i'//repeat(' ', 9)//'j'
+            end if
+            close (unit)
+            if (this%log_ncid >= 0) call create_event_group(this, iv, it)
+         end do
+      end do
+   end subroutine init_event_log
+
+   subroutine write_event_seam(this, t)
+      class(type_output_channel), intent(in) :: this
+      real(SP), intent(in) :: t
+      integer :: iv, it, unit
+      do iv = 1, this%n_vars
+         if (this%hidden(iv)) cycle
+         do it = 1, max(1, this%n_thr)
+            open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
+                  position='append', action='write')
+            write (unit, '(a,es17.8)') '# restart t_start=', t
+            close (unit)
+         end do
+      end do
+   end subroutine write_event_seam
+
+   function event_file_name(this, iv, it) result(fname)
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in) :: iv, it
+      character(:), allocatable :: fname
+      fname = this%result_folder//'events_'//trim(this%prefixes(iv))
+      if (this%n_thr > 0) fname = fname//trim(this%thr_tag(it))
+      fname = fname//'.dat'
+   end function event_file_name
+
+   ! CF discrete-sampling-geometry point features: one element per event
+   ! on an unlimited dimension, time/x/y the coordinates of the peak
+   subroutine create_event_group(this, iv, it)
+      class(type_output_channel), intent(inout) :: this
+      integer, intent(in) :: iv, it
+
+      character(len=*), parameter :: VNAME(LOG_NVARS) = &
+                                     [character(len=8) :: 'time', 't_off', 'duration', 'peak', &
+                                                           'x', 'y', 'i', 'j']
+      character(:), allocatable :: gname, base
+      integer :: e_dim, k, grp
+
+      gname = trim(this%id)//'_events_'//trim(this%prefixes(iv))
+      if (this%n_thr > 0) gname = gname//trim(this%thr_tag(it))
+      call nc_check(nf90_def_grp(this%log_ncid, gname, grp), 'def group '//gname)
+      call nc_check(nf90_put_att(grp, NF90_GLOBAL, 'featureType', 'point'), 'att featureType')
+      call nc_check(nf90_def_dim(grp, 'event', NF90_UNLIMITED, e_dim), 'def event '//gname)
+      do k = 1, LOG_NVARS
+         if (k >= 7) then
+            call nc_check(nf90_def_var(grp, VNAME(k), NF90_INT, [e_dim], &
+                                       this%ev_var(k, iv, it)), 'def var '//VNAME(k))
+         else
+            call nc_check(nf90_def_var(grp, VNAME(k), NF90_DOUBLE, [e_dim], &
+                                       this%ev_var(k, iv, it)), 'def var '//VNAME(k))
+         end if
+      end do
+      base = trim(this%meta(iv)%long_name)
+      if (len(base) == 0) base = trim(this%variables(iv))
+      call nc_check(nf90_put_att(grp, this%ev_var(1, iv, it), 'units', 'seconds since start'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(1, iv, it), 'long_name', 'event onset'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(2, iv, it), 'units', 's'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(2, iv, it), 'long_name', &
+                                 'first sample failing the condition'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(3, iv, it), 'units', 's'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(3, iv, it), 'long_name', &
+                                 'time meeting the condition'), 'att')
+      if (len_trim(this%meta(iv)%units) > 0) &
+         call nc_check(nf90_put_att(grp, this%ev_var(4, iv, it), 'units', &
+                                    trim(this%meta(iv)%units)), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(4, iv, it), 'long_name', &
+                                 base//' furthest past the threshold '//dir_text(this%thr_dir)// &
+                                 ' '//threshold_text(this%thr(it))), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(4, iv, it), 'coordinates', 'time x y'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(5, iv, it), 'units', 'm'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(6, iv, it), 'units', 'm'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(7, iv, it), 'long_name', &
+                                 'global cell i (point index on a point geometry)'), 'att')
+      call nc_check(nf90_put_att(grp, this%ev_var(8, iv, it), 'long_name', &
+                                 'global cell j (1 on a point geometry)'), 'att')
+      this%ev_grp(iv, it) = grp
+   end subroutine create_event_group
+
+   ! Drain every rank's event rows to the IO rank, order them by onset
+   ! (then cell, so the file is rank-layout independent) and append them;
+   ! rows over the per-rank cap are counted, warned once and marked in
+   ! the file at the flush that lost them (rows resume after every flush)
+   subroutine flush_event_log(this, comm, final)
+      class(type_output_channel), intent(inout) :: this
+      type(type_comm), intent(inout) :: comm
+      logical, intent(in) :: final
+
+      integer :: iv, it, n_loc, n_tot, k, r, ierr, io, unit, dropped, dropped_tot
+      integer, allocatable :: counts(:), displs(:), gi(:), gj(:), perm(:)
+      real(SP), allocatable :: t_on(:), t_off(:), dur(:), peak(:), x(:), y(:)
+      real(SP) :: rowbuf(4)
+
+      io = comm%get_io_rank()
+      allocate (counts(comm%size), displs(comm%size))
+      do iv = 1, this%n_vars
+         do it = 1, max(1, this%n_thr)
+            associate (acc => this%accum(iv, it))
+               n_loc = acc%n_events
+               if (this%hidden(iv)) n_loc = 0
+               call MPI_Gather(n_loc, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, io, comm%id, ierr)
+               n_tot = 0
+               if (comm%is_io_node()) then
+                  displs(1) = 0
+                  do r = 2, comm%size
+                     displs(r) = displs(r - 1) + counts(r - 1)
+                  end do
+                  n_tot = sum(counts)
+               end if
+               allocate (t_on(max(1, n_tot)), t_off(max(1, n_tot)), dur(max(1, n_tot)), &
+                         peak(max(1, n_tot)), gi(max(1, n_tot)), gj(max(1, n_tot)))
+               call MPI_Gatherv(acc%ev_t_on, n_loc, MPI_SP, t_on, counts, displs, MPI_SP, &
+                                io, comm%id, ierr)
+               call MPI_Gatherv(acc%ev_t_off, n_loc, MPI_SP, t_off, counts, displs, MPI_SP, &
+                                io, comm%id, ierr)
+               call MPI_Gatherv(acc%ev_dur, n_loc, MPI_SP, dur, counts, displs, MPI_SP, &
+                                io, comm%id, ierr)
+               call MPI_Gatherv(acc%ev_peak, n_loc, MPI_SP, peak, counts, displs, MPI_SP, &
+                                io, comm%id, ierr)
+               ! cells to global indices before the gather
+               call MPI_Gatherv(global_i(this, acc%ev_i(1:n_loc), n_loc), n_loc, MPI_INTEGER, &
+                                gi, counts, displs, MPI_INTEGER, io, comm%id, ierr)
+               call MPI_Gatherv(global_j(this, acc%ev_j(1:n_loc), n_loc), n_loc, MPI_INTEGER, &
+                                gj, counts, displs, MPI_INTEGER, io, comm%id, ierr)
+               call acc%clear_events()
+
+               if (comm%is_io_node() .and. n_tot > 0) then
+                  allocate (x(n_tot), y(n_tot))
+                  if (trim(this%geom_type) == 'field') then
+                     x = real(gi(1:n_tot) - 1, SP)*this%dx0
+                     y = real(gj(1:n_tot) - 1, SP)*this%dy0
+                  else
+                     x = this%log_px(gi(1:n_tot))
+                     y = this%log_py(gi(1:n_tot))
+                  end if
+                  call sort_events(n_tot, t_on, gi, gj, perm)
+                  open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
+                        position='append', action='write')
+                  do k = 1, n_tot
+                     rowbuf = [t_on(perm(k)), t_off(perm(k)), dur(perm(k)), peak(perm(k))]
+                     write (unit, '(6es17.8,2i10)') rowbuf, x(perm(k)), y(perm(k)), &
+                        gi(perm(k)), gj(perm(k))
+                  end do
+                  close (unit)
+                  if (this%ev_grp(iv, it) >= 0) &
+                     call put_event_rows(this, iv, it, n_tot, t_on(perm), t_off(perm), &
+                                         dur(perm), peak(perm), x(perm), y(perm), gi(perm), gj(perm))
+                  deallocate (x, y, perm)
+               end if
+               deallocate (t_on, t_off, dur, peak, gi, gj)
+            end associate
+         end do
+      end do
+
+      ! rows over the cap: one warning, and the total in a trailer line
+      dropped = 0
+      do iv = 1, this%n_vars
+         do it = 1, max(1, this%n_thr)
+            dropped = dropped + this%accum(iv, it)%n_dropped
+         end do
+      end do
+      call MPI_Reduce(dropped, dropped_tot, 1, MPI_INTEGER, MPI_SUM, io, comm%id, ierr)
+      if (comm%is_io_node()) then
+         ! the marker sits where the loss happened (a streaming reader
+         ! learns early that rows /= count from here on); the buffers
+         ! refill after every flush, so rows resume
+         if (dropped_tot > this%log_dropped) then
+            do iv = 1, this%n_vars
+               if (this%hidden(iv)) cycle
+               do it = 1, max(1, this%n_thr)
+                  open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
+                        position='append', action='write')
+                  write (unit, '(a,i0,a,i0,a)') '# dropped ', dropped_tot - this%log_dropped, &
+                     ' rows over the per-rank cap at this flush (', dropped_tot, &
+                     ' so far, channel total)'
+                  close (unit)
+               end do
+            end do
+            if (.not. this%log_warned) then
+               write (*, '(a,i0,a)') 'output_channel: '//trim(this%id)//': event log dropped ', &
+                  dropped_tot, ' rows over the per-rank cap (shorten the interval)'
+               this%log_warned = .true.
+            end if
+            this%log_dropped = dropped_tot
+         end if
+      end if
+      if (final) call write_open_events(this, comm)
+   end subroutine flush_event_log
+
+   ! End of a leg: the events still open (the long ones a restart would
+   ! lose) as comment rows -- onset, peak so far, cell -- so a reader can
+   ! report the truncation or stitch across the seam
+   subroutine write_open_events(this, comm)
+      class(type_output_channel), intent(inout) :: this
+      type(type_comm), intent(inout) :: comm
+
+      integer :: iv, it, n_loc, n_tot, k, r, ierr, io, unit
+      integer, allocatable :: counts(:), displs(:), gi(:), gj(:), perm(:), li(:), lj(:)
+      real(SP), allocatable :: t_on(:), peak(:), lt(:), lp(:)
+
+      io = comm%get_io_rank()
+      allocate (counts(comm%size), displs(comm%size))
+      do iv = 1, this%n_vars
+         do it = 1, max(1, this%n_thr)
+            call this%accum(iv, it)%open_events(n_loc, lt, lp, li, lj)
+            if (this%hidden(iv)) n_loc = 0
+            call MPI_Gather(n_loc, 1, MPI_INTEGER, counts, 1, MPI_INTEGER, io, comm%id, ierr)
+            n_tot = 0
+            if (comm%is_io_node()) then
+               displs(1) = 0
+               do r = 2, comm%size
+                  displs(r) = displs(r - 1) + counts(r - 1)
+               end do
+               n_tot = sum(counts)
+            end if
+            allocate (t_on(max(1, n_tot)), peak(max(1, n_tot)), gi(max(1, n_tot)), gj(max(1, n_tot)))
+            call MPI_Gatherv(lt, n_loc, MPI_SP, t_on, counts, displs, MPI_SP, io, comm%id, ierr)
+            call MPI_Gatherv(lp, n_loc, MPI_SP, peak, counts, displs, MPI_SP, io, comm%id, ierr)
+            call MPI_Gatherv(global_i(this, li(1:n_loc), n_loc), n_loc, MPI_INTEGER, &
+                             gi, counts, displs, MPI_INTEGER, io, comm%id, ierr)
+            call MPI_Gatherv(global_j(this, lj(1:n_loc), n_loc), n_loc, MPI_INTEGER, &
+                             gj, counts, displs, MPI_INTEGER, io, comm%id, ierr)
+            if (comm%is_io_node() .and. n_tot > 0) then
+               call sort_events(n_tot, t_on, gi, gj, perm)
+               open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
+                     position='append', action='write')
+               do k = 1, n_tot
+                  write (unit, '(a,es17.8,a,es17.8,a,i0,a,i0)') '# open t_on=', t_on(perm(k)), &
+                     ' peak=', peak(perm(k)), ' i=', gi(perm(k)), ' j=', gj(perm(k))
+               end do
+               close (unit)
+               deallocate (perm)
+            end if
+            deallocate (t_on, peak, gi, gj, lt, lp, li, lj)
+         end do
+      end do
+   end subroutine write_open_events
+
+   function global_i(this, i_loc, n) result(ig)
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in) :: n, i_loc(n)
+      integer :: ig(max(1, n))
+      ig = 0
+      if (n == 0) return
+      if (trim(this%geom_type) == 'field') then
+         ig(1:n) = this%i0 + i_loc
+      else
+         ig(1:n) = this%interp%point_id(i_loc)
+      end if
+   end function global_i
+
+   function global_j(this, j_loc, n) result(jg)
+      class(type_output_channel), intent(in) :: this
+      integer, intent(in) :: n, j_loc(n)
+      integer :: jg(max(1, n))
+      jg = 0
+      if (n == 0) return
+      if (trim(this%geom_type) == 'field') then
+         jg(1:n) = this%j0 + j_loc
+      else
+         jg(1:n) = 1
+      end if
+   end function global_j
+
+   ! Permutation ordering the rows by (onset, j, i); bottom-up merge
+   ! sort, stable, n log n for the 1e5-row flushes
+   subroutine sort_events(n, t_on, gi, gj, perm)
+      integer, intent(in) :: n
+      real(SP), intent(in) :: t_on(:)
+      integer, intent(in) :: gi(:), gj(:)
+      integer, allocatable, intent(out) :: perm(:)
+
+      integer, allocatable :: tmp(:)
+      integer :: width, lo, mid, hi, a, b, k
+
+      allocate (perm(n), tmp(n))
+      perm = [(k, k=1, n)]
+      width = 1
+      do while (width < n)
+         lo = 1
+         do while (lo <= n)
+            mid = min(lo + width - 1, n)
+            hi = min(lo + 2*width - 1, n)
+            a = lo; b = mid + 1; k = lo
+            do while (a <= mid .and. b <= hi)
+               if (before(perm(b), perm(a))) then
+                  tmp(k) = perm(b); b = b + 1
+               else
+                  tmp(k) = perm(a); a = a + 1
+               end if
+               k = k + 1
+            end do
+            do while (a <= mid)
+               tmp(k) = perm(a); a = a + 1; k = k + 1
+            end do
+            do while (b <= hi)
+               tmp(k) = perm(b); b = b + 1; k = k + 1
+            end do
+            lo = lo + 2*width
+         end do
+         perm = tmp
+         width = 2*width
+      end do
+   contains
+      logical function before(p, q)
+         integer, intent(in) :: p, q
+         if (t_on(p) /= t_on(q)) then
+            before = t_on(p) < t_on(q)
+         else if (gj(p) /= gj(q)) then
+            before = gj(p) < gj(q)
+         else
+            before = gi(p) < gi(q)
+         end if
+      end function before
+   end subroutine sort_events
+
+   subroutine put_event_rows(this, iv, it, n, t_on, t_off, dur, peak, x, y, gi, gj)
+      class(type_output_channel), intent(inout) :: this
+      integer, intent(in) :: iv, it, n
+      real(SP), intent(in) :: t_on(:), t_off(:), dur(:), peak(:), x(:), y(:)
+      integer, intent(in) :: gi(:), gj(:)
+      integer :: grp, s0
+      grp = this%ev_grp(iv, it)
+      s0 = this%ev_nrec(iv, it) + 1
+      call nc_check(nf90_put_var(grp, this%ev_var(1, iv, it), t_on(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(2, iv, it), t_off(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(3, iv, it), dur(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(4, iv, it), peak(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(5, iv, it), x(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(6, iv, it), y(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(7, iv, it), gi(1:n), start=[s0]), 'put events')
+      call nc_check(nf90_put_var(grp, this%ev_var(8, iv, it), gj(1:n), start=[s0]), 'put events')
+      this%ev_nrec(iv, it) = this%ev_nrec(iv, it) + n
+      call nc_check(nf90_sync(this%log_ncid), 'sync events')
+   end subroutine put_event_rows
 
    ! accum(iv, it): column 1 carries every statistic, further columns
    ! (one per extra threshold) the event class only
@@ -634,6 +1048,9 @@ contains
       this%fired = .false.
       if (t < this%t_start) return
       if (t > this%t_end) return
+      ! hot start: the event logs mark the seam with the restart time
+      if (this%log_seam_pending .and. comm%is_io_node()) call write_event_seam(this, t)
+      this%log_seam_pending = .false.
 
       ! dt-accumulator mode: legacy PLOT_COUNT frame cadence
       do_flush = this%trigger%should_trigger(t, dt)
@@ -779,6 +1196,14 @@ contains
                   call this%accum(iv, it)%reset()
                end do
             end do
+         end if
+      end if
+      ! event log: every rank drains its committed rows to the IO rank
+      if (do_flush .and. this%log_events) then
+         if (present(force)) then
+            call flush_event_log(this, comm, force)
+         else
+            call flush_event_log(this, comm, .false.)
          end if
       end if
       if (do_flush) this%stats_primed = .true.
@@ -1220,6 +1645,26 @@ contains
          call blk%set_string('dtype', yaml_quoted('text'))
          call blk%set_string('layout', &
                              yaml_quoted('one line per flush: time, then the point values in order'))
+      end if
+
+      if (this%log_events) then
+         ! the event log beside the frames: one file per variable and
+         ! threshold, fixed columns, the peak in the variable's units
+         blk => yaml_child(root, 'events')
+         call blk%set_string('pattern', yaml_quoted('events_<variable>[_<threshold tag>].dat'))
+         call blk%set_string('columns', yaml_quoted('t_on t_off duration peak x y i j'))
+         call blk%set_string('units', yaml_quoted('s s s <variable> m m 1 1'))
+         call blk%set_string('order', yaml_quoted('by onset, then cell; one row per committed event'))
+         call blk%set_string('invariant', yaml_quoted('rows == the count statistic summed over cells,'// &
+                                                      ' unless a # dropped line is present'))
+         call blk%set_string('peak', yaml_quoted('signed sample furthest past the threshold;'// &
+                                                 ' a magnitude threshold selects on |value|'))
+         call blk%set_string('coordinates', yaml_quoted('model metres, x = (i-1) dx, y = (j-1) dy'// &
+                                                        ' from cell (1,1): NOT georeferenced'))
+         call blk%set_string('restart', yaml_quoted('appends behind a # restart t_start=<t> line;'// &
+                                                    ' # open rows at the end of a leg list the events'// &
+                                                    ' still open (lost across the restart)'))
+         call blk%set_string('cell', yaml_quoted('i j global 1-based; on a point geometry i = point index, j = 1'))
       end if
 
       call root%set_string('Conventions', yaml_quoted('CF-1.8'))
@@ -2168,6 +2613,13 @@ contains
          deallocate (this%accum)
       end if
       if (allocated(this%result_folder)) deallocate (this%result_folder)
+      if (allocated(this%ev_grp)) deallocate (this%ev_grp, this%ev_nrec, this%ev_var)
+      if (allocated(this%log_px)) deallocate (this%log_px, this%log_py)
+      this%log_events = .false.
+      this%log_ncid = -1
+      this%log_dropped = 0
+      this%log_warned = .false.
+      this%log_seam_pending = .false.
       if (allocated(this%nc_names)) deallocate (this%nc_names)
       if (allocated(this%nc_meta)) deallocate (this%nc_meta)
       this%nc_n = 0

@@ -268,6 +268,80 @@ contains
    end subroutine test_event_basic
 
    ! ----------------------------------------------------------------
+   ! event log: the two events of test_event_basic as rows (onset, end,
+   ! duration, peak, cell); a drain forgets them, the dropped count stays
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_log_rows()
+      type(type_accumulator) :: acc
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(0.5_SP, THR_ABOVE)
+      call acc%enable_log(8)
+      call feed(acc, [0.0_SP, 1.0_SP, 3.0_SP, 0.0_SP, 2.0_SP, 0.0_SP])
+
+      @assertEqual(2, acc%n_events)
+      @assertEqual(1.0_SP, acc%ev_t_on(1), tolerance=1e-6_SP)
+      @assertEqual(3.0_SP, acc%ev_t_off(1), tolerance=1e-6_SP)
+      @assertEqual(2.0_SP, acc%ev_dur(1), tolerance=1e-6_SP)
+      @assertEqual(3.0_SP, acc%ev_peak(1), tolerance=1e-6_SP)
+      @assertEqual(4.0_SP, acc%ev_t_on(2), tolerance=1e-6_SP)
+      @assertEqual(2.0_SP, acc%ev_peak(2), tolerance=1e-6_SP)
+      @assertEqual(1, acc%ev_i(2))
+      @assertEqual(1, acc%ev_j(2))
+      @assertEqual(0, acc%n_dropped)
+
+      call acc%clear_events()
+      @assertEqual(0, acc%n_events)
+   end subroutine test_event_log_rows
+
+   ! ----------------------------------------------------------------
+   ! event log: the buffer starts at 1024 rows and doubles up to the cap;
+   ! 1500 one-sample events under a cap of 4096 all land, none dropped
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_log_grows()
+      type(type_accumulator) :: acc
+      real(SP) :: series(3000)
+      integer :: n
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(0.5_SP, THR_ABOVE)
+      call acc%enable_log(4096)
+      do n = 1, 3000
+         series(n) = merge(1.0_SP, 0.0_SP, mod(n, 2) == 1)
+      end do
+      call feed(acc, series)
+
+      @assertEqual(1500, acc%n_events)
+      @assertEqual(0, acc%n_dropped)
+      @assertEqual(2996.0_SP, acc%ev_t_on(1499), tolerance=1e-6_SP)
+   end subroutine test_event_log_grows
+
+   ! ----------------------------------------------------------------
+   ! event log: min_duration discards leave no row; a below threshold
+   ! logs the minimum as the peak; rows over the cap are counted
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_log_filters_and_cap()
+      type(type_accumulator) :: acc
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(0.5_SP, THR_BELOW, min_duration=1.5_SP)
+      call acc%enable_log(1)
+      ! events below 0.5: [1] (1 s, discarded), [3,4] (2 s, logged), [6,7] (over the cap)
+      call feed(acc, [1.0_SP, 0.2_SP, 1.0_SP, 0.1_SP, -0.4_SP, 1.0_SP, 0.3_SP, 0.0_SP, 1.0_SP])
+
+      @assertEqual(1, acc%n_events)
+      @assertEqual(3.0_SP, acc%ev_t_on(1), tolerance=1e-6_SP)
+      @assertEqual(-0.4_SP, acc%ev_peak(1), tolerance=1e-6_SP)
+      @assertEqual(1, acc%n_dropped)
+   end subroutine test_event_log_filters_and_cap
+
+   ! ----------------------------------------------------------------
    ! an open event is not committed; reset keeps it open and it lands
    ! whole in the window it closes in
    ! ----------------------------------------------------------------

@@ -63,6 +63,100 @@ contains
    end subroutine alloc_field
 
    ! ----------------------------------------------------------------
+   ! event log, field on two ranks: a pulse above 0.5 in two cells of
+   ! different ranks over two samples commits at the failing sample; the
+   ! flush writes both rows ordered by onset then cell, global indices
+   ! ----------------------------------------------------------------
+   @test(npes=[2])
+   subroutine test_field_event_log(this)
+      class(MpiTestMethod), intent(inout) :: this
+      type(type_comm)             :: comm
+      type(type_grid_2d)          :: grid
+      type(type_field_registry)   :: reg
+      type(type_output_channel)   :: ch
+      real(SP), allocatable, target :: eta(:, :)
+      character(32) :: vars(1)
+      character(8)  :: stats(1)
+      real(SP) :: cx(1), cy(1), t_on, t_off, dur, peak, x, y
+      integer  :: i, j, ig, jg, unit, ii, jj, n_rows, n_open, ios
+      character(200) :: line
+
+      call open_grid(this, grid, comm)
+      call alloc_field(grid, eta)
+      call reg%register('eta', eta)
+
+      vars(1) = 'eta'; stats(1) = 'count'
+      cx = 0.0_SP; cy = 0.0_SP
+      call ch%init(id='evlog', geom_type='field', variables=vars, n_vars=1, &
+                   statistics=stats, n_stats=1, snapshot=.false., &
+                   t_start=0.0_SP, interval=1.0_SP, &
+                   result_folder='./', format='ascii', &
+                   coords_x=cx, coords_y=cy, n_coords=0, grid=grid, comm=comm, &
+                   thresholds=[0.5_SP], thr_dir=1, log_events=.true.)
+
+      call ch%step(0.0_SP, 0.5_SP, reg, comm)
+      do j = 1, grid%local_ny
+         do i = 1, grid%local_nx
+            ig = grid%ibegin + i - 1
+            jg = grid%jbegin + j - 1
+            if ((ig == 2 .and. jg == 1) .or. (ig == TEST_M .and. jg == TEST_N)) &
+               eta(N_GHOST + i, N_GHOST + j) = 1.0_SP + 0.1_SP*real(ig, SP)
+         end do
+      end do
+      call ch%step(0.5_SP, 0.5_SP, reg, comm)
+      call ch%step(1.0_SP, 0.5_SP, reg, comm)
+      eta = 0.0_SP
+      call ch%step(1.5_SP, 0.5_SP, reg, comm)
+      ! one event open at the final flush: listed as a comment row
+      do j = 1, grid%local_ny
+         do i = 1, grid%local_nx
+            if (grid%ibegin + i - 1 == 3 .and. grid%jbegin + j - 1 == 2) &
+               eta(N_GHOST + i, N_GHOST + j) = 0.9_SP
+         end do
+      end do
+      call ch%step(2.0_SP, 0.5_SP, reg, comm, force=.true.)
+
+      if (comm%is_io_node()) then
+         open (newunit=unit, file='./evlog/events_eta.dat', status='old', action='read')
+         n_rows = 0
+         n_open = 0
+         do
+            read (unit, '(a)', iostat=ios) line
+            if (ios /= 0) exit
+            if (line(1:6) == '# open') then
+               n_open = n_open + 1
+               @assertEqual('# open t_on=   2.00000000E+00 peak=   9.00000000E-01 i=3 j=2', trim(line))
+            end if
+            if (line(1:1) == '#') cycle
+            n_rows = n_rows + 1
+            read (line, *) t_on, t_off, dur, peak, x, y, ii, jj
+            @assertEqual(0.5_SP, t_on, tolerance=1e-6_SP)
+            @assertEqual(1.5_SP, t_off, tolerance=1e-6_SP)
+            @assertEqual(1.0_SP, dur, tolerance=1e-6_SP)
+            if (n_rows == 1) then
+               @assertEqual(2, ii)
+               @assertEqual(1, jj)
+               @assertEqual(1.2_SP, peak, tolerance=1e-6_SP)
+               @assertEqual(1.0_SP, x, tolerance=1e-6_SP)
+               @assertEqual(0.0_SP, y, tolerance=1e-6_SP)
+            else
+               @assertEqual(TEST_M, ii)
+               @assertEqual(TEST_N, jj)
+            end if
+         end do
+         @assertEqual(2, n_rows)
+         @assertEqual(1, n_open)
+         close (unit, status='delete')
+         open (newunit=unit, file='./evlog/metadata.yaml', status='old', action='read')
+         close (unit, status='delete')
+      end if
+
+      call ch%finalize()
+      call reg%finalize()
+      call dummy_fix_lint()
+   end subroutine test_field_event_log
+
+   ! ----------------------------------------------------------------
    ! field snapshot, ascii: eta_00001 holds the assembled global
    ! interior, one row of M values per J
    ! ----------------------------------------------------------------

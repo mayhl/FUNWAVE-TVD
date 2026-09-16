@@ -1089,12 +1089,15 @@ contains
       type(type_channel_derived), allocatable :: dspecs(:)
       character(:), allocatable :: pfmt
       real(SP) :: cwin
-      logical :: is_field
+      logical :: is_field, restart
+      integer :: log_root
       integer :: k, iv, kc, n_owned, ierr, idn, ip, isrc, froot, ic0
       character(16) :: owned_str, total_str
 
       ! Vector-derived scratch: register once when any channel asks;
       ! refreshed each manager step (zero until the first step)
+      ! either hot-start form appends the event logs behind a seam line
+      restart = this%hot_start%use_checkpoint .or. this%hot_start%is_activated
       do k = 1, this%output%n_channels
          do iv = 1, size(this%output%channels(k)%variables)
             select case (trim(this%output%channels(k)%variables(iv)))
@@ -1191,6 +1194,18 @@ contains
                pfmt = point_format(this, k)
             end if
 
+            ! event log rows ride the ascii file on every format; a netcdf
+            ! channel also gets CF point groups in the shared root
+            log_root = -1
+            if (cfg%log_events .and. pfmt == "netcdf") then
+               if (this%output%layout == "single") then
+                  call mgr%open_diagnostics(folder, this%env%comm, fname="output.nc")
+               else
+                  call mgr%open_diagnostics(folder, this%env%comm)
+               end if
+               if (this%env%comm%is_io_node()) log_root = mgr%diag_ncid
+            end if
+
             kc = mgr%n_channels + 1
             call mgr%channels(kc)%init(id=cfg%name, geom_type=geom%geom_type, &
                                        variables=cfg%variables, &
@@ -1220,7 +1235,9 @@ contains
                                        gap=cfg%gap, min_duration=cfg%min_duration, &
                                        wet_floor=this%numerics%MinDepth &
                                        *(1.0_SP + this%breaking%wetdry_disp_ramp), &
-                                       accum_mode=cfg%accum_mode)
+                                       accum_mode=cfg%accum_mode, &
+                                       log_events=cfg%log_events, restart=restart, &
+                                       log_ncid=log_root)
             mgr%n_channels = kc
             deallocate (vmeta, dspecs)
 

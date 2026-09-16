@@ -68,6 +68,25 @@ def _breaker_class(meta, deck: dict, x_bp: float) -> tuple[dict[str, float], str
     return out, label
 
 
+def _event_log_rows(meta, deck: dict) -> list[tuple[str, int, int]]:
+    """(channel, rows, count sum) per logged event channel: the log rides the
+    same filters as the count statistic, so its rows must equal the count
+    summed over cells at the last frame."""
+    out = []
+    for ch in deck.get("output", {}).get("channels", []):
+        if not ch.get("log"):
+            continue
+        for var in ch.get("variables", []):
+            path = Path(meta.output_dir) / ch["name"] / f"events_{var}.dat"
+            frames = meta.output_files(f"{var}_count")
+            if not path.exists() or not frames:
+                continue
+            rows = sum(1 for line in path.read_text().splitlines() if line and not line.startswith("#"))
+            fld = meta.read_field(frames[-1])
+            out.append((ch["name"], rows, int(round(float(fld[fld > FILL + 1.0].sum())))))
+    return out
+
+
 def _station_x(deck: dict, channel: str | None) -> np.ndarray:
     """Return the point x-coordinates of the deck's station/transect channel."""
     out = deck.get("output") or {}
@@ -184,6 +203,9 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
             if slope_meas != 0.0:
                 slope_err = 100.0 * (slope_fit - slope_meas) / abs(slope_meas)
                 metrics.append(MetricResult("surf", "setup_slope_error_pct", slope_err, True, math.inf))
+
+    for name, rows, total in _event_log_rows(meta, deck):
+        metrics.append(MetricResult("surf", f"{name}_event_rows_minus_count", rows - total, rows == total, 0.0))
 
     fig, axes = new_figure(nrows=(1 if h_name else 0) + (1 if s_name else 0), height_per_row=2.6)
     ax_iter = iter(axes)

@@ -59,6 +59,7 @@ output:
       statistics: [count, duration]
       threshold: {above: 0.5}
       gap: 0.2  # 0.1 T: merges the step-scale flicker of the flag (4 fragments per passage unfiltered)
+      log: true  # one row per breaking event: onset, duration, peak, cell
       accumulate: total
       interval: 1.0e6
     - name: crest_events  # the unfiltered reference: one crest per wave per wet cell

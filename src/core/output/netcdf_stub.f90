@@ -40,7 +40,7 @@ module netcdf
    integer, parameter :: STUB_ERR = -1
 
    interface nf90_put_var
-      module procedure put_var_0d, put_var_i0d, put_var_1d, put_var_2d
+      module procedure put_var_0d, put_var_i0d, put_var_1d, put_var_i1d, put_var_2d
    end interface nf90_put_var
 
    ! character and real-array attributes, the two shapes the writer emits
@@ -153,6 +153,17 @@ contains
       if (present(start)) continue
       status = STUB_ERR
    end function put_var_1d
+
+   ! the event channel writes its grid indices as integer vectors
+   integer function put_var_i1d(ncid, varid, values, start) result(status)
+      integer, intent(in) :: ncid, varid
+      integer, intent(in) :: values(:)
+      integer, intent(in), optional :: start(:)
+      associate (i => ncid, v => varid, x => values)
+      end associate
+      if (present(start)) continue
+      status = STUB_ERR
+   end function put_var_i1d
 
    integer function put_var_2d(ncid, varid, values, start) result(status)
       integer, intent(in) :: ncid, varid

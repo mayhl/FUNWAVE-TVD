@@ -147,6 +147,8 @@ module model_output_mod
       integer :: thr_dir = 0
       real(SP) :: gap = 0.0_SP
       real(SP) :: min_duration = 0.0_SP
+      ! log: every committed event as a row (events_<variable>.dat)
+      logical :: log_events = .false.
       ! accumulate: window (default) | running | total
       character(8) :: accum_mode = "window"
       ! statistics presence derives the channel kind: windowed channels
@@ -828,6 +830,10 @@ contains
                cfg%snapshot = .false.
 
             call read_threshold(sub_env, entries(k), cfg)
+            call entries(k)%read_logical("log", silent=no_key, val=cfg%log_events)
+            if (cfg%log_events .and. size(cfg%thresholds) == 0) &
+               call sub_env%log%exit_on_error("output: channels: '"//cfg%name// &
+                                              "': log: needs an event statistic and threshold:")
             call entries(k)%read_enum("accumulate", &
                                       [character(7) :: "window", "running", "total"], &
                                       silent=no_key, val=fmt)
