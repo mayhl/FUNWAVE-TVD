@@ -1,0 +1,65 @@
+# Yoshii, Tanaka & Matsuyama (2018): TSTLE case C7, movable-bed channel =
+# the morphology gate of NTHMP sediment benchmark 3 (Malone: d50 0.208 mm,
+# n 0.42), the 1/100 land-slope sibling of C2.  A bore over the same 1/50 slope and 0.2 m dune (crest
+# x = 40.7, still-water shoreline x = 39.6); the land flattens to 1/100
+# past x = 45 and the run-up reached the x = 84 m gauge.  The measured eta
+# and u at the x = 0.5 m gauge drive the west face through the Flather
+# characteristic (the benchmark supplies no wavemaker); cell 1 sits at that
+# gauge, so engine x = flume x - 0.5.  The land slope continues past the
+# 87.4 m survey to x = 92.  Viscous breaker with the SWE gate, the Froude
+# cap of 2 and the 1 cm floor, as the C2 decks (the drainage-film survivor
+# there).  The legacy benchmark deck's dx 0.06, CFL 0.1 and cd 0.003.
+grid:
+  cell_size: [0.06, 0.06]
+  n_cells: [1526, 3]
+  bathymetry:
+    type: file
+    file: depth_c7.txt
+simulation:
+  title: lab_yoshii_c7_movable
+  total_time: 130.0
+  screen_interval: 10.0
+boundaries:
+  west:
+    forcing:
+      disp_ramp: 2.0  # NSWE at the face: the Flather characteristic gives the dispersion no BC
+      file: west_c7.txt
+breaking:
+  swe_gate: true
+friction:
+  cd: 0.003
+sediment:
+  d50: 0.000208
+  specific_gravity: 2.65
+  porosity: 0.42
+  bed_change: true
+  # suspended load only + avalanching, the C2 closure pair that holds the
+  # scour runaway (Tehranirad et al. 2021 practice)
+  bedload: false
+  morph_interval: 0.05
+  # pickup cutoff: a per-case calibration; Malone found this flume a
+  # knife-edge at 0.04 (0.0375 and 0.0425 both much worse), KL and C2 sit at 0.03
+  min_depth_pickup: 0.03
+  avalanche:
+    tan_phi: 0.5
+numerics:
+  cfl: 0.1
+  froude_cap: 2.0
+  min_depth: 0.01
+output:
+  result_folder: ./output/
+  depth_out: true
+  channels:
+    - name: bed
+      geometry: field
+      variables: [sediment_dchgs, sediment_dchgb]
+      interval: 10.0
+    - name: gauges  # h, not eta: the lab gauges on land read the water column
+      geometry: stations
+      variables: [h, u]
+      interval: 0.05
+  geometries:
+    - name: stations
+      type: station
+      x: [19.5, 29.5, 35.5, 37.5, 39.5, 41.5, 43.5, 47.5, 53.5, 59.5, 69.5]
+      y: [0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06]

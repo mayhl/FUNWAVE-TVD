@@ -9,10 +9,10 @@
 # sediment deck: after 100 s the landward pond drains seaward over the crest
 # as a 1-2 cm supercritical film, and the Froude cap of 2 is what carries
 # that phase (cap 3 collapses at t = 122 s; a 2 cm floor never wets the last
-# gauge).  Legacy benchmark's CFL 0.1 and cd 0.003.
+# gauge).  The legacy benchmark deck's dx 0.06, CFL 0.1 and cd 0.003.
 grid:
-  cell_size: [0.04, 0.04]
-  n_cells: [1613, 3]
+  cell_size: [0.06, 0.06]
+  n_cells: [1076, 3]
   bathymetry:
     type: file
     file: depth_c2.txt
@@ -23,6 +23,7 @@ simulation:
 boundaries:
   west:
     forcing:
+      disp_ramp: 2.0  # NSWE at the face: the Flather characteristic gives the dispersion no BC
       file: west_c2.txt
 breaking:
   swe_gate: true
@@ -64,4 +65,4 @@ output:
     - name: stations
       type: station
       x: [19.5, 29.5, 35.5, 37.5, 39.5, 41.5, 43.5, 45.5, 49.5, 53.5]
-      y: [0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04, 0.04]
+      y: [0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06, 0.06]
