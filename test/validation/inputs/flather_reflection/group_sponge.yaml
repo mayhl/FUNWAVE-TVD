@@ -1,0 +1,27 @@
+# Calibration twin of group.yaml with the rig's direct + friction SPONGE on
+# the east face instead of the Flather radiator: the absorber reading the
+# spectrum lanes rely on, measured the same way as the open face.
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [800, 80]
+  bathymetry: {type: flat, depth: 10.0}
+simulation: {title: flather_reflection_sponge, total_time: 420.0, screen_interval: 100.0}
+wavemaker:
+  seed: 66
+  spectrum: {type: spectrum_2d, file: data/group_s00.txt}
+  source: {x_center: 200.0, y_center: 80.0, depth: 10.0}
+boundaries:
+  west:
+    sponge: {width: 150.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  east:
+    sponge: {width: 160.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0]
+      y: [4.0, 12.0, 20.0, 28.0, 36.0, 44.0, 52.0, 60.0, 68.0, 76.0, 84.0, 92.0, 100.0, 108.0, 116.0, 124.0, 132.0, 140.0, 148.0, 156.0]
+      variables: [eta]
+      interval: 0.1

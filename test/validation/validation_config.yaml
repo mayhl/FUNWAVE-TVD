@@ -978,6 +978,73 @@ simulations:
       # column-mean Hm0 1.041 (err 4.1 %) at np 4, board 09-15
       wavemaker_spectrum: { hm0_err_pct: 10.0, band_frac_pct: 95.0, dead_line_pct: 5.0 }
 
+  # ── Face reflection: one coherent wave group at a zero-target Flather face ──
+  # The Flather figure of merit the boundary-feed Hm0 gates never measure:
+  # an interior source sends a focused group east at a forcing face with a
+  # zero external target (no sponge = pure radiator); a 20-gauge column
+  # 500 m short of the face sees the group outgoing, then whatever comes
+  # back, and the oracle reports Kr from the two time windows.  Variants
+  # spread the same per-line energy over 7 directions (raised cosine to the
+  # half-width); s00 is the single-direction group.  The face takes the
+  # auto dispersion taper (forcing.disp_ramp absent = 5 depths = 50 m):
+  # with the dispersive closure on at the face Kr reads 35 %, with the
+  # taper 0.5 % (50 m), 0.3 % (100 and 200 m); the bare variant sets the
+  # key to 0 to keep the untapered number on record.
+  - name: flather_reflection
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/flather_reflection
+    input_files: [group.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [2d, boundary, flather, reflection, forcing]
+    postprocess:
+      face_reflection: test.validation.oracles.face_reflection
+    tolerances:
+      # tapered face, board 09-15: Kr 0.5 (s00), 2.2 (s15), 3.3 (s30); the
+      # 45 deg point reads 10.9 -- a normal-flux radiation condition is
+      # exact at normal incidence only, and (1 - cos) / (1 + cos) at 45 deg
+      # is 17 % for the edge components -- so it carries its own gate
+      face_reflection: { kr_pct: 5.0 }
+    variants:
+      s00: { overrides: {} }
+      s15: { overrides: { wavemaker.spectrum.file: data/group_s15.txt } }
+      s30: { overrides: { wavemaker.spectrum.file: data/group_s30.txt } }
+      s45: { overrides: { wavemaker.spectrum.file: data/group_s45.txt }, tolerances: { face_reflection: { kr_pct: 15.0 } } }
+      # the untapered face on record: Kr 34.7 (s00), 34.6/34.7/37.9 at
+      # 15/30/45 deg, board 09-15 -- the dispersive closure at the face
+      bare: { overrides: { boundaries.east.forcing.disp_ramp: 0.0 }, tolerances: { face_reflection: { kr_pct: 45.0 } } }
+
+  # Calibration twins of flather_reflection on the single-direction group: a
+  # wall (the group comes back whole -- the bookkeeping check, floor-gated)
+  # and the rig's direct + friction sponge (the absorber the spectrum lanes
+  # rely on).  Measured 09-15: wall Kr 98.3, sponge 2.8.
+  - name: flather_reflection_wall
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/flather_reflection
+    input_files: [group_wall.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [2d, boundary, reflection, refcal, forcing]
+    postprocess:
+      face_reflection: test.validation.oracles.face_reflection
+    tolerances:
+      face_reflection: { kr_min_pct: 90.0 }
+
+  - name: flather_reflection_sponge
+    exe_type: validation-2d
+    np_pin: 4
+    input: test/validation/inputs/flather_reflection
+    input_files: [group_sponge.yaml]
+    binary: funwave
+    output_dir: output
+    tags: [2d, boundary, sponge, reflection, refcal, forcing]
+    postprocess:
+      face_reflection: test.validation.oracles.face_reflection
+    tolerances:
+      face_reflection: { kr_pct: 6.0 }
+
   # ── combined forcing (GEN_ABS): wavemaker spectrum + SWL file on one face ──
   # The west forcing block carries both a wavemaker and a still-water-level file
   # series; the tide relaxes to the SWL while the wavemaker generates the waves.

@@ -1,0 +1,42 @@
+# Face reflection: a coherent wave group from an interior Wei-Kirby source,
+# sent at a zero-target Flather face (east forcing.file of zeros, no sponge),
+# with a 20-gauge alongshore station column between source and face.  The
+# group passes the column once going east and once coming back, 500 m of
+# fetch apart, so the oracle separates incident from reflected energy in
+# TIME (kinematic windows from the table's band and the linear group
+# velocity) and reports the face's reflection coefficient Kr -- the Flather
+# figure of merit (transmit the incident at 1x, radiate the outgoing at ~0)
+# the boundary-feed Hm0 gates never measure.  The west sponge takes the
+# westward half of the group; its residual rides inside the incident window.
+# Sweep points swap the table: s00 is the single-direction group, s15/s30/s45
+# spread the same per-line energy over 7 directions (gen_group_tables.py).
+# The face takes the auto dispersion taper (forcing.disp_ramp absent = 5 x
+# the deepest still water = 50 m here): the Flather condition is derived for
+# the shallow-water equations and the face's ghost columns hold still water,
+# so with the dispersion on the closure at the face sends a third of the
+# amplitude back (Kr 35 %, measured 09-15); 50 m brings it to 0.5 %,
+# 100/200 m to 0.3 %.  The bare variant sets 0 to keep that on record.
+grid:
+  cell_size: [1.0, 2.0]
+  n_cells: [800, 80]
+  bathymetry: {type: flat, depth: 10.0}
+simulation: {title: flather_reflection, total_time: 420.0, screen_interval: 100.0}
+wavemaker:
+  seed: 66
+  spectrum: {type: spectrum_2d, file: data/group_s00.txt}
+  source: {x_center: 200.0, y_center: 80.0, depth: 10.0}
+boundaries:
+  west:
+    sponge: {width: 150.0, direct: {r: 0.85, a: 5.0}, friction: {cd: 1.0}}
+  east:
+    forcing: {file: data/zero.txt}
+  periodic: [y]
+numerics: {cfl: 0.5, froude_cap: 1.0, min_depth: 0.01}
+output:
+  channels:
+    - name: sta
+      type: station
+      x: [300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0, 300.0]
+      y: [4.0, 12.0, 20.0, 28.0, 36.0, 44.0, 52.0, 60.0, 68.0, 76.0, 84.0, 92.0, 100.0, 108.0, 116.0, 124.0, 132.0, 140.0, 148.0, 156.0]
+      variables: [eta]
+      interval: 0.1
