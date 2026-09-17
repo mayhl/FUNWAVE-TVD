@@ -32,17 +32,8 @@
 !    (arrival_time: retired -- a first_time channel on eta, threshold
 !     magnitude:, accumulate: total; the envelopes Hmax/Hmin/Umax/MFmax/
 !     VORmax are max/min channels with accumulate: running)
-!    variables: [U, V, ETA, Hmax, Hmin, Umax, MFmax, VORmax,
-!                MASK, MASK9, Umean, Vmean, ETAmean, WaveHeight,
-!                SXL, SXR, SYL, SYR, SourceX, SourceY,
-!                FrcX, FrcY, BrkdisX, BrkdisY, P, Q,
-!                Fx, Fy, Gx, Gy, AGE, ROLLER, UNDERTOW,
-!                NU, TMP, Radiation, ETAscreen,
-!                Pstorm, Ustorm, Vstorm,     # meteo fields (nee OUT_METEO)
-!                Pves, VesUp, VesVp]         # vessel fields (nee OUT_VESSEL)
-!                                temporary flat list; maps each name → OUT_* flag.
-!                                Unknown names are rejected loudly.
-!                                Will be replaced by per-channel variable lists.
+!    (channel variables are registry names; every requested name lands
+!     in the demand set the engine queries with wants()/wants_any())
 !    geometries:                 named point sets shared by channels
 !      - name: <string>          referenced by channels.geometry,  REQUIRED
 !        type: station|transect                                    REQUIRED
@@ -218,62 +209,11 @@ module model_output_mod
       real(SP) :: diagnostics_interval = ZERO   ! 0 = step-derived cadence
       type(type_diag_metric), allocatable :: diagnostics(:)
 
-      ! Per-variable output flags; derived from variables: list
-      logical :: OUT_U = .false.
-      logical :: OUT_V = .false.
-      logical :: OUT_ETA = .false.
-      logical :: OUT_EtaScreen = .false.
-      ! the running crest envelope the meteo crest mask reads (not an output)
-      logical :: OUT_Hmax = .false.
-      ! instantaneous vorticity mirror (registry name vorticity)
-      logical :: OUT_VORT = .false.
-      ! the vertical-structure gradients a_x/a_y/b_x/b_y (nee legacy AB_OUTPUT)
-      logical :: OUT_AB = .false.
-      ! breaker type: xi_0 / s_0 (static) and the onset-captured xi_b / gamma_b /
-      ! front_steepness (the latter keep the internal h_max/h_min envelopes)
-      logical :: OUT_XI0 = .false.
-      logical :: OUT_S0 = .false.
-      logical :: OUT_BRK_TYPE = .false.
-      ! gate-field mirrors (breaking_active / nu_capped / froude_scale)
-      logical :: OUT_BRK_ACTIVE = .false.
-      logical :: OUT_NU_CAPPED = .false.
-      logical :: OUT_FROUDE_SCALE = .false.
-      logical :: OUT_MASK = .false.
-      logical :: OUT_MASK9 = .false.
-      logical :: OUT_Umean = .false.
-      logical :: OUT_Vmean = .false.
-      logical :: OUT_ETAmean = .false.
-      logical :: OUT_WaveHeight = .false.
-      logical :: OUT_SXL = .false.
-      logical :: OUT_SXR = .false.
-      logical :: OUT_SYL = .false.
-      logical :: OUT_SYR = .false.
-      logical :: OUT_SourceX = .false.
-      logical :: OUT_SourceY = .false.
-      logical :: OUT_FrcX = .false.
-      logical :: OUT_FrcY = .false.
-      logical :: OUT_BrkdisX = .false.
-      logical :: OUT_BrkdisY = .false.
-      logical :: OUT_P = .false.
-      logical :: OUT_Q = .false.
-      logical :: OUT_Fx = .false.
-      logical :: OUT_Fy = .false.
-      logical :: OUT_Gx = .false.
-      logical :: OUT_Gy = .false.
-      logical :: OUT_AGE = .false.
-      logical :: OUT_ROLLER = .false.
-      logical :: OUT_UNDERTOW = .false.
-      logical :: OUT_NU = .false.
-      logical :: OUT_TMP = .false.
-      logical :: OUT_Radiation = .false.
-      ! Meteo/vessel field dumps (nee OUT_METEO/OUT_VESSEL bools); the field
-      ! channel builder cross-checks applicability against the active models
-      logical :: OUT_Pstorm = .false.
-      logical :: OUT_Ustorm = .false.
-      logical :: OUT_Vstorm = .false.
-      logical :: OUT_Pves = .false.
-      logical :: OUT_VesUp = .false.
-      logical :: OUT_VesVp = .false.
+      ! Demand set: every registry name a channel asked for, plus the
+      ! internal consumers that read a maintained array (the meteo crest
+      ! mask on h_max).  The engine queries it by name -- wants() /
+      ! wants_any() -- instead of a flag per variable.
+      type(type_string), allocatable :: demanded(:)
 
       ! Wave-averaged window params: CONFIG-ORPHANED since the means:
       ! retirement (channels own averaged output).  The means module
@@ -286,6 +226,8 @@ module model_output_mod
    contains
       procedure :: read_input => output_read_input
       procedure :: need => output_need
+      procedure :: wants => output_wants
+      procedure :: wants_any => output_wants_any
       procedure :: resolve_blowup => output_resolve_blowup
    end type type_model_output
 
@@ -417,41 +359,56 @@ contains
 
    end subroutine derive_demand_flags
 
-   ! Registry name -> the demand flag that keeps its array maintained.
+   ! Registry name -> the demand set that keeps its array maintained.
    ! Raised by every channel variable and by any consumer that reads a
    ! maintained array without writing it (the meteo crest mask on h_max),
    ! the way a hidden hsig source accumulates unrequested; writing stays
-   ! gated on the channel request.  Only names whose machinery is gated
-   ! need mapping; plain fields (eta/u/v/p_flux/...) are always registered.
+   ! gated on the channel request.
    subroutine output_need(this, name)
       class(type_model_output), intent(inout) :: this
       character(len=*), intent(in) :: name
 
-      select case (trim(name))
-      case ("h_max"); this%OUT_Hmax = .true.
-      case ("vorticity"); this%OUT_VORT = .true.
-      case ("a", "b", "a_x", "a_y", "b_x", "b_y"); this%OUT_AB = .true.
-      case ("xi_0"); this%OUT_XI0 = .true.
-      case ("s_0"); this%OUT_S0 = .true.
-      case ("xi_b", "gamma_b", "front_steepness"); this%OUT_BRK_TYPE = .true.
-      case ("breaking_active"); this%OUT_BRK_ACTIVE = .true.
-      case ("nu_capped"); this%OUT_NU_CAPPED = .true.
-      case ("froude_scale"); this%OUT_FROUDE_SCALE = .true.
-      case ("mask"); this%OUT_MASK = .true.
-      case ("mask9"); this%OUT_MASK9 = .true.
-      case ("nu_break"); this%OUT_NU = .true.
-      case ("age_break"); this%OUT_AGE = .true.
-      case ("roller_flux"); this%OUT_ROLLER = .true.
-      case ("undertow_u", "undertow_v"); this%OUT_UNDERTOW = .true.
-      case ("meteo_pressure"); this%OUT_Pstorm = .true.
-      case ("meteo_wind_u"); this%OUT_Ustorm = .true.
-      case ("meteo_wind_v"); this%OUT_Vstorm = .true.
-      case ("vessel_pressure"); this%OUT_Pves = .true.
-      case ("vessel_up"); this%OUT_VesUp = .true.
-      case ("vessel_vp"); this%OUT_VesVp = .true.
-      end select
+      type(type_string), allocatable :: tmp(:)
+      integer :: n
+
+      if (this%wants(name)) return
+      n = 0
+      if (allocated(this%demanded)) n = size(this%demanded)
+      allocate (tmp(n + 1))
+      if (n > 0) tmp(1:n) = this%demanded
+      tmp(n + 1)%s = trim(name)
+      call move_alloc(tmp, this%demanded)
 
    end subroutine output_need
+
+   ! Whether a registry name was demanded
+   logical function output_wants(this, name) result(yes)
+      class(type_model_output), intent(in) :: this
+      character(len=*), intent(in) :: name
+      integer :: k
+      yes = .false.
+      if (.not. allocated(this%demanded)) return
+      do k = 1, size(this%demanded)
+         if (this%demanded(k)%s == trim(name)) then
+            yes = .true.
+            return
+         end if
+      end do
+   end function output_wants
+
+   ! Whether any of a group of registry names was demanded
+   logical function output_wants_any(this, names) result(yes)
+      class(type_model_output), intent(in) :: this
+      character(len=*), intent(in) :: names(:)
+      integer :: k
+      yes = .false.
+      do k = 1, size(names)
+         if (this%wants(names(k))) then
+            yes = .true.
+            return
+         end if
+      end do
+   end function output_wants_any
 
    subroutine read_diagnostics(this, blk, env)
       type(type_model_output), intent(inout) :: this

@@ -83,6 +83,14 @@ module model_stepper_2d_mod
    private
    public :: type_model_stepper_2d
 
+   ! demand-set name groups the stepper gates arrays on
+   character(len=16), parameter :: BRK_TYPE_NAMES(3) = &
+                                   [character(len=16) :: "xi_b", "gamma_b", "front_steepness"]
+   character(len=16), parameter :: AB_NAMES(6) = &
+                                   [character(len=16) :: "a", "b", "a_x", "a_y", "b_x", "b_y"]
+   character(len=16), parameter :: UNDERTOW_NAMES(2) = &
+                                   [character(len=16) :: "undertow_u", "undertow_v"]
+
    ! breaking-age threshold now rides breaking%t_brk (registry default 20,
    ! the value legacy hard-coded — its per-wavemaker assignments were dead,
    ! parity ledger 17d/e)
@@ -190,8 +198,8 @@ module model_stepper_2d_mod
       real(SP), allocatable :: coriolis(:, :)          ! per-cell f (f-plane; CRS later)
 
       ! Breaking extras (allocated whenever the breaker runs — the
-      ! show-only display mode included — or their OUT_ flags ask for
-      ! the legacy zero-filled files).
+      ! show-only display mode included — or a channel asks for the
+      ! legacy zero-filled files).
       real(SP), allocatable :: roller_flux(:, :)
       real(SP), allocatable :: undertow_u(:, :), undertow_v(:, :)
       logical, allocatable :: in_wm_zone(:, :)         ! breaker's wavemaker-zone flags
@@ -220,12 +228,12 @@ module model_stepper_2d_mod
 
       ! Output mirrors (registry is real(SP)-only): legacy Int2Flo
       ! casts of mask/mask9, refreshed at post_step; allocated only
-      ! under their OUT_ flags.
+      ! when demanded.
       real(SP), allocatable :: mask_out(:, :), mask9_out(:, :)
       ! Gate-field mirrors (registry names breaking_active / nu_capped /
       ! froude_scale): 0/1 flags or the applied weight from the last stage's
-      ! state, refreshed at post_step; allocated full-size only under their
-      ! OUT_ flags.  froude_out is the kernel's write target, so it is a
+      ! state, refreshed at post_step; allocated full-size only when
+      ! demanded.  froude_out is the kernel's write target, so it is a
       ! 1x1 stand-in when off (cal_etauv_update).
       real(SP), allocatable :: brk_active_out(:, :), nu_capped_out(:, :)
       real(SP), allocatable :: froude_out(:, :)
@@ -536,12 +544,12 @@ contains
       allocate (this%src_x(mloc, nloc), source=0.0_SP)
       allocate (this%src_y(mloc, nloc), source=0.0_SP)
       allocate (this%zeros(mloc, nloc), source=0.0_SP)
-      if (this%output%OUT_FROUDE_SCALE) then
+      if (this%output%wants("froude_scale")) then
          allocate (this%froude_out(mloc, nloc), source=1.0_SP)
       else
          allocate (this%froude_out(1, 1), source=1.0_SP)
       end if
-      if (this%output%OUT_VORT) then
+      if (this%output%wants("vorticity")) then
          allocate (this%vort_out(mloc, nloc), source=0.0_SP)
       else
          allocate (this%vort_out(1, 1), source=0.0_SP)
@@ -574,10 +582,10 @@ contains
                        .or. trim(this%breaking%model) == "none"
 
       ! legacy allocates + zeroes ROLLER_FLUX/UNDERTOW unconditionally,
-      ! so OUT_ROLLER/OUT_UNDERTOW without a running breaker still
+      ! so roller_flux/undertow_* without a running breaker still
       ! write zero-filled files
-      if (this%run_breaker .or. this%output%OUT_ROLLER &
-          .or. this%output%OUT_UNDERTOW) then
+      if (this%run_breaker .or. this%output%wants("roller_flux") &
+          .or. this%output%wants_any(UNDERTOW_NAMES)) then
          allocate (this%roller_flux(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_u(mloc, nloc), source=0.0_SP)
          allocate (this%undertow_v(mloc, nloc), source=0.0_SP)
@@ -1223,7 +1231,7 @@ contains
 
          call cal_etauv_update(lp, num%FroudeCap, num%MinDepthFrc, f%mask, &
                                f%h, f%u, f%v, f%hu, f%hv, f%p, f%q, &
-                               this%froude_out, this%output%OUT_FROUDE_SCALE)
+                               this%froude_out, this%output%wants("froude_scale"))
          if (.not. phy%dispersion) then
             ! legacy: without dispersion the conserved flux IS the
             ! (Froude-capped, mask-zeroed) cell flux
@@ -1469,31 +1477,31 @@ contains
       end if
 
       associate (f => this%fields, lp => this%grid%lp)
-         if (this%output%OUT_MASK) then
+         if (this%output%wants("mask")) then
             allocate (this%mask_out(lp%mloc, lp%nloc))
             this%mask_out = real(f%mask, SP)
             call registry%register("mask", this%mask_out)
          end if
-         if (this%output%OUT_MASK9) then
+         if (this%output%wants("mask9")) then
             allocate (this%mask9_out(lp%mloc, lp%nloc))
             this%mask9_out = real(f%mask9, SP)
             call registry%register("mask9", this%mask9_out)
          end if
          ! breaker gate flags exist only with a breaker (nu_break allocated);
          ! an unregistered name fails at the channel like nu_break does
-         if (this%output%OUT_BRK_ACTIVE .and. allocated(f%nu_break)) then
+         if (this%output%wants("breaking_active") .and. allocated(f%nu_break)) then
             allocate (this%brk_active_out(lp%mloc, lp%nloc), source=0.0_SP)
             call registry%register("breaking_active", this%brk_active_out)
          end if
-         if (this%output%OUT_NU_CAPPED .and. allocated(f%nu_break)) then
+         if (this%output%wants("nu_capped") .and. allocated(f%nu_break)) then
             allocate (this%nu_capped_out(lp%mloc, lp%nloc), source=0.0_SP)
             call registry%register("nu_capped", this%nu_capped_out)
          end if
-         if (this%output%OUT_FROUDE_SCALE) &
+         if (this%output%wants("froude_scale")) &
             call registry%register("froude_scale", this%froude_out)
-         if (this%output%OUT_VORT) call registry%register("vorticity", this%vort_out)
+         if (this%output%wants("vorticity")) call registry%register("vorticity", this%vort_out)
          ! the profile gradients exist only with the dispersion workspace
-         if (this%output%OUT_AB .and. allocated(this%dws%duxx)) then
+         if (this%output%wants_any(AB_NAMES) .and. allocated(this%dws%duxx)) then
             allocate (this%ax_out(lp%mloc, lp%nloc), source=0.0_SP)
             allocate (this%ay_out(lp%mloc, lp%nloc), source=0.0_SP)
             allocate (this%bx_out(lp%mloc, lp%nloc), source=0.0_SP)
@@ -1510,28 +1518,28 @@ contains
          ! breaker type: xi_0 and xi_b need an offshore wave (a wavemaker),
          ! s_0 a solitary start; gamma_b and front_steepness take either.
          ! The onset fields also need the viscous breaker's active flag.
-         if (this%output%OUT_XI0 .or. this%output%OUT_S0 .or. this%output%OUT_BRK_TYPE) then
+         if (this%output%wants("xi_0") .or. this%output%wants("s_0") .or. this%output%wants_any(BRK_TYPE_NAMES)) then
             block
                logical :: ok, sol
                call wavemakers_offshore(this%wavemakers, this%brk_h0, this%brk_t, ok)
                sol = this%sol_h0 > 0.0_SP .and. this%sol_d0 > 0.0_SP
                ! say why here: an unregistered field otherwise dies later
                ! as a bare "field not found" from the channel lookup
-               if (this%output%OUT_XI0 .and. .not. ok) call this%env%log%exit_on_error( &
+               if (this%output%wants("xi_0") .and. .not. ok) call this%env%log%exit_on_error( &
                   "output: xi_0 needs an offshore wave -- a wavemaker (regular, cnoidal,"// &
                   " spectral or file); a solitary start has no period to build L0 from, use s_0")
-               if (this%output%OUT_S0 .and. .not. sol) call this%env%log%exit_on_error( &
+               if (this%output%wants("s_0") .and. .not. sol) call this%env%log%exit_on_error( &
                   "output: s_0 is the solitary-wave slope parameter -- it needs initial: solitary")
                if (.not. (ok .or. sol)) call this%env%log%exit_on_error( &
                   "output: xi_b, gamma_b and front_steepness need an offshore wave (a wavemaker)"// &
                   " or a solitary start")
                allocate (this%bed_slope(lp%mloc, lp%nloc), source=0.0_SP)
                if (ok) this%brk_l0 = GRAV*this%brk_t**2/(2.0_SP*PI)
-               if (this%output%OUT_XI0) then
+               if (this%output%wants("xi_0")) then
                   allocate (this%xi0_out(lp%mloc, lp%nloc), source=FILL_VALUE)
                   call registry%register("xi_0", this%xi0_out)
                end if
-               if (this%output%OUT_S0) then
+               if (this%output%wants("s_0")) then
                   allocate (this%s0_out(lp%mloc, lp%nloc), source=FILL_VALUE)
                   call registry%register("s_0", this%s0_out)
                end if
@@ -1540,7 +1548,7 @@ contains
                ! deck stays valid across breaker models; without the viscous
                ! breaker's active flag they hold the fill throughout, and
                ! xi_b stays fill on a solitary start (no L0)
-               if (this%output%OUT_BRK_TYPE) then
+               if (this%output%wants_any(BRK_TYPE_NAMES)) then
                   if (this%run_breaker) then
                      allocate (this%was_active(lp%mloc, lp%nloc), source=.false.)
                      allocate (this%cap_hb(lp%mloc, lp%nloc), source=FILL_VALUE)
@@ -1778,7 +1786,7 @@ contains
       logical :: do_max, do_min
 
       do_min = allocated(this%cap_hb)
-      do_max = this%output%OUT_Hmax .or. do_min
+      do_max = this%output%wants("h_max") .or. do_min
       if (.not. do_max) return
       if (.not. this%past_spinup) return
       associate (f => this%fields, lp => this%grid%lp)
@@ -1896,7 +1904,7 @@ contains
                                       this%u4, this%v4, this%u1p, this%v1p, &
                                       this%u1pp, this%v1pp, this%u2, this%v2, &
                                       this%u3, this%v3, &
-                                      this%vort_out, this%output%OUT_VORT)
+                                      this%vort_out, this%output%wants("vorticity"))
       end associate
 
    end subroutine run_dispersion

@@ -251,9 +251,10 @@ contains
       ! forcing above) or when a breaker field is requested for output —
       ! verified solution-neutral bitwise in show-only mode
       this%breaking%show_breaking = this%physics%viscosity_breaking &
-                                    .or. this%output%OUT_AGE &
-                                    .or. this%output%OUT_ROLLER &
-                                    .or. this%output%OUT_UNDERTOW
+                                    .or. this%output%wants("age_break") &
+                                    .or. this%output%wants("roller_flux") &
+                                    .or. this%output%wants("undertow_u") &
+                                    .or. this%output%wants("undertow_v")
 
       ! wavemaker-zone breaking overrides ride the wavemaker entry
       ! (source.breaking) but land in the global breaking fields until the

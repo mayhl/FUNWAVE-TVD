@@ -10,9 +10,9 @@
 !  interface fluxes every step once time >= STEADY_TIME, plus the
 !  per-cell zero-up-crossing wave-height counters.  When the window
 !  T_sum >= T_INTV_mean closes it freezes the means, updates the
-!  wave-height statistics, writes the flagged umean/vmean/etamean/
-!  ulagm/vlagm/Hrms/Havg/Hsig files (1-based icount_mean), and rolls
-!  T_sum over (legacy subtracts the interval, it does not zero).
+!  wave-height statistics and rolls T_sum over (legacy subtracts the
+!  interval, it does not zero).  The legacy PREVIEW_MEAN writer is gone:
+!  averaged output is a channel statistic.
 !
 !  Legacy quirks kept:
 !    - the window-closing step updates the mean sums but SKIPS the
@@ -24,7 +24,7 @@
 !    - ETA2sum in the closing step uses the previous ETAmean before
 !      the new one is assigned
 !
-!  Radiation stresses (out_radiation): the depth-integrated momentum
+!  Radiation stresses: the depth-integrated momentum
 !  flux of the wave-induced velocity fluctuation, closed on the same
 !  T_sum window as the means,
 !    $$ S_{xx} = \overline{u'^2 H} + \tfrac12 g\,\overline{\eta'^2},\quad
@@ -70,16 +70,10 @@ module model_means_mod
 
    type :: type_model_means
 
-      logical :: out_umean = .false.
-      logical :: out_vmean = .false.
-      logical :: out_etamean = .false.
-      logical :: out_waveheight = .false.
-      logical :: out_radiation = .false.
       real(SP) :: t_intv_mean = 0.0_SP
       real(SP) :: steady_time = 0.0_SP
 
       real(SP) :: t_sum = 0.0_SP
-      integer :: icount_mean = 0
 
       real(SP), allocatable :: umean(:, :), vmean(:, :), etamean(:, :)
       real(SP), allocatable :: usum(:, :), vsum(:, :), etasum(:, :)
@@ -120,11 +114,6 @@ contains
 
       integer :: mloc, nloc
 
-      this%out_umean = output%OUT_Umean
-      this%out_vmean = output%OUT_Vmean
-      this%out_etamean = output%OUT_ETAmean
-      this%out_waveheight = output%OUT_WaveHeight
-      this%out_radiation = output%OUT_Radiation
       this%t_intv_mean = output%T_INTV_mean
       this%steady_time = output%STEADY_TIME
 
@@ -175,7 +164,6 @@ contains
       allocate (this%sig_wave_height(mloc, nloc), source=0.0_SP)
 
       this%t_sum = 0.0_SP
-      this%icount_mean = 0
 
    end subroutine means_init_compute
 
@@ -251,8 +239,6 @@ contains
                end if
             end do
          end do
-
-         call preview_mean(this, f, min_depth_frc)
 
       else
 
@@ -337,67 +323,6 @@ contains
       end associate
 
    end subroutine accumulate_pq_center
-
-   ! Legacy PREVIEW_MEAN: write the flagged mean fields, 1-based
-   ! 5-digit counter, same folder/format as the field channel.
-   subroutine preview_mean(this, f, min_depth_frc)
-      class(type_model_means), intent(inout) :: this
-      type(type_fields_2d), intent(in) :: f
-      real(SP), intent(in) :: min_depth_frc
-
-      real(SP), allocatable :: tmpout(:, :)
-      character(5) :: cnt
-
-      this%icount_mean = this%icount_mean + 1
-      write (cnt, '(I5.5)') this%icount_mean
-
-      if (this%out_umean) then
-         call flush_mean(this, "umean_"//cnt, this%umean)
-         tmpout = this%p_mean/max(f%depth + this%etamean, min_depth_frc)
-         call flush_mean(this, "ulagm_"//cnt, tmpout)
-      end if
-      if (this%out_vmean) then
-         call flush_mean(this, "vmean_"//cnt, this%vmean)
-         tmpout = this%q_mean/max(f%depth + this%etamean, min_depth_frc)
-         call flush_mean(this, "vlagm_"//cnt, tmpout)
-      end if
-      if (this%out_etamean) then
-         call flush_mean(this, "etamean_"//cnt, this%etamean)
-      end if
-      if (this%out_radiation) then
-         call flush_mean(this, "Sxx_"//cnt, this%sxx)
-         call flush_mean(this, "Sxy_"//cnt, this%sxy)
-         call flush_mean(this, "Syy_"//cnt, this%syy)
-      end if
-      if (this%out_waveheight) then
-         call flush_mean(this, "Hrms_"//cnt, this%wave_height_rms)
-         call flush_mean(this, "Havg_"//cnt, this%wave_height_ave)
-         call flush_mean(this, "Hsig_"//cnt, this%sig_wave_height)
-      end if
-
-   end subroutine preview_mean
-
-   ! Gather one local array's interior and write it on the io rank.
-   subroutine flush_mean(this, name, vals)
-      class(type_model_means), intent(inout) :: this
-      character(*), intent(in) :: name
-      real(SP), intent(in) :: vals(:, :)
-
-      real(SP), allocatable :: glob(:, :)
-
-      if (this%comm%is_io_node()) then
-         allocate (glob(this%gatherer%M, this%gatherer%N))
-      else
-         allocate (glob(1, 1))
-      end if
-      associate (ng => N_GHOST, nx => this%grid%local_nx, ny => this%grid%local_ny)
-         call this%gatherer%gather_field(vals(ng + 1:ng + nx, ng + 1:ng + ny), &
-                                         glob, this%comm)
-      end associate
-      if (this%comm%is_io_node()) &
-         call write_field_file(this%folder//name, glob, this%fmt)
-
-   end subroutine flush_mean
 
    subroutine means_free(this)
       class(type_model_means), intent(inout) :: this
