@@ -55,7 +55,9 @@
 !! first and last committed event), `duration` (sum of the time meeting
 !! the condition) and `duration_max`.  Filters, off at zero: `gap`
 !! re-opens the same event when the condition returns within that many
-!! seconds (the gap itself is not counted as duration); `min_duration`
+!! samples (the gap itself is not counted as duration; a step count
+!! follows an adaptive dt, so the chatter it removes needs no per-case
+!! value); `min_duration`
 !! discards a shorter event at close.  `reset` clears only the committed
 !! values, so an event straddling a window boundary lands whole in the
 !! window it closes in and adjacent windows sum exactly.  Time-valued
@@ -116,12 +118,13 @@ module core_accumulators_mod
       !> Event threshold value and direction (THR_ABOVE / THR_BELOW).
       real(SP) :: thr = 0.0_SP
       integer  :: thr_dir = THR_NONE
-      !> Event filters in seconds; 0 = off.
-      real(SP) :: gap = 0.0_SP
+      !> Event filters, 0 = off: gap in samples, min_duration in seconds.
+      integer  :: gap = 0
       real(SP) :: min_duration = 0.0_SP
       !> Open-event state (allocated by any event statistic; survives reset)
       logical, allocatable :: in_event(:, :)   !< condition met at the last sample
       logical, allocatable :: closing(:, :)    !< condition lost, gap not yet elapsed
+      integer, allocatable :: steps_off(:, :)  !< samples since the condition was lost
       real(SP), allocatable :: t_on(:, :)       !< onset of the open event
       real(SP), allocatable :: t_off(:, :)      !< first sample failing the condition
       real(SP), allocatable :: pend_dur(:, :)   !< duration of the open event so far
@@ -223,6 +226,7 @@ contains
          if (.not. allocated(this%in_event)) then
             allocate (this%in_event(this%dim1, this%dim2), source=.false.)
             allocate (this%closing(this%dim1, this%dim2), source=.false.)
+            allocate (this%steps_off(this%dim1, this%dim2), source=0)
             allocate (this%t_on(this%dim1, this%dim2), source=FILL_VALUE)
             allocate (this%t_off(this%dim1, this%dim2), source=FILL_VALUE)
             allocate (this%pend_dur(this%dim1, this%dim2), source=0.0_SP)
@@ -239,12 +243,13 @@ contains
 
    !> Set the event condition: value and direction (THR_ABOVE: sample >
    !! value; THR_BELOW: sample < value; THR_ABS: |sample| > value) and the
-   !! two filters in seconds.
+   !! filters: gap in samples, min_duration in seconds.
    subroutine set_threshold(this, value, direction, gap, min_duration)
       class(type_accumulator), intent(inout) :: this
       real(SP), intent(in) :: value
       integer, intent(in) :: direction
-      real(SP), intent(in), optional :: gap, min_duration
+      integer, intent(in), optional :: gap
+      real(SP), intent(in), optional :: min_duration
       this%thr = value
       this%thr_dir = direction
       if (present(gap)) this%gap = gap
@@ -427,7 +432,8 @@ contains
             else if (this%in_event(i, j)) then
                this%in_event(i, j) = .false.
                this%t_off(i, j) = t
-               if (this%gap > 0.0_SP) then
+               this%steps_off(i, j) = 0
+               if (this%gap > 0) then
                   this%closing(i, j) = .true.
                else
                   call commit_event(this, i, j)
@@ -435,7 +441,8 @@ contains
             end if
             ! the gap has run out: close for good
             if (this%closing(i, j) .and. .not. this%in_event(i, j)) then
-               if (t - this%t_off(i, j) > this%gap) call commit_event(this, i, j)
+               this%steps_off(i, j) = this%steps_off(i, j) + 1
+               if (this%steps_off(i, j) > this%gap) call commit_event(this, i, j)
             end if
          end do
       end do
@@ -579,7 +586,7 @@ contains
       if (allocated(this%val_sum_sq)) deallocate (this%val_sum_sq)
       if (allocated(this%shift)) deallocate (this%shift)
       if (allocated(this%t_max)) deallocate (this%t_max)
-      if (allocated(this%in_event)) deallocate (this%in_event, this%closing, &
+      if (allocated(this%in_event)) deallocate (this%in_event, this%closing, this%steps_off, &
                                                 this%t_on, this%t_off, this%pend_dur, &
                                                 this%first_time, this%last_time, &
                                                 this%dur_sum, this%dur_max, this%count)
@@ -590,7 +597,7 @@ contains
       this%n_events = 0
       this%n_dropped = 0
       this%thr_dir = THR_NONE
-      this%gap = 0.0_SP
+      this%gap = 0
       this%min_duration = 0.0_SP
       this%shifted = .false.
       this%have_shift = .false.

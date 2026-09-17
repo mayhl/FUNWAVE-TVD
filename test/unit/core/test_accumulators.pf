@@ -372,7 +372,7 @@ contains
    end subroutine test_event_open_carries_over_reset
 
    ! ----------------------------------------------------------------
-   ! gap 1.5 s merges [1,2] and [4] into one event of duration 3; the
+   ! gap 1 step merges [1,2] and [4] into one event of duration 3; the
    ! gap sample itself is not duration
    ! ----------------------------------------------------------------
    @test
@@ -382,7 +382,7 @@ contains
 
       call acc%init(1, 1, "h")
       call acc%allocate_stat("count")
-      call acc%set_threshold(0.5_SP, THR_ABOVE, gap=1.5_SP)
+      call acc%set_threshold(0.5_SP, THR_ABOVE, gap=1)
       call feed(acc, [0.0_SP, 1.0_SP, 1.0_SP, 0.0_SP, 1.0_SP, 0.0_SP, 0.0_SP, 0.0_SP])
 
       stat = acc%get_stat("count")
@@ -395,6 +395,29 @@ contains
       stat = acc%get_stat("last_time")
       @assertEqual(1.0_SP, stat(1, 1), tolerance=1e-6_SP)
    end subroutine test_event_gap_merge
+
+   ! ----------------------------------------------------------------
+   ! gap 1: the condition back one sample later continues the
+   ! event ([1,1,0,1] = one event of duration 3); two samples away
+   ! closes it ([1,0,0,1] = two events).  Independent of dt.
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_event_gap_two_apart()
+      type(type_accumulator) :: acc
+      real(SP), allocatable :: stat(:, :)
+
+      call acc%init(1, 1, "h")
+      call acc%allocate_stat("count")
+      call acc%set_threshold(0.5_SP, THR_ABOVE, gap=1)
+      call feed(acc, [1.0_SP, 1.0_SP, 0.0_SP, 1.0_SP, 0.0_SP, 0.0_SP, 1.0_SP, 0.0_SP, 0.0_SP])
+
+      stat = acc%get_stat("count")
+      @assertEqual(2.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration_max")
+      @assertEqual(3.0_SP, stat(1, 1), tolerance=1e-6_SP)
+      stat = acc%get_stat("duration")
+      @assertEqual(4.0_SP, stat(1, 1), tolerance=1e-6_SP)
+   end subroutine test_event_gap_two_apart
 
    ! ----------------------------------------------------------------
    ! min_duration 1.5 s discards the one-sample event without a trace

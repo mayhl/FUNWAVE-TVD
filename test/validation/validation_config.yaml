@@ -479,25 +479,26 @@ simulations:
         viscous: { overrides: { breaking.model: eddy_viscosity }, tolerances: { surf: { height_nrmse_pct: 20.0, setup_rms_pct: 3.5 } } }
 
 
-  # Event-filter study, report-only (tag study): gap and min_duration on the
-  # breaking-event channel, viscous arm; read as counts per wave per cell.
+  # Event-filter study, report-only (tag study): gap (steps) on the breaking-
+  # event channel, viscous arm; read as counts per wave per cell.  Board
+  # 369278 (09-16): 0 = 3.7-4 per wave, 2 = median right but 22-27 % of surf
+  # cells over, 5 = knee, 10 = plateau, 20 identical -> default 10.  The 09-15
+  # round settled the old seconds form (~0.1 T) and min_duration (off).
   - name: study_tk_events_spilling
     <<: *tk_spilling
-    tags: [study]
+    tags: [study, tkev]
     variants:
       viscous: { overrides: { breaking.model: eddy_viscosity } }
     sweep:
-      output.channels.2.gap: [0.0, 0.2, 0.5]
-      output.channels.2.min_duration: [0.0, 0.1, 0.3]
+      output.channels.2.gap: [0, 2, 5, 10, 20]
 
   - name: study_tk_events_plunging
     <<: *tk_plunging
-    tags: [study]
+    tags: [study, tkev]
     variants:
       viscous: { overrides: { breaking.model: eddy_viscosity } }
     sweep:
-      output.channels.2.gap: [0.0, 0.2, 0.5]
-      output.channels.2.min_duration: [0.0, 0.1, 0.3]
+      output.channels.2.gap: [0, 2, 5, 10, 20]
 
 
   # ── Wavemaker fidelity: the h470 incident gauge as its own gated case ───

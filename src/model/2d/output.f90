@@ -142,10 +142,11 @@ module model_output_mod
       character(12), allocatable :: statistics(:)
       integer :: n_stats = 0
       ! threshold: {above | below | magnitude: v | [v, ...]} for the event
-      ! statistics; direction +1 above / -1 below; filters (s, 0 = off)
+      ! statistics; direction +1 above / -1 below; filters, 0 = off (gap
+      ! in steps, min_duration in s)
       real(SP), allocatable :: thresholds(:)
       integer :: thr_dir = 0
-      real(SP) :: gap = 0.0_SP
+      integer :: gap = 0
       real(SP) :: min_duration = 0.0_SP
       ! log: every committed event as a row (events_<variable>.dat)
       logical :: log_events = .false.
@@ -901,8 +902,9 @@ contains
    end subroutine expand_statistics
 
    ! threshold: {above: v | below: v | magnitude: v}, v a real or a list;
-   ! magnitude is above on a .mag speed variable.  gap: and min_duration:
-   ! ride beside it.  Required by the event statistics, pointless without
+   ! magnitude is above on a .mag speed variable.  gap: (steps) and
+   ! min_duration: ride beside it.  Required by the event statistics,
+   ! pointless without
    subroutine read_threshold(sub_env, entry, cfg)
       type(type_env), intent(inout) :: sub_env
       type(type_yaml_reader), intent(inout) :: entry
@@ -963,7 +965,9 @@ contains
          end do
       end do
 
-      call entry%read_nonnegative("gap", silent=no_key, val=cfg%gap, default="0.0")
+      call entry%read("gap", silent=no_key, val=cfg%gap, default="10")
+      if (cfg%gap < 0) call sub_env%log%exit_on_error( &
+         "output: channels: '"//cfg%name//"': gap is a step count, not negative")
       call entry%read_nonnegative("min_duration", silent=no_key, val=cfg%min_duration, &
                                   default="0.0")
    end subroutine read_threshold

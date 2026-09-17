@@ -231,7 +231,7 @@ module core_output_channel_mod
       integer :: n_thr = 0
       real(SP), allocatable :: thr(:)
       integer :: thr_dir = 0
-      real(SP) :: gap = 0.0_SP
+      integer :: gap = 0
       real(SP) :: min_duration = 0.0_SP
       real(SP) :: wet_floor = 0.0_SP
       character(THRTAG_LEN), allocatable :: thr_tag(:)
@@ -370,7 +370,8 @@ contains
       ! filters, the wet-sample depth floor and the accumulate mode
       real(SP), intent(in), optional :: thresholds(:)
       integer, intent(in), optional :: thr_dir
-      real(SP), intent(in), optional :: gap, min_duration, wet_floor
+      integer, intent(in), optional :: gap
+      real(SP), intent(in), optional :: min_duration, wet_floor
       character(*), intent(in), optional :: accum_mode
       ! event log: rows per committed event; restart appends behind a seam
       ! line; log_ncid = a netcdf root for the event groups (IO rank)
