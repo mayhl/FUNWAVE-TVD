@@ -41,6 +41,16 @@ _DEFAULT_NP_K = 13.0
 _MIN_SUBDOMAIN = 4
 
 STAMP_FILE = ".build_stamp"
+# the engine's exit-code contract (core_throw_mod)
+_EXIT_LABELS = {
+    1: "unclassified abort",
+    3: "numerical blow-up",
+    4: "diagnostics abort threshold",
+    5: "output I/O failure",
+    6: "MPI communicator failure",
+    64: "usage error",
+    65: "deck refused",
+}
 CONFIG_PATH = os.path.join(os.path.dirname(__file__), "..", "regression", "regression_config.yaml")
 
 
@@ -79,6 +89,9 @@ class _SimTask:
     dev_elapsed: float = 0.0
     ref_stderr: str = ""
     dev_stderr: str = ""
+    # the dev run's exit code (the engine's contract: 3 blow-up, 4 diagnostics abort,
+    # 5 output I/O, 6 comm, 64 usage, 65 deck refused; None = not known)
+    dev_rc: int | None = None
 
 
 def _value_tag(v) -> str:
@@ -1009,6 +1022,7 @@ class RegressionRunner(BaseRunner):
                             _, t.ref_stderr = self.provider.get_output(jid)
                     else:
                         t.dev_status, t.dev_elapsed = r["status"], r["elapsed"]
+                        t.dev_rc = self.provider.get_returncode(jid)
                         if r["status"] == "FAILED":
                             _, t.dev_stderr = self.provider.get_output(jid)
                     remaining[t.index] -= 1
@@ -1038,7 +1052,10 @@ class RegressionRunner(BaseRunner):
             "steps": steps,
             "dev_ms_per_step": round(1000.0 * task.dev_elapsed / steps, 3) if steps and task.dev_status == "COMPLETED" else None,
             "overrides": sim.get("overrides") or {},
+            "rc": task.dev_rc,
         }
+        if result.status == "SIM_FAILED" and task.dev_rc not in (None, 0):
+            result.notes = f"dev exit code {task.dev_rc}: {_EXIT_LABELS.get(task.dev_rc, 'unclassified abort')}\n" + result.notes
 
         def _fmt_run(s, elapsed=0.0):
             if s == "cached":

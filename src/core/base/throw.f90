@@ -8,6 +8,18 @@ module core_throw_mod
    public :: throw_exception
    public :: set_throw_method
    public :: set_error_code
+   ! Exit-code contract (the wrapper's scheduler backends classify a run
+   ! by this before reading any log; the JSON status event carries it as
+   ! rc).  Anything the engine did not set -- a signal, a runtime crash,
+   ! an MPI library error -- is the launcher's or the runtime's code.
+   integer, parameter, public :: EXIT_OK = 0      ! completed, --validate passed, -v
+   integer, parameter, public :: EXIT_ABORT = 1   ! unclassified abort (internal invariants)
+   integer, parameter, public :: EXIT_BLOWUP = 3  ! numerical divergence detected
+   integer, parameter, public :: EXIT_DIAG = 4    ! a diagnostics abort: threshold tripped
+   integer, parameter, public :: EXIT_IO = 5      ! output I/O failure (netcdf, pnetcdf, a file)
+   integer, parameter, public :: EXIT_COMM = 6    ! the comm layer's own MPI checks failed
+   integer, parameter, public :: EXIT_USAGE = 64  ! bad flag or argument (sysexits EX_USAGE)
+   integer, parameter, public :: EXIT_DECK = 65   ! the deck was refused (sysexits EX_DATAERR)
 
    abstract interface
       subroutine throw(filename, line_number, message)

@@ -24,7 +24,8 @@
 module model_launcher_mod
    use core_env_mod, only: type_env, new_env, get_sub_env
    use core_log_io_mod, only: log_level_debug, log_level_off, set_default_log_levels, &
-                              set_default_log_format, log_format_jsonl, log_line
+                              set_default_log_format, log_format_jsonl, log_line, fail
+   use core_throw_mod, only: EXIT_DECK
    use model_main_mod, only: type_model_main
    use core_version_mod, only: version_line, build_info_lines, n_build_info_lines, &
                                build_info_line_len
@@ -53,6 +54,11 @@ contains
       type(type_model_3d)      :: model_3d
 # endif
 
+      ! Exit codes (core_throw_mod): 0 completed / --validate passed / -v;
+      ! 1 unclassified abort; 3 numerical blow-up; 4 diagnostics abort
+      ! threshold; 5 output I/O failure; 6 the comm layer's MPI checks;
+      ! 64 usage; 65 deck refused.  Signals, runtime crashes and MPI
+      ! library errors keep the launcher's or runtime's code.
       ! CLI: flags anywhere, first non-flag argument is the deck
       ! (default input.yaml); -l redirects the log (default funwave.log);
       ! --validate runs the config read + setup + every module init_compute,
@@ -149,9 +155,7 @@ contains
 # if defined (ENABLE_3D)
          call run_3d(model_3d, env, validate)
 # else
-         call log_line("ERROR: 3D grid detected but HYPRE not linked -- rebuild with"// &
-                       " -DHYPRE_DIR=<path>.", level="ERROR")
-         stop 1
+         call fail("3D grid detected but HYPRE not linked -- rebuild with -DHYPRE_DIR=<path>.", EXIT_DECK)
 # endif
       end if
    end subroutine launch
@@ -160,7 +164,8 @@ contains
       call log_line("Usage: funwave [-q] [-d] [--validate] [-l <log path>]"// &
                     " [--log-format text|jsonl] [input.yaml]")
       call log_line("       funwave -v | --version | --build-info")
-      stop 1
+      ! before MPI is up: a plain stop with the usage code
+      stop 64
    end subroutine usage_stop
 
    ! ── 2D path ────────────────────────────────────────────────────────────

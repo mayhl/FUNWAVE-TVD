@@ -59,6 +59,8 @@ module model_wavemaker_mod
    use model_breaking_mod, only: type_model_breaking
    use model_tide_mod, only: type_model_tide
 
+   use core_log_io_mod, only: fail
+   use core_throw_mod, only: EXIT_DECK
    implicit none
 
    ! Hedges (1995) boundary where Stokes theory hands over to cnoidal
@@ -455,7 +457,7 @@ contains
 
          if (.not. use_peak_cphase) then
             if (h_gen == 0.0_SP .or. cs%Tperiod(c) == 0.0_SP) &
-               error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+               call fail("wavemaker: re-set depth, Tperiod for wavemaker", EXIT_DECK)
          end if
 
          tb = omgn*omgn*h_gen/GRAV
@@ -1099,7 +1101,7 @@ contains
 
       ! legacy uses the scalar spacing (DXg) throughout the wavemaker
       if (grid%dx0 <= 0.0_SP .or. grid%dy0 <= 0.0_SP) &
-         error stop "wavemaker: internal source requires uniform grid spacing"
+         call fail("wavemaker: internal source requires uniform grid spacing", EXIT_DECK)
 
       mloc = grid%lp%mloc
       nloc = grid%lp%nloc
@@ -1790,7 +1792,7 @@ contains
       character(64) :: msg
 
       if (this%DEP_WK == 0.0_SP .or. this%Tperiod == 0.0_SP) &
-         error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+         call fail("wavemaker: re-set depth, Tperiod for wavemaker", EXIT_DECK)
 
       ! wave number from the same dispersion relation as the
       ! coefficient solve (legacy recomputes it inline here)
@@ -1807,12 +1809,12 @@ contains
          m = m + 1
          rlamda_m = real(m, SP)*2.0_SP*PI/grid%dy0/(real(grid%N, SP) - 1.0_SP)
          if (rlamda_m >= wkn) &
-            error stop "wavemaker: should enlarge domain for periodic "// &
-            "boundary with this wave angle"
+            call fail("wavemaker: should enlarge domain for periodic "// &
+                      "boundary with this wave angle", EXIT_DECK)
          theta = sign(asin(rlamda_m/wkn)*180.0_SP/PI, this%Theta_WK)
          if (m > 1000) &
-            error stop "wavemaker: could not find a wave angle for "// &
-            "periodic boundary condition"
+            call fail("wavemaker: could not find a wave angle for "// &
+                      "periodic boundary condition", EXIT_DECK)
       end do
 
       write (msg, '(A,F8.3,A,F8.3)') "wave angle set: ", this%Theta_WK, &
@@ -1856,7 +1858,7 @@ contains
 
       if (this%DEP_WK == 0.0_SP .or. this%FreqPeak == 0.0_SP .or. &
           this%FreqMax == 0.0_SP) &
-         error stop "wavemaker: re-set depth, FreqPeak, FreqMax for wavemaker"
+         call fail("wavemaker: re-set depth, FreqPeak, FreqMax for wavemaker", EXIT_DECK)
 
       allocate (this%omgn_ir(this%Nfreq), &
                 this%Cm(grid%lp%mloc, grid%lp%nloc, this%Nfreq), &
@@ -2118,13 +2120,13 @@ contains
 
       if (this%cnoidal) then
          if (this%DEP_WK <= 0.0_SP) &
-            error stop "wavemaker: cnoidal needs source.depth (or a bed to read it from)"
+            call fail("wavemaker: cnoidal needs source.depth (or a bed to read it from)", EXIT_DECK)
          call cnoidal_harmonics(2.0_SP*this%AMP_WK, this%DEP_WK, this%Tperiod, &
                                 CNOIDAL_NMAX, CNOIDAL_AMP_TOL, this%NumWaveComp, &
                                 amps, wave_length, celerity, modulus)
          if (this%NumWaveComp == 0) &
-            error stop "wavemaker: no cnoidal solution for this H, h, T"// &
-            " (Ursell number below the cnoidal range -- use regular)"
+            call fail("wavemaker: no cnoidal solution for this H, h, T"// &
+                      " (Ursell number below the cnoidal range -- use regular)", EXIT_DECK)
          allocate (this%wave_comp(this%NumWaveComp, 3))
          do kf = 1, this%NumWaveComp
             this%wave_comp(kf, 1) = this%Tperiod/real(kf, SP)
@@ -2139,10 +2141,10 @@ contains
          allocate (this%wave_comp(this%NumWaveComp, 3))
          open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
                action="read", iostat=ios)
-         if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+         if (ios /= 0) call fail("wavemaker: cannot open WaveCompFile", EXIT_DECK)
          do kf = 1, this%NumWaveComp
             read (unit, *, iostat=ios) (this%wave_comp(kf, i), i=1, 3)
-            if (ios /= 0) error stop "wavemaker: WaveCompFile short read"
+            if (ios /= 0) call fail("wavemaker: WaveCompFile short read", EXIT_DECK)
          end do
          close (unit)
       end if
@@ -2150,7 +2152,7 @@ contains
                 rlamda(this%NumWaveComp))
 
       if (this%PeakPeriod == 0.0_SP) &
-         error stop "wavemaker: re-set PeakPeriod for wavemaker"
+         call fail("wavemaker: re-set PeakPeriod for wavemaker", EXIT_DECK)
 
       ! theta = 0 hard-coded (legacy "assume zero because no or few
       ! cases include directions"); the shared solve's cos(0) = 1
@@ -2208,7 +2210,7 @@ contains
 
       open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
             action="read", iostat=ios)
-      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      if (ios /= 0) call fail("wavemaker: cannot open WaveCompFile", EXIT_DECK)
       read (unit, *) nfreq, ndir_in
       allocate (freq(nfreq), dire(ndir_in), amp(nfreq, ndir_in), &
                 phase(nfreq, ndir_in))
@@ -2371,7 +2373,7 @@ contains
 
       open (newunit=unit, file=trim(this%WaveCompFile), status="old", &
             action="read", iostat=ios)
-      if (ios /= 0) error stop "wavemaker: cannot open WaveCompFile"
+      if (ios /= 0) call fail("wavemaker: cannot open WaveCompFile", EXIT_DECK)
       read (unit, *) nfreq_in
       allocate (freq(nfreq_in), dire(nfreq_in), amp(nfreq_in), phase(nfreq_in))
       read (unit, *) this%PeakPeriod
@@ -2618,7 +2620,7 @@ contains
 
       h_ser = this%DepthWaveMaker
       if (h_ser == 0.0_SP .or. this%FreqPeak == 0.0_SP .or. this%FreqMax == 0.0_SP) &
-         error stop "wavemaker: re-set DepthWaveMaker, FreqPeak, FreqMax for wavemaker"
+         call fail("wavemaker: re-set DepthWaveMaker, FreqPeak, FreqMax for wavemaker", EXIT_DECK)
 
       ! per-(freq, theta) phase so the directions add incoherently (legacy
       ! drew one phase per frequency, collapsing them); the shared temporal
@@ -2752,9 +2754,9 @@ contains
       real(SP) :: peak_period
 
       open (newunit=unit, file=trim(fname), status="old", action="read", iostat=ios)
-      if (ios /= 0) error stop "wavemaker: cannot open a boundary spectrum file"
+      if (ios /= 0) call fail("wavemaker: cannot open a boundary spectrum file", EXIT_DECK)
       read (unit, *, iostat=ios) num_freq, num_dir
-      if (ios /= 0) error stop "wavemaker: boundary spectrum short read"
+      if (ios /= 0) call fail("wavemaker: boundary spectrum short read", EXIT_DECK)
       allocate (per_ser(num_freq), theta_ser(num_dir))
       allocate (amp2(num_freq, num_dir), phase2(num_freq, num_dir), source=0.0_SP)
       read (unit, *, iostat=ios) peak_period ! kept for format consistency
@@ -2767,7 +2769,7 @@ contains
       do i = 1, num_dir
          read (unit, *, iostat=ios) (amp2(j, i), j=1, num_freq)
       end do
-      if (ios /= 0) error stop "wavemaker: boundary spectrum short read"
+      if (ios /= 0) call fail("wavemaker: boundary spectrum short read", EXIT_DECK)
       ! phases are optional: EOF leaves input_phase false (legacy END= jump)
       input_phase = .true.
       do i = 1, num_dir
@@ -2783,7 +2785,7 @@ contains
       if (input_phase) phase2 = phase2*DEG2RAD
       do j = 1, num_freq
          if (per_ser(j) == 0.0_SP) &
-            error stop "wavemaker: zero frequency in a boundary spectrum"
+            call fail("wavemaker: zero frequency in a boundary spectrum", EXIT_DECK)
          per_ser(j) = 1.0_SP/per_ser(j)
       end do
       theta_ser = theta_ser*DEG2RAD
@@ -3057,7 +3059,7 @@ contains
 
       h_ser = this%DepthWaveMaker
       if (h_ser == 0.0_SP) &
-         error stop "wavemaker: re-set DepthWaveMaker for wavemaker"
+         call fail("wavemaker: re-set DepthWaveMaker for wavemaker", EXIT_DECK)
 
       do kf = 1, this%Nfreq
          this%Segma_Ser(kf) = 2.0*PI/set%per_ser(kf)
@@ -3343,7 +3345,7 @@ contains
       integer :: m
 
       if (theta_in*180.0_SP/PI >= 90.0_SP .or. theta_in*180.0_SP/PI <= -90.0_SP) &
-         error stop "wavemaker: input angle out of range of -90 -> 90"
+         call fail("wavemaker: input angle out of range of -90 -> 90", EXIT_DECK)
 
       theta_out = theta_in
       if (abs(theta_in) <= SMALL) return
@@ -3522,7 +3524,7 @@ contains
       real(SP) :: D1(1), rl1(1), b1(1)
 
       if (h_gen == 0.0_SP .or. Tperiod == 0.0_SP) &
-         error stop "wavemaker: re-set depth, Tperiod for wavemaker"
+         call fail("wavemaker: re-set depth, Tperiod for wavemaker", EXIT_DECK)
 
       call component_set_alloc(cs, 1)
       cs%Tperiod(1) = Tperiod

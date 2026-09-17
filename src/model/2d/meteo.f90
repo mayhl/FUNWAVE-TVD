@@ -109,6 +109,8 @@ module model_meteo_mod
    use core_yaml_file_mod, only: type_yaml_reader
    use model_base_mod, only: type_model_base
 
+   use core_log_io_mod, only: fail
+   use core_throw_mod, only: EXIT_DECK
    implicit none
 
    private
@@ -554,7 +556,7 @@ contains
       theta = (this%th2*w1 + this%th1*w2)*PI/180.0_SP     ! NOTE 6
 
       if (sigx == ZERO .or. sigy == ZERO) &
-         error stop "meteo: SigmaX or SigmaY is zero"
+         call fail("meteo: SigmaX or SigmaY is zero", EXIT_DECK)
 
       a = (cos(theta))**2/2.0_SP/sigx**2 &
           + (sin(theta))**2/2.0_SP/sigy**2

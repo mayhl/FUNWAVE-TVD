@@ -33,6 +33,8 @@ module model_initial_mod
    use model_base_mod, only: type_model_base
    use model_field_input_mod, only: type_file_spec, parse_file_spec
 
+   use core_log_io_mod, only: fail
+   use core_throw_mod, only: EXIT_DECK
    implicit none
 
    private
@@ -329,9 +331,9 @@ contains
             qreal = real(grid%N, SP)*grid%dy0*sth/per
             if (abs(qreal - real(nint(qreal), SP)) > 1.0e-4_SP .or. &
                 nint(qreal) < 1) then
-               error stop "initial/solitary/angle: box does not tile the"// &
-                  " oblique crest — need Lx*cos(angle) = p*P and"// &
-                  " Ly*sin(angle) = q*P (e.g. a square box at 45 deg)"
+               call fail("initial/solitary/angle: box does not tile the"// &
+                         " oblique crest — need Lx*cos(angle) = p*P and"// &
+                         " Ly*sin(angle) = q*P (e.g. a square box at 45 deg)", EXIT_DECK)
             end if
             do j = 1, grid%lp%nloc
                do i = 1, grid%lp%mloc
@@ -406,7 +408,7 @@ contains
          if (abs(fx) < 1e-5_SP) exit
       end do
       if (abs(fx) >= 1e-5_SP) then
-         error stop "initial: no solitary wave solution (check eps = amplitude/depth)"
+         call fail("initial: no solitary wave solution (check eps = amplitude/depth)", EXIT_DECK)
       end if
 
       rx = sqrt(x)

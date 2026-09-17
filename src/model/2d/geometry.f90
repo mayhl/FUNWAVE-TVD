@@ -47,6 +47,8 @@ module model_geometry_mod
    use model_base_mod, only: type_model_base
    use model_kernel_bc_mod, only: fill_ghost_wall, SIGN_MIRROR
 
+   use core_log_io_mod, only: fail
+   use core_throw_mod, only: EXIT_DECK
    implicit none
 
    private
@@ -258,7 +260,7 @@ contains
       logical :: create_partition
 
       if (allocated(this%dx_file)) then
-         error stop "geometry: variable spacing not yet implemented in new path"
+         call fail("geometry: variable spacing not yet implemented in new path", EXIT_DECK)
       end if
 
       ! n_cells is unified: explicit, or inferred from the file at read_input
@@ -268,7 +270,7 @@ contains
       create_partition = (this%nx_proc <= 0)
       if (.not. create_partition) then
          if (this%nx_proc*this%ny_proc /= comm%size) then
-            error stop "geometry/decomposition: nx_proc*ny_proc must equal MPI size"
+            call fail("geometry/decomposition: nx_proc*ny_proc must equal MPI size", EXIT_DECK)
          end if
          grid%nx_proc = this%nx_proc
          grid%ny_proc = this%ny_proc
@@ -332,7 +334,7 @@ contains
                end do
             end do
          case default
-            error stop "geometry: unknown bathy type"
+            call fail("geometry: unknown bathy type", EXIT_DECK)
          end select
 
          call grid%halo_exchange(depth)

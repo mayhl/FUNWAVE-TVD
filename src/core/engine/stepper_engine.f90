@@ -34,6 +34,7 @@
 module core_stepper_engine_mod
    use core_constants_mod, only: SP
    use core_log_io_mod, only: type_log_writer, log_level_debug
+   use core_throw_mod, only: EXIT_BLOWUP
    use core_simulation_time_mod, only: type_simulation_control
    implicit none
 
@@ -160,7 +161,7 @@ contains
          if (blowup) then
             write (line, "(a,es12.5)") "blow-up detected at t = ", &
                this%clock%current_time
-            call log%exit_on_error(trim(line))
+            call log%exit_on_error(trim(line), errcode=EXIT_BLOWUP)
          end if
 
          write (line, "(a,i0,a,es12.5,a,es12.5)") "step ", this%clock%step, &

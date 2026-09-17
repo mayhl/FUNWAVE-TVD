@@ -32,7 +32,7 @@
 module model_stepper_2d_mod
 
    use core_constants_mod, only: SP, N_GHOST, MPI_SP, GRAV, PI, FILL_VALUE
-   use core_log_io_mod, only: log_line
+   use core_log_io_mod, only: log_line, fail
    use core_grid_mod, only: type_grid_2d
    use core_env_mod, only: type_env
    use core_stepper_engine_mod, only: type_stepper_model
@@ -79,6 +79,7 @@ module model_stepper_2d_mod
                                        VIS_SCHEME_KENNEDY_ORIG, VIS_SCHEME_STATIC_TRANS, &
                                        VIS_SCHEME_DEPTH_RATIO
 
+   use core_throw_mod, only: EXIT_DECK
    implicit none
 
    private
@@ -567,7 +568,7 @@ contains
       if (this%physics%viscosity_breaking .and. this%breaking%wavemaker_vis) then
          ! the model enum made this structural — only roller forcing
          ! eddy viscosity on top of wavemaker_viscosity can land here
-         error stop "stepper: roller forces eddy viscosity — incompatible with the wavemaker_viscosity model"
+         call fail("stepper: roller forces eddy viscosity — incompatible with the wavemaker_viscosity model", EXIT_DECK)
       end if
 
       ! legacy WAVE_BREAKING dispatch: SHOW_BREAKING runs BREAKING

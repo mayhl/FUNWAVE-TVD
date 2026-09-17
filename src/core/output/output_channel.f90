@@ -76,7 +76,8 @@ module core_output_channel_mod
                       nf90mpi_close, nf90mpi_strerror, &
                       PNC_64BIT_DATA => NF90_64BIT_DATA
    use mpi_f08
-   use core_log_io_mod, only: log_line
+   use core_log_io_mod, only: log_line, fail, open_out
+   use core_throw_mod, only: EXIT_IO, EXIT_DECK
    implicit none
 
    private
@@ -397,7 +398,7 @@ contains
       this%n_derived = 0
       if (present(n_derived)) then
          if (n_derived > DERIVED_MAX) &
-            error stop "output_channel: derived list exceeds DERIVED_MAX"
+            call fail("output_channel: derived list exceeds DERIVED_MAX", EXIT_DECK)
          this%n_derived = n_derived
          this%derived(1:n_derived) = derived(1:n_derived)
       end if
@@ -420,8 +421,8 @@ contains
 
       ! loud guard: a release build without bounds checking would silently
       ! corrupt neighbouring components instead
-      if (n_vars > VARS_MAX) error stop "output_channel: variable list exceeds VARS_MAX"
-      if (n_stats > STATS_MAX) error stop "output_channel: statistics list exceeds STATS_MAX"
+      if (n_vars > VARS_MAX) call fail("output_channel: variable list exceeds VARS_MAX", EXIT_DECK)
+      if (n_stats > STATS_MAX) call fail("output_channel: statistics list exceeds STATS_MAX", EXIT_DECK)
 
       this%variables(1:n_vars) = variables(1:n_vars)
       if (present(file_prefixes)) then
@@ -448,14 +449,14 @@ contains
          end do
       end if
       if (this%has_events .and. this%n_thr == 0) &
-         error stop 'output_channel: event statistics need a threshold:'
+         call fail('output_channel: event statistics need a threshold:', EXIT_DECK)
       if (present(gap)) this%gap = gap
       if (present(min_duration)) this%min_duration = min_duration
       if (present(wet_floor)) this%wet_floor = wet_floor
       if (present(accum_mode)) this%accum_mode = accum_mode
       if (present(log_events)) this%log_events = log_events
       if (this%log_events .and. .not. this%has_events) &
-         error stop 'output_channel: log: needs an event statistic'
+         call fail('output_channel: log: needs an event statistic', EXIT_DECK)
       if (present(log_ncid)) this%log_ncid = log_ncid
 
       ! Timing control
@@ -512,8 +513,7 @@ contains
 
          ! per-channel grid descriptor (design_output_io group layout)
          if (comm%is_io_node()) then
-            open (newunit=gunit, file=this%result_folder//'grid.txt', &
-                  status='replace', action='write')
+            call open_out(gunit, this%result_folder//'grid.txt', status='replace', action='write')
             write (gunit, '(2I8, 2E16.8)') grid%M, grid%N, grid%dx0, grid%dy0
             close (gunit)
          end if
@@ -554,7 +554,7 @@ contains
          end if
 
       case default
-         error stop 'type_output_channel: unknown geometry type: '//trim(geom_type)
+         call fail('type_output_channel: unknown geometry type: '//trim(geom_type), EXIT_DECK)
       end select
 
       ! product-derived sources: ensure the required statistic storage
@@ -600,11 +600,9 @@ contains
             exists = .false.
             if (appending) inquire (file=event_file_name(this, iv, it), exist=exists)
             if (exists) then
-               open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
-                     position='append', action='write')
+               call open_out(unit, event_file_name(this, iv, it), status='old', action='write', position='append')
             else
-               open (newunit=unit, file=event_file_name(this, iv, it), status='replace', &
-                     action='write')
+               call open_out(unit, event_file_name(this, iv, it), status='replace', action='write')
                write (unit, '(a)') '#'//repeat(' ', 12)//'t_on'//repeat(' ', 12)//'t_off'// &
                   repeat(' ', 9)//'duration'//repeat(' ', 13)//'peak'//repeat(' ', 16)//'x'// &
                   repeat(' ', 16)//'y'//repeat(' ', 9)//'i'//repeat(' ', 9)//'j'
@@ -622,8 +620,7 @@ contains
       do iv = 1, this%n_vars
          if (this%hidden(iv)) cycle
          do it = 1, max(1, this%n_thr)
-            open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
-                  position='append', action='write')
+            call open_out(unit, event_file_name(this, iv, it), status='old', action='write', position='append')
             write (unit, '(a,es17.8)') '# restart t_start=', t
             close (unit)
          end do
@@ -748,8 +745,7 @@ contains
                      y = this%log_py(gi(1:n_tot))
                   end if
                   call sort_events(n_tot, t_on, gi, gj, perm)
-                  open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
-                        position='append', action='write')
+                  call open_out(unit, event_file_name(this, iv, it), status='old', action='write', position='append')
                   do k = 1, n_tot
                      rowbuf = [t_on(perm(k)), t_off(perm(k)), dur(perm(k)), peak(perm(k))]
                      write (unit, '(6es17.8,2i10)') rowbuf, x(perm(k)), y(perm(k)), &
@@ -782,8 +778,7 @@ contains
             do iv = 1, this%n_vars
                if (this%hidden(iv)) cycle
                do it = 1, max(1, this%n_thr)
-                  open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
-                        position='append', action='write')
+                  call open_out(unit, event_file_name(this, iv, it), status='old', action='write', position='append')
                   write (unit, '(a,i0,a,i0,a)') '# dropped ', dropped_tot - this%log_dropped, &
                      ' rows over the per-rank cap at this flush (', dropped_tot, &
                      ' so far, channel total)'
@@ -840,8 +835,7 @@ contains
                              gj, counts, displs, MPI_INTEGER, io, comm%id, ierr)
             if (comm%is_io_node() .and. n_tot > 0) then
                call sort_events(n_tot, t_on, gi, gj, perm)
-               open (newunit=unit, file=event_file_name(this, iv, it), status='old', &
-                     position='append', action='write')
+               call open_out(unit, event_file_name(this, iv, it), status='old', action='write', position='append')
                do k = 1, n_tot
                   write (unit, '(a,es17.8,a,es17.8,a,i0,a,i0)') '# open t_on=', t_on(perm(k)), &
                      ' peak=', peak(perm(k)), ' i=', gi(perm(k)), ' j=', gj(perm(k))
@@ -1067,8 +1061,7 @@ contains
       ! per-channel frame index (nee the global time_dt.out): one line
       ! per flush -- frame counter, time, dt
       if (do_flush .and. comm%is_io_node()) then
-         open (newunit=tunit, file=this%result_folder//'t.out', &
-               status='unknown', position='append', action='write')
+         call open_out(tunit, this%result_folder//'t.out', status='unknown', action='write', position='append')
          write (tunit, '(I6, 2E16.6)') this%icount, t, dt
          close (tunit)
       end if
@@ -1720,8 +1713,7 @@ contains
          end do
       end if
 
-      open (newunit=unit, file=this%result_folder//'metadata.yaml', &
-            status='replace', action='write')
+      call open_out(unit, this%result_folder//'metadata.yaml', status='replace', action='write')
       write (unit, '(A)') '# netcdf header of this channel (CF attributes for the '// &
          trim(this%format)//' frames) and how the frames are laid out'
       call root%dump(unit, 0)
@@ -1930,8 +1922,7 @@ contains
             ! Time already stamped by the frame the step opened
             call this%ncp%put(name, sorted)
          else
-            open (newunit=unit, file=point_file_name(this, name), &
-                  status='unknown', position='append', action='write')
+            call open_out(unit, point_file_name(this, name), status='unknown', action='write', position='append')
             write (unit, '(*(E16.6))') t, sorted
             close (unit)
          end if
@@ -1953,16 +1944,14 @@ contains
 
       do iv = 1, this%n_vars
          if (this%snapshot) then
-            open (newunit=unit, file=point_file_name(this, trim(this%prefixes(iv))), &
-                  status='replace', action='write')
+            call open_out(unit, point_file_name(this, trim(this%prefixes(iv))), status='replace', action='write')
             close (unit)
          end if
          do is = 1, this%n_stats
             n_it = 1
             if (any(EVENT_STATS == this%statistics(is))) n_it = max(1, this%n_thr)
             do it = 1, n_it
-               open (newunit=unit, file=point_file_name(this, stat_name(this, iv, is, it)), &
-                     status='replace', action='write')
+               call open_out(unit, point_file_name(this, stat_name(this, iv, is, it)), status='replace', action='write')
                close (unit)
             end do
          end do
@@ -1981,13 +1970,12 @@ contains
 
       select case (format)
       case ('binary')
-         open (newunit=unit, file=fname, access='stream', &
-               form='unformatted', status='replace', action='write')
+         call open_out(unit, fname, status='replace', action='write', access='stream', form='unformatted')
          write (unit) g
          close (unit)
       case default   ! 'ascii'
          write (row_fmt, '(A,I0,A)') '(', size(g, 1), 'E16.6)'
-         open (newunit=unit, file=fname, status='replace', action='write')
+         call open_out(unit, fname, status='replace', action='write')
          do j = 1, size(g, 2)
             write (unit, row_fmt) g(:, j)
          end do
@@ -2054,9 +2042,8 @@ contains
       integer, intent(in) :: status
       character(*), intent(in) :: what
       if (status /= NF90_NOERR) then
-         call log_line('output_channel/netcdf: '//what//': '// &
-                       trim(nf90_strerror(status)), level="ERROR")
-         error stop 'output_channel: fatal NetCDF error'
+         call fail('output_channel/netcdf: '//what//': '// &
+                   trim(nf90_strerror(status)), EXIT_IO)
       end if
    end subroutine nc_check
 
@@ -2427,9 +2414,8 @@ contains
       integer, intent(in) :: status
       character(*), intent(in) :: what
       if (status /= NF90_NOERR) then
-         call log_line('output_channel/pnetcdf: '//what//': '// &
-                       trim(nf90mpi_strerror(status)), level="ERROR")
-         error stop 'output_channel: fatal PnetCDF error'
+         call fail('output_channel/pnetcdf: '//what//': '// &
+                   trim(nf90mpi_strerror(status)), EXIT_IO)
       end if
    end subroutine pnc_check
 

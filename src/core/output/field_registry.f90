@@ -16,6 +16,8 @@
 
 module core_field_registry_mod
    use core_constants_mod, only: SP
+   use core_log_io_mod, only: fail
+   use core_throw_mod, only: EXIT_DECK
    implicit none
 
    private
@@ -75,7 +77,7 @@ contains
          end if
       end do
       ptr => null()
-      error stop 'type_field_registry: field not found: '//trim(name)
+      call fail('type_field_registry: field not found: '//trim(name), EXIT_DECK)
    end function get
 
    logical function has(this, name)

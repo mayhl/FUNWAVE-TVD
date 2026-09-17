@@ -59,7 +59,8 @@ module core_diagnostics_mod
    use core_constants_mod, only: SP, MPI_SP, GRAV
    use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
-   use core_log_io_mod, only: type_log_writer, log_line
+   use core_log_io_mod, only: type_log_writer, log_line, fail, open_out
+   use core_throw_mod, only: EXIT_BLOWUP, EXIT_DIAG, EXIT_IO
    use core_path_mod, only: rename_file
    use netcdf
    implicit none
@@ -235,11 +236,9 @@ contains
          if (this%seam_pending) inquire (file=this%folder//"diagnostics.dat", exist=appending)
          if (appending) then
             ! the pre-restart rows are the history a restart is diagnosed from
-            open (newunit=this%unit, file=this%folder//"diagnostics.dat", &
-                  status="old", position="append", action="write")
+            call open_out(this%unit, this%folder//"diagnostics.dat", status="old", action="write", position="append")
          else
-            open (newunit=this%unit, file=this%folder//"diagnostics.dat", &
-                  status="replace", action="write")
+            call open_out(this%unit, this%folder//"diagnostics.dat", status="replace", action="write")
             write (this%unit, "(a)") trim(header_line(this))
          end if
          call write_metadata(this)
@@ -318,8 +317,7 @@ contains
       integer, intent(in) :: status
       character(*), intent(in) :: what
       if (status /= NF90_NOERR) then
-         call log_line("diagnostics netcdf: "//what//": "//trim(nf90_strerror(status)), level="ERROR")
-         error stop "diagnostics: netcdf failure"
+         call fail("diagnostics netcdf: "//what//": "//trim(nf90_strerror(status)), EXIT_IO)
       end if
    end subroutine nc_check
 
@@ -650,8 +648,7 @@ contains
       call put_row(this%unit, this%ring(:, this%n_ring), this%n)
       flush (this%unit)
       ! sidecar: whole file rewritten, then renamed into place
-      open (newunit=unit, file=this%folder//"diagnostics.latest.tmp", &
-            status="replace", action="write")
+      call open_out(unit, this%folder//"diagnostics.latest.tmp", status="replace", action="write")
       write (unit, "(a)") trim(header_line(this))
       do r = 1, this%n_ring
          call put_row(unit, this%ring(:, r), this%n)
@@ -675,8 +672,7 @@ contains
    subroutine write_metadata(this)
       class(type_diagnostics), intent(in) :: this
       integer :: unit, k
-      open (newunit=unit, file=this%folder//"diagnostics.metadata.yaml", &
-            status="replace", action="write")
+      call open_out(unit, this%folder//"diagnostics.metadata.yaml", status="replace", action="write")
       write (unit, "(a)") "# columns of diagnostics.dat and diagnostics.latest, in order"
       write (unit, "(a)") "Conventions: 'CF-1.8'"
       write (unit, "(a)") "source: 'FUNWAVE-TVD'"
@@ -706,12 +702,12 @@ contains
             if (.not. ieee_is_finite(m%value)) then
                write (msg, '(a,a,a,es12.5)') "diagnostics: ", trim(m%name), &
                   " is not finite at t = ", t
-               call this%log%exit_on_error(trim(msg))
+               call this%log%exit_on_error(trim(msg), errcode=EXIT_BLOWUP)
             end if
             if (m%has_abort .and. m%value > m%abort_above) then
                write (msg, '(a,a,a,es12.5,a,es12.5,a,es12.5)') "diagnostics: ", trim(m%name), &
                   " = ", m%value, " exceeds abort ", m%abort_above, " at t = ", t
-               call this%log%exit_on_error(trim(msg))
+               call this%log%exit_on_error(trim(msg), errcode=EXIT_DIAG)
             end if
          end associate
       end do

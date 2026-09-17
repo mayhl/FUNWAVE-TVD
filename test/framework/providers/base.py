@@ -18,6 +18,10 @@ class BaseProvider(ABC):
         """Return the current status: QUEUED, RUNNING, COMPLETED, FAILED."""
         pass
 
+    def get_returncode(self, job_id: str) -> int | None:
+        """The finished job's exit code, None while it runs or when the backend cannot say."""
+        return None
+
 
 class LocalProvider(BaseProvider):
     """Launch runs as local mpirun processes; drive many concurrently.
@@ -80,7 +84,13 @@ class LocalProvider(BaseProvider):
             return "RUNNING"
         entry["stdout_f"].close()
         entry["stderr_f"].close()
+        entry["returncode"] = returncode
         return "COMPLETED" if returncode == 0 else "FAILED"
+
+    def get_returncode(self, job_id: str) -> int | None:
+        """The finished job's exit code, None while it runs."""
+        entry = self.jobs.get(job_id)
+        return None if not entry else entry.get("returncode")
 
     def get_output(self, job_id: str) -> tuple[str, str]:
         """(stdout, stderr) of a finished job, empty while it runs."""

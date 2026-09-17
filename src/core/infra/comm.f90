@@ -15,6 +15,7 @@ module core_comm_mod
    use mpi_f08
    use core_constants_mod, only: LABEL_SIZE, SP, MPI_SP, type_string
    use core_log_io_mod, only: type_log_writer, new_log_writer
+   use core_throw_mod, only: EXIT_COMM
 
    implicit none
 
@@ -81,7 +82,7 @@ contains
          this%id = MPI_COMM_WORLD
          call MPI_Initialized(is_mpi_initialized, ierr)
          if (ierr .ne. MPI_SUCCESS) then
-            error stop "Failed to check if MPI is initialized."
+            error stop EXIT_COMM  ! Failed to check if MPI is initialized.
          end if
 
          if (.not. is_mpi_initialized) then
@@ -90,22 +91,22 @@ contains
             ! MPI library; a threadless run accepts whatever is provided
             call MPI_Init_thread(MPI_THREAD_FUNNELED, provided, ierr)
             if (ierr .ne. MPI_SUCCESS) then
-               error stop "Failed to initialize MPI."
+               error stop EXIT_COMM  ! Failed to initialize MPI.
             end if
 !$          if (provided < MPI_THREAD_FUNNELED .and. omp_get_max_threads() > 1) then
-!$             error stop "MPI library lacks the MPI_THREAD_FUNNELED support needed for OpenMP threads."
+!$             error stop EXIT_COMM  ! MPI library lacks MPI_THREAD_FUNNELED for OpenMP threads
 !$          end if
          end if
       end if
 
       call MPI_Comm_rank(this%id, this%rank_id, ierr)
       if (ierr .ne. MPI_SUCCESS) then
-         error stop "Failed to get MPI rank."
+         error stop EXIT_COMM  ! Failed to get MPI rank.
       end if
 
       call MPI_Comm_size(this%id, this%size, ierr)
       if (ierr .ne. MPI_SUCCESS) then
-         error stop "Failed to get MPI size."
+         error stop EXIT_COMM  ! Failed to get MPI size.
       end if
 
       this%p_is_io_node = this%rank_id .eq. io_rank_id

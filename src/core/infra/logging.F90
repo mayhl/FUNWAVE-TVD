@@ -2,7 +2,7 @@
 !! Replaces external flogging dependency with a native implementation.
 module core_log_io_mod
    use, intrinsic :: iso_fortran_env, only: output_unit, error_unit
-   use core_throw_mod, only: throw_exception, set_error_code
+   use core_throw_mod, only: throw_exception, set_error_code, EXIT_ABORT, EXIT_DECK, EXIT_IO
    implicit none
    private
 
@@ -10,7 +10,7 @@ module core_log_io_mod
    character(len=1), parameter :: ESC = achar(27)
 
    public :: new_log_writer, format_log_line, format_json_line, set_default_log_levels
-   public :: set_default_log_format, log_line, json_escape
+   public :: set_default_log_format, log_line, json_escape, fail, open_out
 
    !> @brief Log levels
    integer, parameter, public :: log_level_debug = 1
@@ -145,12 +145,17 @@ contains
       class(type_log_writer), intent(inout) :: this
       character(len=*), intent(in) :: message
       integer, optional, intent(in) :: errcode
+      integer :: rc
+      ! nearly every caller is a config-time refusal; the runtime sites
+      ! (blow-up, diagnostics abort) pass their own code
+      rc = EXIT_DECK
+      if (present(errcode)) rc = errcode
       call this%write_log(log_level_error, "ERROR", message)
-      call this%status_event(log_level_error, "ERROR", message, errcode)
+      call this%status_event(log_level_error, "ERROR", message, rc)
       ! the abort below skips normal unit finalization -- flush, or the log
       ! file ends empty exactly when it matters
       if (this%file_unit /= -1) flush (this%file_unit)
-      if (present(errcode)) call set_error_code(errcode)
+      call set_error_code(rc)
       if (this%is_io_node) call throw_exception(__FILE__, __LINE__, message=message)
    end subroutine exit_on_error
 
@@ -158,10 +163,13 @@ contains
       class(type_log_writer), intent(inout) :: this
       character(len=*), intent(in) :: message
       integer, optional, intent(in) :: errcode
+      integer :: rc
+      rc = EXIT_ABORT
+      if (present(errcode)) rc = errcode
       call this%write_log(log_level_fatal, "FATAL", message)
-      call this%status_event(log_level_fatal, "FATAL", message, errcode)
+      call this%status_event(log_level_fatal, "FATAL", message, rc)
       if (this%file_unit /= -1) flush (this%file_unit)
-      if (present(errcode)) call set_error_code(errcode)
+      call set_error_code(rc)
       if (this%is_io_node) call throw_exception(__FILE__, __LINE__, message=message)
    end subroutine exit_on_fatal
 
@@ -237,20 +245,44 @@ contains
    end subroutine event
 
    ! JSON format only: the exit status event behind an error, rc = the
-   ! process exit code (1 unless the caller set one)
-   subroutine status_event(this, level, prefix, message, errcode)
+   ! process exit code
+   subroutine status_event(this, level, prefix, message, rc)
       class(type_log_writer), intent(inout) :: this
       integer, intent(in) :: level
       character(len=*), intent(in) :: prefix, message
-      integer, intent(in), optional :: errcode
+      integer, intent(in) :: rc
       character(len=32) :: rc_s
-      integer :: rc
       if (default_log_format /= log_format_jsonl) return
-      rc = 1
-      if (present(errcode)) rc = errcode
       write (rc_s, '(a,i0)') '"rc":', rc
       call this%write_log(level, prefix, message, "status", trim(rc_s))
    end subroutine status_event
+
+   ! Abort from a site without a writer with a contract code: the message
+   ! as an ERROR line (and the status event on a JSON console), then the
+   ! same MPI-wide termination exit_on_error takes.  Replaces the bare
+   ! error stops, which exit 1 and skip the status event.
+   subroutine fail(msg, code, label)
+      character(len=*), intent(in) :: msg
+      integer, intent(in) :: code
+      character(len=*), intent(in), optional :: label
+      character(len=20) :: date, time
+      character(len=8)  :: zone
+      character(len=19) :: timestamp
+      character(len=32) :: rc_s
+      character(len=:), allocatable :: lab
+      lab = "funwave"
+      if (present(label)) lab = label
+      call log_line(msg, lab, "ERROR")
+      if (default_log_format == log_format_jsonl) then
+         call date_and_time(date, time, zone)
+         timestamp = date(1:4)//"-"//date(5:6)//"-"//date(7:8)//" "//time(1:2)//":"//time(3:4)//":"//time(5:6)
+         write (rc_s, '(a,i0)') '"rc":', code
+         write (output_unit, "(A)") format_json_line(lab, timestamp, "status", "ERROR", msg, trim(rc_s))
+      end if
+      flush (output_unit)
+      call set_error_code(code)
+      call throw_exception(__FILE__, __LINE__, message=msg)
+   end subroutine fail
 
    ! A line from any rank without a writer (blow-up sites, netcdf failures
    ! before an error stop, the usage text): stdout in the process format.
@@ -358,6 +390,25 @@ contains
          end select
       end do
    end function json_escape
+
+   ! open an output file or fail with the I/O contract code: a permission
+   ! or disk failure otherwise dies as a runtime error with the runtime's
+   ! own exit code, outside the contract
+   subroutine open_out(unit, file, status, action, access, form, position)
+      integer, intent(out) :: unit
+      character(len=*), intent(in) :: file
+      character(len=*), intent(in), optional :: status, action, access, form, position
+      character(len=:), allocatable :: st, ac, acc, fm, pos
+      integer :: ios
+      st = "unknown"; ac = "write"; acc = "sequential"; fm = "formatted"; pos = "asis"
+      if (present(status)) st = status
+      if (present(action)) ac = action
+      if (present(access)) acc = access
+      if (present(form)) fm = form
+      if (present(position)) pos = position
+      open (newunit=unit, file=trim(file), status=st, action=ac, access=acc, form=fm, position=pos, iostat=ios)
+      if (ios /= 0) call fail("output: cannot open "//trim(file)//" for writing", EXIT_IO)
+   end subroutine open_out
 
    subroutine log_writer_finalize(this)
       class(type_log_writer), intent(inout) :: this
