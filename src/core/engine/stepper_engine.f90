@@ -33,7 +33,7 @@
 
 module core_stepper_engine_mod
    use core_constants_mod, only: SP
-   use core_log_io_mod, only: type_log_writer
+   use core_log_io_mod, only: type_log_writer, log_level_debug
    use core_simulation_time_mod, only: type_simulation_control
    implicit none
 
@@ -133,14 +133,15 @@ contains
       real(SP) :: dt, t_screen
       integer :: istage
       logical :: blowup
-      character(160) :: line
+      character(160) :: line, extra
 
       dt = 0.0_SP
       t_screen = this%clock%current_time
 
       write (line, "(a,es12.5,a,es12.5)") "stepper engine: t = ", &
          this%clock%current_time, " -> ", this%clock%t_end
-      call log%info(trim(line))
+      write (extra, '(a,es12.5,a,es12.5)') '"phase":"run","t0":', this%clock%current_time, ',"t1":', this%clock%t_end
+      call log%event("phase", trim(line), extra=trim(extra))
 
       do while (.not. this%clock%is_finished())
 
@@ -164,11 +165,12 @@ contains
 
          write (line, "(a,i0,a,es12.5,a,es12.5)") "step ", this%clock%step, &
             "  t = ", this%clock%current_time, "  dt = ", dt
-         call log%debug(trim(line))
+         write (extra, '(a,i0,a,es12.5,a,es12.5)') '"step":', this%clock%step, ',"t":', this%clock%current_time, ',"dt":', dt
+         call log%event("progress", trim(line), extra=trim(extra), level=log_level_debug)
 
          if (this%screen_interval > 0.0_SP .and. &
              this%clock%current_time >= t_screen) then
-            call log%info(trim(line))
+            call log%event("progress", trim(line), extra=trim(extra))
             t_screen = t_screen + this%screen_interval
          end if
 

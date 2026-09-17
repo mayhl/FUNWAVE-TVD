@@ -23,8 +23,8 @@
 
 module model_launcher_mod
    use core_env_mod, only: type_env, new_env, get_sub_env
-   use core_log_io_mod, only: log_level_debug, log_level_off, &
-                              set_default_log_levels
+   use core_log_io_mod, only: log_level_debug, log_level_off, set_default_log_levels, &
+                              set_default_log_format, log_format_jsonl, log_line
    use model_main_mod, only: type_model_main
    use core_version_mod, only: version_line, build_info_lines, n_build_info_lines, &
                                build_info_line_len
@@ -45,6 +45,9 @@ contains
       integer, allocatable     :: dims(:)
       integer                  :: ndim, i, j
       logical                  :: missing, no_grid, quiet, dbg, want_log, have_deck, validate
+      logical                  :: want_fmt, jsonl
+      character(64)            :: envval
+      integer                  :: envlen
       type(type_model_main)    :: model_2d
 # if defined (ENABLE_3D)
       type(type_model_3d)      :: model_3d
@@ -59,7 +62,12 @@ contains
       dbg = .false.
       validate = .false.
       want_log = .false.
+      want_fmt = .false.
       have_deck = .false.
+      ! JSON Lines console: the flag wins over the MU_WRAP=1 environment the
+      ! Go shim sets on every subprocess; text stays the default
+      call get_environment_variable("MU_WRAP", envval, envlen)
+      jsonl = envlen > 0 .and. trim(envval) == "1"
       yaml_path = "input.yaml"
       log_path = "funwave.log"
       do i = 1, command_argument_count()
@@ -69,10 +77,20 @@ contains
             want_log = .false.
             cycle
          end if
+         if (want_fmt) then
+            select case (trim(arg))
+            case ("text"); jsonl = .false.
+            case ("jsonl"); jsonl = .true.
+            case default; call usage_stop()
+            end select
+            want_fmt = .false.
+            cycle
+         end if
          select case (trim(arg))
          case ("-q", "--quiet"); quiet = .true.
          case ("-d", "--debug"); dbg = .true.
          case ("-l", "--log"); want_log = .true.
+         case ("--log-format"); want_fmt = .true.
          case ("--validate"); validate = .true.
             ! return, not stop: cce prints " STOP " on a bare stop and that
             ! would trail the parsed output
@@ -92,7 +110,7 @@ contains
             have_deck = .true.
          end select
       end do
-      if (want_log) call usage_stop()
+      if (want_log .or. want_fmt) call usage_stop()
 
       ! -d opens both sinks to the debug config-resolution trace; -q turns
       ! the console off (errors fall through to stderr).  Defaults are set
@@ -101,6 +119,7 @@ contains
       if (dbg) call set_default_log_levels(stdout_level=log_level_debug, &
                                            file_level=log_level_debug)
       if (quiet) call set_default_log_levels(stdout_level=log_level_off)
+      if (jsonl) call set_default_log_format(log_format_jsonl)
 
       ! Initialise environment once — owns MPI, YAML, and logging for this run.
       call new_env(env, label="funwave", yaml_path=trim(yaml_path), log_path=trim(log_path))
@@ -130,15 +149,17 @@ contains
 # if defined (ENABLE_3D)
          call run_3d(model_3d, env, validate)
 # else
-         write (*, "(a)") "ERROR: 3D grid detected but HYPRE not linked — rebuild with -DHYPRE_DIR=<path>."
+         call log_line("ERROR: 3D grid detected but HYPRE not linked -- rebuild with"// &
+                       " -DHYPRE_DIR=<path>.", level="ERROR")
          stop 1
 # endif
       end if
    end subroutine launch
 
    subroutine usage_stop()
-      write (*, "(a)") "Usage: funwave [-q] [-d] [--validate] [-l <log path>] [input.yaml]"
-      write (*, "(a)") "       funwave -v | --version | --build-info"
+      call log_line("Usage: funwave [-q] [-d] [--validate] [-l <log path>]"// &
+                    " [--log-format text|jsonl] [input.yaml]")
+      call log_line("       funwave -v | --version | --build-info")
       stop 1
    end subroutine usage_stop
 

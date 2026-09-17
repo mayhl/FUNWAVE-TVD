@@ -869,6 +869,7 @@ contains
 
          call output_mgr%finalize()
          if (diag%is_activated) call diag%finalize()
+         call this%env%log%event("status", "run completed", extra='"rc":0')
       end if
 
       call stepper%free()

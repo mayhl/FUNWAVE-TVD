@@ -9,7 +9,8 @@ module core_log_io_mod
    ! ANSI escape character for terminal coloring
    character(len=1), parameter :: ESC = achar(27)
 
-   public :: new_log_writer, format_log_line, set_default_log_levels
+   public :: new_log_writer, format_log_line, format_json_line, set_default_log_levels
+   public :: set_default_log_format, log_line, json_escape
 
    !> @brief Log levels
    integer, parameter, public :: log_level_debug = 1
@@ -20,6 +21,17 @@ module core_log_io_mod
    ! threshold above every level: a sink set to off never writes
    integer, parameter, public :: log_level_off = 6
 
+   ! Console format: text (default) or JSON Lines -- one object per line
+   ! {ts, kind, label, level, msg[, fields]}, the shape the funtools
+   ! porcelain emitter speaks, so one consumer reads both.  Opt-in only
+   ! (--log-format jsonl, or MU_WRAP=1 from the Go shim); the log FILE
+   ! stays text either way -- it is the human record, the stream the
+   ! machine one.  kinds: log (any message), phase (init/run/exit
+   ! transitions), progress (the step line with step/t/dt as fields),
+   ! status (the exit reason with rc).
+   integer, parameter, public :: log_format_text = 1
+   integer, parameter, public :: log_format_jsonl = 2
+
    ! Process-wide state new writers inherit: the CLI verbosity flags set the
    ! default levels once (before any writer exists), and the env's writer
    ! publishes its log file so later writers (e.g. the yaml [config] logger)
@@ -28,6 +40,7 @@ module core_log_io_mod
    integer, save :: default_stderr_level = log_level_error
    integer, save :: default_file_level = log_level_info
    integer, save :: shared_file_unit = -1
+   integer, save :: default_log_format = log_format_text
 
    type, public :: type_log_writer
       private
@@ -41,9 +54,10 @@ module core_log_io_mod
       logical :: owns_file = .false.
    contains
       procedure, public :: debug, info, warning => warn, exit_on_error, exit_on_fatal, finalize => log_writer_finalize
+      procedure, public :: event
       procedure, public :: set_levels => log_set_levels
       procedure, public :: set_file => log_set_file
-      procedure, private :: write_log
+      procedure, private :: write_log, status_event
    end type type_log_writer
 
    interface new_log_writer
@@ -80,6 +94,11 @@ contains
 
    ! Process-wide defaults for writers created AFTER this call; the CLI
    ! flags run this once before new_env creates the first writer
+   subroutine set_default_log_format(fmt)
+      integer, intent(in) :: fmt
+      default_log_format = fmt
+   end subroutine set_default_log_format
+
    subroutine set_default_log_levels(stdout_level, stderr_level, file_level)
       integer, intent(in), optional :: stdout_level, stderr_level, file_level
       if (present(stdout_level)) default_stdout_level = stdout_level
@@ -127,6 +146,7 @@ contains
       character(len=*), intent(in) :: message
       integer, optional, intent(in) :: errcode
       call this%write_log(log_level_error, "ERROR", message)
+      call this%status_event(log_level_error, "ERROR", message, errcode)
       ! the abort below skips normal unit finalization -- flush, or the log
       ! file ends empty exactly when it matters
       if (this%file_unit /= -1) flush (this%file_unit)
@@ -139,15 +159,17 @@ contains
       character(len=*), intent(in) :: message
       integer, optional, intent(in) :: errcode
       call this%write_log(log_level_fatal, "FATAL", message)
+      call this%status_event(log_level_fatal, "FATAL", message, errcode)
       if (this%file_unit /= -1) flush (this%file_unit)
       if (present(errcode)) call set_error_code(errcode)
       if (this%is_io_node) call throw_exception(__FILE__, __LINE__, message=message)
    end subroutine exit_on_fatal
 
-   subroutine write_log(this, level, prefix, msg)
+   subroutine write_log(this, level, prefix, msg, kind, extra)
       class(type_log_writer), intent(in) :: this
       integer, intent(in) :: level
       character(len=*), intent(in) :: prefix, msg
+      character(len=*), intent(in), optional :: kind, extra
 
       character(len=20) :: date, time
       character(len=8)  :: zone
@@ -173,13 +195,86 @@ contains
       ! Per-sink thresholds; a quiet console (stdout off) still surfaces
       ! errors on stderr so a failing batch run is never silent
       if (level >= this%min_stdout_level) then
-         write (output_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
+         write (output_unit, "(A)") trim(console_line(this, timestamp, colored_prefix, prefix, msg, kind, extra))
       else if (level >= this%min_stderr_level) then
-         write (error_unit, "(A)") trim(format_log_line(this, timestamp, colored_prefix, msg))
+         write (error_unit, "(A)") trim(console_line(this, timestamp, colored_prefix, prefix, msg, kind, extra))
       end if
       if (this%file_unit /= -1 .and. level >= this%min_file_level) &
          write (this%file_unit, *) trim(format_log_line(this, timestamp, prefix, msg))
    end subroutine write_log
+
+   ! the console line in the process format: coloured text, or one JSON object
+   function console_line(this, timestamp, colored_prefix, prefix, msg, kind, extra) result(line)
+      class(type_log_writer), intent(in) :: this
+      character(len=*), intent(in) :: timestamp, colored_prefix, prefix, msg
+      character(len=*), intent(in), optional :: kind, extra
+      character(len=:), allocatable :: line
+      if (default_log_format == log_format_jsonl) then
+         line = format_json_line(this%label, timestamp, kind, prefix, msg, extra)
+      else
+         line = format_log_line(this, timestamp, colored_prefix, msg)
+      end if
+   end function console_line
+
+   ! A typed event: kind (phase | progress | status | log), the message the
+   ! text format prints unchanged, and an optional JSON fragment of extra
+   ! fields ('"step":470,"t":20.0') the JSON format appends.  Text logs
+   ! stay byte-identical to a plain info() call.
+   subroutine event(this, kind, message, extra, level)
+      class(type_log_writer), intent(inout) :: this
+      character(len=*), intent(in) :: kind, message
+      character(len=*), intent(in), optional :: extra
+      integer, intent(in), optional :: level
+      integer :: lvl
+      lvl = log_level_info
+      if (present(level)) lvl = level
+      select case (lvl)
+      case (log_level_debug); call this%write_log(lvl, "DEBUG", message, kind, extra)
+      case (log_level_warn); call this%write_log(lvl, "WARN", message, kind, extra)
+      case (log_level_error); call this%write_log(lvl, "ERROR", message, kind, extra)
+      case default; call this%write_log(lvl, "INFO", message, kind, extra)
+      end select
+   end subroutine event
+
+   ! JSON format only: the exit status event behind an error, rc = the
+   ! process exit code (1 unless the caller set one)
+   subroutine status_event(this, level, prefix, message, errcode)
+      class(type_log_writer), intent(inout) :: this
+      integer, intent(in) :: level
+      character(len=*), intent(in) :: prefix, message
+      integer, intent(in), optional :: errcode
+      character(len=32) :: rc_s
+      integer :: rc
+      if (default_log_format /= log_format_jsonl) return
+      rc = 1
+      if (present(errcode)) rc = errcode
+      write (rc_s, '(a,i0)') '"rc":', rc
+      call this%write_log(level, prefix, message, "status", trim(rc_s))
+   end subroutine status_event
+
+   ! A line from any rank without a writer (blow-up sites, netcdf failures
+   ! before an error stop, the usage text): stdout in the process format.
+   ! Bare write(*,*) calls would corrupt a JSON stream, so every module
+   ! screen print goes through here.
+   subroutine log_line(msg, label, level)
+      character(len=*), intent(in) :: msg
+      character(len=*), intent(in), optional :: label, level
+      character(len=20) :: date, time
+      character(len=8)  :: zone
+      character(len=19) :: timestamp
+      character(len=:), allocatable :: lab, lvl
+      lab = "funwave"
+      lvl = "INFO"
+      if (present(label)) lab = label
+      if (present(level)) lvl = level
+      if (default_log_format == log_format_jsonl) then
+         call date_and_time(date, time, zone)
+         timestamp = date(1:4)//"-"//date(5:6)//"-"//date(7:8)//" "//time(1:2)//":"//time(3:4)//":"//time(5:6)
+         write (output_unit, "(A)") format_json_line(lab, timestamp, "log", lvl, msg)
+      else
+         write (output_unit, "(A)") trim(msg)
+      end if
+   end subroutine log_line
 
    !> @brief Wrap text in ANSI SGR escape codes (ECMA-48).
    !! Inline replacement for the external FACE dependency; supports only the
@@ -222,6 +317,47 @@ contains
       character(len=:), allocatable :: formatted
       formatted = trim(timestamp)//" ["//trim(this%label)//"] "//trim(prefix)//": "//trim(msg)
    end function format_log_line
+
+   ! One JSON object: {"ts","kind","label","level","msg"[,extra fields]};
+   ! the timestamp is written ISO-style (T separator); absent kind = log
+   function format_json_line(label, timestamp, kind, level_name, msg, extra) result(line)
+      character(len=*), intent(in) :: label, timestamp, level_name, msg
+      character(len=*), intent(in), optional :: kind, extra
+      character(len=:), allocatable :: line, ts, k
+      ts = trim(timestamp)
+      if (len(ts) >= 11) ts = ts(1:10)//"T"//ts(12:)
+      k = "log"
+      if (present(kind)) k = trim(kind)
+      line = '{"ts":"'//ts//'","kind":"'//k//'","label":"'//trim(label)// &
+             '","level":"'//trim(level_name)//'","msg":"'//json_escape(trim(msg))//'"'
+      if (present(extra)) then
+         if (len_trim(extra) > 0) line = line//","//trim(extra)
+      end if
+      line = line//"}"
+   end function format_json_line
+
+   ! Escape a string for a JSON literal: backslash, double quote, and the
+   ! control characters as \uXXXX (tab and newline in their short forms)
+   function json_escape(s) result(out)
+      character(len=*), intent(in) :: s
+      character(len=:), allocatable :: out
+      character(len=6) :: u
+      integer :: i, c
+      out = ""
+      do i = 1, len(s)
+         c = iachar(s(i:i))
+         select case (c)
+         case (34); out = out//'\"'
+         case (92); out = out//'\\'
+         case (10); out = out//'\n'
+         case (9); out = out//'\t'
+         case (0:8, 11:12, 14:31)
+            write (u, '(a2,z4.4)') '\u', c
+            out = out//u
+         case default; out = out//s(i:i)
+         end select
+      end do
+   end function json_escape
 
    subroutine log_writer_finalize(this)
       class(type_log_writer), intent(inout) :: this

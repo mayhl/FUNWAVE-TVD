@@ -76,6 +76,7 @@ module core_output_channel_mod
                       nf90mpi_close, nf90mpi_strerror, &
                       PNC_64BIT_DATA => NF90_64BIT_DATA
    use mpi_f08
+   use core_log_io_mod, only: log_line
    implicit none
 
    private
@@ -790,8 +791,12 @@ contains
                end do
             end do
             if (.not. this%log_warned) then
-               write (*, '(a,i0,a)') 'output_channel: '//trim(this%id)//': event log dropped ', &
-                  dropped_tot, ' rows over the per-rank cap (shorten the interval)'
+               block
+                  character(len=160) :: buf
+                  write (buf, '(a,i0,a)') 'output_channel: '//trim(this%id)//': event log dropped ', &
+                     dropped_tot, ' rows over the per-rank cap (shorten the interval)'
+                  call log_line(trim(buf), level="WARN")
+               end block
                this%log_warned = .true.
             end if
             this%log_dropped = dropped_tot
@@ -2049,8 +2054,8 @@ contains
       integer, intent(in) :: status
       character(*), intent(in) :: what
       if (status /= NF90_NOERR) then
-         write (*, '(A)') 'output_channel/netcdf: '//what//': '// &
-            trim(nf90_strerror(status))
+         call log_line('output_channel/netcdf: '//what//': '// &
+                       trim(nf90_strerror(status)), level="ERROR")
          error stop 'output_channel: fatal NetCDF error'
       end if
    end subroutine nc_check
@@ -2422,8 +2427,8 @@ contains
       integer, intent(in) :: status
       character(*), intent(in) :: what
       if (status /= NF90_NOERR) then
-         write (*, '(A)') 'output_channel/pnetcdf: '//what//': '// &
-            trim(nf90mpi_strerror(status))
+         call log_line('output_channel/pnetcdf: '//what//': '// &
+                       trim(nf90mpi_strerror(status)), level="ERROR")
          error stop 'output_channel: fatal PnetCDF error'
       end if
    end subroutine pnc_check

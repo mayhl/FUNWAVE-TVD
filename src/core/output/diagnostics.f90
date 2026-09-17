@@ -59,7 +59,7 @@ module core_diagnostics_mod
    use core_constants_mod, only: SP, MPI_SP, GRAV
    use core_grid_mod, only: type_grid_2d
    use core_field_registry_mod, only: type_field_registry
-   use core_log_io_mod, only: type_log_writer
+   use core_log_io_mod, only: type_log_writer, log_line
    use core_path_mod, only: rename_file
    use netcdf
    implicit none
@@ -318,7 +318,7 @@ contains
       integer, intent(in) :: status
       character(*), intent(in) :: what
       if (status /= NF90_NOERR) then
-         write (*, "(a)") "diagnostics netcdf: "//what//": "//trim(nf90_strerror(status))
+         call log_line("diagnostics netcdf: "//what//": "//trim(nf90_strerror(status)), level="ERROR")
          error stop "diagnostics: netcdf failure"
       end if
    end subroutine nc_check
@@ -549,7 +549,7 @@ contains
                      (real(g%ibegin + i - lp%ib, SP) + 0.5_SP)*g%dx0, " y = ", &
                      (real(g%jbegin + j - lp%jb, SP) + 0.5_SP)*g%dy0, &
                      " (", nint(local_count), " cells on this rank)"
-                  write (*, '(a)') trim(msg)
+                  call log_line(trim(msg), level="WARN")
                   flush (output_unit)
                   return
                end if

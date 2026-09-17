@@ -2,7 +2,7 @@
 module test_logging
 
    use FUnit
-   use core_log_io_mod, only: type_log_writer, new_log_writer, format_log_line
+   use core_log_io_mod, only: type_log_writer, new_log_writer, format_log_line, format_json_line, json_escape
    use core_constants_mod, only: LABEL_SIZE
    implicit none
 
@@ -63,6 +63,20 @@ contains
       call assert_file_contains(log_path, "INFO")
       call assert_file_contains(log_path, "WARN")
    end subroutine test_logging_methods
+
+   ! ----------------------------------------------------------------
+   ! JSON Lines: one object with the porcelain fields, an ISO timestamp,
+   ! extra fields appended verbatim, and a message escaped for JSON
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_json_line()
+      character(len=:), allocatable :: line
+      line = format_json_line("funwave", "2026-09-16 08:13:53", "progress", "INFO", "step 470", '"step":470,"t":20.0')
+      @assertEqual('{"ts":"2026-09-16T08:13:53","kind":"progress","label":"funwave","level":"INFO","msg":"step 470","step":470,"t":20.0}', line)
+      line = format_json_line("config", "2026-09-16 08:13:53", level_name="ERROR", msg='key "x" is bad')
+      @assertEqual('{"ts":"2026-09-16T08:13:53","kind":"log","label":"config","level":"ERROR","msg":"key \"x\" is bad"}', line)
+      @assertEqual('a\\b\tc', json_escape("a\b"//achar(9)//"c"))
+   end subroutine test_json_line
 
    @test
    subroutine test_exit_on_error()

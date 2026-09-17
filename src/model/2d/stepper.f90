@@ -32,6 +32,7 @@
 module model_stepper_2d_mod
 
    use core_constants_mod, only: SP, N_GHOST, MPI_SP, GRAV, PI, FILL_VALUE
+   use core_log_io_mod, only: log_line
    use core_grid_mod, only: type_grid_2d
    use core_env_mod, only: type_env
    use core_stepper_engine_mod, only: type_stepper_model
@@ -1763,7 +1764,7 @@ contains
             ! direct write, not env%log: write_log drops non-IO ranks, and
             ! the site holder is almost never rank 0 -- launchers route
             ! every rank's stdout into the job log
-            write (*, '(a)') trim(msg)
+            call log_line(trim(msg), level="ERROR")
             ! flush BEFORE returning: the caller aborts on the blowup flag
             ! without unit finalization, and a non-IO rank's buffered stdout
             ! is then discarded under srun -- the line survived on mpiexec

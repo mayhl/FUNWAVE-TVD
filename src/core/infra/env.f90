@@ -16,7 +16,7 @@
 
 module core_env_mod
    use core_comm_mod, only: type_comm, new_comm
-   use core_log_io_mod, only: type_log_writer, new_log_writer
+   use core_log_io_mod, only: type_log_writer, new_log_writer, json_escape
    use core_version_mod, only: build_info_lines, n_build_info_lines, build_info_line_len
    use core_yaml_file_mod, only: type_yaml_reader
 
@@ -74,7 +74,7 @@ contains
       ! Build identity heads every log so provenance travels with the run
       info = build_info_lines()
       do i = 1, n_build_info_lines
-         call this%log%info(trim(adjustl(info(i))))
+         call this%log%event("phase", trim(adjustl(info(i))), extra=build_field(info(i), i))
       end do
 
       ! 3. Initialize YAML Reader
@@ -82,6 +82,22 @@ contains
       call this%yaml%init(yaml_fpath, this%comm)
 
    end subroutine env_initialize
+
+   ! one build-identity line as a JSON field: "key:   value" -> "key":"value"
+   ! (the name line, which has no key, is phase init)
+   function build_field(line, i) result(extra)
+      character(len=*), intent(in) :: line
+      integer, intent(in) :: i
+      character(len=:), allocatable :: extra, l
+      integer :: k
+      l = trim(adjustl(line))
+      k = index(l, ":")
+      if (i == 1 .or. k <= 1) then
+         extra = '"phase":"init"'
+      else
+         extra = '"phase":"init","'//trim(l(1:k - 1))//'":"'//json_escape(trim(adjustl(l(k + 1:))))//'"'
+      end if
+   end function build_field
 
    function get_sub_env(parent_env, dict_name, is_empty) result(sub_env)
       class(type_env), intent(in), target :: parent_env

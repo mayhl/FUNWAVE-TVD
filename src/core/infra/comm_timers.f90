@@ -3,6 +3,7 @@ module core_comm_timers_mod
    use, intrinsic :: iso_fortran_env, only: int64, real64
    use mpi_f08, only: MPI_Comm, MPI_Reduce, MPI_DOUBLE_PRECISION, &
                       MPI_SUM, MPI_MAX, MPI_Comm_rank, MPI_Comm_size
+   use core_log_io_mod, only: log_line
    implicit none
    private
 
@@ -27,6 +28,16 @@ module core_comm_timers_mod
 
 contains
 
+   function timer_line(name, n, avg, mx) result(line)
+      character(len=*), intent(in) :: name
+      integer(int64), intent(in) :: n
+      real(real64), intent(in) :: avg, mx
+      character(len=:), allocatable :: line
+      character(len=96) :: buf
+      write (buf, '(a,a9,a,i0,a,f10.3,a,f10.3)') "COMMTIMER phase=", name, " calls=", n, " avg_s=", avg, " max_s=", mx
+      line = trim(buf)
+   end function timer_line
+
    ! ----------------------------------------------------------------
    ! comm_timers_report — avg/max across ranks, printed by rank 0.
    ! Call once, before MPI_Finalize.
@@ -48,9 +59,7 @@ contains
       if (rank /= 0) return
       do i = 1, NCT
          if (comm_n(i) > 0_int64 .or. tmax(i) > 0.0_real64) &
-            write (*, '(a,a9,a,i0,a,f10.3,a,f10.3)') &
-            "COMMTIMER phase=", ct_name(i), " calls=", comm_n(i), &
-            " avg_s=", tsum(i)/nranks, " max_s=", tmax(i)
+            call log_line(timer_line(ct_name(i), comm_n(i), tsum(i)/nranks, tmax(i)))
       end do
    end subroutine comm_timers_report
 
