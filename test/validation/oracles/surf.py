@@ -13,8 +13,12 @@ breakpoint_offset_m, mean_level_offset_m, setup_slope_error_pct (linear
 setup gradient shoreward of the measured breakpoint, model vs measured --
 the radiation-stress balance, blind to the datum), and the breaker class
 at the measured breakpoint when the deck writes the breaker fields
-(xi_0/xi_b/gamma_b medians over the 2 m shoreward of it; Battjes 1974:
-xi_b < 0.4 spilling, 0.4 to 2 plunging, above surging).
+(xi_0/xi_b/gamma_b medians over the 2 m shoreward of it; breaker type from
+the surf-similarity parameter at breaking with the thresholds of Battjes
+(1974): xi_b < 0.4 spilling, 0.4 to 2 plunging, above collapsing/surging),
+with a confidence: cell agreement, the margin to the nearest threshold in
+spread units and a front-steepness cross-check; no event at all = non-breaking, told apart by the
+beach-face xi_0.
 """
 
 from __future__ import annotations
@@ -33,6 +37,9 @@ from test.validation.oracles._lab import load_deck, new_figure, nrmse_pct, read_
 MIN_WAVES = 5  # stations with fewer zero-crossing waves are swash/dry — excluded
 MIN_SLOPE_POINTS = 3  # setup stations shoreward of the breakpoint needed for a gradient
 BREAKER_SPAN_M = 2.0  # breaker-field median window shoreward of the measured breakpoint
+XI_BANDS = (0.4, 2.0)  # surf-similarity thresholds at breaking, Battjes (1974): spilling | plunging | collapsing-surging
+FRONT_STEEP_PLUNGE = 0.55  # provisional and resolution-dependent: the plunging window max reads 0.75 at the lab dx
+# but 0.57 at 2x and 4x (the grid washes the front out), spilling 0.45-0.47 on every grid (gap sweep 09-16)
 FILL = -9999.0
 
 _LABEL = "Surf profiles"
@@ -44,28 +51,74 @@ def _skip(msg: str) -> SubsectionResult:
     return SubsectionResult(kind="statistics", label=_LABEL, metrics=[])
 
 
-def _breaker_class(meta, deck: dict, x_bp: float) -> tuple[dict[str, float], str] | None:
-    """Breaker-field medians over the span shoreward of x_bp, and the class.
+def _mid_row(meta, name: str):
+    """The last frame's centre row of a breaker field, or None when the deck writes none."""
+    frames = meta.output_files(name)
+    if not frames:
+        return None
+    fld = meta.read_field(frames[-1])
+    return fld[fld.shape[0] // 2]
+
+
+def _shoreline_x(meta, dx: float) -> float:
+    """x of the still-water shoreline from dep.out (first non-positive depth), nan without it."""
+    files = meta.output_files("DEPTH_OUT")
+    if not files:
+        return float("nan")
+    dep = meta.read_field(files[0])
+    row = dep[dep.shape[0] // 2]
+    dry = np.flatnonzero(row <= 0.0)
+    return float(dry[0] * dx) if dry.size else float("nan")
+
+
+def _breaker_class(meta, deck: dict, x_bp: float) -> tuple[dict[str, float], str, dict[str, float]] | None:
+    """Breaker-field medians over the span shoreward of x_bp, the class, and its confidence.
 
     Reads the last breaker frame; None when the deck writes no breaker fields.
+    Confidence: `agreement` = the fraction of window cells whose own xi_b sits
+    in the reported class; `margin_sigma` = the median's distance to the nearest
+    class threshold in units of the window spread (IQR / 1.349); `front_steepness_max`
+    with `cross_check` = 1 when its class (above FRONT_STEEP_PLUNGE = plunging)
+    agrees with the xi_b class.  With no dissipation event shoreward of the
+    breakpoint the class is non-breaking, and the beach-face xi_0 (the span
+    seaward of the still-water shoreline) says whether that is collapsing or
+    surging (xi_0 above the plunging threshold) or a case that never broke.
     """
-    files = meta.output_files("xi_b")
-    if not files:
+    rows = {name: _mid_row(meta, name) for name in ("xi_0", "xi_b", "gamma_b", "front_steepness")}
+    if any(r is None for r in rows.values()):
         return None
     dx = float(deck["grid"]["cell_size"][0])
-    out: dict[str, float] = {}
+    x = np.arange(len(rows["xi_b"])) * dx
+    win = (x >= x_bp) & (x <= x_bp + BREAKER_SPAN_M)
+    vals: dict[str, float] = {}
     for name in ("xi_0", "xi_b", "gamma_b"):
-        frames = meta.output_files(name)
-        if not frames:
-            return None
-        fld = meta.read_field(frames[-1])
-        row = fld[fld.shape[0] // 2]
-        x = np.arange(len(row)) * dx
-        sel = (x >= x_bp) & (x <= x_bp + BREAKER_SPAN_M) & (row > FILL + 1.0)
-        out[name] = float(np.median(row[sel])) if sel.any() else float("nan")
-    xb = out["xi_b"]
-    label = "unknown" if not np.isfinite(xb) else "spilling" if xb < 0.4 else "plunging" if xb < 2.0 else "surging"
-    return out, label
+        sel = win & (rows[name] > FILL + 1.0)
+        vals[name] = float(np.median(rows[name][sel])) if sel.any() else float("nan")
+    conf: dict[str, float] = {}
+    cells = rows["xi_b"][win & (rows["xi_b"] > FILL + 1.0)]
+    if cells.size == 0:
+        shore = _shoreline_x(meta, dx)
+        face = (x >= shore - BREAKER_SPAN_M) & (x <= shore) & (rows["xi_0"] > FILL + 1.0)
+        xi_0_face = float(np.median(rows["xi_0"][face])) if face.any() else float("nan")
+        vals["xi_0_face"] = xi_0_face
+        label = "non-breaking (collapsing/surging)" if xi_0_face >= XI_BANDS[1] else "non-breaking"
+        return vals, label, conf
+    xb = vals["xi_b"]
+    band = 0 if xb < XI_BANDS[0] else 1 if xb < XI_BANDS[1] else 2
+    label = ("spilling", "plunging", "collapsing/surging")[band]
+    lo = (-np.inf, XI_BANDS[0], XI_BANDS[1])[band]
+    hi = (XI_BANDS[0], XI_BANDS[1], np.inf)[band]
+    conf["agreement"] = float(np.mean((cells >= lo) & (cells < hi)))
+    q25, q75 = np.percentile(cells, [25, 75])
+    sigma = float(q75 - q25) / 1.349
+    edge = min(abs(xb - e) for e in XI_BANDS)
+    conf["margin_sigma"] = float(edge / sigma) if sigma > 0.0 else float("inf")
+    steep = rows["front_steepness"][win & (rows["front_steepness"] > FILL + 1.0)]
+    if steep.size:
+        conf["front_steepness_max"] = float(steep.max())
+        cross = "plunging" if steep.max() > FRONT_STEEP_PLUNGE else "spilling"
+        conf["cross_check"] = float(cross == label)
+    return vals, label, conf
 
 
 def _event_log_rows(meta, deck: dict) -> list[tuple[str, int, int]]:
@@ -175,12 +228,20 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
             metrics.append(MetricResult("surf", "breakpoint_offset_m", bp_off, True, math.inf))
         breaker = _breaker_class(meta, deck, float(xm_h[int(np.argmax(h_meas))]) + x_off)
         if breaker is not None:
-            vals, label = breaker
+            vals, label, conf = breaker
             for name, v in vals.items():
                 metrics.append(MetricResult("surf", f"{name}_breakpoint", v, True, math.inf))
-            print(
-                f"surf: breaker class at the measured breakpoint: {label} (xi_b {vals['xi_b']:.2f}, gamma_b {vals['gamma_b']:.2f}, xi_0 {vals['xi_0']:.2f})"
-            )
+            for name, v in conf.items():
+                metrics.append(MetricResult("surf", f"breaker_{name}", v, True, math.inf))
+            line = f"surf: breaker class at the measured breakpoint: {label} (xi_b {vals['xi_b']:.2f}, gamma_b {vals['gamma_b']:.2f}, xi_0 {vals['xi_0']:.2f}"
+            if "xi_0_face" in vals:
+                line += f"; beach-face xi_0 {vals['xi_0_face']:.2f}"
+            line += ")"
+            if conf:
+                line += f"; agreement {conf['agreement']:.2f}, margin {conf['margin_sigma']:.1f} sigma"
+                if "cross_check" in conf:
+                    line += f", front steepness max {conf['front_steepness_max']:.2f} {'agrees' if conf['cross_check'] else 'DISAGREES'}"
+            print(line)
         metrics.append(MetricResult("surf", "height_nrmse_pct", h_err, h_ok, h_tol))
 
     s_fit = None
