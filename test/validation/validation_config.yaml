@@ -501,6 +501,102 @@ simulations:
       output.channels.2.gap: [0, 2, 5, 10, 20]
 
 
+  # Gap-filter tuning sweep, report-only (tags study, tkgap): the step count
+  # against cells per wavelength (dx x1/x2/x4 at the same wave: 158/79/40 per
+  # L at the toe) and CFL, spilling and plunging, plus an irregular TMA arm
+  # (same Hm0 and Tp on the spilling flume).  Readout = breaking events per
+  # crest over the surf cells (crest_events is the denominator) and the
+  # over-count fraction; pass = the plateau starts at or below gap 10 on
+  # every arm.  Board 369278 (09-16) set the default from the dx1 arm alone.
+  - name: study_tk_gap_spilling_dx1
+    <<: *tk_spilling
+    tags: [study, tkgap, tkgapslow]
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      numerics.cfl: [0.5, 0.25]
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_spilling_dx2
+    <<: *tk_spilling
+    tags: [study, tkgap, tkgapfast]
+    overrides: { grid.cell_size: [0.05, 0.2], grid.n_cells: [800, 3] }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      numerics.cfl: [0.5, 0.25]
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_spilling_dx4
+    <<: *tk_spilling
+    tags: [study, tkgap, tkgapfast]
+    overrides: { grid.cell_size: [0.1, 0.2], grid.n_cells: [400, 3] }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      numerics.cfl: [0.5, 0.25]
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_plunging_dx1
+    <<: *tk_plunging
+    tags: [study, tkgap, tkgapslow]
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      numerics.cfl: [0.5, 0.25]
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_plunging_dx2
+    <<: *tk_plunging
+    tags: [study, tkgap, tkgapfast]
+    overrides: { grid.cell_size: [0.05, 0.2], grid.n_cells: [800, 3] }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      numerics.cfl: [0.5, 0.25]
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_plunging_dx4
+    <<: *tk_plunging
+    tags: [study, tkgap, tkgapfast]
+    overrides: { grid.cell_size: [0.1, 0.2], grid.n_cells: [400, 3] }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      numerics.cfl: [0.5, 0.25]
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_tma_dx1
+    <<: *tk_spilling
+    tags: [study, tkgap, tkgapfast]
+    overrides: { wavemaker.spectrum: { type: tma, hm0: 0.125, gamma: 3.3, freq: { peak: 0.5, min: 0.25, max: 1.5 }, discretization: { freq_bins: 45 } } }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_tma_dx2
+    <<: *tk_spilling
+    tags: [study, tkgap, tkgapfast]
+    overrides: { wavemaker.spectrum: { type: tma, hm0: 0.125, gamma: 3.3, freq: { peak: 0.5, min: 0.25, max: 1.5 }, discretization: { freq_bins: 45 } }, grid.cell_size: [0.05, 0.2], grid.n_cells: [800, 3] }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      output.channels.2.gap: [5, 10, 20]
+  - name: study_tk_gap_tma_dx4
+    <<: *tk_spilling
+    tags: [study, tkgap, tkgapfast]
+    overrides: { wavemaker.spectrum: { type: tma, hm0: 0.125, gamma: 3.3, freq: { peak: 0.5, min: 0.25, max: 1.5 }, discretization: { freq_bins: 45 } }, grid.cell_size: [0.1, 0.2], grid.n_cells: [400, 3] }
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      output.channels.2.gap: [5, 10, 20]
+  # Steep-beach arm, report-only (tags study, tksteep): the same wave on 1:5
+  # and 1:2.5 (xi_0 1.4 and 2.8) to exercise the oracle's non-breaking path --
+  # no dissipation event, class from the beach-face xi_0.  The height and
+  # setup gates fail by construction here (measured on the 1:35 beach).
+  - name: study_tk_steep
+    <<: *tk_spilling
+    tags: [study, tksteep]
+    variants:
+      viscous: { overrides: { breaking.model: eddy_viscosity } }
+    sweep:
+      grid.bathymetry.slope: [0.2, 0.4]
+
+
   # ── Wavemaker fidelity: the h470 incident gauge as its own gated case ───
   # anchors: nrmse 8.6 over the 60-700 s window
   - name: lab_mase_wavemaker
