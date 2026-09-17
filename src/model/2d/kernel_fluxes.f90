@@ -244,6 +244,7 @@ contains
       real(SP) :: din(lp%mloc, lp%nloc)
       real(SP) :: txp1, txp2, txp3, dvp1, dvp2, dvp3
       real(SP) :: van1, van2, rat, tmp1, tmp2
+      logical :: flat
       integer  :: i, j
       ! no din zero-fill: every read row below is written first
       do j = lp%jb, lp%je
@@ -268,24 +269,26 @@ contains
          end do
          do i = lp%ib, lp%ie + 1
             tmp1 = din(i - 1, j); tmp2 = din(i, j)
+            flat = abs(tmp1) <= SMALL .and. abs(tmp2) <= SMALL
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
             rat = tmp2/tmp1
             van1 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van1 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van1 = (rat + abs(rat))/(1.0_SP + rat)
             rat = tmp1/tmp2
             van2 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van2 = (rat + abs(rat))/(1.0_SP + rat)
             outl(i, j) = vin(i - 1, j) + (1.0_SP/6.0_SP)*(van1*tmp1 + 2.0_SP*van2*tmp2)
             tmp1 = din(i, j); tmp2 = din(i + 1, j)
+            flat = abs(tmp1) <= SMALL .and. abs(tmp2) <= SMALL
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
             rat = tmp2/tmp1
             van1 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van1 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van1 = (rat + abs(rat))/(1.0_SP + rat)
             rat = tmp1/tmp2
             van2 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van2 = (rat + abs(rat))/(1.0_SP + rat)
             outr(i, j) = vin(i, j) - (1.0_SP/6.0_SP)*(2.0_SP*van1*tmp1 + van2*tmp2)
          end do
       end do
@@ -303,6 +306,7 @@ contains
       real(SP) :: din(lp%mloc, lp%nloc)
       real(SP) :: typ1, typ2, typ3, dvp1, dvp2, dvp3
       real(SP) :: van1, van2, rat, tmp1, tmp2
+      logical :: flat
       integer  :: i, j
       ! no din zero-fill: every read row below is written first
       ! two j-outer nests like the minmod sibling — the fused per-i
@@ -331,24 +335,26 @@ contains
       do j = js, je
          do i = lp%ib, lp%ie
             tmp1 = din(i, j - 1); tmp2 = din(i, j)
+            flat = abs(tmp1) <= SMALL .and. abs(tmp2) <= SMALL
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
             rat = tmp2/tmp1
             van1 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van1 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van1 = (rat + abs(rat))/(1.0_SP + rat)
             rat = tmp1/tmp2
             van2 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van2 = (rat + abs(rat))/(1.0_SP + rat)
             outl(i, j) = vin(i, j - 1) + (1.0_SP/6.0_SP)*(van1*tmp1 + 2.0_SP*van2*tmp2)
             tmp1 = din(i, j); tmp2 = din(i, j + 1)
+            flat = abs(tmp1) <= SMALL .and. abs(tmp2) <= SMALL
             if (abs(tmp1) <= SMALL) tmp1 = SMALL*sign(1.0_SP, tmp1)
             if (abs(tmp2) <= SMALL) tmp2 = SMALL*sign(1.0_SP, tmp2)
             rat = tmp2/tmp1
             van1 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van1 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van1 = (rat + abs(rat))/(1.0_SP + rat)
             rat = tmp1/tmp2
             van2 = 0.0_SP
-            if (abs(1.0_SP + rat) > SMALL) van2 = (rat + abs(rat))/(1.0_SP + rat)
+            if (abs(1.0_SP + rat) > SMALL .and. .not. flat) van2 = (rat + abs(rat))/(1.0_SP + rat)
             outr(i, j) = vin(i, j) - (1.0_SP/6.0_SP)*(2.0_SP*van1*tmp1 + van2*tmp2)
          end do
       end do

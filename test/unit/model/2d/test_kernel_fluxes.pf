@@ -184,6 +184,42 @@ contains
    end subroutine test_construct_ho_x_linear
 
    ! ----------------------------------------------------------------
+   ! construct_ho_x / construct_ho_y: a flat field reconstructs to itself
+   ! exactly (no SMALL-clamp jump at the faces)
+   ! ----------------------------------------------------------------
+   @test
+   subroutine test_construct_ho_flat()
+      type(type_loop_bounds) :: lp
+      real(SP) :: uin(MLOC, NLOC)
+      real(SP) :: outl(MLOC + 1, NLOC + 1), outr(MLOC + 1, NLOC + 1)
+      integer  :: mask(MLOC, NLOC), i, j
+
+      call make_lp(lp)
+      mask = 1
+      uin = 2.0_SP
+      outl = 0.0_SP; outr = 0.0_SP
+
+      call construct_ho_x(lp, mask, uin, outl(:, 1:NLOC), outr(:, 1:NLOC))
+      do j = lp%jb, lp%je
+         do i = lp%ib, lp%ie + 1
+            @assertEqual(2.0_SP, outl(i, j))
+            @assertEqual(2.0_SP, outr(i, j))
+         end do
+      end do
+
+      outl = 0.0_SP; outr = 0.0_SP
+      call construct_ho_y(lp, mask, uin, outl(1:MLOC, :), outr(1:MLOC, :), lp%jb, lp%je + 1)
+      do j = lp%jb, lp%je + 1
+         do i = lp%ib, lp%ie
+            @assertEqual(2.0_SP, outl(i, j))
+            @assertEqual(2.0_SP, outr(i, j))
+         end do
+      end do
+
+      call dummy_fix_lint()
+   end subroutine test_construct_ho_flat
+
+   ! ----------------------------------------------------------------
    ! construct_ho_y: linear field
    ! ----------------------------------------------------------------
    @test

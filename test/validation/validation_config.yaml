@@ -907,7 +907,7 @@ simulations:
     postprocess:
       still_water: test.validation.oracles.still_water
     tolerances:
-      # measured: max|eta| 3.3e-6 m (numerical flat-state floor), datum_err 0
+      # measured: max|eta| 0 (exact since the flat-state reconstruction guard), datum_err 0
       still_water: { max_eta_m: 1.0e-3, depth_datum_err_m: 1.0e-6 }
 
   # ── Flather open boundary (characteristic BC track): tide transmission ──
