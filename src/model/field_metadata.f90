@@ -116,6 +116,13 @@ contains
          m%long_name = "offshore surf similarity parameter"
          m%funwave_name = "surf_similarity_parameter_offshore"
          m%comment = "bed slope / sqrt(H0 / L0); H0, T from the wavemakers (2a and T, or Hm0 and T_m-1,0), L0 = g T^2 / 2 pi"
+      case ("s_0")
+         m%units = "1"
+         m%has_fill = .true.
+         m%fill_value = -9999.0_SP
+         m%long_name = "solitary wave slope parameter"
+         m%funwave_name = "solitary_wave_slope_parameter"
+         m%comment = "1.521 slope / sqrt(H0/h0), initial.solitary; Grilli 1997: >0.37 none, 0.30-0.37 surging, 0.025-0.30 plunging"
       case ("xi_b")
          m%units = "1"
          m%has_fill = .true.

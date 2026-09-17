@@ -812,6 +812,11 @@ contains
                         this%precipitation, this%subgrid, this%foam, &
                         this%tracer, this%vessel, this%sediment, this%meteo, &
                         restart=this%hot_start%use_checkpoint)
+      ! the solitary start is what s_0 (breaker type) is built from
+      if (trim(this%initial%ic_type) == "INI_SOLITARY") then
+         stepper%sol_h0 = this%initial%AMP_SOLI
+         stepper%sol_d0 = this%initial%DEP_SOLI
+      end if
       call stepper%register_output(this%registry)
 
       if (validate) then

@@ -229,9 +229,10 @@ module model_output_mod
       logical :: OUT_VORT = .false.
       ! the vertical-structure gradients a_x/a_y/b_x/b_y (nee legacy AB_OUTPUT)
       logical :: OUT_AB = .false.
-      ! breaker type: xi_0 (static) and the onset-captured xi_b / gamma_b /
+      ! breaker type: xi_0 / s_0 (static) and the onset-captured xi_b / gamma_b /
       ! front_steepness (the latter keep the internal h_max/h_min envelopes)
       logical :: OUT_XI0 = .false.
+      logical :: OUT_S0 = .false.
       logical :: OUT_BRK_TYPE = .false.
       ! gate-field mirrors (breaking_active / nu_capped / froude_scale)
       logical :: OUT_BRK_ACTIVE = .false.
@@ -431,6 +432,7 @@ contains
       case ("vorticity"); this%OUT_VORT = .true.
       case ("a", "b", "a_x", "a_y", "b_x", "b_y"); this%OUT_AB = .true.
       case ("xi_0"); this%OUT_XI0 = .true.
+      case ("s_0"); this%OUT_S0 = .true.
       case ("xi_b", "gamma_b", "front_steepness"); this%OUT_BRK_TYPE = .true.
       case ("breaking_active"); this%OUT_BRK_ACTIVE = .true.
       case ("nu_capped"); this%OUT_NU_CAPPED = .true.

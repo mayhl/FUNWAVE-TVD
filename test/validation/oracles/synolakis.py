@@ -5,7 +5,10 @@ One case-wide norm scale (per-instant blows up on drawdown); dry land is
 clamped to -depth (the NTHMP archives record the beach face).
 
 Keys: profiles (file names; headers carry t_star).
-Gate: profile_nrmse_pct on the worst instant.
+Gate: profile_nrmse_pct on the worst instant.  Report-only when the deck
+writes the breaker fields: s_0 on the slope (Grilli et al. 1997 solitary
+slope parameter, median over the beach cells that hold it) with its class,
+and whether a dissipation event fired (gamma_b holds a value).
 """
 
 from __future__ import annotations
@@ -21,6 +24,8 @@ from test.framework.tolerances import check_keys
 from test.validation.oracles._lab import frame_times, load_deck, new_figure, read_table, save_figure
 
 G = 9.81  # m s-2
+S0_BANDS = (0.025, 0.30, 0.37)  # Grilli et al. 1997 on s_0: spilling | plunging | surging | no breaking
+FILL = -9999.0
 
 _LABEL = "Synolakis runup"
 ACCEPTED_KEYS = ("profiles", "profile_nrmse_pct")
@@ -92,6 +97,33 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
 
     ok = math.isfinite(worst) and worst < tol
     metrics.append(MetricResult("synolakis", "profile_nrmse_pct", worst, ok, tol))
+
+    s0_files = meta.output_files("s_0")
+    if s0_files:
+        s0 = meta.read_field(s0_files[-1]).astype(float)[meta.ny // 2]
+        on_slope = (x_cell > float(bathy["x0"])) & (s0 > FILL + 1.0)
+        s0_slope = float(np.median(s0[on_slope])) if on_slope.any() else float("nan")
+        label = (
+            "unknown"
+            if not np.isfinite(s0_slope)
+            else "spilling"
+            if s0_slope < S0_BANDS[0]
+            else "plunging"
+            if s0_slope < S0_BANDS[1]
+            else "surging"
+            if s0_slope < S0_BANDS[2]
+            else "non-breaking"
+        )
+        fired = 0.0
+        gb_files = meta.output_files("gamma_b")
+        if gb_files:
+            gb = meta.read_field(gb_files[-1]).astype(float)
+            fired = float((gb > FILL + 1.0).any())
+        metrics.append(MetricResult("synolakis", "s_0_slope", s0_slope, True, math.inf))
+        metrics.append(MetricResult("synolakis", "breaking_event_fired", fired, True, math.inf))
+        print(
+            f"synolakis: solitary slope parameter on the beach: {label} (s_0 {s0_slope:.3f}); dissipation event fired: {'yes' if fired else 'no'}"
+        )
 
     figures = []
     if panels:

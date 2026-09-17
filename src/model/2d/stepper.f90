@@ -238,12 +238,15 @@ module model_stepper_2d_mod
       real(SP), allocatable :: ax_out(:, :), ay_out(:, :), bx_out(:, :), by_out(:, :)
       ! and the divergences themselves (registry names a b): w(z) = -A - z B
       real(SP), allocatable :: a_out(:, :), b_out(:, :)
-      ! breaker type (registry names xi_0 xi_b gamma_b front_steepness): the
-      ! offshore wave from the wavemakers, |grad depth| (refreshed after a
-      ! bed change), the static xi_0 map, the kernel's onset capture (raw
-      ! ingredients, sentinel-filled) and the host-assembled mirrors
+      ! breaker type (registry names xi_0 s_0 xi_b gamma_b front_steepness):
+      ! the offshore wave from the wavemakers, or the solitary start's
+      ! amplitude and depth (set by main; 0 = none), |grad depth| (refreshed
+      ! after a bed change), the static xi_0 / s_0 maps, the kernel's onset
+      ! capture (raw ingredients, sentinel-filled) and the host-assembled
+      ! mirrors
       real(SP) :: brk_h0 = 0.0_SP, brk_t = 0.0_SP, brk_l0 = 0.0_SP
-      real(SP), allocatable :: bed_slope(:, :), xi0_out(:, :)
+      real(SP) :: sol_h0 = 0.0_SP, sol_d0 = 0.0_SP
+      real(SP), allocatable :: bed_slope(:, :), xi0_out(:, :), s0_out(:, :)
       logical, allocatable :: was_active(:, :)
       real(SP), allocatable :: cap_hb(:, :), cap_mid(:, :), cap_steep(:, :)
       real(SP), allocatable :: xib_out(:, :), gammab_out(:, :), steep_out(:, :)
@@ -1504,42 +1507,52 @@ contains
             call registry%register("a", this%a_out)
             call registry%register("b", this%b_out)
          end if
-         ! breaker type: needs an offshore wave (a wavemaker); the onset
-         ! fields also need the viscous breaker's active flag
-         if (this%output%OUT_XI0 .or. this%output%OUT_BRK_TYPE) then
+         ! breaker type: xi_0 and xi_b need an offshore wave (a wavemaker),
+         ! s_0 a solitary start; gamma_b and front_steepness take either.
+         ! The onset fields also need the viscous breaker's active flag.
+         if (this%output%OUT_XI0 .or. this%output%OUT_S0 .or. this%output%OUT_BRK_TYPE) then
             block
-               logical :: ok
+               logical :: ok, sol
                call wavemakers_offshore(this%wavemakers, this%brk_h0, this%brk_t, ok)
-               if (ok) then
-                  this%brk_l0 = GRAV*this%brk_t**2/(2.0_SP*PI)
-                  allocate (this%bed_slope(lp%mloc, lp%nloc), source=0.0_SP)
+               sol = this%sol_h0 > 0.0_SP .and. this%sol_d0 > 0.0_SP
+               ! say why here: an unregistered field otherwise dies later
+               ! as a bare "field not found" from the channel lookup
+               if (this%output%OUT_XI0 .and. .not. ok) call this%env%log%exit_on_error( &
+                  "output: xi_0 needs an offshore wave -- a wavemaker (regular, cnoidal,"// &
+                  " spectral or file); a solitary start has no period to build L0 from, use s_0")
+               if (this%output%OUT_S0 .and. .not. sol) call this%env%log%exit_on_error( &
+                  "output: s_0 is the solitary-wave slope parameter -- it needs initial: solitary")
+               if (.not. (ok .or. sol)) call this%env%log%exit_on_error( &
+                  "output: xi_b, gamma_b and front_steepness need an offshore wave (a wavemaker)"// &
+                  " or a solitary start")
+               allocate (this%bed_slope(lp%mloc, lp%nloc), source=0.0_SP)
+               if (ok) this%brk_l0 = GRAV*this%brk_t**2/(2.0_SP*PI)
+               if (this%output%OUT_XI0) then
                   allocate (this%xi0_out(lp%mloc, lp%nloc), source=FILL_VALUE)
-                  call compute_xi0(this)
                   call registry%register("xi_0", this%xi0_out)
-                  ! the captured three exist whenever xi_0 does, so a deck
-                  ! stays valid across breaker models; without the viscous
-                  ! breaker's active flag they hold the fill throughout
-                  if (this%output%OUT_BRK_TYPE) then
-                     if (this%run_breaker) then
-                        allocate (this%was_active(lp%mloc, lp%nloc), source=.false.)
-                        allocate (this%cap_hb(lp%mloc, lp%nloc), source=FILL_VALUE)
-                        allocate (this%cap_mid(lp%mloc, lp%nloc), source=FILL_VALUE)
-                        allocate (this%cap_steep(lp%mloc, lp%nloc), source=FILL_VALUE)
-                     end if
-                     allocate (this%xib_out(lp%mloc, lp%nloc), source=FILL_VALUE)
-                     allocate (this%gammab_out(lp%mloc, lp%nloc), source=FILL_VALUE)
-                     allocate (this%steep_out(lp%mloc, lp%nloc), source=FILL_VALUE)
-                     call registry%register("xi_b", this%xib_out)
-                     call registry%register("gamma_b", this%gammab_out)
-                     call registry%register("front_steepness", this%steep_out)
+               end if
+               if (this%output%OUT_S0) then
+                  allocate (this%s0_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                  call registry%register("s_0", this%s0_out)
+               end if
+               call compute_breaker_static(this)
+               ! the captured three exist whenever the static ones do, so a
+               ! deck stays valid across breaker models; without the viscous
+               ! breaker's active flag they hold the fill throughout, and
+               ! xi_b stays fill on a solitary start (no L0)
+               if (this%output%OUT_BRK_TYPE) then
+                  if (this%run_breaker) then
+                     allocate (this%was_active(lp%mloc, lp%nloc), source=.false.)
+                     allocate (this%cap_hb(lp%mloc, lp%nloc), source=FILL_VALUE)
+                     allocate (this%cap_mid(lp%mloc, lp%nloc), source=FILL_VALUE)
+                     allocate (this%cap_steep(lp%mloc, lp%nloc), source=FILL_VALUE)
                   end if
-               else
-                  ! say why here: an unregistered field otherwise dies later
-                  ! as a bare "field not found" from the channel lookup
-                  call this%env%log%exit_on_error("output: xi_0, xi_b, gamma_b and"// &
-                                                  " front_steepness need an offshore wave -- a wavemaker"// &
-                                                  " (regular, cnoidal, spectral or file); a solitary"// &
-                                                  " start has no period to build L0 from")
+                  allocate (this%xib_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                  allocate (this%gammab_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                  allocate (this%steep_out(lp%mloc, lp%nloc), source=FILL_VALUE)
+                  call registry%register("xi_b", this%xib_out)
+                  call registry%register("gamma_b", this%gammab_out)
+                  call registry%register("front_steepness", this%steep_out)
                end if
             end block
          end if
@@ -1572,7 +1585,7 @@ contains
                                        this%fields%depth_y)
          if (this%sediment%bed_change) then
             call set_face_depth(this)
-            if (allocated(this%xi0_out)) call compute_xi0(this)
+            if (allocated(this%bed_slope)) call compute_breaker_static(this)
          end if
       end if
 
@@ -1784,13 +1797,16 @@ contains
 
    ! ----------------------------------------------------------------
    ! Private: |grad depth| by central differences on the still-water
-   ! depth (the slope-gate stencil), then xi_0 = slope / sqrt(H0 / L0)
-   ! with the wavemakers' offshore wave.  Called at registration and
+   ! depth (the slope-gate stencil), then the static breaker maps that
+   ! exist: xi_0 = slope / sqrt(H0 / L0) with the wavemakers' offshore
+   ! wave, s_0 = 1.521 slope / sqrt(H0 / h0) with the solitary start
+   ! (Grilli, Svendsen & Subramanya 1997).  Called at registration and
    ! after every bed change.
    ! ----------------------------------------------------------------
-   subroutine compute_xi0(this)
+   subroutine compute_breaker_static(this)
       class(type_model_stepper_2d), intent(inout) :: this
 
+      real(SP), parameter :: GRILLI = 1.521_SP
       real(SP) :: gx, gy, s0
       integer :: i, j
 
@@ -1804,15 +1820,22 @@ contains
          end do
       end associate
       call this%grid%halo_exchange(this%bed_slope)
-      s0 = sqrt(this%brk_h0/this%brk_l0)
-      this%xi0_out = this%bed_slope/s0
+      if (allocated(this%xi0_out)) then
+         s0 = sqrt(this%brk_h0/this%brk_l0)
+         this%xi0_out = this%bed_slope/s0
+      end if
+      if (allocated(this%s0_out)) then
+         s0 = sqrt(this%sol_h0/this%sol_d0)
+         this%s0_out = GRILLI*this%bed_slope/s0
+      end if
 
-   end subroutine compute_xi0
+   end subroutine compute_breaker_static
 
    ! ----------------------------------------------------------------
    ! Private: host assembly of the breaker-type mirrors from the
-   ! kernel's onset capture -- xi_b = slope / sqrt(H_b / L0), gamma_b =
-   ! H_b / (still depth + envelope mid-level); fill until the first onset
+   ! kernel's onset capture -- xi_b = slope / sqrt(H_b / L0) (fill on a
+   ! solitary start, no L0), gamma_b = H_b / (still depth + envelope
+   ! mid-level); fill until the first onset
    ! ----------------------------------------------------------------
    subroutine assemble_breaker_type(this)
       class(type_model_stepper_2d), intent(inout) :: this
@@ -1825,7 +1848,7 @@ contains
             do i = 1, lp%mloc
                hb = this%cap_hb(i, j)
                if (hb <= 0.0_SP) cycle
-               this%xib_out(i, j) = this%bed_slope(i, j)/sqrt(hb/this%brk_l0)
+               if (this%brk_l0 > 0.0_SP) this%xib_out(i, j) = this%bed_slope(i, j)/sqrt(hb/this%brk_l0)
                d = f%depth(i, j) + this%cap_mid(i, j)
                if (d > 0.0_SP) this%gammab_out(i, j) = hb/d
                this%steep_out(i, j) = this%cap_steep(i, j)
@@ -2246,7 +2269,9 @@ contains
       if (allocated(this%ax_out)) deallocate (this%ax_out, this%ay_out, &
                                               this%bx_out, this%by_out, &
                                               this%a_out, this%b_out)
-      if (allocated(this%bed_slope)) deallocate (this%bed_slope, this%xi0_out)
+      if (allocated(this%bed_slope)) deallocate (this%bed_slope)
+      if (allocated(this%xi0_out)) deallocate (this%xi0_out)
+      if (allocated(this%s0_out)) deallocate (this%s0_out)
       if (allocated(this%cap_hb)) deallocate (this%was_active, this%cap_hb, this%cap_mid, &
                                               this%cap_steep)
       if (allocated(this%xib_out)) deallocate (this%xib_out, this%gammab_out, this%steep_out)

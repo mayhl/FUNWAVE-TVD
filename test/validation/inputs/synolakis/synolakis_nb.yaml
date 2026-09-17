@@ -32,3 +32,7 @@ output:
       geometry: field
       variables: [eta]
       interval: 0.05
+    - name: breaker  # end-of-run snapshot: s_0 at the toe and whether a breaking event fired
+      geometry: field
+      variables: [s_0, gamma_b, front_steepness]
+      interval: 1.0e6
