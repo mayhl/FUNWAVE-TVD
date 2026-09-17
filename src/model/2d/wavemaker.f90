@@ -4206,7 +4206,7 @@ contains
 
       write (msg, '(A,F8.3,A,F8.3,A,F8.3)') "periodic bc, freq: ", fre, &
          ", dir: ", theta*180.0_SP/PI, " -> ", scratch*180.0_SP/PI
-      call env%log%info(trim(msg))
+      call env%log%debug(trim(msg))
       theta = scratch
 
    end subroutine spectral_periodic_snap
