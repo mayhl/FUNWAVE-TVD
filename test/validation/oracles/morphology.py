@@ -4,7 +4,8 @@ sediment_dchgs + sediment_dchgb fields (deposition positive), centerline row.
 Two gate families, picked by the tolerances keys:
 
   bedchange: <file>   measured dz(x) profile (x offset by gate_x onto model x);
-                      gates bedchange_nrmse_pct (peak norm) + peak_offset_m.
+                      gates bedchange_nrmse_pct (peak norm) + trough_offset_m
+                      (half-maximum scour-centroid offset; the deposit one reports).
   growth: <file>      per-wave emax/dmax growth table normalized by h0; wave
                       `wave` (default 1) gates emax_rel_err_pct/dmax_rel_err_pct.
 
@@ -39,6 +40,18 @@ ACCEPTED_KEYS = (
     "emax_rel_err_pct",
     "dmax_rel_err_pct",
 )
+
+
+def _centroid(x: np.ndarray, w: np.ndarray, frac: float = 0.5) -> float:
+    """Centroid of the part of a non-negative profile at or above frac of its
+    maximum; nan when it is all zero.  The threshold keeps the locator on the
+    main feature: the low-level checkerboard away from it would otherwise
+    drag a full-profile centroid by metres on a long flume."""
+    top = float(w.max())
+    if top <= 0:
+        return math.nan
+    m = w >= frac * top
+    return float((x[m] * w[m]).sum() / w[m].sum())
 
 
 def _skip(msg: str) -> SubsectionResult:
@@ -84,11 +97,14 @@ def run(ref_dir, dev_dir, tolerances: dict, plots_dir: Path, verbose: bool = Fal
         metrics.append(MetricResult("morphology", "bedchange_nrmse_pct", err, ok, tol))
         # the erosion trough is the robust locator: measured profiles settle
         # fully, so the deposition peak carries the suspended-load lag
-        # (CACR-16-02 p.69) and reports ungated
-        tr_off = float(xm[int(np.argmin(fit))] - xm[int(np.argmin(dzm))])
+        # (CACR-16-02 p.69) and reports ungated.  Both are half-maximum
+        # scour/deposit centroids, not argmin/argmax: the modelled bed
+        # change carries a 2 dx bed-feedback checkerboard, and a point
+        # locator lands on whichever spike wins
+        tr_off = _centroid(xm, np.maximum(-fit, 0)) - _centroid(xm, np.maximum(-dzm, 0))
         tr_tol = float(tolerances.get("trough_offset_m", math.inf))
         metrics.append(MetricResult("morphology", "trough_offset_m", tr_off, abs(tr_off) < tr_tol, tr_tol))
-        pk_off = float(xm[int(np.argmax(fit))] - xm[int(np.argmax(dzm))])
+        pk_off = _centroid(xm, np.maximum(fit, 0)) - _centroid(xm, np.maximum(dzm, 0))
         metrics.append(MetricResult("morphology", "peak_offset_m", pk_off, True, math.inf))
         ax.plot(xm, dzm, "-", color="#2563eb", label="measured")
         ax.plot(xm, fit, "-", color="#dc2626", label="modern")
