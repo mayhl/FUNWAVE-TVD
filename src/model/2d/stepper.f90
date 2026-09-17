@@ -1533,6 +1533,13 @@ contains
                      call registry%register("gamma_b", this%gammab_out)
                      call registry%register("front_steepness", this%steep_out)
                   end if
+               else
+                  ! say why here: an unregistered field otherwise dies later
+                  ! as a bare "field not found" from the channel lookup
+                  call this%env%log%exit_on_error("output: xi_0, xi_b, gamma_b and"// &
+                                                  " front_steepness need an offshore wave -- a wavemaker"// &
+                                                  " (regular, cnoidal, spectral or file); a solitary"// &
+                                                  " start has no period to build L0 from")
                end if
             end block
          end if
